@@ -1,4 +1,5 @@
 # monkey-rust
+![Rust](https://github.com/gengjiawen/monkey_rust/workflows/Rust/badge.svg)
 
 An interpreter for the Monkey programming language written in Rust
 
