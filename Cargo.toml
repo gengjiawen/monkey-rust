@@ -10,6 +10,6 @@ edition = "2018"
 name = "monkey"
 path= "lib/monkey.rs"
 
-[dependencies]
+[dev-dependencies]
 insta = "1.0.0"
 cargo-insta = "1.0.0"
