@@ -1,0 +1,15 @@
+---
+source: lib/lexer/mod.rs
+expression: token_vs
+---
+[
+    ASSIGN,
+    PLUS,
+    LPAREN,
+    RPAREN,
+    LPAREN,
+    RPAREN,
+    COMMA,
+    SEMICOLON,
+    EOF,
+]
