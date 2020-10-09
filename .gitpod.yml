@@ -2,5 +2,6 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - init: cargo build
-    command: cargo build
+  - before: printf "\n[settings]\napi_key = $WAKA_TIME_API_KEY\n" > ~/.wakatime.cfg
+    init: cargo build
+    command: cargo test
