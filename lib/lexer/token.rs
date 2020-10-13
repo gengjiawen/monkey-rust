@@ -1,16 +1,25 @@
-
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub enum Token {
     ILLEGAL,
     EOF,
 
     // Identifiers + literals
-    IDENT(String),
-    Int(i64),
+    IDENTIFIER(String),
+    INT(i64),
 
     // Operators
-    ASSIGN,
-    PLUS,
+    ASSIGN, // =
+    PLUS, // +
+    MINUS, // -
+    BANG, // !
+    ASTERISK, // *
+    SLASH, // /
+
+    LT, // <
+    RT, // >
+
+    EQ, // ==
+    NOT_EQ, // !=
 
     // delimiters
     COMMA,
@@ -23,6 +32,25 @@ pub enum Token {
 
     // keywords
     FUNCTION,
-    LET
+    LET,
+    TRUE,
+    FALSE,
+    IF,
+    ELSE,
+    RETURN
 }
+
+pub fn lookup_identifier(identifier: &str) -> Token {
+    match identifier {
+        "fn" => Token::FUNCTION,
+        "let" => Token::LET,
+        "true" => Token::TRUE,
+        "false" => Token::TRUE,
+        "if" => Token::IF,
+        "else" => Token::ELSE,
+        "return" => Token::RETURN,
+        _ => Token::IDENTIFIER(identifier.to_string())
+    }
+}
+
 
