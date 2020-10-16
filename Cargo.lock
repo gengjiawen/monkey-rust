@@ -61,9 +61,9 @@ checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
 name = "cargo-insta"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e1d59edcf0d4f7bc4a3ca3cef627f2463dbb3ecb37209774bdd9720fe0ee3b0"
+checksum = "3d3092cca7739caa4888628ab2c01b805b1d5149508575a71869b3696e27ebf6"
 dependencies = [
  "clap",
  "console",
@@ -178,9 +178,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3463f26c58ee98b72e4eae1a6b4c28bc3320ab69d4836b55162362c2ec63fa6"
+checksum = "e7e7528a20113cf7ca90eddfc2439c608188b6eafc0613964da2bd140c92acec"
 dependencies = [
  "console",
  "difference",

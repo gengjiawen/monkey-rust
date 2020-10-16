@@ -12,4 +12,4 @@ path= "lib/monkey.rs"
 
 [dev-dependencies]
 insta = "1.0.0"
-cargo-insta = "1.0.0"
+cargo-insta = "1.1.0"
