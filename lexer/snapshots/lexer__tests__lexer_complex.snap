@@ -1,5 +1,5 @@
 ---
-source: lib/lexer/mod.rs
+source: lexer/lib.rs
 expression: token_vs
 ---
 [
