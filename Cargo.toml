@@ -1,15 +1,4 @@
-[package]
-name = "monkey_rust"
-version = "0.1.0"
-authors = ["gengjiawen <technicalcute@gmail.com>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-name = "monkey"
-path= "lib/monkey.rs"
-
-[dev-dependencies]
-insta = "1.0.0"
-cargo-insta = "1.0.0"
+[workspace]
+members = [
+  "lexer",
+]
