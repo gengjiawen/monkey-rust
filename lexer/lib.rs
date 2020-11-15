@@ -131,8 +131,8 @@ fn is_digit(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::Lexer;
-    use crate::lexer::token::Token;
+    use crate::Lexer;
+    use crate::token::Token;
     use insta::assert_debug_snapshot;
 
     #[test]
