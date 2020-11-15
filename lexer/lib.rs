@@ -1,4 +1,4 @@
-use crate::lexer::token::{Token, lookup_identifier};
+use crate::token::{Token, lookup_identifier};
 
 pub mod token;
 
