@@ -1,10 +1,16 @@
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+extern crate derive_more;
+
+use derive_more::{Display};
+
+#[derive(Clone, Debug, Display, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub enum Token {
     ILLEGAL,
     EOF,
 
     // Identifiers + literals
+    #[display(fmt = "IDENTIFIER: {}", _0)]
     IDENTIFIER(String),
+    #[display(fmt = "INT: {}", _0)]
     INT(i64),
 
     // Operators
