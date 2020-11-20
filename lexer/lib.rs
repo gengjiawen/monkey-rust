@@ -83,9 +83,10 @@ impl<'a> Lexer<'a> {
            '\u{0}' => Token::EOF,
             _ => {
                 if is_letter(self.ch) {
-                    lookup_identifier(&self.read_identifier())
+                    // has to return, I am not sure rust goes this way :(
+                    return lookup_identifier(&self.read_identifier())
                 } else if is_digit(self.ch) {
-                    Token::INT(self.read_number())
+                    return Token::INT(self.read_number())
                 } else {
                     Token::ILLEGAL
                 }
@@ -108,7 +109,8 @@ impl<'a> Lexer<'a> {
             self.read_char();
         }
 
-        self.input[pos..self.position].to_string()
+        let x = self.input[pos..self.position].to_string();
+        x
     }
 
     fn read_number(&mut self) -> i64 {
@@ -133,11 +135,10 @@ fn is_digit(c: char) -> bool {
 mod tests {
     use crate::Lexer;
     use crate::token::Token;
+    use super::*;
     use insta::assert_debug_snapshot;
 
-    #[test]
-    fn test_lexer_simple() {
-        let mut l = Lexer::new("=+(){},;");
+    fn test_token_set(l: &mut Lexer) -> Vec<Token> {
         let mut token_vs: Vec<Token> = vec![];
         loop {
             let t = l.next_token();
@@ -148,6 +149,21 @@ mod tests {
                 token_vs.push(t);
             }
         }
+        token_vs
+    }
+
+    #[test]
+    fn test_lexer_simple() {
+        let mut l = Lexer::new("=+(){},;");
+        let token_vs = test_token_set(&mut l);
+
+        assert_debug_snapshot!(token_vs)
+    }
+
+    #[test]
+    fn test_lexer_let() {
+        let mut l = Lexer::new("let x=5");
+        let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)
     }

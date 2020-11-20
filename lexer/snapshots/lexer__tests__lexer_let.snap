@@ -1,0 +1,15 @@
+---
+source: lexer/lib.rs
+expression: token_vs
+---
+[
+    LET,
+    IDENTIFIER(
+        "x",
+    ),
+    ASSIGN,
+    INT(
+        5,
+    ),
+    EOF,
+]
