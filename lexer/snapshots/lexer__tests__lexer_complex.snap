@@ -11,6 +11,7 @@ expression: token_vs
     INT(
         5,
     ),
+    SEMICOLON,
     LET,
     IDENTIFIER(
         "ten",
@@ -19,18 +20,22 @@ expression: token_vs
     INT(
         10,
     ),
+    SEMICOLON,
     LET,
     IDENTIFIER(
         "add",
     ),
     ASSIGN,
     FUNCTION,
+    LPAREN,
     IDENTIFIER(
         "x",
     ),
+    COMMA,
     IDENTIFIER(
         "y",
     ),
+    RPAREN,
     LPAREN,
     IDENTIFIER(
         "x",
@@ -39,6 +44,7 @@ expression: token_vs
     IDENTIFIER(
         "y",
     ),
+    SEMICOLON,
     RPAREN,
     SEMICOLON,
     LET,
@@ -49,12 +55,15 @@ expression: token_vs
     IDENTIFIER(
         "add",
     ),
+    LPAREN,
     IDENTIFIER(
         "five",
     ),
+    COMMA,
     IDENTIFIER(
         "ten",
     ),
+    RPAREN,
     SEMICOLON,
     BANG,
     MINUS,
@@ -63,6 +72,7 @@ expression: token_vs
     INT(
         5,
     ),
+    SEMICOLON,
     INT(
         5,
     ),
@@ -74,6 +84,7 @@ expression: token_vs
     INT(
         5,
     ),
+    SEMICOLON,
     IF,
     LPAREN,
     INT(
@@ -83,14 +94,17 @@ expression: token_vs
     INT(
         10,
     ),
+    RPAREN,
     LPAREN,
     RETURN,
     TRUE,
+    SEMICOLON,
     RPAREN,
     ELSE,
     LPAREN,
     RETURN,
     TRUE,
+    SEMICOLON,
     RPAREN,
     INT(
         10,
@@ -99,6 +113,7 @@ expression: token_vs
     INT(
         10,
     ),
+    SEMICOLON,
     INT(
         10,
     ),
@@ -106,5 +121,6 @@ expression: token_vs
     INT(
         9,
     ),
+    SEMICOLON,
     EOF,
 ]

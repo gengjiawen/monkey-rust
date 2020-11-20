@@ -1,5 +1,4 @@
 use std::io::stdin;
-use lexer::Lexer;
 use lexer::token::Token;
 
 pub fn main() {
