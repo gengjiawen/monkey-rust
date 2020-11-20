@@ -1,0 +1,20 @@
+[package]
+name = "monkey_parser"
+version = "0.1.0"
+authors = ["daniel"]
+homepage = "https://github.com/gengjiawen/monkey_rust"
+repository = "https://github.com/gengjiawen/monkey_rust"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "parser"
+path= "lib.rs"
+
+[[bin]]
+name = "parser"
+path = "main.rs"
+
+[dependencies]
+monkey_lexer = { path = "../lexer", version = "0.1.0" }

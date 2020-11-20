@@ -243,6 +243,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "monkey_parser"
+version = "0.1.0"
+dependencies = [
+ "monkey_lexer",
+]
+
+[[package]]
 name = "opaque-debug"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
