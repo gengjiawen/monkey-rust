@@ -71,6 +71,7 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
         match self.current_token {
             Token::LET => self.parse_let_statement(),
+            Token::RETURN => self.parse_return_statement(),
             _ => self.parse_expression_statement(),
         }
     }
@@ -113,6 +114,26 @@ impl<'a> Parser<'a> {
     fn parse_expression_statement(&self) -> Result<Statement, ParseError> {
         unimplemented!()
     }
+
+    fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
+        self.next_token();
+
+        // todo
+        // let value = self.parse_expression()?;
+        let value = match self.current_token {
+            Token::INT(i) => Expression::LITERAL(Literal::Integer(i)),
+            _ => {
+                return Err("unexpected token here".to_string());
+            }
+        };
+
+
+        if self.peek_token_is(&Token::SEMICOLON) {
+            self.next_token();
+        }
+
+        return Ok(Statement::Return(value));
+    }
 }
 
 #[cfg(test)]
@@ -129,9 +150,10 @@ mod tests {
     }
 
     fn verify_program(test_cases: &[(&str, &str)]) {
+
         for (input, expected) in test_cases {
-            let wanted = parse(input);
-            assert!(matches!(wanted, expected))
+            let parsed = parse(input).unwrap().to_string();
+            assert_eq!(&format!("{}", parsed), expected);
         }
     }
 
@@ -139,9 +161,18 @@ mod tests {
     #[test]
     fn parse_let_statement() {
         let let_tests = [
-            ("let x=5;", "lex x = 5;"),
-            // ("let y=5;", "lex y = true;"),
+            ("let x=5;", "let x = 5;"),
+            // ("let y=5;", "let y = true;"),
             // ("let foo=y;", "lex foo = y;"),
+        ];
+
+        verify_program(&let_tests);
+    }
+
+    #[test]
+    fn parse_return_statement() {
+        let let_tests = [
+            ("return 5", "return 5"),
         ];
 
         verify_program(&let_tests);
