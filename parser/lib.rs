@@ -1,4 +1,5 @@
 mod ast;
+mod precedences;
 
 use lexer::token::{Token};
 use lexer::Lexer;

@@ -33,8 +33,10 @@ pub enum Token {
 
     LPAREN,
     RPAREN,
-    LBRACE,
-    RBRACE,
+    LBRACE, // {
+    RBRACE, // }
+    LBRACKET, // [
+    RBRACKET, // ]
 
     // keywords
     FUNCTION,
