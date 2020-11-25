@@ -12,10 +12,10 @@ pub enum Precedence {
     INDEX, // array[index]
 }
 
-pub fn precedences(token: &Token) -> Precedence {
+pub fn get_token_precedence(token: &Token) -> Precedence {
     match token {
         Token::EQ => Precedence::EQUALS,
-        Token::NOT_EQ => Precedence::EQUALS,
+        Token::NotEq => Precedence::EQUALS,
         Token::LT => Precedence::LessGreater,
         Token::GT => Precedence::LessGreater,
         Token::PLUS => Precedence::SUM,

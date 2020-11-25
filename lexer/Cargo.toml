@@ -15,7 +15,6 @@ name = "lexer"
 path = "main.rs"
 
 [dependencies]
-derive_more = "0.99.11"
 
 [dev-dependencies]
 insta = "1.0.0"

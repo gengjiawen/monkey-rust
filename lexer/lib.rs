@@ -69,15 +69,15 @@ impl<'a> Lexer<'a> {
             '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::NOT_EQ
+                    Token::NotEq
                 } else {
                     Token::BANG
                 }
             },
             '*' => Token::ASTERISK,
             '/' => Token::SLASH,
-            '>' => Token::LT,
-            '<' => Token::RT,
+            '<' => Token::LT,
+            '>' => Token::GT,
             '{' => Token::LPAREN,
             '}' => Token::RPAREN,
            '\u{0}' => Token::EOF,
@@ -163,6 +163,14 @@ mod tests {
     #[test]
     fn test_lexer_let() {
         let mut l = Lexer::new("let x=5");
+        let token_vs = test_token_set(&mut l);
+
+        assert_debug_snapshot!(token_vs)
+    }
+
+    #[test]
+    fn test_lexer_bool() {
+        let mut l = Lexer::new("let y=true");
         let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)

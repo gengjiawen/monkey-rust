@@ -76,11 +76,11 @@ expression: token_vs
     INT(
         5,
     ),
-    RT,
+    LT,
     INT(
         10,
     ),
-    LT,
+    GT,
     INT(
         5,
     ),
@@ -90,7 +90,7 @@ expression: token_vs
     INT(
         5,
     ),
-    RT,
+    LT,
     INT(
         10,
     ),
@@ -103,7 +103,7 @@ expression: token_vs
     ELSE,
     LPAREN,
     RETURN,
-    TRUE,
+    FALSE,
     SEMICOLON,
     RPAREN,
     INT(
@@ -117,7 +117,7 @@ expression: token_vs
     INT(
         10,
     ),
-    NOT_EQ,
+    NotEq,
     INT(
         9,
     ),

@@ -1,6 +1,7 @@
 use core::fmt;
 use core::fmt::Result;
 use std::fmt::Formatter;
+use lexer::token::Token;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Node {
@@ -30,7 +31,7 @@ impl fmt::Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Statement::Let(id, expr) => write!(f, "let {} = {};", id, expr),
-            Statement::Return(expr) => write!(f, "return {}", expr),
+            Statement::Return(expr) => write!(f, "return {};", expr),
             Statement::Expr(expr) => write!(f, "{}", expr),
         }
     }
@@ -40,6 +41,8 @@ impl fmt::Display for Statement {
 pub enum Expression {
     IDENTIFIER(String),
     LITERAL(Literal),
+    PREFIX(Token, Box<Expression>),
+    INFIX(Token, Box<Expression>, Box<Expression>),
 }
 
 impl fmt::Display for Expression {
@@ -47,6 +50,8 @@ impl fmt::Display for Expression {
         match self {
             Expression::IDENTIFIER(id) => write!(f, "{}", id),
             Expression::LITERAL(l) => write!(f, "{}",l),
+            Expression::PREFIX(op, expr) => write!(f, "({}{})", op, expr),
+            Expression::INFIX(op, left, right) => write!(f, "({} {} {})", left, op, right),
         }
     }
 }
