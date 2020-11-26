@@ -30,7 +30,7 @@ impl<'a> Parser<'a> {
         // let infix_parse_fns = HashMap::new();
         // ```
 
-        let mut p = Parser {
+        let p = Parser {
             lexer,
             current_token: cur,
             peek_token: next,
@@ -129,15 +129,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParseError> {
-        let left = self.parse_prefix_expression(precedence)?;
+        let mut left = self.parse_prefix_expression()?;
         while self.peek_token != Token::SEMICOLON && precedence < get_token_precedence(&self.peek_token) {
-            return Ok(self.parse_infix_expression(left)?);
+            match self.parse_infix_expression(&left) {
+                Some(infix) => left = infix?,
+                None => return Ok(left),
+            }
         }
 
         Ok(left)
     }
 
-    fn parse_prefix_expression(&mut self, precedence: Precedence) -> Result<Expression, ParseError> {
+    fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
         match &self.current_token {
             Token::IDENTIFIER(ref id) => return Ok(Expression::IDENTIFIER(id.clone())),
@@ -156,7 +159,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
+    fn parse_infix_expression(&mut self, left: &Expression) -> Option<Result<Expression, ParseError>> {
         match self.peek_token {
             Token::PLUS |
             Token::MINUS |
@@ -170,12 +173,10 @@ impl<'a> Parser<'a> {
                 let infix_op = self.current_token.clone();
                 let precedence_value = get_token_precedence(&self.current_token);
                 self.next_token();
-                let right = self.parse_expression(precedence_value)?;
-                return Ok(Expression::INFIX(infix_op, Box::new(left), Box::new(right)));
-            }
-            _ => {
-                return Ok(left);
-            }
+                let right: Expression = self.parse_expression(precedence_value).unwrap();
+                return Some(Ok(Expression::INFIX(infix_op, Box::new(left.clone()), Box::new(right))));
+            },
+            _ => None,
 
         }
     }
@@ -261,6 +262,21 @@ mod tests {
             ("true == true", "(true == true)"),
             ("true != false", "(true != false)"),
             ("false == false", "(false == false)"),
+        ];
+
+        verify_program(&let_tests);
+    }
+
+    #[test]
+    fn parse_op_expression() {
+        let let_tests = [
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
         ];
 
         verify_program(&let_tests);
