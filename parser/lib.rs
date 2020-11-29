@@ -153,6 +153,12 @@ impl<'a> Parser<'a> {
                 let expr = self.parse_expression(Precedence::PREFIX)?;
                 return Ok(Expression::PREFIX(prefix_op, Box::new(expr)));
             },
+            Token::LPAREN => {
+                self.next_token();
+                let expr = self.parse_expression(Precedence::LOWEST);
+                self.expect_peek(&Token::RPAREN);
+                return expr
+            },
             _ => {
                 Err(format!("no prefix function for token: {}", self.current_token))
             }
@@ -277,6 +283,49 @@ mod tests {
             ("a * b * c", "((a * b) * c)"),
             ("a * b / c", "((a * b) / c)"),
             ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            // ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            // (
+            //     "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            //     "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            // ),
+            // (
+            //     "add(a + b + c * d / f + g)",
+            //     "add((((a + b) + ((c * d) / f)) + g))",
+            // ),
+            // (
+            //     "a * [1, 2, 3, 4][b * c] * d",
+            //     "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            // ),
+            // (
+            //     "add(a * b[2], b[1], 2 * [1, 2][1])",
+            //     "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            // ),
+        ];
+
+        verify_program(&let_tests);
+    }
+
+    #[test]
+    fn parse_brace_expression() {
+        let let_tests = [
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("(5 + 5) * 2 * (5 + 5)", "(((5 + 5) * 2) * (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         verify_program(&let_tests);
