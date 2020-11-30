@@ -38,11 +38,27 @@ impl fmt::Display for Statement {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct BlockStatement(Vec<Statement>);
+
+impl BlockStatement {
+    pub fn new(statements: Vec<Statement>) -> BlockStatement {
+        BlockStatement(statements)
+    }
+}
+
+impl fmt::Display for BlockStatement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", format_statements(&self.0))
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Expression {
     IDENTIFIER(String),
     LITERAL(Literal),
     PREFIX(Token, Box<Expression>),
     INFIX(Token, Box<Expression>, Box<Expression>),
+    IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
 }
 
 impl fmt::Display for Expression {
@@ -52,6 +68,22 @@ impl fmt::Display for Expression {
             Expression::LITERAL(l) => write!(f, "{}",l),
             Expression::PREFIX(op, expr) => write!(f, "({}{})", op, expr),
             Expression::INFIX(op, left, right) => write!(f, "({} {} {})", left, op, right),
+            Expression::IF(condition, if_block, else_block) => {
+                if let Some(else_block) = else_block {
+                    write!(f,
+                           "if {} {{ {} }} else {{ {} }}",
+                           condition,
+                           if_block,
+                           else_block
+                    )
+                } else {
+                    write!(f,
+                           "if {} {{ {} }}",
+                           condition,
+                           if_block,
+                    )
+                }
+            }
         }
     }
 }

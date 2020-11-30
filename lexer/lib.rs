@@ -78,8 +78,8 @@ impl<'a> Lexer<'a> {
             '/' => Token::SLASH,
             '<' => Token::LT,
             '>' => Token::GT,
-            '{' => Token::LPAREN,
-            '}' => Token::RPAREN,
+            '{' => Token::LBRACE,
+            '}' => Token::RBRACE,
            '\u{0}' => Token::EOF,
             _ => {
                 if is_letter(self.ch) {

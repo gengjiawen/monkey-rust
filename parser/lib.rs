@@ -3,7 +3,7 @@ mod precedences;
 
 use lexer::token::{Token};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -54,6 +54,7 @@ impl<'a> Parser<'a> {
         self.peek_token == *token
     }
 
+    //todo bugfix, this is not working now
     fn expect_peek(&mut self, token: &Token) -> Result<(), ParseError> {
         self.next_token();
         if self.current_token == *token {
@@ -159,6 +160,7 @@ impl<'a> Parser<'a> {
                 self.expect_peek(&Token::RPAREN);
                 return expr
             },
+            Token::IF => self.parse_if_expression(),
             _ => {
                 Err(format!("no prefix function for token: {}", self.current_token))
             }
@@ -185,6 +187,42 @@ impl<'a> Parser<'a> {
             _ => None,
 
         }
+    }
+
+    fn parse_if_expression(&mut self) -> Result<Expression, ParseError> {
+        self.expect_peek(&Token::LPAREN);
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::LOWEST)?;
+        self.expect_peek(&Token::RPAREN);
+        self.expect_peek(&Token::LBRACE);
+
+        let consequence = self.parse_block_statement()?;
+
+        let alternative = if self.peek_token_is(&Token::ELSE) {
+            self.next_token();
+            self.expect_peek(&Token::LBRACE);
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
+        return Ok(Expression::IF(Box::new(condition), consequence, alternative))
+    }
+
+    fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
+        self.next_token();
+        let mut block_statement = Vec::new();
+
+        while !self.current_token_is(&Token::RBRACE) && !self.current_token_is(&Token::EOF) {
+            if let Ok(statement) = self.parse_statement() {
+                block_statement.push(statement)
+            }
+
+            self.next_token();
+        }
+
+        Ok(BlockStatement::new(block_statement))
     }
 }
 
@@ -275,7 +313,7 @@ mod tests {
 
     #[test]
     fn parse_op_expression() {
-        let let_tests = [
+        let tt = [
             ("-a * b", "((-a) * b)"),
             ("!-a", "(!(-a))"),
             ("a + b + c", "((a + b) + c)"),
@@ -295,31 +333,14 @@ mod tests {
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
             ("3 < 5 == true", "((3 < 5) == true)"),
-            // ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
-            // (
-            //     "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
-            //     "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
-            // ),
-            // (
-            //     "add(a + b + c * d / f + g)",
-            //     "add((((a + b) + ((c * d) / f)) + g))",
-            // ),
-            // (
-            //     "a * [1, 2, 3, 4][b * c] * d",
-            //     "((a * ([1, 2, 3, 4][(b * c)])) * d)",
-            // ),
-            // (
-            //     "add(a * b[2], b[1], 2 * [1, 2][1])",
-            //     "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
-            // ),
         ];
 
-        verify_program(&let_tests);
+        verify_program(&tt);
     }
 
     #[test]
     fn parse_brace_expression() {
-        let let_tests = [
+        let tt = [
             ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
             ("(5 + 5) * 2", "((5 + 5) * 2)"),
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
@@ -328,6 +349,19 @@ mod tests {
             ("!(true == true)", "(!(true == true))"),
         ];
 
-        verify_program(&let_tests);
+        verify_program(&tt);
     }
+
+    #[test]
+    fn test_if_expression() {
+        let tt = [("if (x < y) { x }", "if (x < y) { x }")];
+        verify_program(&tt);
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let tt = [("if (x < y) { x } else { y }", "if (x < y) { x } else { y }")];
+        verify_program(&tt);
+    }
+    
 }
