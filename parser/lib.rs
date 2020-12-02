@@ -41,7 +41,6 @@ impl<'a> Parser<'a> {
     }
 
     fn next_token(&mut self) {
-        // todo remove clone
         self.current_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
     }
@@ -54,13 +53,12 @@ impl<'a> Parser<'a> {
         self.peek_token == *token
     }
 
-    //todo bugfix, this is not working now
     fn expect_peek(&mut self, token: &Token) -> Result<(), ParseError> {
         self.next_token();
         if self.current_token == *token {
             Ok(())
         } else {
-            let e = format!("expected token: {}, got: {}", token, self.peek_token);
+            let e = format!("expected token: {}, got: {}", token, self.current_token);
             Err(e)
         }
     }
@@ -157,7 +155,7 @@ impl<'a> Parser<'a> {
             Token::LPAREN => {
                 self.next_token();
                 let expr = self.parse_expression(Precedence::LOWEST);
-                self.expect_peek(&Token::RPAREN);
+                self.expect_peek(&Token::RPAREN)?;
                 return expr
             },
             Token::IF => self.parse_if_expression(),
@@ -190,18 +188,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression, ParseError> {
-        self.expect_peek(&Token::LPAREN);
+        self.expect_peek(&Token::LPAREN)?;
         self.next_token();
 
         let condition = self.parse_expression(Precedence::LOWEST)?;
-        self.expect_peek(&Token::RPAREN);
-        self.expect_peek(&Token::LBRACE);
+        self.expect_peek(&Token::RPAREN)?;
+        self.expect_peek(&Token::LBRACE)?;
 
         let consequence = self.parse_block_statement()?;
 
         let alternative = if self.peek_token_is(&Token::ELSE) {
             self.next_token();
-            self.expect_peek(&Token::LBRACE);
+            self.expect_peek(&Token::LBRACE)?;
             Some(self.parse_block_statement()?)
         } else {
             None
