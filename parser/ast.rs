@@ -59,6 +59,7 @@ pub enum Expression {
     PREFIX(Token, Box<Expression>),
     INFIX(Token, Box<Expression>, Box<Expression>),
     IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
+    FUNCTION(Vec<String>, BlockStatement)
 }
 
 impl fmt::Display for Expression {
@@ -83,6 +84,9 @@ impl fmt::Display for Expression {
                            if_block,
                     )
                 }
+            }
+            Expression::FUNCTION(params, func_body) => {
+                write!(f, "fn({}) {{ {} }}", params.join(", "), func_body)
             }
         }
     }

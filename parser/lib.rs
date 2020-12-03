@@ -159,6 +159,7 @@ impl<'a> Parser<'a> {
                 return expr
             },
             Token::IF => self.parse_if_expression(),
+            Token::FUNCTION => self.parse_fn_expression(),
             _ => {
                 Err(format!("no prefix function for token: {}", self.current_token))
             }
@@ -221,6 +222,46 @@ impl<'a> Parser<'a> {
         }
 
         Ok(BlockStatement::new(block_statement))
+    }
+
+    fn parse_fn_expression(&mut self) -> Result<Expression, ParseError> {
+        self.expect_peek(&Token::LPAREN)?;
+
+        let params = self.parse_fn_parameters()?;
+
+        self.expect_peek(&Token::LBRACE)?;
+
+        let function_body = self.parse_block_statement()?;
+
+        Ok(Expression::FUNCTION(params, function_body))
+    }
+    
+    fn parse_fn_parameters(&mut self) -> Result<Vec<String>, ParseError> {
+        let mut params = Vec::new();
+        if self.peek_token_is(&Token::RPAREN) {
+            self.next_token();
+            return Ok(params);
+        }
+
+        self.next_token();
+
+        match &self.current_token {
+            Token::IDENTIFIER(ref id) => params.push(id.clone()),
+            token => return Err(format!("expected function params  to be an identifier, got {}", token))
+        }
+
+        while self.peek_token_is(&Token::COMMA) {
+           self.next_token();
+           self.next_token();
+            match &self.current_token {
+                Token::IDENTIFIER(ref id) => params.push(id.clone()),
+                token => return Err(format!("expected function params  to be an identifier, got {}", token))
+            }
+        }
+
+        self.expect_peek(&Token::RPAREN)?;
+
+        return Ok(params)
     }
 }
 
@@ -361,5 +402,15 @@ mod tests {
         let tt = [("if (x < y) { x } else { y }", "if (x < y) { x } else { y }")];
         verify_program(&tt);
     }
-    
+
+    #[test]
+    fn test_fn_else_expression() {
+        let tt = [
+            ("fn() {};", "fn() {  }"),
+            ("fn(x) {};", "fn(x) {  }"),
+            ("fn(x, y, z) { x };", "fn(x, y, z) { x }"),
+        ];
+        verify_program(&tt);
+    }
+
 }
