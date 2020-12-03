@@ -3,7 +3,7 @@ use lexer::Lexer;
 use lexer::token::Token;
 
 pub fn main() {
-    println!("Welcome to monkey lexer");
+    println!("Welcome to monkey lexer by gengjiawen");
     loop {
         let mut input = String::new();
         stdin().read_line(&mut input);

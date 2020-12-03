@@ -13,10 +13,27 @@ pub enum Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Node::Program(p) => write!(f, "{}", format_statements(&p.statements)),
+            Node::Program(p) => write!(f, "{}", p),
             Node::Statement(stmt) => write!(f, "{}", stmt),
             Node::Expression(expr) => write!(f, "{}", expr),
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Program {
+    pub statements: Vec<Statement>,
+}
+
+impl Program {
+    pub fn new() -> Self {
+        Program { statements: vec![] }
+    }
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", format_statements(&self.statements))
     }
 }
 
@@ -110,17 +127,6 @@ impl fmt::Display for Literal {
             Literal::Boolean(b) => write!(f, "{}", b),
             Literal::String(s) => write!(f, "\"{}\"", s),
         }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Program {
-    pub statements: Vec<Statement>,
-}
-
-impl Program {
-    pub fn new() -> Self {
-        Program { statements: vec![] }
     }
 }
 
