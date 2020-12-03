@@ -183,6 +183,10 @@ impl<'a> Parser<'a> {
                 let right: Expression = self.parse_expression(precedence_value).unwrap();
                 return Some(Ok(Expression::INFIX(infix_op, Box::new(left.clone()), Box::new(right))));
             },
+            Token::LPAREN => {
+                self.next_token();
+                return Some(self.parse_fn_call_expression(left.clone()));
+            },
             _ => None,
 
         }
@@ -262,6 +266,33 @@ impl<'a> Parser<'a> {
         self.expect_peek(&Token::RPAREN)?;
 
         return Ok(params)
+    }
+
+    fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
+        let arguments = self.parse_expression_list(&Token::RPAREN)?;
+        Ok(Expression::FunctionCall(Box::new(expr), arguments))
+    }
+    
+    fn parse_expression_list(&mut self, end: &Token) -> Result<Vec<Expression>, ParseError> {
+        let mut expr_list = Vec::new();
+        if self.peek_token_is(end) {
+            self.next_token();
+            return Ok(expr_list);
+        }
+
+        self.next_token();
+
+        expr_list.push(self.parse_expression(Precedence::LOWEST)?);
+
+        while self.peek_token_is(&Token::COMMA) {
+            self.next_token();
+            self.next_token();
+            expr_list.push(self.parse_expression(Precedence::LOWEST)?);
+        }
+
+        self.expect_peek(end);
+
+        return Ok(expr_list);
     }
 }
 
@@ -409,6 +440,14 @@ mod tests {
             ("fn() {};", "fn() {  }"),
             ("fn(x) {};", "fn(x) {  }"),
             ("fn(x, y, z) { x };", "fn(x, y, z) { x }"),
+        ];
+        verify_program(&tt);
+    }
+
+    #[test]
+    fn test_fn_call_else_expression() {
+        let tt = [
+            ("add(1, 2 * 3, 4 + 5);", "add(1, (2 * 3), (4 + 5))")
         ];
         verify_program(&tt);
     }

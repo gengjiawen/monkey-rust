@@ -59,7 +59,8 @@ pub enum Expression {
     PREFIX(Token, Box<Expression>),
     INFIX(Token, Box<Expression>, Box<Expression>),
     IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
-    FUNCTION(Vec<String>, BlockStatement)
+    FUNCTION(Vec<String>, BlockStatement),
+    FunctionCall(Box<Expression>, Vec<Expression>), // function can be Identifier or FunctionLiteral (think iife)
 }
 
 impl fmt::Display for Expression {
@@ -87,6 +88,9 @@ impl fmt::Display for Expression {
             }
             Expression::FUNCTION(params, func_body) => {
                 write!(f, "fn({}) {{ {} }}", params.join(", "), func_body)
+            }
+            Expression::FunctionCall(function, args) => {
+                write!(f, "{}({})", function, format_expressions(args))
             }
         }
     }
@@ -126,4 +130,12 @@ fn format_statements(statements: &Vec<Statement>) -> String {
         .map(|stmt| stmt.to_string())
         .collect::<Vec<String>>()
         .join("")
+}
+
+fn format_expressions(exprs: &Vec<Expression>) -> String {
+    return exprs
+        .iter()
+        .map(|stmt| stmt.to_string())
+        .collect::<Vec<String>>()
+        .join(", ")
 }
