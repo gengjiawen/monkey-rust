@@ -223,14 +223,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
-name = "monkey_evaluator"
+name = "monkey-evaluator"
 version = "0.1.0"
 dependencies = [
- "monkey_parser",
+ "monkey-parser",
 ]
 
 [[package]]
-name = "monkey_lexer"
+name = "monkey-lexer"
 version = "0.1.0"
 dependencies = [
  "cargo-insta",
@@ -238,10 +238,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "monkey_parser"
+name = "monkey-parser"
 version = "0.1.0"
 dependencies = [
- "monkey_lexer",
+ "monkey-lexer",
 ]
 
 [[package]]

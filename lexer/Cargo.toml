@@ -1,5 +1,5 @@
 [package]
-name = "monkey_lexer"
+name = "monkey-lexer"
 version = "0.1.0"
 authors = ["gengjiawen <technicalcute@gmail.com>"]
 edition = "2018"

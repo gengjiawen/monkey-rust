@@ -1,5 +1,5 @@
 [package]
-name = "monkey_parser"
+name = "monkey-parser"
 version = "0.1.0"
 authors = ["daniel"]
 homepage = "https://github.com/gengjiawen/monkey_rust"
@@ -17,4 +17,4 @@ name = "parser"
 path = "main.rs"
 
 [dependencies]
-monkey_lexer = { path = "../lexer", version = "0.1.0" }
+monkey-lexer = { path = "../lexer", version = "0.1.0" }
