@@ -1,4 +1,4 @@
-mod ast;
+pub mod ast;
 mod precedences;
 
 use lexer::token::{Token};
