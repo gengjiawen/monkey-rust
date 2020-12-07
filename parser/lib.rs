@@ -296,18 +296,17 @@ impl<'a> Parser<'a> {
     }
 }
 
+pub fn parse(input: &str) -> Result<Node, ParseErrors> {
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program()?;
+
+    Ok(Node::Program(program))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // helper function
-    pub fn parse(input: &str) -> Result<Node, ParseErrors> {
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program()?;
-
-        Ok(Node::Program(program))
-    }
 
     fn verify_program(test_cases: &[(&str, &str)]) {
 
