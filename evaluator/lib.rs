@@ -6,15 +6,15 @@ use parser::lexer::token::Token;
 
 pub fn eval(node: Node) -> Result<Object, EvalError> {
     match node {
-        Node::Program(p) => eval_program(&p),
+        Node::Program(p) => eval_block_statements(&p.statements),
         Node::Statement(statements) => eval_statement(&statements),
         Node::Expression(expression) => eval_expression(&expression),
     }
 }
 
-fn eval_program(p: &Program) -> Result<Object, EvalError> {
+fn eval_block_statements(statements: &Vec<Statement>) -> Result<Object, EvalError> {
     let mut result = Object::Null;
-    for statement in &p.statements {
+    for statement in statements {
         let val = eval_statement(statement)?;
         match val {
             _ => { result = val; }
@@ -31,6 +31,14 @@ fn eval_statement(statement: &Statement) -> Result<Object, EvalError> {
     }
 }
 
+fn is_truthy(obj: &Object) -> bool {
+    match obj {
+        Object::Null => return false,
+        Object::Boolean(false) => return false,
+        _ => true,
+    }
+}
+
 fn eval_expression(expression: &Expression) -> Result<Object, EvalError> {
     match expression {
         Expression::LITERAL(literal) => eval_literal(literal),
@@ -43,11 +51,21 @@ fn eval_expression(expression: &Expression) -> Result<Object, EvalError> {
             let right = eval_expression(right)?;
             return eval_infix(op, &left, &right);
         }
+        Expression::IF(condition, consequence, alternative) => {
+            let condition = eval_expression(condition)?;
+            if is_truthy(&condition) {
+                eval_block_statements(&(consequence.0))
+            } else {
+                match alternative {
+                    Some(alt) => eval_block_statements(&(alt.0)),
+                    None => Ok(Object::Null)
+                }
+            }
+        }
         // Expression::IDENTIFIER(_) => {}
-        // Expression::IF(_, _, _) => {}
         // Expression::FUNCTION(_, _) => {}
         // Expression::FunctionCall(_, _) => {}
-        _ => return Err(String::from("unknown literal"))
+        _ => return Err(String::from("unknown expression"))
     }
 }
 
@@ -118,15 +136,13 @@ fn eval_literal(literal: &Literal) -> Result<Object, EvalError> {
         Literal::Integer(i) => Ok(Object::Integer(*i)),
         Literal::Boolean(b) => Ok(Object::Boolean(*b)),
         // Literal::String(s) => Ok(Object::String(s)),
-        _ => return Err(String::from("unknown literal"))
+        l => return Err(format!("unknown literal: {}", *l))
     }
 }
 
 mod tests {
     use parser::*;
     use crate::eval;
-    use crate::object::EvalError;
-    use parser::ast::Node;
 
     fn apply_test(test_cases: &[(&str, &str)]) {
         for (input, expected) in test_cases {
@@ -153,7 +169,6 @@ mod tests {
         ];
         apply_test(&test_case);
     }
-
 
     #[test]
     fn test_boolean_expressions() {
@@ -190,6 +205,20 @@ mod tests {
             ("!!true", "true"),
             ("!!false", "false"),
             ("!!5", "true"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_if_else_expressions() {
+        let test_case = [
+            ("if (true) { 10 }", "10"),
+            ("if (false) { 10 }", "null"),
+            ("if (1) { 10 }", "10"),
+            ("if (1 < 2) { 10 }", "10"),
+            ("if (1 > 2) { 10 }", "null"),
+            ("if (1 > 2) { 10 } else { 20 }", "20"),
+            ("if (1 < 2) { 10 } else { 20 }", "10"),
         ];
         apply_test(&test_case);
     }

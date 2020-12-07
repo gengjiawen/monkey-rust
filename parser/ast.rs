@@ -55,7 +55,7 @@ impl fmt::Display for Statement {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct BlockStatement(Vec<Statement>);
+pub struct BlockStatement(pub Vec<Statement>);
 
 impl BlockStatement {
     pub fn new(statements: Vec<Statement>) -> BlockStatement {
