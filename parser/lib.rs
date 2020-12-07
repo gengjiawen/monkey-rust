@@ -290,7 +290,7 @@ impl<'a> Parser<'a> {
             expr_list.push(self.parse_expression(Precedence::LOWEST)?);
         }
 
-        self.expect_peek(end);
+        self.expect_peek(end)?;
 
         return Ok(expr_list);
     }
