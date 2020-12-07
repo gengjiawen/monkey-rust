@@ -3,6 +3,7 @@ mod object;
 use parser::ast::*;
 use crate::object::{EvalError, Object};
 use parser::lexer::token::Token;
+use std::rc::Rc;
 
 pub fn eval(node: Node) -> Result<Object, EvalError> {
     match node {
@@ -17,6 +18,7 @@ fn eval_block_statements(statements: &Vec<Statement>) -> Result<Object, EvalErro
     for statement in statements {
         let val = eval_statement(statement)?;
         match val {
+            Object::ReturnValue(_) => return Ok(val),
             _ => { result = val; }
         }
     }
@@ -27,7 +29,12 @@ fn eval_block_statements(statements: &Vec<Statement>) -> Result<Object, EvalErro
 fn eval_statement(statement: &Statement) -> Result<Object, EvalError> {
     match statement {
         Statement::Expr(expr) => eval_expression(expr),
-        _ => return Err(String::from("unknown statement"))
+        Statement::Return(expr) => {
+            let val = eval_expression(expr)?;
+            return Ok(Object::ReturnValue(Rc::new(val)));
+        },
+        // Statement::Let(_, _) => {}
+        s => return Err(format!("unknown statement: {}", s))
     }
 }
 
@@ -219,6 +226,44 @@ mod tests {
             ("if (1 > 2) { 10 }", "null"),
             ("if (1 > 2) { 10 } else { 20 }", "20"),
             ("if (1 < 2) { 10 } else { 20 }", "10"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let test_case = [
+            ("return 10;", "10"),
+            ("return 10; 9;", "10"),
+            ("return 2 * 5; 9;", "10"),
+            ("9; return 2 * 5; 9;", "10"),
+            ("if (10 > 1) { return 10; }", "10"),
+            (
+                "if (10 > 1) { \
+                 if (10 > 1) { \
+                 return 10; \
+                 } \
+                 return 1; \
+                 }",
+                "10",
+            ),
+            // (
+            //     "let f = fn(x) { \
+            //      return x; \
+            //      x + 10; \
+            //      }; \
+            //      f(10);",
+            //     "10",
+            // ),
+            // (
+            //     "let f = fn(x) { \
+            //      let result = x + 10; \
+            //      return result; \
+            //      return 10; \
+            //      }; \
+            //      f(10);",
+            //     "20",
+            // ),
         ];
         apply_test(&test_case);
     }

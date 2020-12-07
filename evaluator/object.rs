@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
+use std::rc::Rc;
 
 pub type EvalError = String;
 
@@ -8,6 +9,7 @@ pub enum Object {
     Integer(i64),
     Boolean(bool),
     Null,
+    ReturnValue(Rc<Object>),
 }
 
 impl fmt::Display for Object {
@@ -16,6 +18,7 @@ impl fmt::Display for Object {
             Object::Integer(i) => write!(f, "{}", i),
             Object::Null => write!(f, "null"),
             Object::Boolean(b) => write!(f, "{}", b),
+            Object::ReturnValue(expr) => write!(f, "{}", expr),
         }
     }
 }
