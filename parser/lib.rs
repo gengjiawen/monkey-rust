@@ -1,6 +1,7 @@
 pub mod ast;
 mod precedences;
 
+pub extern crate lexer;
 use lexer::token::{Token};
 use lexer::Lexer;
 use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement};
