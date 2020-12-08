@@ -6,7 +6,7 @@ use crate::environment::*;
 use crate::object::{EvalError, Object};
 use parser::lexer::token::Token;
 use std::rc::Rc;
-use std::borrow::Borrow;
+use std::cell::RefCell;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
     match node {
@@ -77,10 +77,50 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
             }
         }
         Expression::IDENTIFIER(id) => eval_identifier(&id, env),
-        // Expression::FUNCTION(_, _) => {}
-        // Expression::FunctionCall(_, _) => {}
-        _ => return Err(String::from("unknown expression"))
+        Expression::FUNCTION(params, body) => {
+            return Ok(Rc::new(Object::Function(params.clone(), body.clone(), Rc::clone(env))));
+        }
+        Expression::FunctionCall(func, args) => {
+            let func = eval_expression(func, &Rc::clone(env))?;
+            let args = eval_expressions(args, env)?;
+            apply_function(&func, &args)
+        }
     }
+}
+
+fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Object>, EvalError> {
+    match &**function {
+        Object::Function(params, body, env) => {
+            let mut env = Environment::new_enclosed_environment(&env);
+
+            params.iter().enumerate().for_each(|(i, param)| {
+                env.set(param.clone(), args[i].clone());
+            });
+
+            let evaluated = eval_block_statements(&body.0, &Rc::new(RefCell::new(env)))?;
+            return unwrap_return(evaluated);
+
+        },
+        f => Err(format!("expected {} to be a function", f))
+    }
+}
+
+fn unwrap_return(obj: Rc<Object>) -> Result<Rc<Object>, EvalError> {
+    if let Object::ReturnValue(val) = &*obj {
+        Ok(Rc::clone(&val))
+    } else {
+        Ok(obj)
+    }
+}
+
+fn eval_expressions(exprs: &Vec<Expression>, env: &Env) -> Result<Vec<Rc<Object>>, EvalError> {
+    let mut list = Vec::new();
+    for expr in exprs {
+        let val = eval_expression(expr, &Rc::clone(env))?;
+        list.push(val);
+    }
+
+    Ok(list)
 }
 
 fn eval_identifier(id: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
@@ -294,6 +334,28 @@ mod tests {
             ("let a = 5 * 5; a;", "25"),
             ("let a = 5; let b = a; b;", "5"),
             ("let a = 5; let b = a; let c = a + b + 5; c;", "15"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_function_object() {
+        let test_case = [("fn(x) { x + 2; };", "fn(x) { (x + 2) }")];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_function_application() {
+        let test_case = [
+            ("let identity = fn(x) { x; }; identity(5);", "5"),
+            ("let identity = fn(x) { return x; }; identity(5);", "5"),
+            ("let double = fn(x) { x * 2; }; double(5);", "10"),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", "10"),
+            (
+                "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+                "20",
+            ),
+            ("fn(x) { x; }(5)", "5"),
         ];
         apply_test(&test_case);
     }
