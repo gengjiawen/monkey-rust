@@ -3,124 +3,420 @@ source: lexer/lib.rs
 expression: token_vs
 ---
 [
-    LET,
-    IDENTIFIER(
-        "five",
-    ),
-    ASSIGN,
-    INT(
-        5,
-    ),
-    SEMICOLON,
-    LET,
-    IDENTIFIER(
-        "ten",
-    ),
-    ASSIGN,
-    INT(
-        10,
-    ),
-    SEMICOLON,
-    LET,
-    IDENTIFIER(
-        "add",
-    ),
-    ASSIGN,
-    FUNCTION,
-    LPAREN,
-    IDENTIFIER(
-        "x",
-    ),
-    COMMA,
-    IDENTIFIER(
-        "y",
-    ),
-    RPAREN,
-    LBRACE,
-    IDENTIFIER(
-        "x",
-    ),
-    PLUS,
-    IDENTIFIER(
-        "y",
-    ),
-    SEMICOLON,
-    RBRACE,
-    SEMICOLON,
-    LET,
-    IDENTIFIER(
-        "result",
-    ),
-    ASSIGN,
-    IDENTIFIER(
-        "add",
-    ),
-    LPAREN,
-    IDENTIFIER(
-        "five",
-    ),
-    COMMA,
-    IDENTIFIER(
-        "ten",
-    ),
-    RPAREN,
-    SEMICOLON,
-    BANG,
-    MINUS,
-    SLASH,
-    ASTERISK,
-    INT(
-        5,
-    ),
-    SEMICOLON,
-    INT(
-        5,
-    ),
-    LT,
-    INT(
-        10,
-    ),
-    GT,
-    INT(
-        5,
-    ),
-    SEMICOLON,
-    IF,
-    LPAREN,
-    INT(
-        5,
-    ),
-    LT,
-    INT(
-        10,
-    ),
-    RPAREN,
-    LBRACE,
-    RETURN,
-    TRUE,
-    SEMICOLON,
-    RBRACE,
-    ELSE,
-    LBRACE,
-    RETURN,
-    FALSE,
-    SEMICOLON,
-    RBRACE,
-    INT(
-        10,
-    ),
-    EQ,
-    INT(
-        10,
-    ),
-    SEMICOLON,
-    INT(
-        10,
-    ),
-    NotEq,
-    INT(
-        9,
-    ),
-    SEMICOLON,
-    EOF,
+    Token {
+        start: 0,
+        end: 3,
+        kind: LET,
+    },
+    Token {
+        start: 4,
+        end: 8,
+        kind: IDENTIFIER(
+            "five",
+        ),
+    },
+    Token {
+        start: 9,
+        end: 10,
+        kind: ASSIGN,
+    },
+    Token {
+        start: 11,
+        end: 12,
+        kind: INT(
+            5,
+        ),
+    },
+    Token {
+        start: 12,
+        end: 13,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 14,
+        end: 17,
+        kind: LET,
+    },
+    Token {
+        start: 18,
+        end: 21,
+        kind: IDENTIFIER(
+            "ten",
+        ),
+    },
+    Token {
+        start: 22,
+        end: 23,
+        kind: ASSIGN,
+    },
+    Token {
+        start: 24,
+        end: 26,
+        kind: INT(
+            10,
+        ),
+    },
+    Token {
+        start: 26,
+        end: 27,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 29,
+        end: 32,
+        kind: LET,
+    },
+    Token {
+        start: 33,
+        end: 36,
+        kind: IDENTIFIER(
+            "add",
+        ),
+    },
+    Token {
+        start: 37,
+        end: 38,
+        kind: ASSIGN,
+    },
+    Token {
+        start: 39,
+        end: 41,
+        kind: FUNCTION,
+    },
+    Token {
+        start: 41,
+        end: 42,
+        kind: LPAREN,
+    },
+    Token {
+        start: 42,
+        end: 43,
+        kind: IDENTIFIER(
+            "x",
+        ),
+    },
+    Token {
+        start: 43,
+        end: 44,
+        kind: COMMA,
+    },
+    Token {
+        start: 45,
+        end: 46,
+        kind: IDENTIFIER(
+            "y",
+        ),
+    },
+    Token {
+        start: 46,
+        end: 47,
+        kind: RPAREN,
+    },
+    Token {
+        start: 48,
+        end: 49,
+        kind: LBRACE,
+    },
+    Token {
+        start: 52,
+        end: 53,
+        kind: IDENTIFIER(
+            "x",
+        ),
+    },
+    Token {
+        start: 54,
+        end: 55,
+        kind: PLUS,
+    },
+    Token {
+        start: 56,
+        end: 57,
+        kind: IDENTIFIER(
+            "y",
+        ),
+    },
+    Token {
+        start: 57,
+        end: 58,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 59,
+        end: 60,
+        kind: RBRACE,
+    },
+    Token {
+        start: 60,
+        end: 61,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 63,
+        end: 66,
+        kind: LET,
+    },
+    Token {
+        start: 67,
+        end: 73,
+        kind: IDENTIFIER(
+            "result",
+        ),
+    },
+    Token {
+        start: 74,
+        end: 75,
+        kind: ASSIGN,
+    },
+    Token {
+        start: 76,
+        end: 79,
+        kind: IDENTIFIER(
+            "add",
+        ),
+    },
+    Token {
+        start: 79,
+        end: 80,
+        kind: LPAREN,
+    },
+    Token {
+        start: 80,
+        end: 84,
+        kind: IDENTIFIER(
+            "five",
+        ),
+    },
+    Token {
+        start: 84,
+        end: 85,
+        kind: COMMA,
+    },
+    Token {
+        start: 86,
+        end: 89,
+        kind: IDENTIFIER(
+            "ten",
+        ),
+    },
+    Token {
+        start: 89,
+        end: 90,
+        kind: RPAREN,
+    },
+    Token {
+        start: 90,
+        end: 91,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 92,
+        end: 93,
+        kind: BANG,
+    },
+    Token {
+        start: 93,
+        end: 94,
+        kind: MINUS,
+    },
+    Token {
+        start: 94,
+        end: 95,
+        kind: SLASH,
+    },
+    Token {
+        start: 95,
+        end: 96,
+        kind: ASTERISK,
+    },
+    Token {
+        start: 96,
+        end: 97,
+        kind: INT(
+            5,
+        ),
+    },
+    Token {
+        start: 97,
+        end: 98,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 99,
+        end: 100,
+        kind: INT(
+            5,
+        ),
+    },
+    Token {
+        start: 101,
+        end: 102,
+        kind: LT,
+    },
+    Token {
+        start: 103,
+        end: 105,
+        kind: INT(
+            10,
+        ),
+    },
+    Token {
+        start: 106,
+        end: 107,
+        kind: GT,
+    },
+    Token {
+        start: 108,
+        end: 109,
+        kind: INT(
+            5,
+        ),
+    },
+    Token {
+        start: 109,
+        end: 110,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 112,
+        end: 114,
+        kind: IF,
+    },
+    Token {
+        start: 115,
+        end: 116,
+        kind: LPAREN,
+    },
+    Token {
+        start: 116,
+        end: 117,
+        kind: INT(
+            5,
+        ),
+    },
+    Token {
+        start: 118,
+        end: 119,
+        kind: LT,
+    },
+    Token {
+        start: 120,
+        end: 122,
+        kind: INT(
+            10,
+        ),
+    },
+    Token {
+        start: 122,
+        end: 123,
+        kind: RPAREN,
+    },
+    Token {
+        start: 124,
+        end: 125,
+        kind: LBRACE,
+    },
+    Token {
+        start: 127,
+        end: 133,
+        kind: RETURN,
+    },
+    Token {
+        start: 134,
+        end: 138,
+        kind: TRUE,
+    },
+    Token {
+        start: 138,
+        end: 139,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 140,
+        end: 141,
+        kind: RBRACE,
+    },
+    Token {
+        start: 142,
+        end: 146,
+        kind: ELSE,
+    },
+    Token {
+        start: 147,
+        end: 148,
+        kind: LBRACE,
+    },
+    Token {
+        start: 150,
+        end: 156,
+        kind: RETURN,
+    },
+    Token {
+        start: 157,
+        end: 162,
+        kind: FALSE,
+    },
+    Token {
+        start: 162,
+        end: 163,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 164,
+        end: 165,
+        kind: RBRACE,
+    },
+    Token {
+        start: 167,
+        end: 169,
+        kind: INT(
+            10,
+        ),
+    },
+    Token {
+        start: 171,
+        end: 172,
+        kind: EQ,
+    },
+    Token {
+        start: 173,
+        end: 175,
+        kind: INT(
+            10,
+        ),
+    },
+    Token {
+        start: 175,
+        end: 176,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 177,
+        end: 179,
+        kind: INT(
+            10,
+        ),
+    },
+    Token {
+        start: 181,
+        end: 182,
+        kind: NotEq,
+    },
+    Token {
+        start: 183,
+        end: 184,
+        kind: INT(
+            9,
+        ),
+    },
+    Token {
+        start: 184,
+        end: 185,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 185,
+        end: 186,
+        kind: EOF,
+    },
 ]

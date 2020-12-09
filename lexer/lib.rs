@@ -1,4 +1,4 @@
-use crate::token::{Token, lookup_identifier};
+use crate::token::{TokenKind, lookup_identifier, Token};
 
 pub mod token;
 
@@ -55,46 +55,47 @@ impl<'a> Lexer<'a> {
             '=' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::EQ
+                    TokenKind::EQ
                 } else {
-                    Token::ASSIGN
+                    TokenKind::ASSIGN
                 }
-            },
-            ';' => Token::SEMICOLON,
-            '(' => Token::LPAREN,
-            ')' => Token::RPAREN,
-            ',' => Token::COMMA,
-            '+' => Token::PLUS,
-            '-' => Token::MINUS,
+            }
+            ';' => TokenKind::SEMICOLON,
+            '(' => TokenKind::LPAREN,
+            ')' => TokenKind::RPAREN,
+            ',' => TokenKind::COMMA,
+            '+' => TokenKind::PLUS,
+            '-' => TokenKind::MINUS,
             '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::NotEq
+                    TokenKind::NotEq
                 } else {
-                    Token::BANG
+                    TokenKind::BANG
                 }
-            },
-            '*' => Token::ASTERISK,
-            '/' => Token::SLASH,
-            '<' => Token::LT,
-            '>' => Token::GT,
-            '{' => Token::LBRACE,
-            '}' => Token::RBRACE,
-           '\u{0}' => Token::EOF,
+            }
+            '*' => TokenKind::ASTERISK,
+            '/' => TokenKind::SLASH,
+            '<' => TokenKind::LT,
+            '>' => TokenKind::GT,
+            '{' => TokenKind::LBRACE,
+            '}' => TokenKind::RBRACE,
+            '\u{0}' => TokenKind::EOF,
             _ => {
                 if is_letter(self.ch) {
-                    // has to return, I am not sure rust goes this way :(
-                    return lookup_identifier(&self.read_identifier())
+                    let (start, end, identifier) = self.read_identifier();
+                    return Token { start, end, kind: lookup_identifier(&identifier) };
                 } else if is_digit(self.ch) {
-                    return Token::INT(self.read_number())
+                    let (start, end, num) = self.read_number();
+                    return Token { start, end, kind: TokenKind::INT(num) };
                 } else {
-                    Token::ILLEGAL
+                    TokenKind::ILLEGAL
                 }
             }
         };
 
         self.read_char();
-        return t;
+        return Token { start: self.position - 1, end: self.read_position - 1, kind: t };
     }
 
     fn skip_whitespace(&mut self) {
@@ -103,23 +104,25 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_identifier(&mut self) -> String {
+    fn read_identifier(&mut self) -> (usize, usize, String) {
         let pos = self.position;
         while is_letter(self.ch) {
             self.read_char();
         }
 
         let x = self.input[pos..self.position].to_string();
-        x
+        return (pos, self.position, x)
     }
 
-    fn read_number(&mut self) -> i64 {
+    fn read_number(&mut self) -> (usize, usize, i64) {
         let pos = self.position;
         while is_digit(self.ch) {
             self.read_char();
         }
 
-        self.input[pos..self.position].parse().unwrap()
+        let x = self.input[pos..self.position].parse().unwrap();
+
+        return (pos, self.position, x)
     }
 }
 
@@ -134,7 +137,7 @@ fn is_digit(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::Lexer;
-    use crate::token::Token;
+    use crate::token::TokenKind;
     use super::*;
     use insta::assert_debug_snapshot;
 
@@ -142,9 +145,9 @@ mod tests {
         let mut token_vs: Vec<Token> = vec![];
         loop {
             let t = l.next_token();
-            if t == Token::EOF {
+            if t.kind == TokenKind::EOF {
                 token_vs.push(t);
-                break
+                break;
             } else {
                 token_vs.push(t);
             }
@@ -163,6 +166,14 @@ mod tests {
     #[test]
     fn test_lexer_let() {
         let mut l = Lexer::new("let x=5");
+        let token_vs = test_token_set(&mut l);
+
+        assert_debug_snapshot!(token_vs)
+    }
+
+    #[test]
+    fn test_lexer_let_with_space() {
+        let mut l = Lexer::new("let x = 5");
         let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)
@@ -197,16 +208,7 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;");
-        let mut token_vs: Vec<Token> = vec![];
-        loop {
-            let t = l.next_token();
-            if t == Token::EOF {
-                token_vs.push(t);
-                break
-            } else {
-                token_vs.push(t);
-            }
-        }
+        let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)
     }

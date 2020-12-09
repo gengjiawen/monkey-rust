@@ -2,7 +2,20 @@ use std::fmt;
 use std::fmt::Formatter;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
-pub enum Token {
+pub struct Token {
+    pub start: usize,
+    pub end: usize,
+    pub kind: TokenKind,
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "start: {}, end: {}, kind: {}", self.start, self.end, self.kind)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+pub enum TokenKind {
     ILLEGAL,
     EOF,
 
@@ -46,52 +59,52 @@ pub enum Token {
     RETURN
 }
 
-pub fn lookup_identifier(identifier: &str) -> Token {
+pub fn lookup_identifier(identifier: &str) -> TokenKind {
     match identifier {
-        "fn" => Token::FUNCTION,
-        "let" => Token::LET,
-        "true" => Token::TRUE,
-        "false" => Token::FALSE,
-        "if" => Token::IF,
-        "else" => Token::ELSE,
-        "return" => Token::RETURN,
-        _ => Token::IDENTIFIER(identifier.to_string())
+        "fn" => TokenKind::FUNCTION,
+        "let" => TokenKind::LET,
+        "true" => TokenKind::TRUE,
+        "false" => TokenKind::FALSE,
+        "if" => TokenKind::IF,
+        "else" => TokenKind::ELSE,
+        "return" => TokenKind::RETURN,
+        _ => TokenKind::IDENTIFIER(identifier.to_string())
     }
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Token::IDENTIFIER(id) => write!(f, "{}", id),
-            Token::INT(i) => write!(f, "{}", i),
-            Token::STRING(s) => write!(f, "{}", s),
-            Token::ASSIGN => write!(f, "="),
-            Token::PLUS => write!(f, "+"),
-            Token::MINUS => write!(f, "-"),
-            Token::BANG => write!(f, "!"),
-            Token::ASTERISK => write!(f, "*"),
-            Token::SLASH => write!(f, "/"),
-            Token::LT => write!(f, "<"),
-            Token::GT => write!(f, ">"),
-            Token::EQ => write!(f, "=="),
-            Token::NotEq => write!(f, "!="),
-            Token::COMMA => write!(f, ","),
-            Token::SEMICOLON => write!(f, ";"),
-            Token::LPAREN => write!(f, "("),
-            Token::RPAREN => write!(f, ")"),
-            Token::LBRACE => write!(f, "{{"),
-            Token::RBRACE => write!(f, "}}"),
-            Token::LBRACKET => write!(f, "["),
-            Token::RBRACKET => write!(f, "]"),
-            Token::FUNCTION => write!(f, "fn"),
-            Token::LET => write!(f, "let"),
-            Token::TRUE => write!(f, "true"),
-            Token::FALSE => write!(f, "false"),
-            Token::IF => write!(f, "if"),
-            Token::ELSE => write!(f, "else"),
-            Token::RETURN => write!(f, "return"),
-            Token::ILLEGAL => write!(f, "ILLEGAL"),
-            Token::EOF => write!(f, "EOF"),
+            TokenKind::IDENTIFIER(id) => write!(f, "{}", id),
+            TokenKind::INT(i) => write!(f, "{}", i),
+            TokenKind::STRING(s) => write!(f, "{}", s),
+            TokenKind::ASSIGN => write!(f, "="),
+            TokenKind::PLUS => write!(f, "+"),
+            TokenKind::MINUS => write!(f, "-"),
+            TokenKind::BANG => write!(f, "!"),
+            TokenKind::ASTERISK => write!(f, "*"),
+            TokenKind::SLASH => write!(f, "/"),
+            TokenKind::LT => write!(f, "<"),
+            TokenKind::GT => write!(f, ">"),
+            TokenKind::EQ => write!(f, "=="),
+            TokenKind::NotEq => write!(f, "!="),
+            TokenKind::COMMA => write!(f, ","),
+            TokenKind::SEMICOLON => write!(f, ";"),
+            TokenKind::LPAREN => write!(f, "("),
+            TokenKind::RPAREN => write!(f, ")"),
+            TokenKind::LBRACE => write!(f, "{{"),
+            TokenKind::RBRACE => write!(f, "}}"),
+            TokenKind::LBRACKET => write!(f, "["),
+            TokenKind::RBRACKET => write!(f, "]"),
+            TokenKind::FUNCTION => write!(f, "fn"),
+            TokenKind::LET => write!(f, "let"),
+            TokenKind::TRUE => write!(f, "true"),
+            TokenKind::FALSE => write!(f, "false"),
+            TokenKind::IF => write!(f, "if"),
+            TokenKind::ELSE => write!(f, "else"),
+            TokenKind::RETURN => write!(f, "return"),
+            TokenKind::ILLEGAL => write!(f, "ILLEGAL"),
+            TokenKind::EOF => write!(f, "EOF"),
         }
     }
 }

@@ -4,7 +4,7 @@ pub mod environment;
 use parser::ast::*;
 use crate::environment::*;
 use crate::object::{EvalError, Object};
-use parser::lexer::token::Token;
+use parser::lexer::token::{TokenKind, Token};
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -131,9 +131,9 @@ fn eval_identifier(id: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
 }
 
 fn eval_prefix(op: &Token, right: &Object) -> Result<Rc<Object>, EvalError> {
-    match op {
-        Token::BANG => eval_prefix_bang(right),
-        Token::MINUS => eval_prefix_minus(right),
+    match op.kind {
+        TokenKind::BANG => eval_prefix_bang(right),
+        TokenKind::MINUS => eval_prefix_minus(right),
         _ => Err(format!("unknown prefix operator: {}", op))
     }
 }
@@ -166,15 +166,15 @@ fn eval_infix(op: &Token, left: &Object, right: &Object) -> Result<Rc<Object>, E
 }
 
 fn eval_integer_infix(op: &Token, left: i64, right: i64) -> Result<Rc<Object>, EvalError> {
-    let result = match op {
-        Token::PLUS => Object::Integer(left + right),
-        Token::MINUS => Object::Integer(left - right),
-        Token::ASTERISK => Object::Integer(left * right),
-        Token::SLASH => Object::Integer(left / right),
-        Token::LT => Object::Boolean(left < right),
-        Token::GT => Object::Boolean(left > right),
-        Token::EQ => Object::Boolean(left == right),
-        Token::NotEq => Object::Boolean(left != right),
+    let result = match &op.kind {
+        TokenKind::PLUS => Object::Integer(left + right),
+        TokenKind::MINUS => Object::Integer(left - right),
+        TokenKind::ASTERISK => Object::Integer(left * right),
+        TokenKind::SLASH => Object::Integer(left / right),
+        TokenKind::LT => Object::Boolean(left < right),
+        TokenKind::GT => Object::Boolean(left > right),
+        TokenKind::EQ => Object::Boolean(left == right),
+        TokenKind::NotEq => Object::Boolean(left != right),
         op => return Err(format!("Invalid infix operator for int: {}", op))
     };
 
@@ -182,9 +182,9 @@ fn eval_integer_infix(op: &Token, left: i64, right: i64) -> Result<Rc<Object>, E
 }
 
 fn eval_boolean_infix(op: &Token, left: bool, right: bool) -> Result<Rc<Object>, EvalError> {
-    let result = match op {
-        Token::EQ => Object::Boolean(left == right),
-        Token::NotEq => Object::Boolean(left != right),
+    let result = match &op.kind {
+        TokenKind::EQ => Object::Boolean(left == right),
+        TokenKind::NotEq => Object::Boolean(left != right),
         op => return Err(format!("Invalid infix operator for int: {}", op))
     };
 

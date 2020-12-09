@@ -1,4 +1,4 @@
-use lexer::token::Token;
+use lexer::token::TokenKind;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Precedence {
@@ -12,18 +12,18 @@ pub enum Precedence {
     INDEX, // array[index]
 }
 
-pub fn get_token_precedence(token: &Token) -> Precedence {
+pub fn get_token_precedence(token: &TokenKind) -> Precedence {
     match token {
-        Token::EQ => Precedence::EQUALS,
-        Token::NotEq => Precedence::EQUALS,
-        Token::LT => Precedence::LessGreater,
-        Token::GT => Precedence::LessGreater,
-        Token::PLUS => Precedence::SUM,
-        Token::MINUS => Precedence::SUM,
-        Token::ASTERISK => Precedence::PRODUCT,
-        Token::SLASH => Precedence::PRODUCT,
-        Token::LPAREN => Precedence::CALL,
-        Token::LBRACE => Precedence::INDEX,
+        TokenKind::EQ => Precedence::EQUALS,
+        TokenKind::NotEq => Precedence::EQUALS,
+        TokenKind::LT => Precedence::LessGreater,
+        TokenKind::GT => Precedence::LessGreater,
+        TokenKind::PLUS => Precedence::SUM,
+        TokenKind::MINUS => Precedence::SUM,
+        TokenKind::ASTERISK => Precedence::PRODUCT,
+        TokenKind::SLASH => Precedence::PRODUCT,
+        TokenKind::LPAREN => Precedence::CALL,
+        TokenKind::LBRACE => Precedence::INDEX,
         _ => Precedence::LOWEST,
     }
 }

@@ -2,7 +2,7 @@ pub mod ast;
 mod precedences;
 
 pub extern crate lexer;
-use lexer::token::{Token};
+use lexer::token::{TokenKind, Token};
 use lexer::Lexer;
 use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement};
 use crate::precedences::{Precedence, get_token_precedence};
@@ -46,17 +46,17 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn current_token_is(&mut self, token: &Token) -> bool {
-        self.current_token == *token
+    fn current_token_is(&mut self, token: &TokenKind) -> bool {
+        self.current_token.kind == *token
     }
 
-    fn peek_token_is(&mut self, token: &Token) -> bool {
-        self.peek_token == *token
+    fn peek_token_is(&mut self, token: &TokenKind) -> bool {
+        self.peek_token.kind == *token
     }
 
-    fn expect_peek(&mut self, token: &Token) -> Result<(), ParseError> {
+    fn expect_peek(&mut self, token: &TokenKind) -> Result<(), ParseError> {
         self.next_token();
-        if self.current_token == *token {
+        if self.current_token.kind == *token {
             Ok(())
         } else {
             let e = format!("expected token: {}, got: {}", token, self.current_token);
@@ -66,7 +66,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> Result<Program, ParseErrors> {
         let mut program = Program::new();
-        while !self.current_token_is(&Token::EOF) {
+        while !self.current_token_is(&TokenKind::EOF) {
             match self.parse_statement() {
                 Ok(stmt) => program.statements.push(stmt),
                 Err(e) => self.errors.push(e),
@@ -82,25 +82,25 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
-        match self.current_token {
-            Token::LET => self.parse_let_statement(),
-            Token::RETURN => self.parse_return_statement(),
+        match self.current_token.kind {
+            TokenKind::LET => self.parse_let_statement(),
+            TokenKind::RETURN => self.parse_return_statement(),
             _ => self.parse_expression_statement(),
         }
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
         self.next_token();
-        let name = match self.current_token {
-            Token::IDENTIFIER(ref id) => id.to_string(),
+        let name = match self.current_token.kind {
+            TokenKind::IDENTIFIER(ref id) => id.to_string(),
             _ => return Err(format!("not an identifier"))
         };
-        self.expect_peek(&Token::ASSIGN)?;
+        self.expect_peek(&TokenKind::ASSIGN)?;
         self.next_token();
 
         let value = self.parse_expression(Precedence::LOWEST)?;
 
-        if self.peek_token_is(&Token::SEMICOLON) {
+        if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
 
@@ -112,7 +112,7 @@ impl<'a> Parser<'a> {
 
         let value = self.parse_expression(Precedence::LOWEST)?;
 
-        if self.peek_token_is(&Token::SEMICOLON) {
+        if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
 
@@ -121,7 +121,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
         let expr = self.parse_expression(Precedence::LOWEST)?;
-        if self.peek_token_is(&Token::SEMICOLON) {
+        if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
 
@@ -130,7 +130,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParseError> {
         let mut left = self.parse_prefix_expression()?;
-        while self.peek_token != Token::SEMICOLON && precedence < get_token_precedence(&self.peek_token) {
+        while self.peek_token.kind != TokenKind::SEMICOLON && precedence < get_token_precedence(&self.peek_token.kind) {
             match self.parse_infix_expression(&left) {
                 Some(infix) => left = infix?,
                 None => return Ok(left),
@@ -142,25 +142,25 @@ impl<'a> Parser<'a> {
 
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
-        match &self.current_token {
-            Token::IDENTIFIER(ref id) => return Ok(Expression::IDENTIFIER(id.clone())),
-            Token::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(*i))),
-            Token::STRING(s) => return Ok(Expression::LITERAL(Literal::String(s.to_string()))),
-            b @ Token::TRUE| b @ Token::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(*b == Token::TRUE))),
-            Token::BANG | Token::MINUS => {
+        match &self.current_token.kind {
+            TokenKind::IDENTIFIER(ref id) => return Ok(Expression::IDENTIFIER(id.clone())),
+            TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(*i))),
+            TokenKind::STRING(s) => return Ok(Expression::LITERAL(Literal::String(s.to_string()))),
+            b @ TokenKind::TRUE| b @ TokenKind::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(*b == TokenKind::TRUE))),
+            TokenKind::BANG | TokenKind::MINUS => {
                 let prefix_op = self.current_token.clone();
                 self.next_token();
                 let expr = self.parse_expression(Precedence::PREFIX)?;
                 return Ok(Expression::PREFIX(prefix_op, Box::new(expr)));
             },
-            Token::LPAREN => {
+            TokenKind::LPAREN => {
                 self.next_token();
                 let expr = self.parse_expression(Precedence::LOWEST);
-                self.expect_peek(&Token::RPAREN)?;
+                self.expect_peek(&TokenKind::RPAREN)?;
                 return expr
             },
-            Token::IF => self.parse_if_expression(),
-            Token::FUNCTION => self.parse_fn_expression(),
+            TokenKind::IF => self.parse_if_expression(),
+            TokenKind::FUNCTION => self.parse_fn_expression(),
             _ => {
                 Err(format!("no prefix function for token: {}", self.current_token))
             }
@@ -168,23 +168,23 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_infix_expression(&mut self, left: &Expression) -> Option<Result<Expression, ParseError>> {
-        match self.peek_token {
-            Token::PLUS |
-            Token::MINUS |
-            Token::ASTERISK |
-            Token::SLASH |
-            Token::EQ |
-            Token::NotEq |
-            Token::LT |
-            Token::GT => {
+        match self.peek_token.kind {
+            TokenKind::PLUS |
+            TokenKind::MINUS |
+            TokenKind::ASTERISK |
+            TokenKind::SLASH |
+            TokenKind::EQ |
+            TokenKind::NotEq |
+            TokenKind::LT |
+            TokenKind::GT => {
                 self.next_token();
                 let infix_op = self.current_token.clone();
-                let precedence_value = get_token_precedence(&self.current_token);
+                let precedence_value = get_token_precedence(&self.current_token.kind);
                 self.next_token();
                 let right: Expression = self.parse_expression(precedence_value).unwrap();
                 return Some(Ok(Expression::INFIX(infix_op, Box::new(left.clone()), Box::new(right))));
             },
-            Token::LPAREN => {
+            TokenKind::LPAREN => {
                 self.next_token();
                 return Some(self.parse_fn_call_expression(left.clone()));
             },
@@ -194,18 +194,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression, ParseError> {
-        self.expect_peek(&Token::LPAREN)?;
+        self.expect_peek(&TokenKind::LPAREN)?;
         self.next_token();
 
         let condition = self.parse_expression(Precedence::LOWEST)?;
-        self.expect_peek(&Token::RPAREN)?;
-        self.expect_peek(&Token::LBRACE)?;
+        self.expect_peek(&TokenKind::RPAREN)?;
+        self.expect_peek(&TokenKind::LBRACE)?;
 
         let consequence = self.parse_block_statement()?;
 
-        let alternative = if self.peek_token_is(&Token::ELSE) {
+        let alternative = if self.peek_token_is(&TokenKind::ELSE) {
             self.next_token();
-            self.expect_peek(&Token::LBRACE)?;
+            self.expect_peek(&TokenKind::LBRACE)?;
             Some(self.parse_block_statement()?)
         } else {
             None
@@ -218,7 +218,7 @@ impl<'a> Parser<'a> {
         self.next_token();
         let mut block_statement = Vec::new();
 
-        while !self.current_token_is(&Token::RBRACE) && !self.current_token_is(&Token::EOF) {
+        while !self.current_token_is(&TokenKind::RBRACE) && !self.current_token_is(&TokenKind::EOF) {
             if let Ok(statement) = self.parse_statement() {
                 block_statement.push(statement)
             }
@@ -230,11 +230,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_expression(&mut self) -> Result<Expression, ParseError> {
-        self.expect_peek(&Token::LPAREN)?;
+        self.expect_peek(&TokenKind::LPAREN)?;
 
         let params = self.parse_fn_parameters()?;
 
-        self.expect_peek(&Token::LBRACE)?;
+        self.expect_peek(&TokenKind::LBRACE)?;
 
         let function_body = self.parse_block_statement()?;
 
@@ -243,38 +243,38 @@ impl<'a> Parser<'a> {
     
     fn parse_fn_parameters(&mut self) -> Result<Vec<String>, ParseError> {
         let mut params = Vec::new();
-        if self.peek_token_is(&Token::RPAREN) {
+        if self.peek_token_is(&TokenKind::RPAREN) {
             self.next_token();
             return Ok(params);
         }
 
         self.next_token();
 
-        match &self.current_token {
-            Token::IDENTIFIER(ref id) => params.push(id.clone()),
+        match &self.current_token.kind {
+            TokenKind::IDENTIFIER(ref id) => params.push(id.clone()),
             token => return Err(format!("expected function params  to be an identifier, got {}", token))
         }
 
-        while self.peek_token_is(&Token::COMMA) {
+        while self.peek_token_is(&TokenKind::COMMA) {
            self.next_token();
            self.next_token();
-            match &self.current_token {
-                Token::IDENTIFIER(ref id) => params.push(id.clone()),
+            match &self.current_token.kind {
+                TokenKind::IDENTIFIER(ref id) => params.push(id.clone()),
                 token => return Err(format!("expected function params  to be an identifier, got {}", token))
             }
         }
 
-        self.expect_peek(&Token::RPAREN)?;
+        self.expect_peek(&TokenKind::RPAREN)?;
 
         return Ok(params)
     }
 
     fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
-        let arguments = self.parse_expression_list(&Token::RPAREN)?;
+        let arguments = self.parse_expression_list(&TokenKind::RPAREN)?;
         Ok(Expression::FunctionCall(Box::new(expr), arguments))
     }
     
-    fn parse_expression_list(&mut self, end: &Token) -> Result<Vec<Expression>, ParseError> {
+    fn parse_expression_list(&mut self, end: &TokenKind) -> Result<Vec<Expression>, ParseError> {
         let mut expr_list = Vec::new();
         if self.peek_token_is(end) {
             self.next_token();
@@ -285,7 +285,7 @@ impl<'a> Parser<'a> {
 
         expr_list.push(self.parse_expression(Precedence::LOWEST)?);
 
-        while self.peek_token_is(&Token::COMMA) {
+        while self.peek_token_is(&TokenKind::COMMA) {
             self.next_token();
             self.next_token();
             expr_list.push(self.parse_expression(Precedence::LOWEST)?);

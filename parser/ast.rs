@@ -85,8 +85,8 @@ impl fmt::Display for Expression {
         match self {
             Expression::IDENTIFIER(id) => write!(f, "{}", id),
             Expression::LITERAL(l) => write!(f, "{}",l),
-            Expression::PREFIX(op, expr) => write!(f, "({}{})", op, expr),
-            Expression::INFIX(op, left, right) => write!(f, "({} {} {})", left, op, right),
+            Expression::PREFIX(op, expr) => write!(f, "({}{})", op.kind, expr),
+            Expression::INFIX(op, left, right) => write!(f, "({} {} {})", left, op.kind, right),
             Expression::IF(condition, if_block, else_block) => {
                 if let Some(else_block) = else_block {
                     write!(f,
