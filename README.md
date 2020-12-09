@@ -1,5 +1,5 @@
 # monkey-rust
-![Rust](https://github.com/gengjiawen/monkey_rust/workflows/Rust/badge.svg)
+![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/gengjiawen/monkey_rust)
 
 An interpreter for the Monkey programming language written in Rust
