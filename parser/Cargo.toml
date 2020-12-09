@@ -1,10 +1,12 @@
 [package]
 name = "monkey-parser"
 version = "0.1.0"
+description = "a parser for monkey lang"
+homepage = "https://github.com/gengjiawen/monkey-rust"
+repository = "https://github.com/gengjiawen/monkey-rust"
 authors = ["gengjiawen <technicalcute@gmail.com>"]
-homepage = "https://github.com/gengjiawen/monkey_rust"
-repository = "https://github.com/gengjiawen/monkey_rust"
 edition = "2018"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
