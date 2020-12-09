@@ -15,7 +15,7 @@ name = "parser"
 path= "lib.rs"
 
 [[bin]]
-name = "parser"
+name = "monkey-parser"
 path = "main.rs"
 
 [dependencies]

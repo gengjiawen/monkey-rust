@@ -15,7 +15,7 @@ name = "lexer"
 path= "lib.rs"
 
 [[bin]]
-name = "lexer"
+name = "monkey-lexer"
 path = "main.rs"
 
 [dependencies]

@@ -15,7 +15,7 @@ name = "evaluator"
 path= "lib.rs"
 
 [[bin]]
-name = "evaluator"
+name = "monkey-evaluator"
 path = "main.rs"
 
 [dependencies]
