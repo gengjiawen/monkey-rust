@@ -1,6 +1,6 @@
 [package]
 name = "monkey-evaluator"
-version = "0.1.0"
+version = "0.2.0"
 description = "a evaluator for monkey lang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -19,4 +19,4 @@ name = "monkey-evaluator"
 path = "main.rs"
 
 [dependencies]
-monkey-parser = { path = "../parser", version = "0.1.0" }
+monkey-parser = { path = "../parser", version = "0.2.0" }
