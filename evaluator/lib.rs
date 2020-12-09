@@ -124,8 +124,7 @@ fn eval_expressions(exprs: &Vec<Expression>, env: &Env) -> Result<Vec<Rc<Object>
 }
 
 fn eval_identifier(id: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
-    // todo why borrow not working ?
-    match env.borrow_mut().get(id) {
+    match env.borrow().get(id) {
         Some(obj) => Ok(obj.clone()),
         None => Err(format!("unknown identifier {}", id))
     }
