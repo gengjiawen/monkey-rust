@@ -10,7 +10,7 @@ fn main() {
     let env: Env = Rc::new(RefCell::new(Default::default()));
     loop {
         let mut input = String::new();
-        stdin().read_line(&mut input);
+        stdin().read_line(&mut input).unwrap();
 
         if input.trim_end().is_empty() {
             println!("bye");
