@@ -50,6 +50,7 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Token {
+        // println!("self ch {}, position {} read_position {}", self.ch, self.position, self.read_position);
         self.skip_whitespace();
         let t = match self.ch {
             '=' => {
@@ -81,6 +82,10 @@ impl<'a> Lexer<'a> {
             '{' => TokenKind::LBRACE,
             '}' => TokenKind::RBRACE,
             '\u{0}' => TokenKind::EOF,
+            '"' => {
+                let (start, end, string) = self.read_string();
+                return Token { start, end, kind: TokenKind::STRING(string) };
+            },
             _ => {
                 if is_letter(self.ch) {
                     let (start, end, identifier) = self.read_identifier();
@@ -123,6 +128,24 @@ impl<'a> Lexer<'a> {
         let x = self.input[pos..self.position].parse().unwrap();
 
         return (pos, self.position, x)
+    }
+
+    fn read_string(&mut self) -> (usize, usize, String) {
+        let pos = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == '"' || self.ch == '\u{0}' {
+                break
+            }
+        }
+        
+        let x = self.input[pos..self.position].to_string();
+
+        // consume the end "
+        if self.ch == '"'{
+            self.read_char();
+        }
+        return (pos - 1, self.position, x)
     }
 }
 
@@ -174,6 +197,14 @@ mod tests {
     #[test]
     fn test_lexer_let_with_space() {
         let mut l = Lexer::new("let x = 5");
+        let token_vs = test_token_set(&mut l);
+
+        assert_debug_snapshot!(token_vs)
+    }
+
+    #[test]
+    fn test_lexer_string() {
+        let mut l = Lexer::new(r#""a""#);
         let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)

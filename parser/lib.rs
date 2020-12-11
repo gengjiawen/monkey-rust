@@ -452,4 +452,10 @@ mod tests {
         verify_program(&tt);
     }
 
+   #[test]
+    fn test_string_literal_expression() {
+        let test_case = [(r#""hello world";"#, r#""hello world""#)];
+        verify_program(&test_case);
+    }
+
 }

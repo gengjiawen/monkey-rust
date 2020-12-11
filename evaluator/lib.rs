@@ -161,6 +161,9 @@ fn eval_infix(op: &Token, left: &Object, right: &Object) -> Result<Rc<Object>, E
         (Object::Boolean(left), Object::Boolean(right)) => {
             return eval_boolean_infix(op, *left, *right);
         }
+        (Object::String(left), Object::String(right)) => {
+            return eval_string_infix(op, left.to_string(), right.to_string());
+        }
         _ => Err(format!("eval infix error for op: {}, left: {}, right: {}", op, left, right))
     }
 }
@@ -175,7 +178,7 @@ fn eval_integer_infix(op: &Token, left: i64, right: i64) -> Result<Rc<Object>, E
         TokenKind::GT => Object::Boolean(left > right),
         TokenKind::EQ => Object::Boolean(left == right),
         TokenKind::NotEq => Object::Boolean(left != right),
-        op => return Err(format!("Invalid infix operator for int: {}", op))
+        op => return Err(format!("Invalid infix operator {} for int", op))
     };
 
     Ok(Rc::from(result))
@@ -191,13 +194,23 @@ fn eval_boolean_infix(op: &Token, left: bool, right: bool) -> Result<Rc<Object>,
     Ok(Rc::from(result))
 }
 
+fn eval_string_infix(op: &Token, left: String, right: String) -> Result<Rc<Object>, EvalError> {
+    let result = match &op.kind {
+        TokenKind::EQ => Object::Boolean(left == right),
+        TokenKind::NotEq => Object::Boolean(left != right),
+        TokenKind::PLUS => Object::String(format!("{}{}", left, right)),
+        op => return Err(format!("Invalid infix {} operator for string", op))
+    };
+
+    Ok(Rc::from(result))
+}
 
 fn eval_literal(literal: &Literal) -> Result<Rc<Object>, EvalError> {
     match literal {
         Literal::Integer(i) => Ok(Rc::from(Object::Integer(*i))),
         Literal::Boolean(b) => Ok(Rc::from(Object::Boolean(*b))),
-        // Literal::String(s) => Ok(Object::String(s)),
-        l => return Err(format!("unknown literal: {}", *l))
+        Literal::String(s) => Ok(Rc::from(Object::String(s.clone()))),
+        // l => return Err(format!("unknown literal: {}", *l))
     }
 }
 
@@ -358,4 +371,15 @@ mod tests {
         ];
         apply_test(&test_case);
     }
+
+   #[test]
+    fn test_string_concatenation() {
+        let test_case = [
+            (r#""Hello" + " " + "World!""#, "Hello World!"),
+            (r#""Hello" == "Hello""#, "true"),
+            (r#""Hello" == "Hi""#, "false"),
+        ];
+        apply_test(&test_case);
+    }
+
 }
