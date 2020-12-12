@@ -1,3 +1,4 @@
+mod builtins;
 mod object;
 pub mod environment;
 
@@ -7,6 +8,7 @@ use crate::object::{EvalError, Object};
 use parser::lexer::token::{TokenKind, Token};
 use std::rc::Rc;
 use std::cell::RefCell;
+use crate::builtins::BUILTINS;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
     match node {
@@ -101,6 +103,7 @@ fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Ob
             return unwrap_return(evaluated);
 
         },
+        Object::Builtin(b) => Ok(Rc::new(b(args.to_vec()))),
         f => Err(format!("expected {} to be a function", f))
     }
 }
@@ -126,7 +129,12 @@ fn eval_expressions(exprs: &Vec<Expression>, env: &Env) -> Result<Vec<Rc<Object>
 fn eval_identifier(id: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
     match env.borrow().get(id) {
         Some(obj) => Ok(obj.clone()),
-        None => Err(format!("unknown identifier {}", id))
+        None => {
+            match BUILTINS.get(id) {
+                Some(obj) => Ok(Rc::new(Object::Builtin(*obj))),
+                None => Err(format!("unknown identifier {}", id)),
+            }
+        }
     }
 }
 
@@ -214,6 +222,7 @@ fn eval_literal(literal: &Literal) -> Result<Rc<Object>, EvalError> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use parser::*;
     use crate::eval;
@@ -378,6 +387,34 @@ mod tests {
             (r#""Hello" + " " + "World!""#, "Hello World!"),
             (r#""Hello" == "Hello""#, "true"),
             (r#""Hello" == "Hi""#, "false"),
+        ];
+        apply_test(&test_case);
+    }
+
+       #[test]
+    fn test_builtin_functions() {
+        let test_case = [
+            (r#"len("")"#, "0"),
+            (r#"len("four")"#, "4"),
+            (r#"len("hello world")"#, "11"),
+            // ("len([1, 2, 3])", "3"),
+            // ("len([])", "0"),
+            // ("len(1)", "argument to `len` not supported, got 1"),
+            // (
+            //     r#"len("one", "two")"#,
+            //     "invalid number of arguments: expected=1, got=2",
+            // ),
+            // // (r#"puts("hello", "world!")"#, "null"),
+            // ("first([1, 2, 3])", "1"),
+            // ("first([])", "null"),
+            // ("first(1)", "argument to `first` must be ARRAY, got 1"),
+            // ("last([1, 2, 3])", "3"),
+            // ("last([])", "null"),
+            // ("last(1)", "argument to `last` must be ARRAY, got 1"),
+            // ("rest([1, 2, 3])", "[2, 3]"),
+            // ("rest([])", "null"),
+            // ("push([], 1)", "[1]"),
+            // ("push(1, 1)", "argument to `push` must be ARRAY, got 1"),
         ];
         apply_test(&test_case);
     }
