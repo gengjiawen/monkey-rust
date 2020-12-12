@@ -5,6 +5,7 @@ use crate::environment::Env;
 use parser::ast::BlockStatement;
 
 pub type EvalError = String;
+pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Object;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
@@ -14,6 +15,8 @@ pub enum Object {
     Null,
     ReturnValue(Rc<Object>),
     Function(Vec<String>, BlockStatement, Env),
+    Builtin(BuiltinFunc),
+    Error(String),
 }
 
 impl fmt::Display for Object {
@@ -27,6 +30,8 @@ impl fmt::Display for Object {
             Object::Function(params, body,  _env) => {
                 write!(f, "fn({}) {{ {} }}", params.join(", "), body)
             },
+            Object::Builtin(_) => write!(f, "[builtin function]"),
+            Object::Error(e) => write!(f, "{}", e),
         }
     }
 }
