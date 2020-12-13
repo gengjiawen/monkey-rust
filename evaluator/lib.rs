@@ -57,7 +57,7 @@ fn is_truthy(obj: &Object) -> bool {
 
 fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, EvalError> {
     match expression {
-        Expression::LITERAL(literal) => eval_literal(literal),
+        Expression::LITERAL(literal) => eval_literal(literal, env),
         Expression::PREFIX(op, expr) => {
             let right = eval_expression(expr, &Rc::clone(env))?;
             return eval_prefix(op, &right);
@@ -213,11 +213,15 @@ fn eval_string_infix(op: &Token, left: String, right: String) -> Result<Rc<Objec
     Ok(Rc::from(result))
 }
 
-fn eval_literal(literal: &Literal) -> Result<Rc<Object>, EvalError> {
+fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
     match literal {
         Literal::Integer(i) => Ok(Rc::from(Object::Integer(*i))),
         Literal::Boolean(b) => Ok(Rc::from(Object::Boolean(*b))),
         Literal::String(s) => Ok(Rc::from(Object::String(s.clone()))),
+        Literal::Array(elements) => {
+            let list = eval_expressions(elements, env)?;
+            return Ok(Rc::from(Object::Array(list)));
+        }
         // l => return Err(format!("unknown literal: {}", *l))
     }
 }
@@ -416,6 +420,13 @@ mod tests {
             // ("push([], 1)", "[1]"),
             // ("push(1, 1)", "argument to `push` must be ARRAY, got 1"),
         ];
+        apply_test(&test_case);
+    }
+
+
+    #[test]
+    fn test_array_literals() {
+        let test_case = [("[1, 2 * 2, 3 + 3]", "[1, 4, 6]")];
         apply_test(&test_case);
     }
 

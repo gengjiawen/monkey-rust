@@ -12,6 +12,7 @@ pub enum Object {
     Integer(i64),
     Boolean(bool),
     String(String),
+    Array(Vec<Rc<Object>>),
     Null,
     ReturnValue(Rc<Object>),
     Function(Vec<String>, BlockStatement, Env),
@@ -32,6 +33,7 @@ impl fmt::Display for Object {
             },
             Object::Builtin(_) => write!(f, "[builtin function]"),
             Object::Error(e) => write!(f, "{}", e),
+            Object::Array(e) => write!(f, "[{}]", e.iter().map(|o|o.to_string()).collect::<Vec<String>>().join(", "))
         }
     }
 }

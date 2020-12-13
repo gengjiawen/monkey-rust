@@ -159,6 +159,10 @@ impl<'a> Parser<'a> {
                 self.expect_peek(&TokenKind::RPAREN)?;
                 return expr
             },
+            TokenKind::LBRACKET => {
+                let elements = self.parse_expression_list(&TokenKind::RBRACKET)?;
+                return Ok(Expression::LITERAL(Literal::Array(elements)));
+            },
             TokenKind::IF => self.parse_if_expression(),
             TokenKind::FUNCTION => self.parse_fn_expression(),
             _ => {
@@ -455,6 +459,15 @@ mod tests {
    #[test]
     fn test_string_literal_expression() {
         let test_case = [(r#""hello world";"#, r#""hello world""#)];
+        verify_program(&test_case);
+    }
+
+    #[test]
+    fn test_array_literal_expression() {
+        let test_case = [
+            ("[]", "[]"),
+            ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)]")
+        ];
         verify_program(&test_case);
     }
 

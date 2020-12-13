@@ -1,0 +1,28 @@
+---
+source: lexer/lib.rs
+expression: token_vs
+---
+[
+    Token {
+        start: 0,
+        end: 1,
+        kind: LBRACKET,
+    },
+    Token {
+        start: 1,
+        end: 2,
+        kind: INT(
+            3,
+        ),
+    },
+    Token {
+        start: 2,
+        end: 3,
+        kind: RBRACKET,
+    },
+    Token {
+        start: 3,
+        end: 4,
+        kind: EOF,
+    },
+]

@@ -81,6 +81,8 @@ impl<'a> Lexer<'a> {
             '>' => TokenKind::GT,
             '{' => TokenKind::LBRACE,
             '}' => TokenKind::RBRACE,
+            '[' => TokenKind::LBRACKET,
+            ']' => TokenKind::RBRACKET,
             '\u{0}' => TokenKind::EOF,
             '"' => {
                 let (start, end, string) = self.read_string();
@@ -205,6 +207,14 @@ mod tests {
     #[test]
     fn test_lexer_string() {
         let mut l = Lexer::new(r#""a""#);
+        let token_vs = test_token_set(&mut l);
+
+        assert_debug_snapshot!(token_vs)
+    }
+
+    #[test]
+    fn test_lexer_array() {
+        let mut l = Lexer::new("[3]");
         let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)
