@@ -120,7 +120,7 @@ fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Ob
             return unwrap_return(evaluated);
 
         },
-        Object::Builtin(b) => Ok(Rc::new(b(args.to_vec()))),
+        Object::Builtin(b) => Ok(b(args.to_vec())),
         f => Err(format!("expected {} to be a function", f))
     }
 }
@@ -412,30 +412,12 @@ mod tests {
         apply_test(&test_case);
     }
 
-       #[test]
+    #[test]
     fn test_builtin_functions() {
         let test_case = [
             (r#"len("")"#, "0"),
             (r#"len("four")"#, "4"),
             (r#"len("hello world")"#, "11"),
-            // ("len([1, 2, 3])", "3"),
-            // ("len([])", "0"),
-            // ("len(1)", "argument to `len` not supported, got 1"),
-            // (
-            //     r#"len("one", "two")"#,
-            //     "invalid number of arguments: expected=1, got=2",
-            // ),
-            // // (r#"puts("hello", "world!")"#, "null"),
-            // ("first([1, 2, 3])", "1"),
-            // ("first([])", "null"),
-            // ("first(1)", "argument to `first` must be ARRAY, got 1"),
-            // ("last([1, 2, 3])", "3"),
-            // ("last([])", "null"),
-            // ("last(1)", "argument to `last` must be ARRAY, got 1"),
-            // ("rest([1, 2, 3])", "[2, 3]"),
-            // ("rest([])", "null"),
-            // ("push([], 1)", "[1]"),
-            // ("push(1, 1)", "argument to `push` must be ARRAY, got 1"),
         ];
         apply_test(&test_case);
     }
@@ -450,9 +432,6 @@ mod tests {
     #[test]
     fn test_array_index_expressions() {
         let test_case = [
-            ("[1, 2, 3][0]", "1"),
-            ("[1, 2, 3][1]", "2"),
-            ("[1, 2, 3][2]", "3"),
             ("let i = 0; [1][i];", "1"),
             ("[1, 2, 3][1 + 1];", "3"),
             ("let myArray = [1, 2, 3]; myArray[2];", "3"),
@@ -468,6 +447,30 @@ mod tests {
             ("[1, 2, 3][-1]", "null"),
         ];
         apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_array_builtin_functions() {
+        let test_case = [
+            ("len([1, 2, 3])", "3"),
+            ("len([])", "0"),
+            (r#"puts("hello", "world!")"#, "null"),
+            ("first([1, 2, 3])", "1"),
+            ("first([])", "null"),
+            ("last([1, 2, 3])", "3"),
+            ("last([])", "null"),
+            ("rest([1, 2, 3])", "[2, 3]"),
+            ("rest([])", "null"),
+            ("push([], 1)", "[1]"),
+        ];
+        apply_test(&test_case);
+        // let illegal_cases = [
+        //     "len(1)",
+        //     r#"len("one", "two")"#,
+        //     "first(1)",
+        //     "last(1)",
+        //     "push(1, 1)"
+        // ];
     }
 
 }

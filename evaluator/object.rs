@@ -5,7 +5,7 @@ use crate::environment::Env;
 use parser::ast::BlockStatement;
 
 pub type EvalError = String;
-pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Object;
+pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Rc<Object>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
