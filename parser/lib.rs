@@ -192,8 +192,11 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 return Some(self.parse_fn_call_expression(left.clone()));
             },
-            _ => None,
-
+            TokenKind::LBRACKET => {
+                self.next_token();
+                return Some(self.parse_index_expression(left.clone()));
+            },
+            _ => None
         }
     }
 
@@ -299,6 +302,16 @@ impl<'a> Parser<'a> {
 
         return Ok(expr_list);
     }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
+        self.next_token();
+        let index = self.parse_expression(Precedence::LOWEST)?;
+
+        self.expect_peek(&TokenKind::RBRACKET)?;
+
+        return Ok(Expression::Index(Box::new(left), Box::new(index)));
+    }
+
 }
 
 pub fn parse(input: &str) -> Result<Node, ParseErrors> {
@@ -316,11 +329,11 @@ mod tests {
     fn verify_program(test_cases: &[(&str, &str)]) {
 
         for (input, expected) in test_cases {
-            let parsed = parse(input).unwrap().to_string();
+            let ast = parse(input).unwrap();
+            let parsed = ast.to_string();
             assert_eq!(&format!("{}", parsed), expected);
         }
     }
-
 
     #[test]
     fn parse_let_statement() {
@@ -467,6 +480,15 @@ mod tests {
         let test_case = [
             ("[]", "[]"),
             ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)]")
+        ];
+        verify_program(&test_case);
+    }
+
+    #[test]
+    fn test_index_expression() {
+        let test_case = [
+            ("a[1]", "(a[1])"),
+            ("a[1 + 1]", "(a[(1 + 1)])")
         ];
         verify_program(&test_case);
     }

@@ -23,7 +23,7 @@ pub fn get_token_precedence(token: &TokenKind) -> Precedence {
         TokenKind::ASTERISK => Precedence::PRODUCT,
         TokenKind::SLASH => Precedence::PRODUCT,
         TokenKind::LPAREN => Precedence::CALL,
-        TokenKind::LBRACE => Precedence::INDEX,
+        TokenKind::LBRACKET => Precedence::INDEX,
         _ => Precedence::LOWEST,
     }
 }

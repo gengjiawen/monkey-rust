@@ -78,6 +78,7 @@ pub enum Expression {
     IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
     FUNCTION(Vec<String>, BlockStatement),
     FunctionCall(Box<Expression>, Vec<Expression>), // function can be Identifier or FunctionLiteral (think iife)
+    Index(Box<Expression>, Box<Expression>),
 }
 
 impl fmt::Display for Expression {
@@ -108,6 +109,9 @@ impl fmt::Display for Expression {
             }
             Expression::FunctionCall(function, args) => {
                 write!(f, "{}({})", function, format_expressions(args))
+            }
+            Expression::Index(left, index) => {
+                write!(f, "({}[{}])", left, index)
             }
         }
     }

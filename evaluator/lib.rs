@@ -87,6 +87,23 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
             let args = eval_expressions(args, env)?;
             apply_function(&func, &args)
         }
+        Expression::Index(left, index) => {
+            let literal = eval_expression(left, &Rc::clone(env))?;
+            let index = eval_expression(index, env)?;
+            eval_index_expression(&literal, &index)
+        }
+    }
+}
+
+fn eval_index_expression(left: &Rc<Object>, index: &Rc<Object>) -> Result<Rc<Object>, EvalError> {
+    match (&**left, &**index) {
+        (Object::Array(arr), Object::Integer(idx)) => {
+            match arr.get(*idx as usize) {
+                Some(obj) => return Ok(Rc::clone(obj)),
+                None => return Ok(Rc::new(Object::Null))
+            }
+        },
+        _ => return Err(format!("index operator not supported for {}", left)),
     }
 }
 
@@ -427,6 +444,29 @@ mod tests {
     #[test]
     fn test_array_literals() {
         let test_case = [("[1, 2 * 2, 3 + 3]", "[1, 4, 6]")];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_array_index_expressions() {
+        let test_case = [
+            ("[1, 2, 3][0]", "1"),
+            ("[1, 2, 3][1]", "2"),
+            ("[1, 2, 3][2]", "3"),
+            ("let i = 0; [1][i];", "1"),
+            ("[1, 2, 3][1 + 1];", "3"),
+            ("let myArray = [1, 2, 3]; myArray[2];", "3"),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                "6",
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                "2",
+            ),
+            ("[1, 2, 3][3]", "null"),
+            ("[1, 2, 3][-1]", "null"),
+        ];
         apply_test(&test_case);
     }
 
