@@ -123,6 +123,7 @@ pub enum Literal {
     Boolean(bool),
     String(String),
     Array(Vec<Expression>),
+    Hash(Vec<(Expression, Expression)>),
 }
 
 impl fmt::Display for Literal {
@@ -132,6 +133,15 @@ impl fmt::Display for Literal {
             Literal::Boolean(b) => write!(f, "{}", b),
             Literal::String(s) => write!(f, "\"{}\"", s),
             Literal::Array(e) => write!(f, "[{}]", format_expressions(e)),
+            Literal::Hash(map) => {
+                let to_string = map
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                write!(f, "{{{}}}", to_string)
+            }
         }
     }
 }

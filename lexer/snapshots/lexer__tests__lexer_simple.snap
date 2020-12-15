@@ -41,11 +41,16 @@ expression: token_vs
     Token {
         start: 7,
         end: 8,
-        kind: SEMICOLON,
+        kind: COLON,
     },
     Token {
         start: 8,
         end: 9,
+        kind: SEMICOLON,
+    },
+    Token {
+        start: 9,
+        end: 10,
         kind: EOF,
     },
 ]

@@ -9,6 +9,7 @@ use parser::lexer::token::{TokenKind, Token};
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::builtins::BUILTINS;
+use std::collections::HashMap;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
     match node {
@@ -99,6 +100,16 @@ fn eval_index_expression(left: &Rc<Object>, index: &Rc<Object>) -> Result<Rc<Obj
     match (&**left, &**index) {
         (Object::Array(arr), Object::Integer(idx)) => {
             match arr.get(*idx as usize) {
+                Some(obj) => return Ok(Rc::clone(obj)),
+                None => return Ok(Rc::new(Object::Null))
+            }
+        },
+        (Object::Hash(map), key) => {
+            if !(key.is_hashable()) {
+                return Err(format!("not a valid hash key"))
+            }
+
+            match map.get(key) {
                 Some(obj) => return Ok(Rc::clone(obj)),
                 None => return Ok(Rc::new(Object::Null))
             }
@@ -238,6 +249,20 @@ fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
         Literal::Array(elements) => {
             let list = eval_expressions(elements, env)?;
             return Ok(Rc::from(Object::Array(list)));
+        }
+        Literal::Hash(map) => {
+            let mut hash_map = HashMap::new();
+
+            for (k, v) in map {
+                let key = eval_expression(k, env)?;
+                if !key.is_hashable() {
+                    return Err(format!("key {} is not hashable", key));
+                }
+                let value = eval_expression(v, env)?;
+                hash_map.insert(key, value);
+            }
+
+            return Ok(Rc::new(Object::Hash(hash_map)));
         }
         // l => return Err(format!("unknown literal: {}", *l))
     }
@@ -471,6 +496,20 @@ mod tests {
         //     "last(1)",
         //     "push(1, 1)"
         // ];
+    }
+
+    #[test]
+    fn test_hash_index_expressions() {
+        let test_case = [
+            (r#"{"foo": 5}["foo"]"#, "5"),
+            (r#"{"foo": 5}["bar"]"#, "null"),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, "5"),
+            (r#"{}["foo"]"#, "null"),
+            (r#"{5: 5}[5]"#, "5"),
+            (r#"{true: 5}[true]"#, "5"),
+            (r#"{false: 5}[false]"#, "5"),
+        ];
+        apply_test(&test_case);
     }
 
 }

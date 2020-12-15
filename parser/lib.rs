@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
         if self.current_token.kind == *token {
             Ok(())
         } else {
-            let e = format!("expected token: {}, got: {}", token, self.current_token);
+            let e = format!("expected token: {} got: {}", token, self.current_token);
             Err(e)
         }
     }
@@ -159,12 +159,13 @@ impl<'a> Parser<'a> {
                 self.expect_peek(&TokenKind::RPAREN)?;
                 return expr
             },
+            TokenKind::IF => self.parse_if_expression(),
+            TokenKind::FUNCTION => self.parse_fn_expression(),
             TokenKind::LBRACKET => {
                 let elements = self.parse_expression_list(&TokenKind::RBRACKET)?;
                 return Ok(Expression::LITERAL(Literal::Array(elements)));
             },
-            TokenKind::IF => self.parse_if_expression(),
-            TokenKind::FUNCTION => self.parse_fn_expression(),
+            TokenKind::LBRACE => self.parse_hash_expression(),
             _ => {
                 Err(format!("no prefix function for token: {}", self.current_token))
             }
@@ -310,6 +311,30 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::RBRACKET)?;
 
         return Ok(Expression::Index(Box::new(left), Box::new(index)));
+    }
+
+    fn parse_hash_expression(&mut self) -> Result<Expression, ParseError> {
+        let mut map = Vec::new();
+        while !self.peek_token_is(&TokenKind::RBRACE) {
+            self.next_token();
+
+            let key = self.parse_expression(Precedence::LOWEST)?;
+
+            self.expect_peek(&TokenKind::COLON)?;
+
+            self.next_token();
+            let value = self.parse_expression(Precedence::LOWEST)?;
+
+            map.push((key, value));
+
+            if !self.peek_token_is(&TokenKind::RBRACE) {
+                self.expect_peek(&TokenKind::COMMA)?;
+            }
+        }
+
+        self.expect_peek(&TokenKind::RBRACE)?;
+
+        Ok(Expression::LITERAL(Literal::Hash(map)))
     }
 
 }
@@ -489,6 +514,26 @@ mod tests {
         let test_case = [
             ("a[1]", "(a[1])"),
             ("a[1 + 1]", "(a[(1 + 1)])")
+        ];
+        verify_program(&test_case);
+    }
+
+    #[test]
+    fn test_hash_literal_expression() {
+        let test_case = [
+            (
+                r#"{"a": 1}"#,
+                r#"{"a": 1}"#,
+            ),
+            (
+                r#"{"one": 1, "two": 2, "three": 3}"#,
+                r#"{"one": 1, "two": 2, "three": 3}"#,
+            ),
+            (r#"{}"#, r#"{}"#),
+            (
+                r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#,
+                r#"{"one": (0 + 1), "two": (10 - 8), "three": (15 / 5)}"#,
+            ),
         ];
         verify_program(&test_case);
     }

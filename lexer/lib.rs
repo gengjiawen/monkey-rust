@@ -82,6 +82,7 @@ impl<'a> Lexer<'a> {
             '{' => TokenKind::LBRACE,
             '}' => TokenKind::RBRACE,
             '[' => TokenKind::LBRACKET,
+            ':' => TokenKind::COLON,
             ']' => TokenKind::RBRACKET,
             '\u{0}' => TokenKind::EOF,
             '"' => {
@@ -182,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_lexer_simple() {
-        let mut l = Lexer::new("=+(){},;");
+        let mut l = Lexer::new("=+(){},:;");
         let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)
@@ -215,6 +216,14 @@ mod tests {
     #[test]
     fn test_lexer_array() {
         let mut l = Lexer::new("[3]");
+        let token_vs = test_token_set(&mut l);
+
+        assert_debug_snapshot!(token_vs)
+    }
+
+    #[test]
+    fn test_lexer_hash() {
+        let mut l = Lexer::new(r#"{"one": 1, "two": 2, "three": 3}"#);
         let token_vs = test_token_set(&mut l);
 
         assert_debug_snapshot!(token_vs)

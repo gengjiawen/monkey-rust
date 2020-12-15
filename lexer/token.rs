@@ -41,6 +41,7 @@ pub enum TokenKind {
     // delimiters
     COMMA,
     SEMICOLON,
+    COLON,
 
     LPAREN,
     RPAREN,
@@ -105,6 +106,7 @@ impl fmt::Display for TokenKind {
             TokenKind::RETURN => write!(f, "return"),
             TokenKind::ILLEGAL => write!(f, "ILLEGAL"),
             TokenKind::EOF => write!(f, "EOF"),
+            TokenKind::COLON => write!(f, ":")
         }
     }
 }
