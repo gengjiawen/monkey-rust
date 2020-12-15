@@ -5,6 +5,7 @@ use phf::phf_map;
 pub static BUILTINS: phf::Map<&'static str, BuiltinFunc> = phf_map! {
     "len" => len,
     "puts" => puts,
+    "print" => puts,
     "first" => first,
     "last" => last,
     "rest" => rest,
