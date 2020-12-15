@@ -241,7 +241,7 @@ checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "monkey-evaluator"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "monkey-parser",
  "phf",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-lexer"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-insta",
  "insta",
@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-parser"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "monkey-lexer",
 ]
