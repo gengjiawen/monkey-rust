@@ -43,7 +43,7 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
             env.borrow_mut().set(id.clone(), obj);
-            return Ok(val);
+            return Ok(Rc::new(Object::Null));
         }
     }
 }
