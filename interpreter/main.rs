@@ -1,9 +1,9 @@
 use parser::parse;
 use std::io::stdin;
-use evaluator::eval;
+use interpreter::eval;
 use std::rc::Rc;
 use std::cell::RefCell;
-use evaluator::environment::Env;
+use interpreter::environment::Env;
 
 fn main() {
     println!("Welcome to monkey interpreter by gengjiawen");
