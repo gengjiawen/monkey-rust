@@ -1,5 +1,5 @@
 [package]
-name = "monkey-evaluator"
+name = "monkey-interpreter"
 version = "0.3.0"
 description = "a evaluator for monkey lang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
@@ -11,11 +11,11 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "evaluator"
+name = "monkey-interpreter"
 path= "lib.rs"
 
 [[bin]]
-name = "monkey-evaluator"
+name = "monkey-interpreter"
 path = "main.rs"
 
 [dependencies]

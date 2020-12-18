@@ -2,5 +2,5 @@
 members = [
   "lexer",
   "parser",
-  "evaluator",
+    "interpreter",
 ]

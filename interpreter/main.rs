@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use evaluator::environment::Env;
 
 fn main() {
-    println!("Welcome to monkey evaluator by gengjiawen");
+    println!("Welcome to monkey interpreter by gengjiawen");
     let env: Env = Rc::new(RefCell::new(Default::default()));
     loop {
         let mut input = String::new();
