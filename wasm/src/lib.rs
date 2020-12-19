@@ -1,6 +1,7 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
+use parser::parse;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -14,6 +15,11 @@ extern {
 }
 
 #[wasm_bindgen]
-pub fn greet() {
-    alert("Hello, monkey-wasm!");
+pub fn greet() -> String {
+    match parse("let a = 3") {
+        Ok(node) => {
+            node.to_string()
+        },
+        Err(e) => format!("parse error: {}", e[0])
+    }
 }
