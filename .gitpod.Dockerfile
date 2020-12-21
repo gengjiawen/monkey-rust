@@ -6,5 +6,5 @@ FROM gengjiawen/node-build
 #
 # More information: https://www.gitpod.io/docs/config-docker/
 
-RUN cargo install --git https://github.com/rustwasm/wasm-pack --debug
 RUN rustup target add wasm32-unknown-unknown
+RUN cargo install wasm-pack
