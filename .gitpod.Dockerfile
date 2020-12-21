@@ -6,4 +6,4 @@ FROM gengjiawen/node-build
 #
 # More information: https://www.gitpod.io/docs/config-docker/
 
-RUN cargo install wasm-pack
+RUN cargo install --git https://github.com/rustwasm/wasm-pack --debug
