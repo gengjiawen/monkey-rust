@@ -3,4 +3,5 @@ members = [
   "lexer",
   "parser",
   "interpreter",
+  "wasm"
 ]
