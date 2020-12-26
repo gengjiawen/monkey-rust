@@ -11,9 +11,9 @@ expression: token_vs
     Token {
         start: 4,
         end: 8,
-        kind: IDENTIFIER(
-            "five",
-        ),
+        kind: IDENTIFIER {
+            name: "five",
+        },
     },
     Token {
         start: 9,
@@ -40,9 +40,9 @@ expression: token_vs
     Token {
         start: 18,
         end: 21,
-        kind: IDENTIFIER(
-            "ten",
-        ),
+        kind: IDENTIFIER {
+            name: "ten",
+        },
     },
     Token {
         start: 22,
@@ -69,9 +69,9 @@ expression: token_vs
     Token {
         start: 33,
         end: 36,
-        kind: IDENTIFIER(
-            "add",
-        ),
+        kind: IDENTIFIER {
+            name: "add",
+        },
     },
     Token {
         start: 37,
@@ -91,9 +91,9 @@ expression: token_vs
     Token {
         start: 42,
         end: 43,
-        kind: IDENTIFIER(
-            "x",
-        ),
+        kind: IDENTIFIER {
+            name: "x",
+        },
     },
     Token {
         start: 43,
@@ -103,9 +103,9 @@ expression: token_vs
     Token {
         start: 45,
         end: 46,
-        kind: IDENTIFIER(
-            "y",
-        ),
+        kind: IDENTIFIER {
+            name: "y",
+        },
     },
     Token {
         start: 46,
@@ -120,9 +120,9 @@ expression: token_vs
     Token {
         start: 52,
         end: 53,
-        kind: IDENTIFIER(
-            "x",
-        ),
+        kind: IDENTIFIER {
+            name: "x",
+        },
     },
     Token {
         start: 54,
@@ -132,9 +132,9 @@ expression: token_vs
     Token {
         start: 56,
         end: 57,
-        kind: IDENTIFIER(
-            "y",
-        ),
+        kind: IDENTIFIER {
+            name: "y",
+        },
     },
     Token {
         start: 57,
@@ -159,9 +159,9 @@ expression: token_vs
     Token {
         start: 67,
         end: 73,
-        kind: IDENTIFIER(
-            "result",
-        ),
+        kind: IDENTIFIER {
+            name: "result",
+        },
     },
     Token {
         start: 74,
@@ -171,9 +171,9 @@ expression: token_vs
     Token {
         start: 76,
         end: 79,
-        kind: IDENTIFIER(
-            "add",
-        ),
+        kind: IDENTIFIER {
+            name: "add",
+        },
     },
     Token {
         start: 79,
@@ -183,9 +183,9 @@ expression: token_vs
     Token {
         start: 80,
         end: 84,
-        kind: IDENTIFIER(
-            "five",
-        ),
+        kind: IDENTIFIER {
+            name: "five",
+        },
     },
     Token {
         start: 84,
@@ -195,9 +195,9 @@ expression: token_vs
     Token {
         start: 86,
         end: 89,
-        kind: IDENTIFIER(
-            "ten",
-        ),
+        kind: IDENTIFIER {
+            name: "ten",
+        },
     },
     Token {
         start: 89,

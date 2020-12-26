@@ -1,9 +1,10 @@
 use core::fmt;
 use core::fmt::Result;
 use std::fmt::Formatter;
-use lexer::token::Token;
+use lexer::token::{Token, TokenKind};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Node {
     Program(Program),
     Statement(Statement),
@@ -20,26 +21,40 @@ impl fmt::Display for Node {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
 pub struct Program {
-    pub statements: Vec<Statement>,
+    pub body: Vec<Statement>,
 }
 
 impl Program {
     pub fn new() -> Self {
-        Program { statements: vec![] }
+        Program { body: vec![] }
     }
 }
 
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", format_statements(&self.statements))
+        write!(f, "{}", format_statements(&self.body))
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Let {
+    pub identifier: Token, // rust can't do precise type with enum
+    pub expr: Expression,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub enum Statement {
-    Let(String, Expression),
+    Let(Let),
     Return(Expression),
     Expr(Expression),
 }
@@ -47,14 +62,19 @@ pub enum Statement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Statement::Let(id, expr) => write!(f, "let {} = {};", id, expr),
+            Statement::Let(Let { identifier: id, expr, .. }) => {
+                if let TokenKind::IDENTIFIER {name} = &id.kind {
+                    return write!(f, "let {} = {};", name, expr)
+                }
+                panic!("unreachable")
+            },
             Statement::Return(expr) => write!(f, "return {};", expr),
             Statement::Expr(expr) => write!(f, "{}", expr),
         }
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Serialize, Deserialize, PartialEq)]
 pub struct BlockStatement(pub Vec<Statement>);
 
 impl BlockStatement {
@@ -69,7 +89,7 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Expression {
     IDENTIFIER(String),
     LITERAL(Literal),
@@ -117,7 +137,7 @@ impl fmt::Display for Expression {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
 pub enum Literal {
     Integer(i64),
     Boolean(bool),

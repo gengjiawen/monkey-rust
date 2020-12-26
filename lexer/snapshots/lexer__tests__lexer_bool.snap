@@ -11,9 +11,9 @@ expression: token_vs
     Token {
         start: 4,
         end: 5,
-        kind: IDENTIFIER(
-            "y",
-        ),
+        kind: IDENTIFIER {
+            name: "y",
+        },
     },
     Token {
         start: 5,

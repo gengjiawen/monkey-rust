@@ -4,7 +4,7 @@ mod precedences;
 pub extern crate lexer;
 use lexer::token::{TokenKind, Token};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Span};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -68,7 +68,7 @@ impl<'a> Parser<'a> {
         let mut program = Program::new();
         while !self.current_token_is(&TokenKind::EOF) {
             match self.parse_statement() {
-                Ok(stmt) => program.statements.push(stmt),
+                Ok(stmt) => program.body.push(stmt),
                 Err(e) => self.errors.push(e),
             }
             self.next_token();
@@ -90,11 +90,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.current_token.start;
         self.next_token();
-        let name = match self.current_token.kind {
-            TokenKind::IDENTIFIER(ref id) => id.to_string(),
-            _ => return Err(format!("not an identifier"))
+
+        let name = self.current_token.clone();
+        match &self.current_token.kind {
+            TokenKind::IDENTIFIER { name: _ } => {},
+            _ => return Err(format!("{} not an identifier", self.current_token))
         };
+
         self.expect_peek(&TokenKind::ASSIGN)?;
         self.next_token();
 
@@ -104,7 +108,16 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        return Ok(Statement::Let(name, value));
+        let end = self.current_token.end;
+
+        return Ok(Statement::Let(Let {
+            identifier: name,
+            expr: value,
+            span: Span {
+                start,
+                end,
+            },
+        }));
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
@@ -143,7 +156,7 @@ impl<'a> Parser<'a> {
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER(ref id) => return Ok(Expression::IDENTIFIER(id.clone())),
+            TokenKind::IDENTIFIER {name} => return Ok(Expression::IDENTIFIER(name.clone())),
             TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(*i))),
             TokenKind::STRING(s) => return Ok(Expression::LITERAL(Literal::String(s.to_string()))),
             b @ TokenKind::TRUE| b @ TokenKind::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(*b == TokenKind::TRUE))),
@@ -259,7 +272,7 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER(ref id) => params.push(id.clone()),
+            TokenKind::IDENTIFIER{ name} => params.push(name.clone()),
             token => return Err(format!("expected function params  to be an identifier, got {}", token))
         }
 
@@ -267,7 +280,7 @@ impl<'a> Parser<'a> {
            self.next_token();
            self.next_token();
             match &self.current_token.kind {
-                TokenKind::IDENTIFIER(ref id) => params.push(id.clone()),
+                TokenKind::IDENTIFIER {name} => params.push(name.clone()),
                 token => return Err(format!("expected function params  to be an identifier, got {}", token))
             }
         }
@@ -538,4 +551,14 @@ mod tests {
         verify_program(&test_case);
     }
 
+    #[test]
+    fn test_span() {
+        let let_ast = match parse("let a = 3") {
+            Ok(node) => {
+                serde_json::to_string(&node).unwrap()
+            },
+            Err(e) => format!("parse error: {}", e[0])
+        };
+        println!("{}", let_ast)
+    }
 }

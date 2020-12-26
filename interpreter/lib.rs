@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
     match node {
-        Node::Program(p) => eval_block_statements(&p.statements, env),
+        Node::Program(p) => eval_block_statements(&p.body, env),
         Node::Statement(statements) => eval_statement(&statements, env),
         Node::Expression(expression) => eval_expression(&expression, env),
     }
@@ -39,10 +39,12 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
             let val = eval_expression(expr, env)?;
             return Ok(Rc::new(Object::ReturnValue(val)));
         },
-        Statement::Let(id, expr) => {
+        Statement::Let(Let { identifier: id, expr: expr, .. }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
-            env.borrow_mut().set(id.clone(), obj);
+            if let TokenKind::IDENTIFIER {name} = &id.kind {
+                env.borrow_mut().set(name.clone(), obj);
+            }
             return Ok(Rc::new(Object::Null));
         }
     }

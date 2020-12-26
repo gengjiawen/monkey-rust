@@ -1,7 +1,8 @@
 use std::fmt;
 use std::fmt::Formatter;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Token {
     pub start: usize,
     pub end: usize,
@@ -14,13 +15,14 @@ impl fmt::Display for Token {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
+#[serde(tag = "type")]
 pub enum TokenKind {
     ILLEGAL,
     EOF,
 
     // Identifiers + literals
-    IDENTIFIER(String),
+    IDENTIFIER{name: String},
     INT(i64),
     STRING(String),
 
@@ -69,14 +71,14 @@ pub fn lookup_identifier(identifier: &str) -> TokenKind {
         "if" => TokenKind::IF,
         "else" => TokenKind::ELSE,
         "return" => TokenKind::RETURN,
-        _ => TokenKind::IDENTIFIER(identifier.to_string())
+        _ => TokenKind::IDENTIFIER { name: identifier.to_string() }
     }
 }
 
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TokenKind::IDENTIFIER(id) => write!(f, "{}", id),
+            TokenKind::IDENTIFIER {name} => write!(f, "{}", name),
             TokenKind::INT(i) => write!(f, "{}", i),
             TokenKind::STRING(s) => write!(f, "{}", s),
             TokenKind::ASSIGN => write!(f, "="),
