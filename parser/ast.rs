@@ -138,21 +138,43 @@ impl fmt::Display for Expression {
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub enum Literal {
-    Integer(i64),
-    Boolean(bool),
-    String(String),
-    Array(Vec<Expression>),
+    Integer(Integer),
+    Boolean(Boolean),
+    String(StringType),
+    Array(Array),
     Hash(Vec<(Expression, Expression)>),
 }
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Integer {
+    pub raw: i64,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Boolean {
+    pub raw: bool,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct StringType {
+    pub raw: String,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Array { pub elements: Vec<Expression> }
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Literal::Integer(i) => write!(f, "{}", i),
-            Literal::Boolean(b) => write!(f, "{}", b),
-            Literal::String(s) => write!(f, "\"{}\"", s),
-            Literal::Array(e) => write!(f, "[{}]", format_expressions(e)),
+            Literal::Integer(Integer { raw: i, .. }) => write!(f, "{}", i),
+            Literal::Boolean(Boolean { raw: b, .. }) => write!(f, "{}", b),
+            Literal::String(StringType { raw: s, .. }) => write!(f, "\"{}\"", s),
+            Literal::Array(Array { elements: e }) => write!(f, "[{}]", format_expressions(e)),
             Literal::Hash(map) => {
                 let to_string = map
                     .iter()

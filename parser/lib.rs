@@ -2,9 +2,10 @@ pub mod ast;
 mod precedences;
 
 pub extern crate lexer;
+
 use lexer::token::{TokenKind, Token};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Span};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Span, Integer, Boolean, StringType, Array};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -95,7 +96,7 @@ impl<'a> Parser<'a> {
 
         let name = self.current_token.clone();
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name: _ } => {},
+            TokenKind::IDENTIFIER { name: _ } => {}
             _ => return Err(format!("{} not an identifier", self.current_token))
         };
 
@@ -156,28 +157,40 @@ impl<'a> Parser<'a> {
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER {name} => return Ok(Expression::IDENTIFIER(name.clone())),
-            TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(*i))),
-            TokenKind::STRING(s) => return Ok(Expression::LITERAL(Literal::String(s.to_string()))),
-            b @ TokenKind::TRUE| b @ TokenKind::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(*b == TokenKind::TRUE))),
+            TokenKind::IDENTIFIER { name } => return Ok(Expression::IDENTIFIER(name.clone())),
+            TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(
+                Integer {
+                    raw: *i,
+                    span: Span { start: self.current_token.start, end: self.current_token.end },
+                }))),
+            TokenKind::STRING(s) => return Ok(Expression::LITERAL(Literal::String(
+                StringType {
+                    raw: s.to_string(),
+                    span: Span { start: self.current_token.start, end: self.current_token.end },
+                }))),
+            b @ TokenKind::TRUE | b @ TokenKind::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(
+                Boolean {
+                    raw: *b == TokenKind::TRUE,
+                    span: Span { start: self.current_token.start, end: self.current_token.end },
+                }))),
             TokenKind::BANG | TokenKind::MINUS => {
                 let prefix_op = self.current_token.clone();
                 self.next_token();
                 let expr = self.parse_expression(Precedence::PREFIX)?;
                 return Ok(Expression::PREFIX(prefix_op, Box::new(expr)));
-            },
+            }
             TokenKind::LPAREN => {
                 self.next_token();
                 let expr = self.parse_expression(Precedence::LOWEST);
                 self.expect_peek(&TokenKind::RPAREN)?;
-                return expr
-            },
+                return expr;
+            }
             TokenKind::IF => self.parse_if_expression(),
             TokenKind::FUNCTION => self.parse_fn_expression(),
             TokenKind::LBRACKET => {
                 let elements = self.parse_expression_list(&TokenKind::RBRACKET)?;
-                return Ok(Expression::LITERAL(Literal::Array(elements)));
-            },
+                return Ok(Expression::LITERAL(Literal::Array(Array { elements: elements })));
+            }
             TokenKind::LBRACE => self.parse_hash_expression(),
             _ => {
                 Err(format!("no prefix function for token: {}", self.current_token))
@@ -201,15 +214,15 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 let right: Expression = self.parse_expression(precedence_value).unwrap();
                 return Some(Ok(Expression::INFIX(infix_op, Box::new(left.clone()), Box::new(right))));
-            },
+            }
             TokenKind::LPAREN => {
                 self.next_token();
                 return Some(self.parse_fn_call_expression(left.clone()));
-            },
+            }
             TokenKind::LBRACKET => {
                 self.next_token();
                 return Some(self.parse_index_expression(left.clone()));
-            },
+            }
             _ => None
         }
     }
@@ -232,7 +245,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        return Ok(Expression::IF(Box::new(condition), consequence, alternative))
+        return Ok(Expression::IF(Box::new(condition), consequence, alternative));
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
@@ -261,7 +274,7 @@ impl<'a> Parser<'a> {
 
         Ok(Expression::FUNCTION(params, function_body))
     }
-    
+
     fn parse_fn_parameters(&mut self) -> Result<Vec<String>, ParseError> {
         let mut params = Vec::new();
         if self.peek_token_is(&TokenKind::RPAREN) {
@@ -272,29 +285,29 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER{ name} => params.push(name.clone()),
+            TokenKind::IDENTIFIER { name } => params.push(name.clone()),
             token => return Err(format!("expected function params  to be an identifier, got {}", token))
         }
 
         while self.peek_token_is(&TokenKind::COMMA) {
-           self.next_token();
-           self.next_token();
+            self.next_token();
+            self.next_token();
             match &self.current_token.kind {
-                TokenKind::IDENTIFIER {name} => params.push(name.clone()),
+                TokenKind::IDENTIFIER { name } => params.push(name.clone()),
                 token => return Err(format!("expected function params  to be an identifier, got {}", token))
             }
         }
 
         self.expect_peek(&TokenKind::RPAREN)?;
 
-        return Ok(params)
+        return Ok(params);
     }
 
     fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
         let arguments = self.parse_expression_list(&TokenKind::RPAREN)?;
         Ok(Expression::FunctionCall(Box::new(expr), arguments))
     }
-    
+
     fn parse_expression_list(&mut self, end: &TokenKind) -> Result<Vec<Expression>, ParseError> {
         let mut expr_list = Vec::new();
         if self.peek_token_is(end) {
@@ -349,7 +362,6 @@ impl<'a> Parser<'a> {
 
         Ok(Expression::LITERAL(Literal::Hash(map)))
     }
-
 }
 
 pub fn parse(input: &str) -> Result<Node, ParseErrors> {
@@ -365,7 +377,6 @@ mod tests {
     use super::*;
 
     fn verify_program(test_cases: &[(&str, &str)]) {
-
         for (input, expected) in test_cases {
             let ast = parse(input).unwrap();
             let parsed = ast.to_string();
@@ -507,7 +518,7 @@ mod tests {
         verify_program(&tt);
     }
 
-   #[test]
+    #[test]
     fn test_string_literal_expression() {
         let test_case = [(r#""hello world";"#, r#""hello world""#)];
         verify_program(&test_case);
@@ -556,7 +567,7 @@ mod tests {
         let let_ast = match parse("let a = 3") {
             Ok(node) => {
                 serde_json::to_string(&node).unwrap()
-            },
+            }
             Err(e) => format!("parse error: {}", e[0])
         };
         println!("{}", let_ast)

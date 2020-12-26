@@ -39,7 +39,7 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
             let val = eval_expression(expr, env)?;
             return Ok(Rc::new(Object::ReturnValue(val)));
         },
-        Statement::Let(Let { identifier: id, expr: expr, .. }) => {
+        Statement::Let(Let { identifier: id, expr, .. }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
             if let TokenKind::IDENTIFIER {name} = &id.kind {
@@ -245,10 +245,10 @@ fn eval_string_infix(op: &Token, left: String, right: String) -> Result<Rc<Objec
 
 fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
     match literal {
-        Literal::Integer(i) => Ok(Rc::from(Object::Integer(*i))),
-        Literal::Boolean(b) => Ok(Rc::from(Object::Boolean(*b))),
-        Literal::String(s) => Ok(Rc::from(Object::String(s.clone()))),
-        Literal::Array(elements) => {
+        Literal::Integer(Integer { raw: i, .. }) => Ok(Rc::from(Object::Integer(*i))),
+        Literal::Boolean(Boolean { raw: b, .. }) => Ok(Rc::from(Object::Boolean(*b))),
+        Literal::String(StringType { raw: s, .. }) => Ok(Rc::from(Object::String(s.clone()))),
+        Literal::Array(Array { elements }) => {
             let list = eval_expressions(elements, env)?;
             return Ok(Rc::from(Object::Array(list)));
         }
