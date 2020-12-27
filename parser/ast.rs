@@ -85,10 +85,10 @@ impl fmt::Display for BlockStatement {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Expression {
-    IDENTIFIER(String),
+    IDENTIFIER(IDENTIFIER),
     LITERAL(Literal),
-    PREFIX(PREFIX),
-    INFIX(Token, Box<Expression>, Box<Expression>),
+    PREFIX(UnaryExpression),
+    INFIX(BinaryExpression),
     IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
     FUNCTION(Vec<String>, BlockStatement),
     FunctionCall(Box<Expression>, Vec<Expression>), // function can be Identifier or FunctionLiteral (think iife)
@@ -96,19 +96,37 @@ pub enum Expression {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
-pub struct PREFIX {
+pub struct IDENTIFIER {
+    pub name: String,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct UnaryExpression {
     pub op: Token,
     pub operand: Box<Expression>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct BinaryExpression {
+    pub op: Token,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
     pub span: Span,
 }
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::IDENTIFIER(id) => write!(f, "{}", id),
+            Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => write!(f, "{}", id),
             Expression::LITERAL(l) => write!(f, "{}",l),
-            Expression::PREFIX(PREFIX { op: op, operand: expr, .. }) => write!(f, "({}{})", op.kind, expr),
-            Expression::INFIX(op, left, right) => write!(f, "({} {} {})", left, op.kind, right),
+            Expression::PREFIX(UnaryExpression { op, operand: expr, .. }) => {
+                write!(f, "({}{})", op.kind, expr)
+            },
+            Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
+                write!(f, "({} {} {})", left, op.kind, right)
+            },
             Expression::IF(condition, if_block, else_block) => {
                 if let Some(else_block) = else_block {
                     write!(f,

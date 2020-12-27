@@ -10,7 +10,6 @@ mod tests {
             }
             Err(e) => format!("parse error: {}", e[0])
         };
-        println!("{}", let_ast);
         assert_snapshot!(name, let_ast);
     }
 
@@ -48,5 +47,11 @@ mod tests {
     fn test_unary() {
         let input = "-3";
         test_ast_tree("test_unary", input)
+    }
+
+    #[test]
+    fn test_binary() {
+        let input = "1 + 2 * 3";
+        test_ast_tree("test_binary", input)
     }
 }

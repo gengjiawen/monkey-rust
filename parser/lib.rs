@@ -6,7 +6,7 @@ pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, PREFIX};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -145,10 +145,17 @@ impl<'a> Parser<'a> {
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<(Expression, Span), ParseError> {
         let start = self.current_token.span.start;
+        let mut left_start = self.current_token.span.start;
         let mut left = self.parse_prefix_expression()?;
         while self.peek_token.kind != TokenKind::SEMICOLON && precedence < get_token_precedence(&self.peek_token.kind) {
-            match self.parse_infix_expression(&left) {
-                Some(infix) => left = infix?,
+            match self.parse_infix_expression(
+                &left,
+                left_start
+            ) {
+                Some(infix) => {
+                    left_start = self.current_token.span.end;
+                    left = infix?
+                }
                 None => return Ok((left, Span {
                     start,
                     end: self.current_token.span.end
@@ -167,7 +174,11 @@ impl<'a> Parser<'a> {
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => return Ok(Expression::IDENTIFIER(name.clone())),
+            TokenKind::IDENTIFIER { name } => return Ok(Expression::IDENTIFIER(
+                IDENTIFIER {
+                    name: name.clone(),
+                    span: self.current_token.clone().span,
+                })),
             TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(
                 Integer {
                     raw: *i,
@@ -188,7 +199,7 @@ impl<'a> Parser<'a> {
                 let prefix_op = self.current_token.clone();
                 self.next_token();
                 let (expr, span) = self.parse_expression(Precedence::PREFIX)?;
-                return Ok(Expression::PREFIX(PREFIX {
+                return Ok(Expression::PREFIX(UnaryExpression {
                     op: prefix_op,
                     operand: Box::new(expr),
                     span: Span {
@@ -220,7 +231,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_infix_expression(&mut self, left: &Expression) -> Option<Result<Expression, ParseError>> {
+    fn parse_infix_expression(&mut self, left: &Expression, left_start: usize) -> Option<Result<Expression, ParseError>> {
         match self.peek_token.kind {
             TokenKind::PLUS |
             TokenKind::MINUS |
@@ -234,8 +245,16 @@ impl<'a> Parser<'a> {
                 let infix_op = self.current_token.clone();
                 let precedence_value = get_token_precedence(&self.current_token.kind);
                 self.next_token();
-                let right: Expression = self.parse_expression(precedence_value).unwrap().0;
-                return Some(Ok(Expression::INFIX(infix_op, Box::new(left.clone()), Box::new(right))));
+                let (right, span) = self.parse_expression(precedence_value).unwrap();
+                return Some(Ok(Expression::INFIX(BinaryExpression {
+                    op: infix_op,
+                    left: Box::new(left.clone()),
+                    right: Box::new(right),
+                    span: Span {
+                        start: left_start,
+                        end: span.end
+                    }
+                })));
             }
             TokenKind::LPAREN => {
                 self.next_token();
@@ -447,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_prefix_expression() {
+    fn test_parse_prefix_expression() {
         let let_tests = [
             ("-15;", "(-15)"),
             ("!5;", "(!5)"),
@@ -461,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_infix_expression() {
+    fn test_parse_infix_expression() {
         let let_tests = [
             ("5 + 5;", "(5 + 5)"),
             ("5 - 5;", "(5 - 5)"),
