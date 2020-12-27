@@ -70,12 +70,12 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
             let right = eval_expression(right, &Rc::clone(env))?;
             return eval_infix(op, &left, &right);
         }
-        Expression::IF(condition, consequence, alternative) => {
+        Expression::IF(IF { condition, consequent, alternate, .. }) => {
             let condition = eval_expression(condition, &Rc::clone(env))?;
             if is_truthy(&condition) {
-                eval_block_statements(&(consequence.0), env)
+                eval_block_statements(&(consequent.0), env)
             } else {
-                match alternative {
+                match alternate {
                     Some(alt) => eval_block_statements(&(alt.0), env),
                     None => Ok(Rc::new(Object::Null))
                 }

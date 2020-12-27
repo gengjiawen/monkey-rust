@@ -6,7 +6,7 @@ pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -268,6 +268,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression, ParseError> {
+        let start = self.current_token.span.start;
         self.expect_peek(&TokenKind::LPAREN)?;
         self.next_token();
 
@@ -275,9 +276,9 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::RPAREN)?;
         self.expect_peek(&TokenKind::LBRACE)?;
 
-        let consequence = self.parse_block_statement()?;
+        let consequent = self.parse_block_statement()?;
 
-        let alternative = if self.peek_token_is(&TokenKind::ELSE) {
+        let alternate = if self.peek_token_is(&TokenKind::ELSE) {
             self.next_token();
             self.expect_peek(&TokenKind::LBRACE)?;
             Some(self.parse_block_statement()?)
@@ -285,7 +286,17 @@ impl<'a> Parser<'a> {
             None
         };
 
-        return Ok(Expression::IF(Box::new(condition), consequence, alternative));
+        let end = self.current_token.span.end;
+
+        return Ok(Expression::IF(IF {
+            condition: Box::new(condition),
+            consequent,
+            alternate,
+            span: Span {
+                start,
+                end,
+            }
+        }));
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {

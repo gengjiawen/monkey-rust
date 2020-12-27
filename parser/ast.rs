@@ -89,7 +89,7 @@ pub enum Expression {
     LITERAL(Literal),
     PREFIX(UnaryExpression),
     INFIX(BinaryExpression),
-    IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
+    IF(IF),
     FUNCTION(Vec<String>, BlockStatement),
     FunctionCall(Box<Expression>, Vec<Expression>), // function can be Identifier or FunctionLiteral (think iife)
     Index(Box<Expression>, Box<Expression>),
@@ -116,6 +116,14 @@ pub struct BinaryExpression {
     pub span: Span,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct IF {
+    pub condition: Box<Expression>,
+    pub consequent: BlockStatement,
+    pub alternate: Option<BlockStatement>,
+    pub span: Span,
+}
+
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -127,19 +135,19 @@ impl fmt::Display for Expression {
             Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
                 write!(f, "({} {} {})", left, op.kind, right)
             },
-            Expression::IF(condition, if_block, else_block) => {
-                if let Some(else_block) = else_block {
+            Expression::IF(IF { condition, consequent, alternate, .. }) => {
+                if let Some(else_block) = alternate {
                     write!(f,
                            "if {} {{ {} }} else {{ {} }}",
                            condition,
-                           if_block,
-                           else_block
+                           consequent,
+                           else_block,
                     )
                 } else {
                     write!(f,
                            "if {} {{ {} }}",
                            condition,
-                           if_block,
+                           consequent,
                     )
                 }
             }
