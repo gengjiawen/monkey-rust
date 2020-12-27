@@ -4,14 +4,20 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Token {
-    pub start: usize,
-    pub end: usize,
+    pub span: Span,
     pub kind: TokenKind,
 }
 
+#[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "start: {}, end: {}, kind: {}", self.start, self.end, self.kind)
+        write!(f, "start: {}, end: {}, kind: {}", self.span.start, self.span.end, self.kind)
     }
 }
 

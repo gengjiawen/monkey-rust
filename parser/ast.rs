@@ -1,7 +1,7 @@
 use core::fmt;
 use core::fmt::Result;
 use std::fmt::Formatter;
-use lexer::token::{Token, TokenKind};
+use lexer::token::{Token, TokenKind, Span};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
@@ -36,12 +36,6 @@ impl fmt::Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", format_statements(&self.body))
     }
-}
-
-#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]

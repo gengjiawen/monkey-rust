@@ -4,9 +4,9 @@ mod ast_tree_test;
 
 pub extern crate lexer;
 
-use lexer::token::{TokenKind, Token};
+use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Span, Integer, Boolean, StringType, Array, Hash};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -92,7 +92,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
-        let start = self.current_token.start;
+        let start = self.current_token.span.start;
         self.next_token();
 
         let name = self.current_token.clone();
@@ -110,7 +110,7 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        let end = self.current_token.end;
+        let end = self.current_token.span.end;
 
         return Ok(Statement::Let(Let {
             identifier: name,
@@ -162,17 +162,17 @@ impl<'a> Parser<'a> {
             TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(
                 Integer {
                     raw: *i,
-                    span: Span { start: self.current_token.start, end: self.current_token.end },
+                    span: self.current_token.clone().span,
                 }))),
             TokenKind::STRING(s) => return Ok(Expression::LITERAL(Literal::String(
                 StringType {
                     raw: s.to_string(),
-                    span: Span { start: self.current_token.start, end: self.current_token.end },
+                    span: self.current_token.clone().span,
                 }))),
             b @ TokenKind::TRUE | b @ TokenKind::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(
                 Boolean {
                     raw: *b == TokenKind::TRUE,
-                    span: Span { start: self.current_token.start, end: self.current_token.end },
+                    span: self.current_token.clone().span,
                 }))),
             TokenKind::BANG | TokenKind::MINUS => {
                 let prefix_op = self.current_token.clone();
@@ -314,11 +314,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_list(&mut self, end: &TokenKind) -> Result<(Vec<Expression>, Span), ParseError> {
-        let start = self.current_token.start;
+        let start = self.current_token.span.start;
         let mut expr_list = Vec::new();
         if self.peek_token_is(end) {
             self.next_token();
-            let end = self.current_token.end;
+            let end = self.current_token.span.end;
             return Ok((expr_list, Span {
                 start,
                 end
@@ -336,7 +336,7 @@ impl<'a> Parser<'a> {
         }
 
         self.expect_peek(end)?;
-        let end = self.current_token.end;
+        let end = self.current_token.span.end;
 
         return Ok((expr_list, Span {
             start,
@@ -355,7 +355,7 @@ impl<'a> Parser<'a> {
 
     fn parse_hash_expression(&mut self) -> Result<Expression, ParseError> {
         let mut map = Vec::new();
-        let start = self.current_token.start;
+        let start = self.current_token.span.start;
         while !self.peek_token_is(&TokenKind::RBRACE) {
             self.next_token();
 
@@ -374,7 +374,7 @@ impl<'a> Parser<'a> {
         }
 
         self.expect_peek(&TokenKind::RBRACE)?;
-        let end = self.current_token.end;
+        let end = self.current_token.span.end;
 
         Ok(Expression::LITERAL(Literal::Hash(
             Hash {

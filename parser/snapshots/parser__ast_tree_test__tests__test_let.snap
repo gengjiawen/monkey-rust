@@ -8,8 +8,10 @@ expression: let_ast
       {
         "type": "Let",
         "identifier": {
-          "start": 4,
-          "end": 5,
+          "span": {
+            "start": 4,
+            "end": 5
+          },
           "kind": {
             "type": "IDENTIFIER",
             "name": "a"

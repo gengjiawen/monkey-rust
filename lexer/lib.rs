@@ -1,4 +1,4 @@
-use crate::token::{TokenKind, lookup_identifier, Token};
+use crate::token::{TokenKind, lookup_identifier, Token, Span};
 
 pub mod token;
 
@@ -87,15 +87,15 @@ impl<'a> Lexer<'a> {
             '\u{0}' => TokenKind::EOF,
             '"' => {
                 let (start, end, string) = self.read_string();
-                return Token { start, end, kind: TokenKind::STRING(string) };
+                return Token { span: Span {start, end},  kind: TokenKind::STRING(string) };
             },
             _ => {
                 if is_letter(self.ch) {
                     let (start, end, identifier) = self.read_identifier();
-                    return Token { start, end, kind: lookup_identifier(&identifier) };
+                    return Token { span: Span {start, end}, kind: lookup_identifier(&identifier) };
                 } else if is_digit(self.ch) {
                     let (start, end, num) = self.read_number();
-                    return Token { start, end, kind: TokenKind::INT(num) };
+                    return Token { span: Span {start, end}, kind: TokenKind::INT(num) };
                 } else {
                     TokenKind::ILLEGAL
                 }
@@ -103,7 +103,7 @@ impl<'a> Lexer<'a> {
         };
 
         self.read_char();
-        return Token { start: self.position - 1, end: self.read_position - 1, kind: t };
+        return Token { span: Span {start: self.position - 1, end: self.read_position - 1, }, kind: t };
     }
 
     fn skip_whitespace(&mut self) {

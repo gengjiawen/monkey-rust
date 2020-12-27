@@ -4,32 +4,42 @@ expression: token_vs
 ---
 [
     Token {
-        start: 0,
-        end: 3,
+        span: Span {
+            start: 0,
+            end: 3,
+        },
         kind: LET,
     },
     Token {
-        start: 4,
-        end: 5,
+        span: Span {
+            start: 4,
+            end: 5,
+        },
         kind: IDENTIFIER {
             name: "x",
         },
     },
     Token {
-        start: 5,
-        end: 6,
+        span: Span {
+            start: 5,
+            end: 6,
+        },
         kind: ASSIGN,
     },
     Token {
-        start: 6,
-        end: 7,
+        span: Span {
+            start: 6,
+            end: 7,
+        },
         kind: INT(
             5,
         ),
     },
     Token {
-        start: 7,
-        end: 8,
+        span: Span {
+            start: 7,
+            end: 8,
+        },
         kind: EOF,
     },
 ]
