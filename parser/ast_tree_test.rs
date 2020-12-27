@@ -67,9 +67,17 @@ mod tests {
         test_ast_tree("test_func_declaration", input)
     }
 
+    // JS: https://astexplorer.net/#/gist/b263eabba126aba94f1ad1c00ccce45e/2eb24376e622e07cf04915ee7eea1bc1c49d6122
     #[test]
     fn test_func_call() {
         let input = "add(1, 2)";
         test_ast_tree("test_func_call", input)
+    }
+
+    // JS: https://astexplorer.net/#/gist/785eba71d71896939d5e91e0d445d357/a7bc3d915da84c16313da691a42b4a410fc3eef0
+    #[test]
+    fn test_index() {
+        let input = "a[1]";
+        test_ast_tree("test_index", input)
     }
 }

@@ -83,14 +83,6 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-// function can be Identifier or FunctionLiteral (think iife)
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
-pub struct FunctionCall {
-    pub callee: Box<Expression>,
-    pub arguments: Vec<Expression>,
-    pub span: Span,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Expression {
     IDENTIFIER(IDENTIFIER),
@@ -100,7 +92,7 @@ pub enum Expression {
     IF(IF),
     FUNCTION(FunctionDeclaration),
     FunctionCall(FunctionCall),
-    Index(Box<Expression>, Box<Expression>),
+    Index(Index),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
@@ -139,6 +131,21 @@ pub struct FunctionDeclaration {
     pub span: Span,
 }
 
+// function can be Identifier or FunctionLiteral (think iife)
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct FunctionCall {
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct Index {
+    pub object: Box<Expression>,
+    pub index: Box<Expression>,
+    pub span: Span,
+}
+
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -172,8 +179,8 @@ impl fmt::Display for Expression {
             Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
                 write!(f, "{}({})", callee, format_expressions(arguments))
             }
-            Expression::Index(left, index) => {
-                write!(f, "({}[{}])", left, index)
+            Expression::Index(Index { object, index, .. }) => {
+                write!(f, "({}[{}])", object, index)
             }
         }
     }

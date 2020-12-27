@@ -90,7 +90,7 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
             let args = eval_expressions(arguments, env)?;
             apply_function(&func, &args)
         }
-        Expression::Index(left, index) => {
+        Expression::Index(Index { object: left, index, .. }) => {
             let literal = eval_expression(left, &Rc::clone(env))?;
             let index = eval_expression(index, env)?;
             eval_index_expression(&literal, &index)

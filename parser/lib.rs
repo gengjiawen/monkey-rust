@@ -6,7 +6,7 @@ pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF, FunctionDeclaration, FunctionCall};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF, FunctionDeclaration, FunctionCall, Index};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -410,12 +410,22 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
+        let start = self.current_token.span.start;
         self.next_token();
         let index = self.parse_expression(Precedence::LOWEST)?.0;
 
         self.expect_peek(&TokenKind::RBRACKET)?;
 
-        return Ok(Expression::Index(Box::new(left), Box::new(index)));
+        let end = self.current_token.span.end;
+
+        return Ok(Expression::Index(Index {
+            object: Box::new(left),
+            index: Box::new(index),
+            span: Span {
+                start,
+                end,
+            }
+        }));
     }
 
     fn parse_hash_expression(&mut self) -> Result<Expression, ParseError> {
