@@ -85,9 +85,9 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
         Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
             return Ok(Rc::new(Object::Function(params.clone(), body.clone(), Rc::clone(env))));
         }
-        Expression::FunctionCall(func, args) => {
-            let func = eval_expression(func, &Rc::clone(env))?;
-            let args = eval_expressions(args, env)?;
+        Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
+            let func = eval_expression(callee, &Rc::clone(env))?;
+            let args = eval_expressions(arguments, env)?;
             apply_function(&func, &args)
         }
         Expression::Index(left, index) => {

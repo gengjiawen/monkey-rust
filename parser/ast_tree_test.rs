@@ -66,4 +66,10 @@ mod tests {
         let input = "fn(x) { x };";
         test_ast_tree("test_func_declaration", input)
     }
+
+    #[test]
+    fn test_func_call() {
+        let input = "add(1, 2)";
+        test_ast_tree("test_func_call", input)
+    }
 }

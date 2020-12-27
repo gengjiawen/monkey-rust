@@ -83,6 +83,14 @@ impl fmt::Display for BlockStatement {
     }
 }
 
+// function can be Identifier or FunctionLiteral (think iife)
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct FunctionCall {
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
+    pub span: Span,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Expression {
     IDENTIFIER(IDENTIFIER),
@@ -91,7 +99,7 @@ pub enum Expression {
     INFIX(BinaryExpression),
     IF(IF),
     FUNCTION(FunctionDeclaration),
-    FunctionCall(Box<Expression>, Vec<Expression>), // function can be Identifier or FunctionLiteral (think iife)
+    FunctionCall(FunctionCall),
     Index(Box<Expression>, Box<Expression>),
 }
 
@@ -161,8 +169,8 @@ impl fmt::Display for Expression {
             Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
                 write!(f, "fn({}) {{ {} }}", params.join(", "), body)
             }
-            Expression::FunctionCall(function, args) => {
-                write!(f, "{}({})", function, format_expressions(args))
+            Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
+                write!(f, "{}({})", callee, format_expressions(arguments))
             }
             Expression::Index(left, index) => {
                 write!(f, "({}[{}])", left, index)
