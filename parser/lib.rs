@@ -6,7 +6,7 @@ pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF, FunctionDeclaration};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -315,6 +315,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_expression(&mut self) -> Result<Expression, ParseError> {
+        let start = self.current_token.span.start;
         self.expect_peek(&TokenKind::LPAREN)?;
 
         let params = self.parse_fn_parameters()?;
@@ -323,7 +324,16 @@ impl<'a> Parser<'a> {
 
         let function_body = self.parse_block_statement()?;
 
-        Ok(Expression::FUNCTION(params, function_body))
+        let end = self.current_token.span.end;
+
+        Ok(Expression::FUNCTION(FunctionDeclaration {
+            params: params,
+            body: function_body,
+            span: Span {
+                start,
+                end,
+            }
+        }))
     }
 
     fn parse_fn_parameters(&mut self) -> Result<Vec<String>, ParseError> {

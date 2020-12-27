@@ -82,7 +82,7 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
             }
         }
         Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => eval_identifier(&id, env),
-        Expression::FUNCTION(params, body) => {
+        Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
             return Ok(Rc::new(Object::Function(params.clone(), body.clone(), Rc::clone(env))));
         }
         Expression::FunctionCall(func, args) => {

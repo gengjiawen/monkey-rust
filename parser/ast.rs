@@ -90,7 +90,7 @@ pub enum Expression {
     PREFIX(UnaryExpression),
     INFIX(BinaryExpression),
     IF(IF),
-    FUNCTION(Vec<String>, BlockStatement),
+    FUNCTION(FunctionDeclaration),
     FunctionCall(Box<Expression>, Vec<Expression>), // function can be Identifier or FunctionLiteral (think iife)
     Index(Box<Expression>, Box<Expression>),
 }
@@ -124,6 +124,13 @@ pub struct IF {
     pub span: Span,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct FunctionDeclaration {
+    pub params: Vec<String>,
+    pub body: BlockStatement,
+    pub span: Span,
+}
+
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -151,8 +158,8 @@ impl fmt::Display for Expression {
                     )
                 }
             }
-            Expression::FUNCTION(params, func_body) => {
-                write!(f, "fn({}) {{ {} }}", params.join(", "), func_body)
+            Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
+                write!(f, "fn({}) {{ {} }}", params.join(", "), body)
             }
             Expression::FunctionCall(function, args) => {
                 write!(f, "{}({})", function, format_expressions(args))

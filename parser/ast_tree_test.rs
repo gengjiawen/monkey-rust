@@ -60,4 +60,10 @@ mod tests {
         let input = "if (x < y) { x } else { y }";
         test_ast_tree("test_if", input)
     }
+
+    #[test]
+    fn test_func_declaration() {
+        let input = "fn(x) { x };";
+        test_ast_tree("test_func_declaration", input)
+    }
 }
