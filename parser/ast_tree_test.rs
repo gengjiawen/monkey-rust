@@ -37,4 +37,16 @@ mod tests {
         let input = r#"{"a": 1}"#;
         test_ast_tree("test_hash", input)
     }
+
+    #[test]
+    fn test_return() {
+        let input = "return 3";
+        test_ast_tree("test_return", input)
+    }
+
+    #[test]
+    fn test_unary() {
+        let input = "-3";
+        test_ast_tree("test_unary", input)
+    }
 }

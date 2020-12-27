@@ -87,7 +87,7 @@ impl fmt::Display for BlockStatement {
 pub enum Expression {
     IDENTIFIER(String),
     LITERAL(Literal),
-    PREFIX(Token, Box<Expression>),
+    PREFIX(PREFIX),
     INFIX(Token, Box<Expression>, Box<Expression>),
     IF(Box<Expression>, BlockStatement, Option<BlockStatement>),
     FUNCTION(Vec<String>, BlockStatement),
@@ -95,12 +95,19 @@ pub enum Expression {
     Index(Box<Expression>, Box<Expression>),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct PREFIX {
+    pub op: Token,
+    pub operand: Box<Expression>,
+    pub span: Span,
+}
+
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Expression::IDENTIFIER(id) => write!(f, "{}", id),
             Expression::LITERAL(l) => write!(f, "{}",l),
-            Expression::PREFIX(op, expr) => write!(f, "({}{})", op.kind, expr),
+            Expression::PREFIX(PREFIX { op: op, operand: expr, .. }) => write!(f, "({}{})", op.kind, expr),
             Expression::INFIX(op, left, right) => write!(f, "({} {} {})", left, op.kind, right),
             Expression::IF(condition, if_block, else_block) => {
                 if let Some(else_block) = else_block {

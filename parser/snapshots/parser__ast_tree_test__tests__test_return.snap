@@ -1,0 +1,21 @@
+---
+source: parser/ast_tree_test.rs
+expression: let_ast
+---
+{
+  "Program": {
+    "body": [
+      {
+        "type": "Return",
+        "LITERAL": {
+          "type": "Integer",
+          "raw": 3,
+          "span": {
+            "start": 7,
+            "end": 8
+          }
+        }
+      }
+    ]
+  }
+}

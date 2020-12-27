@@ -6,7 +6,7 @@ pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, PREFIX};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -104,7 +104,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::ASSIGN)?;
         self.next_token();
 
-        let value = self.parse_expression(Precedence::LOWEST)?;
+        let value = self.parse_expression(Precedence::LOWEST)?.0;
 
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
@@ -125,7 +125,7 @@ impl<'a> Parser<'a> {
     fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
         self.next_token();
 
-        let value = self.parse_expression(Precedence::LOWEST)?;
+        let value = self.parse_expression(Precedence::LOWEST)?.0;
 
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
@@ -135,7 +135,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
-        let expr = self.parse_expression(Precedence::LOWEST)?;
+        let expr = self.parse_expression(Precedence::LOWEST)?.0;
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
@@ -143,16 +143,25 @@ impl<'a> Parser<'a> {
         Ok(Statement::Expr(expr))
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParseError> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<(Expression, Span), ParseError> {
+        let start = self.current_token.span.start;
         let mut left = self.parse_prefix_expression()?;
         while self.peek_token.kind != TokenKind::SEMICOLON && precedence < get_token_precedence(&self.peek_token.kind) {
             match self.parse_infix_expression(&left) {
                 Some(infix) => left = infix?,
-                None => return Ok(left),
+                None => return Ok((left, Span {
+                    start,
+                    end: self.current_token.span.end
+                })),
             }
         }
 
-        Ok(left)
+        let end = self.current_token.span.end;
+
+        Ok((left, Span {
+            start,
+            end,
+        }))
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
@@ -175,16 +184,24 @@ impl<'a> Parser<'a> {
                     span: self.current_token.clone().span,
                 }))),
             TokenKind::BANG | TokenKind::MINUS => {
+                let start = self.current_token.span.start;
                 let prefix_op = self.current_token.clone();
                 self.next_token();
-                let expr = self.parse_expression(Precedence::PREFIX)?;
-                return Ok(Expression::PREFIX(prefix_op, Box::new(expr)));
+                let (expr, span) = self.parse_expression(Precedence::PREFIX)?;
+                return Ok(Expression::PREFIX(PREFIX {
+                    op: prefix_op,
+                    operand: Box::new(expr),
+                    span: Span {
+                        start,
+                        end: span.end
+                    }
+                }));
             }
             TokenKind::LPAREN => {
                 self.next_token();
-                let expr = self.parse_expression(Precedence::LOWEST);
+                let expr = self.parse_expression(Precedence::LOWEST)?.0;
                 self.expect_peek(&TokenKind::RPAREN)?;
-                return expr;
+                return Ok(expr);
             }
             TokenKind::IF => self.parse_if_expression(),
             TokenKind::FUNCTION => self.parse_fn_expression(),
@@ -217,7 +234,7 @@ impl<'a> Parser<'a> {
                 let infix_op = self.current_token.clone();
                 let precedence_value = get_token_precedence(&self.current_token.kind);
                 self.next_token();
-                let right: Expression = self.parse_expression(precedence_value).unwrap();
+                let right: Expression = self.parse_expression(precedence_value).unwrap().0;
                 return Some(Ok(Expression::INFIX(infix_op, Box::new(left.clone()), Box::new(right))));
             }
             TokenKind::LPAREN => {
@@ -236,7 +253,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::LPAREN)?;
         self.next_token();
 
-        let condition = self.parse_expression(Precedence::LOWEST)?;
+        let condition = self.parse_expression(Precedence::LOWEST)?.0;
         self.expect_peek(&TokenKind::RPAREN)?;
         self.expect_peek(&TokenKind::LBRACE)?;
 
@@ -327,12 +344,12 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        expr_list.push(self.parse_expression(Precedence::LOWEST)?);
+        expr_list.push(self.parse_expression(Precedence::LOWEST)?.0);
 
         while self.peek_token_is(&TokenKind::COMMA) {
             self.next_token();
             self.next_token();
-            expr_list.push(self.parse_expression(Precedence::LOWEST)?);
+            expr_list.push(self.parse_expression(Precedence::LOWEST)?.0);
         }
 
         self.expect_peek(end)?;
@@ -346,7 +363,7 @@ impl<'a> Parser<'a> {
 
     fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
         self.next_token();
-        let index = self.parse_expression(Precedence::LOWEST)?;
+        let index = self.parse_expression(Precedence::LOWEST)?.0;
 
         self.expect_peek(&TokenKind::RBRACKET)?;
 
@@ -359,12 +376,12 @@ impl<'a> Parser<'a> {
         while !self.peek_token_is(&TokenKind::RBRACE) {
             self.next_token();
 
-            let key = self.parse_expression(Precedence::LOWEST)?;
+            let key = self.parse_expression(Precedence::LOWEST)?.0;
 
             self.expect_peek(&TokenKind::COLON)?;
 
             self.next_token();
-            let value = self.parse_expression(Precedence::LOWEST)?;
+            let value = self.parse_expression(Precedence::LOWEST)?.0;
 
             map.push((key, value));
 

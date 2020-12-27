@@ -61,7 +61,7 @@ fn is_truthy(obj: &Object) -> bool {
 fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, EvalError> {
     match expression {
         Expression::LITERAL(literal) => eval_literal(literal, env),
-        Expression::PREFIX(op, expr) => {
+        Expression::PREFIX(PREFIX { op: op, operand: expr, .. }) => {
             let right = eval_expression(expr, &Rc::clone(env))?;
             return eval_prefix(op, &right);
         }
