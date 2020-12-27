@@ -248,11 +248,11 @@ fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
         Literal::Integer(Integer { raw: i, .. }) => Ok(Rc::from(Object::Integer(*i))),
         Literal::Boolean(Boolean { raw: b, .. }) => Ok(Rc::from(Object::Boolean(*b))),
         Literal::String(StringType { raw: s, .. }) => Ok(Rc::from(Object::String(s.clone()))),
-        Literal::Array(Array { elements }) => {
+        Literal::Array(Array { elements, .. }) => {
             let list = eval_expressions(elements, env)?;
             return Ok(Rc::from(Object::Array(list)));
         }
-        Literal::Hash(map) => {
+        Literal::Hash(Hash { elements: map, .. }) => {
             let mut hash_map = HashMap::new();
 
             for (k, v) in map {

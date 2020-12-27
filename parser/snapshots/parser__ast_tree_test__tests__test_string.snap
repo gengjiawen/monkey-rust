@@ -1,0 +1,21 @@
+---
+source: parser/ast_tree_test.rs
+expression: let_ast
+---
+{
+  "Program": {
+    "body": [
+      {
+        "type": "Expr",
+        "LITERAL": {
+          "type": "String",
+          "raw": "jw",
+          "span": {
+            "start": 0,
+            "end": 4
+          }
+        }
+      }
+    ]
+  }
+}

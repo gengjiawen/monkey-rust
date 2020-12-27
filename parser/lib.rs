@@ -1,11 +1,12 @@
 pub mod ast;
 mod precedences;
+mod ast_tree_test;
 
 pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Span, Integer, Boolean, StringType, Array};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Span, Integer, Boolean, StringType, Array, Hash};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -188,8 +189,12 @@ impl<'a> Parser<'a> {
             TokenKind::IF => self.parse_if_expression(),
             TokenKind::FUNCTION => self.parse_fn_expression(),
             TokenKind::LBRACKET => {
-                let elements = self.parse_expression_list(&TokenKind::RBRACKET)?;
-                return Ok(Expression::LITERAL(Literal::Array(Array { elements: elements })));
+                let (elements, span) = self.parse_expression_list(&TokenKind::RBRACKET)?;
+                return Ok(Expression::LITERAL(Literal::Array(
+                    Array {
+                        elements,
+                        span
+                    })));
             }
             TokenKind::LBRACE => self.parse_hash_expression(),
             _ => {
@@ -304,15 +309,20 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
-        let arguments = self.parse_expression_list(&TokenKind::RPAREN)?;
+        let (arguments, ..) = self.parse_expression_list(&TokenKind::RPAREN)?;
         Ok(Expression::FunctionCall(Box::new(expr), arguments))
     }
 
-    fn parse_expression_list(&mut self, end: &TokenKind) -> Result<Vec<Expression>, ParseError> {
+    fn parse_expression_list(&mut self, end: &TokenKind) -> Result<(Vec<Expression>, Span), ParseError> {
+        let start = self.current_token.start;
         let mut expr_list = Vec::new();
         if self.peek_token_is(end) {
             self.next_token();
-            return Ok(expr_list);
+            let end = self.current_token.end;
+            return Ok((expr_list, Span {
+                start,
+                end
+            }));
         }
 
         self.next_token();
@@ -326,8 +336,12 @@ impl<'a> Parser<'a> {
         }
 
         self.expect_peek(end)?;
+        let end = self.current_token.end;
 
-        return Ok(expr_list);
+        return Ok((expr_list, Span {
+            start,
+            end
+        }));
     }
 
     fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
@@ -341,6 +355,7 @@ impl<'a> Parser<'a> {
 
     fn parse_hash_expression(&mut self) -> Result<Expression, ParseError> {
         let mut map = Vec::new();
+        let start = self.current_token.start;
         while !self.peek_token_is(&TokenKind::RBRACE) {
             self.next_token();
 
@@ -359,8 +374,16 @@ impl<'a> Parser<'a> {
         }
 
         self.expect_peek(&TokenKind::RBRACE)?;
+        let end = self.current_token.end;
 
-        Ok(Expression::LITERAL(Literal::Hash(map)))
+        Ok(Expression::LITERAL(Literal::Hash(
+            Hash {
+                elements: map,
+                span: Span {
+                    start,
+                    end,
+                },
+            })))
     }
 }
 
@@ -560,16 +583,5 @@ mod tests {
             ),
         ];
         verify_program(&test_case);
-    }
-
-    #[test]
-    fn test_span() {
-        let let_ast = match parse("let a = 3") {
-            Ok(node) => {
-                serde_json::to_string(&node).unwrap()
-            }
-            Err(e) => format!("parse error: {}", e[0])
-        };
-        println!("{}", let_ast)
     }
 }

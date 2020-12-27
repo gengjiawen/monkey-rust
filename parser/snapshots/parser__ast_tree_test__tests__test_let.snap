@@ -1,0 +1,35 @@
+---
+source: parser/ast_tree_test.rs
+expression: let_ast
+---
+{
+  "Program": {
+    "body": [
+      {
+        "type": "Let",
+        "identifier": {
+          "start": 4,
+          "end": 5,
+          "kind": {
+            "type": "IDENTIFIER",
+            "name": "a"
+          }
+        },
+        "expr": {
+          "LITERAL": {
+            "type": "Integer",
+            "raw": 3,
+            "span": {
+              "start": 8,
+              "end": 9
+            }
+          }
+        },
+        "span": {
+          "start": 0,
+          "end": 9
+        }
+      }
+    ]
+  }
+}

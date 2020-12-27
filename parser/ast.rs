@@ -144,7 +144,7 @@ pub enum Literal {
     Boolean(Boolean),
     String(StringType),
     Array(Array),
-    Hash(Vec<(Expression, Expression)>),
+    Hash(Hash),
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
@@ -166,7 +166,16 @@ pub struct StringType {
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
-pub struct Array { pub elements: Vec<Expression> }
+pub struct Array {
+    pub elements: Vec<Expression>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Hash {
+    pub elements: Vec<(Expression, Expression)>,
+    pub span: Span,
+}
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -174,8 +183,8 @@ impl fmt::Display for Literal {
             Literal::Integer(Integer { raw: i, .. }) => write!(f, "{}", i),
             Literal::Boolean(Boolean { raw: b, .. }) => write!(f, "{}", b),
             Literal::String(StringType { raw: s, .. }) => write!(f, "\"{}\"", s),
-            Literal::Array(Array { elements: e }) => write!(f, "[{}]", format_expressions(e)),
-            Literal::Hash(map) => {
+            Literal::Array(Array { elements: e, .. }) => write!(f, "[{}]", format_expressions(e)),
+            Literal::Hash(Hash { elements: map, .. }) => {
                 let to_string = map
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k, v))
