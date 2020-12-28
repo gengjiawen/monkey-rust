@@ -1,4 +1,4 @@
-FROM gitpod/workspace-wasm
+FROM gengjiawen/node-build
 
 # Install custom tools, runtimes, etc.
 # For example "bastet", a command-line tetris clone:
@@ -6,3 +6,5 @@ FROM gitpod/workspace-wasm
 #
 # More information: https://www.gitpod.io/docs/config-docker/
 
+RUN cargo install wasm-pack
+RUN rustup target add wasm32-unknown-unknown
