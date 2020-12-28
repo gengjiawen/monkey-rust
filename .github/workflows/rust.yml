@@ -21,6 +21,7 @@ jobs:
     container: gengjiawen/node-build:wasm
     steps:
       - uses: actions/checkout@v2
+      - run: npx envinfo
       - name: Run tests
         run: |
           cd wasm && wasm-pack build
