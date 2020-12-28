@@ -26,4 +26,5 @@ jobs:
       - name: Run tests
         run: |
           export PATH=/root/.cargo/bin:$PATH
+          npx envinfo
           cd wasm && wasm-pack build
