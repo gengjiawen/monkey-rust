@@ -22,3 +22,8 @@ There is a book about learning how to make an interpreter: [Writing An Interpret
 $ cargo build
 $ cargo test
 ```
+
+## References on compiler
+* https://github.com/dinfuehr/dora
+* https://github.com/wren-lang/wren
+* https://github.com/apollographql/federation
