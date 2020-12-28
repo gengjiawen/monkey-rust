@@ -42,6 +42,10 @@ expression: "add(1, 2)"
         }
       }
     ],
+    "span": {
+      "start": 0,
+      "end": 10
+    },
     "type": "Program"
   }
 }

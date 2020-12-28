@@ -27,6 +27,7 @@ impl fmt::Display for Node {
 #[derive(Clone, Debug, Eq, Deserialize, Hash, PartialEq)]
 pub struct Program {
     pub body: Vec<Statement>,
+    pub span: Span,
 }
 
 // remove this if serde resolve resolve https://github.com/serde-rs/serde/issues/760
@@ -37,6 +38,7 @@ impl Serialize for Program {
     {
         let mut state = serializer.serialize_struct("Program", 2)?;
         state.serialize_field("body", &self.body)?;
+        state.serialize_field("span", &self.span)?;
         state.serialize_field("type", "Program")?;
         state.end()
     }
@@ -44,7 +46,10 @@ impl Serialize for Program {
 
 impl Program {
     pub fn new() -> Self {
-        Program { body: vec![] }
+        Program { body: vec![], span: Span {
+            start: 0,
+            end: 0,
+        } }
     }
 }
 
@@ -103,7 +108,7 @@ impl fmt::Display for BlockStatement {
 #[serde(tag = "expr_type")]
 pub enum Expression {
     IDENTIFIER(IDENTIFIER),
-    LITERAL(Literal),
+    LITERAL(Literal), // need to flatten
     PREFIX(UnaryExpression),
     INFIX(BinaryExpression),
     IF(IF),

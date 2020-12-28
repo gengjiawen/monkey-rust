@@ -37,6 +37,10 @@ expression: "{\"a\": 1}"
         }
       }
     ],
+    "span": {
+      "start": 0,
+      "end": 9
+    },
     "type": "Program"
   }
 }

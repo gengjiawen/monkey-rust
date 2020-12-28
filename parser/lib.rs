@@ -75,6 +75,7 @@ impl<'a> Parser<'a> {
             }
             self.next_token();
         }
+        program.span.end = self.current_token.span.end;
 
         if self.errors.is_empty() {
             return Ok(program);

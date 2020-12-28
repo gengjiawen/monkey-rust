@@ -32,6 +32,10 @@ expression: let a = 3
         }
       }
     ],
+    "span": {
+      "start": 0,
+      "end": 10
+    },
     "type": "Program"
   }
 }

@@ -28,6 +28,10 @@ expression: "fn(x) { x };"
         }
       }
     ],
+    "span": {
+      "start": 0,
+      "end": 13
+    },
     "type": "Program"
   }
 }
