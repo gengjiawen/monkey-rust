@@ -1,75 +1,71 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: 1 + 2 * 3
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "INFIX": {
+        "stmt_type": "Expr",
+        "expr_type": "INFIX",
+        "op": {
+          "span": {
+            "start": 2,
+            "end": 3
+          },
+          "kind": {
+            "type": "PLUS"
+          }
+        },
+        "left": {
+          "expr_type": "LITERAL",
+          "type": "Integer",
+          "raw": 1,
+          "span": {
+            "start": 0,
+            "end": 1
+          }
+        },
+        "right": {
+          "expr_type": "INFIX",
           "op": {
             "span": {
-              "start": 2,
-              "end": 3
+              "start": 6,
+              "end": 7
             },
             "kind": {
-              "type": "PLUS"
+              "type": "ASTERISK"
             }
           },
           "left": {
-            "LITERAL": {
-              "type": "Integer",
-              "raw": 1,
-              "span": {
-                "start": 0,
-                "end": 1
-              }
+            "expr_type": "LITERAL",
+            "type": "Integer",
+            "raw": 2,
+            "span": {
+              "start": 4,
+              "end": 5
             }
           },
           "right": {
-            "INFIX": {
-              "op": {
-                "span": {
-                  "start": 6,
-                  "end": 7
-                },
-                "kind": {
-                  "type": "ASTERISK"
-                }
-              },
-              "left": {
-                "LITERAL": {
-                  "type": "Integer",
-                  "raw": 2,
-                  "span": {
-                    "start": 4,
-                    "end": 5
-                  }
-                }
-              },
-              "right": {
-                "LITERAL": {
-                  "type": "Integer",
-                  "raw": 3,
-                  "span": {
-                    "start": 8,
-                    "end": 9
-                  }
-                }
-              },
-              "span": {
-                "start": 4,
-                "end": 9
-              }
+            "expr_type": "LITERAL",
+            "type": "Integer",
+            "raw": 3,
+            "span": {
+              "start": 8,
+              "end": 9
             }
           },
           "span": {
-            "start": 0,
+            "start": 4,
             "end": 9
           }
+        },
+        "span": {
+          "start": 0,
+          "end": 9
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

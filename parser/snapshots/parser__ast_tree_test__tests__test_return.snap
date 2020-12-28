@@ -1,21 +1,21 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: return 3
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Return",
-        "LITERAL": {
-          "type": "Integer",
-          "raw": 3,
-          "span": {
-            "start": 7,
-            "end": 8
-          }
+        "stmt_type": "Return",
+        "expr_type": "LITERAL",
+        "type": "Integer",
+        "raw": 3,
+        "span": {
+          "start": 7,
+          "end": 8
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

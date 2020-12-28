@@ -1,50 +1,47 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: "add(1, 2)"
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "FunctionCall": {
-          "callee": {
-            "IDENTIFIER": {
-              "name": "add",
-              "span": {
-                "start": 0,
-                "end": 3
-              }
+        "stmt_type": "Expr",
+        "expr_type": "FunctionCall",
+        "callee": {
+          "expr_type": "IDENTIFIER",
+          "name": "add",
+          "span": {
+            "start": 0,
+            "end": 3
+          }
+        },
+        "arguments": [
+          {
+            "expr_type": "LITERAL",
+            "type": "Integer",
+            "raw": 1,
+            "span": {
+              "start": 4,
+              "end": 5
             }
           },
-          "arguments": [
-            {
-              "LITERAL": {
-                "type": "Integer",
-                "raw": 1,
-                "span": {
-                  "start": 4,
-                  "end": 5
-                }
-              }
-            },
-            {
-              "LITERAL": {
-                "type": "Integer",
-                "raw": 2,
-                "span": {
-                  "start": 7,
-                  "end": 8
-                }
-              }
+          {
+            "expr_type": "LITERAL",
+            "type": "Integer",
+            "raw": 2,
+            "span": {
+              "start": 7,
+              "end": 8
             }
-          ],
-          "span": {
-            "start": 3,
-            "end": 9
           }
+        ],
+        "span": {
+          "start": 3,
+          "end": 9
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

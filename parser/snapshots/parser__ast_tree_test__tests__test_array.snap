@@ -1,42 +1,40 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: "[1, true]"
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "LITERAL": {
-          "type": "Array",
-          "elements": [
-            {
-              "LITERAL": {
-                "type": "Integer",
-                "raw": 1,
-                "span": {
-                  "start": 1,
-                  "end": 2
-                }
-              }
-            },
-            {
-              "LITERAL": {
-                "type": "Boolean",
-                "raw": true,
-                "span": {
-                  "start": 4,
-                  "end": 8
-                }
-              }
+        "stmt_type": "Expr",
+        "expr_type": "LITERAL",
+        "type": "Array",
+        "elements": [
+          {
+            "expr_type": "LITERAL",
+            "type": "Integer",
+            "raw": 1,
+            "span": {
+              "start": 1,
+              "end": 2
             }
-          ],
-          "span": {
-            "start": 0,
-            "end": 9
+          },
+          {
+            "expr_type": "LITERAL",
+            "type": "Boolean",
+            "raw": true,
+            "span": {
+              "start": 4,
+              "end": 8
+            }
           }
+        ],
+        "span": {
+          "start": 0,
+          "end": 9
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

@@ -1,78 +1,73 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: "if (x < y) { x } else { y }"
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "IF": {
-          "condition": {
-            "INFIX": {
-              "op": {
-                "span": {
-                  "start": 6,
-                  "end": 7
-                },
-                "kind": {
-                  "type": "LT"
-                }
-              },
-              "left": {
-                "IDENTIFIER": {
-                  "name": "x",
-                  "span": {
-                    "start": 4,
-                    "end": 5
-                  }
-                }
-              },
-              "right": {
-                "IDENTIFIER": {
-                  "name": "y",
-                  "span": {
-                    "start": 8,
-                    "end": 9
-                  }
-                }
-              },
-              "span": {
-                "start": 4,
-                "end": 9
-              }
+        "stmt_type": "Expr",
+        "expr_type": "IF",
+        "condition": {
+          "expr_type": "INFIX",
+          "op": {
+            "span": {
+              "start": 6,
+              "end": 7
+            },
+            "kind": {
+              "type": "LT"
             }
           },
-          "consequent": [
-            {
-              "type": "Expr",
-              "IDENTIFIER": {
-                "name": "x",
-                "span": {
-                  "start": 13,
-                  "end": 14
-                }
-              }
+          "left": {
+            "expr_type": "IDENTIFIER",
+            "name": "x",
+            "span": {
+              "start": 4,
+              "end": 5
             }
-          ],
-          "alternate": [
-            {
-              "type": "Expr",
-              "IDENTIFIER": {
-                "name": "y",
-                "span": {
-                  "start": 24,
-                  "end": 25
-                }
-              }
+          },
+          "right": {
+            "expr_type": "IDENTIFIER",
+            "name": "y",
+            "span": {
+              "start": 8,
+              "end": 9
             }
-          ],
+          },
           "span": {
-            "start": 0,
-            "end": 27
+            "start": 4,
+            "end": 9
           }
+        },
+        "consequent": [
+          {
+            "stmt_type": "Expr",
+            "expr_type": "IDENTIFIER",
+            "name": "x",
+            "span": {
+              "start": 13,
+              "end": 14
+            }
+          }
+        ],
+        "alternate": [
+          {
+            "stmt_type": "Expr",
+            "expr_type": "IDENTIFIER",
+            "name": "y",
+            "span": {
+              "start": 24,
+              "end": 25
+            }
+          }
+        ],
+        "span": {
+          "start": 0,
+          "end": 27
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

@@ -1,12 +1,12 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: let a = 3
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Let",
+        "stmt_type": "Let",
         "identifier": {
           "span": {
             "start": 4,
@@ -18,13 +18,12 @@ expression: let_ast
           }
         },
         "expr": {
-          "LITERAL": {
-            "type": "Integer",
-            "raw": 3,
-            "span": {
-              "start": 8,
-              "end": 9
-            }
+          "expr_type": "LITERAL",
+          "type": "Integer",
+          "raw": 3,
+          "span": {
+            "start": 8,
+            "end": 9
           }
         },
         "span": {
@@ -32,6 +31,7 @@ expression: let_ast
           "end": 9
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

@@ -1,38 +1,36 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: "a[1]"
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "Index": {
-          "object": {
-            "IDENTIFIER": {
-              "name": "a",
-              "span": {
-                "start": 0,
-                "end": 1
-              }
-            }
-          },
-          "index": {
-            "LITERAL": {
-              "type": "Integer",
-              "raw": 1,
-              "span": {
-                "start": 2,
-                "end": 3
-              }
-            }
-          },
+        "stmt_type": "Expr",
+        "expr_type": "Index",
+        "object": {
+          "expr_type": "IDENTIFIER",
+          "name": "a",
           "span": {
-            "start": 1,
-            "end": 4
+            "start": 0,
+            "end": 1
           }
+        },
+        "index": {
+          "expr_type": "LITERAL",
+          "type": "Integer",
+          "raw": 1,
+          "span": {
+            "start": 2,
+            "end": 3
+          }
+        },
+        "span": {
+          "start": 1,
+          "end": 4
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

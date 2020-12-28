@@ -1,21 +1,21 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: "\"jw\""
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "LITERAL": {
-          "type": "String",
-          "raw": "jw",
-          "span": {
-            "start": 0,
-            "end": 4
-          }
+        "stmt_type": "Expr",
+        "expr_type": "LITERAL",
+        "type": "String",
+        "raw": "jw",
+        "span": {
+          "start": 0,
+          "end": 4
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }

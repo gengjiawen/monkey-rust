@@ -2,8 +2,11 @@ use core::fmt;
 use core::fmt::Result;
 use std::fmt::Formatter;
 use lexer::token::{Token, TokenKind, Span};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::ser::SerializeStruct;
 
+// still wait for https://github.com/serde-rs/serde/issues/1402
+// or https://github.com/serde-rs/serde/issues/760
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Node {
     Program(Program),
@@ -21,9 +24,22 @@ impl fmt::Display for Node {
     }
 }
 
-#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Deserialize, Hash, PartialEq)]
 pub struct Program {
     pub body: Vec<Statement>,
+}
+
+// remove this if serde resolve resolve https://github.com/serde-rs/serde/issues/760
+impl Serialize for Program {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Program", 2)?;
+        state.serialize_field("body", &self.body)?;
+        state.serialize_field("type", "Program")?;
+        state.end()
+    }
 }
 
 impl Program {
@@ -46,7 +62,7 @@ pub struct Let {
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
-#[serde(tag = "type")]
+#[serde(tag = "stmt_type")]
 pub enum Statement {
     Let(Let),
     Return(Expression),
@@ -84,6 +100,7 @@ impl fmt::Display for BlockStatement {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "expr_type")]
 pub enum Expression {
     IDENTIFIER(IDENTIFIER),
     LITERAL(Literal),

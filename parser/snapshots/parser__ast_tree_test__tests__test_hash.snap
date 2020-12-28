@@ -1,44 +1,42 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let_ast
+expression: "{\"a\": 1}"
 ---
 {
   "Program": {
     "body": [
       {
-        "type": "Expr",
-        "LITERAL": {
-          "type": "Hash",
-          "elements": [
-            [
-              {
-                "LITERAL": {
-                  "type": "String",
-                  "raw": "a",
-                  "span": {
-                    "start": 1,
-                    "end": 4
-                  }
-                }
-              },
-              {
-                "LITERAL": {
-                  "type": "Integer",
-                  "raw": 1,
-                  "span": {
-                    "start": 6,
-                    "end": 7
-                  }
-                }
+        "stmt_type": "Expr",
+        "expr_type": "LITERAL",
+        "type": "Hash",
+        "elements": [
+          [
+            {
+              "expr_type": "LITERAL",
+              "type": "String",
+              "raw": "a",
+              "span": {
+                "start": 1,
+                "end": 4
               }
-            ]
-          ],
-          "span": {
-            "start": 0,
-            "end": 8
-          }
+            },
+            {
+              "expr_type": "LITERAL",
+              "type": "Integer",
+              "raw": 1,
+              "span": {
+                "start": 6,
+                "end": 7
+              }
+            }
+          ]
+        ],
+        "span": {
+          "start": 0,
+          "end": 8
         }
       }
-    ]
+    ],
+    "type": "Program"
   }
 }
