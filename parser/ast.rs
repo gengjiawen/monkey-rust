@@ -2,7 +2,7 @@ use core::fmt;
 use core::fmt::Result;
 use std::fmt::Formatter;
 use lexer::token::{Token, TokenKind, Span};
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
 // still wait for https://github.com/serde-rs/serde/issues/1402

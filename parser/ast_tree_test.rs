@@ -8,7 +8,7 @@ mod tests {
             Ok(node) => {
                 serde_json::to_string_pretty(&node).unwrap()
             }
-            Err(e) => format!("parse error: {}", e[0])
+            Err(e) => panic!("parse error: {}", e[0])
         };
         assert_snapshot!(name, ast, input);
     }
