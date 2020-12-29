@@ -1,0 +1,22 @@
+version: 2.1
+
+jobs:
+  test:
+    working_directory: ~/repo
+    docker:
+      - image: gengjiawen/node-build:wasm
+    steps:
+      - checkout
+      - run: npx envinfo
+      - run:
+          name: test
+          command: |
+            npx envinfo
+            cd wasm && wasm-pack build
+
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - test
