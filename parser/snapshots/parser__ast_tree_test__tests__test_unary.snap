@@ -7,7 +7,6 @@ expression: "-3"
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Expr",
         "expr_type": "PREFIX",
         "op": {
           "span": {

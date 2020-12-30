@@ -7,7 +7,6 @@ expression: 1 + 2 * 3
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Expr",
         "expr_type": "INFIX",
         "op": {
           "span": {

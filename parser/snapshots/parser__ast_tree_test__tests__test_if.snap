@@ -7,7 +7,6 @@ expression: "if (x < y) { x } else { y }"
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Expr",
         "expr_type": "IF",
         "condition": {
           "expr_type": "INFIX",
@@ -43,7 +42,6 @@ expression: "if (x < y) { x } else { y }"
         },
         "consequent": [
           {
-            "stmt_type": "Expr",
             "expr_type": "IDENTIFIER",
             "name": "x",
             "span": {
@@ -54,7 +52,6 @@ expression: "if (x < y) { x } else { y }"
         ],
         "alternate": [
           {
-            "stmt_type": "Expr",
             "expr_type": "IDENTIFIER",
             "name": "y",
             "span": {

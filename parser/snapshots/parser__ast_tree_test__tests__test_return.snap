@@ -7,7 +7,6 @@ expression: return 3
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Return",
         "expr_type": "LITERAL",
         "type": "Integer",
         "raw": 3,

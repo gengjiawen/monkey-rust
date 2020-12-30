@@ -7,14 +7,12 @@ expression: "fn(x) { x };"
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Expr",
         "expr_type": "FUNCTION",
         "params": [
           "x"
         ],
         "body": [
           {
-            "stmt_type": "Expr",
             "expr_type": "IDENTIFIER",
             "name": "x",
             "span": {

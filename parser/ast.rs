@@ -46,18 +46,19 @@ impl fmt::Display for Program {
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(untagged)]
+pub enum Statement {
+    Let(Let),
+    Return(Expression), // todo refactor to struct
+    Expr(Expression),
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct Let {
     pub identifier: Token, // rust can't do precise type with enum
     pub expr: Expression,
     pub span: Span,
-}
-
-#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
-#[serde(tag = "stmt_type")]
-pub enum Statement {
-    Let(Let),
-    Return(Expression),
-    Expr(Expression),
 }
 
 impl fmt::Display for Statement {

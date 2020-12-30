@@ -7,7 +7,6 @@ expression: "a[1]"
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Expr",
         "expr_type": "Index",
         "object": {
           "expr_type": "IDENTIFIER",

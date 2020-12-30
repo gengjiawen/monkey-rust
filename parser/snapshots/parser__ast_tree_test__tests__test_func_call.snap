@@ -7,7 +7,6 @@ expression: "add(1, 2)"
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Expr",
         "expr_type": "FunctionCall",
         "callee": {
           "expr_type": "IDENTIFIER",

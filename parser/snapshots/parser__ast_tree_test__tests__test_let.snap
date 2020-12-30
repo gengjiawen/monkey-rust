@@ -7,7 +7,7 @@ expression: let a = 3
     "type": "Program",
     "body": [
       {
-        "stmt_type": "Let",
+        "type": "Let",
         "identifier": {
           "span": {
             "start": 4,
