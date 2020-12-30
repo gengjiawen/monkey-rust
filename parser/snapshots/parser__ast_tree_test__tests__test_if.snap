@@ -4,6 +4,7 @@ expression: "if (x < y) { x } else { y }"
 ---
 {
   "Program": {
+    "type": "Program",
     "body": [
       {
         "stmt_type": "Expr",
@@ -71,7 +72,6 @@ expression: "if (x < y) { x } else { y }"
     "span": {
       "start": 0,
       "end": 28
-    },
-    "type": "Program"
+    }
   }
 }

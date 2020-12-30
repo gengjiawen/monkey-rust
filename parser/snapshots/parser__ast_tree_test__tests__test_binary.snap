@@ -4,6 +4,7 @@ expression: 1 + 2 * 3
 ---
 {
   "Program": {
+    "type": "Program",
     "body": [
       {
         "stmt_type": "Expr",
@@ -69,7 +70,6 @@ expression: 1 + 2 * 3
     "span": {
       "start": 0,
       "end": 10
-    },
-    "type": "Program"
+    }
   }
 }

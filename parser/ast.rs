@@ -2,8 +2,7 @@ use core::fmt;
 use core::fmt::Result;
 use std::fmt::Formatter;
 use lexer::token::{Token, TokenKind, Span};
-use serde::{Deserialize, Serialize, Serializer};
-use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize};
 
 // still wait for https://github.com/serde-rs/serde/issues/1402
 // or https://github.com/serde-rs/serde/issues/760
@@ -24,24 +23,11 @@ impl fmt::Display for Node {
     }
 }
 
-#[derive(Clone, Debug, Eq, Deserialize, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct Program {
     pub body: Vec<Statement>,
     pub span: Span,
-}
-
-// remove this if serde resolve resolve https://github.com/serde-rs/serde/issues/760
-impl Serialize for Program {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Program", 2)?;
-        state.serialize_field("body", &self.body)?;
-        state.serialize_field("span", &self.span)?;
-        state.serialize_field("type", "Program")?;
-        state.end()
-    }
 }
 
 impl Program {
