@@ -6,7 +6,7 @@ pub extern crate lexer;
 
 use lexer::token::{TokenKind, Token, Span};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF, FunctionDeclaration, FunctionCall, Index};
+use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF, FunctionDeclaration, FunctionCall, Index, ReturnStatement};
 use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
@@ -124,6 +124,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.current_token.span.start;
         self.next_token();
 
         let value = self.parse_expression(Precedence::LOWEST)?.0;
@@ -131,8 +132,13 @@ impl<'a> Parser<'a> {
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
+        let end = self.current_token.span.end;
 
-        return Ok(Statement::Return(value));
+        return Ok(Statement::Return(
+            ReturnStatement {
+                argument: value,
+                span: Span { start, end },
+            }));
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {

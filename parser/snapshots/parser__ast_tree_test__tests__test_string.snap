@@ -7,7 +7,6 @@ expression: "\"jw\""
     "type": "Program",
     "body": [
       {
-        "expr_type": "LITERAL",
         "type": "String",
         "raw": "jw",
         "span": {

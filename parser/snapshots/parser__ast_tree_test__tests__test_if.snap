@@ -7,9 +7,9 @@ expression: "if (x < y) { x } else { y }"
     "type": "Program",
     "body": [
       {
-        "expr_type": "IF",
+        "type": "IF",
         "condition": {
-          "expr_type": "INFIX",
+          "type": "BinaryExpression",
           "op": {
             "span": {
               "start": 6,
@@ -20,7 +20,7 @@ expression: "if (x < y) { x } else { y }"
             }
           },
           "left": {
-            "expr_type": "IDENTIFIER",
+            "type": "IDENTIFIER",
             "name": "x",
             "span": {
               "start": 4,
@@ -28,7 +28,7 @@ expression: "if (x < y) { x } else { y }"
             }
           },
           "right": {
-            "expr_type": "IDENTIFIER",
+            "type": "IDENTIFIER",
             "name": "y",
             "span": {
               "start": 8,
@@ -42,7 +42,7 @@ expression: "if (x < y) { x } else { y }"
         },
         "consequent": [
           {
-            "expr_type": "IDENTIFIER",
+            "type": "IDENTIFIER",
             "name": "x",
             "span": {
               "start": 13,
@@ -52,7 +52,7 @@ expression: "if (x < y) { x } else { y }"
         ],
         "alternate": [
           {
-            "expr_type": "IDENTIFIER",
+            "type": "IDENTIFIER",
             "name": "y",
             "span": {
               "start": 24,

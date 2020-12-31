@@ -19,7 +19,6 @@ expression: let a = 3
           }
         },
         "expr": {
-          "expr_type": "LITERAL",
           "type": "Integer",
           "raw": 3,
           "span": {

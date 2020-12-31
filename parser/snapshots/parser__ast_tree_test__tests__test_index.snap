@@ -7,9 +7,9 @@ expression: "a[1]"
     "type": "Program",
     "body": [
       {
-        "expr_type": "Index",
+        "type": "Index",
         "object": {
-          "expr_type": "IDENTIFIER",
+          "type": "IDENTIFIER",
           "name": "a",
           "span": {
             "start": 0,
@@ -17,7 +17,6 @@ expression: "a[1]"
           }
         },
         "index": {
-          "expr_type": "LITERAL",
           "type": "Integer",
           "raw": 1,
           "span": {

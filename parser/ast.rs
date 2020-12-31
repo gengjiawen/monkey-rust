@@ -5,7 +5,6 @@ use lexer::token::{Token, TokenKind, Span};
 use serde::{Deserialize, Serialize};
 
 // still wait for https://github.com/serde-rs/serde/issues/1402
-// or https://github.com/serde-rs/serde/issues/760
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Node {
     Program(Program),
@@ -45,11 +44,12 @@ impl fmt::Display for Program {
     }
 }
 
+
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum Statement {
     Let(Let),
-    Return(Expression), // todo refactor to struct
+    Return(ReturnStatement),
     Expr(Expression),
 }
 
@@ -58,6 +58,13 @@ pub enum Statement {
 pub struct Let {
     pub identifier: Token, // rust can't do precise type with enum
     pub expr: Expression,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct ReturnStatement {
+    pub argument: Expression,
     pub span: Span,
 }
 
@@ -70,7 +77,7 @@ impl fmt::Display for Statement {
                 }
                 panic!("unreachable")
             },
-            Statement::Return(expr) => write!(f, "return {};", expr),
+            Statement::Return(ReturnStatement { argument, .. }) => write!(f, "return {};", argument),
             Statement::Expr(expr) => write!(f, "{}", expr),
         }
     }
@@ -92,7 +99,7 @@ impl fmt::Display for BlockStatement {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
-#[serde(tag = "expr_type")]
+#[serde(untagged)]
 pub enum Expression {
     IDENTIFIER(IDENTIFIER),
     LITERAL(Literal), // need to flatten
@@ -105,12 +112,14 @@ pub enum Expression {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct IDENTIFIER {
     pub name: String,
     pub span: Span,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct UnaryExpression {
     pub op: Token,
     pub operand: Box<Expression>,
@@ -118,6 +127,7 @@ pub struct UnaryExpression {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct BinaryExpression {
     pub op: Token,
     pub left: Box<Expression>,
@@ -126,6 +136,7 @@ pub struct BinaryExpression {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct IF {
     pub condition: Box<Expression>,
     pub consequent: BlockStatement,
@@ -134,6 +145,7 @@ pub struct IF {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct FunctionDeclaration {
     pub params: Vec<String>,
     pub body: BlockStatement,
@@ -142,6 +154,7 @@ pub struct FunctionDeclaration {
 
 // function can be Identifier or FunctionLiteral (think iife)
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct FunctionCall {
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
@@ -149,6 +162,7 @@ pub struct FunctionCall {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
 pub struct Index {
     pub object: Box<Expression>,
     pub index: Box<Expression>,

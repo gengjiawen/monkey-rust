@@ -7,11 +7,9 @@ expression: "[1, true]"
     "type": "Program",
     "body": [
       {
-        "expr_type": "LITERAL",
         "type": "Array",
         "elements": [
           {
-            "expr_type": "LITERAL",
             "type": "Integer",
             "raw": 1,
             "span": {
@@ -20,7 +18,6 @@ expression: "[1, true]"
             }
           },
           {
-            "expr_type": "LITERAL",
             "type": "Boolean",
             "raw": true,
             "span": {

@@ -7,12 +7,10 @@ expression: "{\"a\": 1}"
     "type": "Program",
     "body": [
       {
-        "expr_type": "LITERAL",
         "type": "Hash",
         "elements": [
           [
             {
-              "expr_type": "LITERAL",
               "type": "String",
               "raw": "a",
               "span": {
@@ -21,7 +19,6 @@ expression: "{\"a\": 1}"
               }
             },
             {
-              "expr_type": "LITERAL",
               "type": "Integer",
               "raw": 1,
               "span": {

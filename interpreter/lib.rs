@@ -35,10 +35,10 @@ fn eval_block_statements(statements: &Vec<Statement>, env: &Env) -> Result<Rc<Ob
 fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalError> {
     match statement {
         Statement::Expr(expr) => eval_expression(expr, env),
-        Statement::Return(expr) => {
-            let val = eval_expression(expr, env)?;
+        Statement::Return(ReturnStatement { argument, .. }) => {
+            let val = eval_expression(argument, env)?;
             return Ok(Rc::new(Object::ReturnValue(val)));
-        },
+        }
         Statement::Let(Let { identifier: id, expr, .. }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
