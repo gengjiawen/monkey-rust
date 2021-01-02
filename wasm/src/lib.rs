@@ -1,7 +1,8 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
-use parser::parse;
+use parser::{parse_ast_json_string};
+use wasm_bindgen::throw_str;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -15,11 +16,11 @@ extern {
 }
 
 #[wasm_bindgen]
-pub fn greet() -> String {
-    match parse("let a = 3") {
+pub fn parse(input: &str) -> String {
+    match parse_ast_json_string(input) {
         Ok(node) => {
             node.to_string()
         },
-        Err(e) => format!("parse error: {}", e[0])
+        Err(e) => throw_str(format!("parse error: {}", e[0]).as_str())
     }
 }
