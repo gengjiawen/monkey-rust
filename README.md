@@ -23,6 +23,18 @@ $ cargo build
 $ cargo test
 ```
 
+### Version and Publish
+Version
+```bash
+cargo install cargo-workspaces
+cargo workspaces version custom --exact 0.4.0 --no-git-commit
+```
+
+Publish
+```bash
+cargo workspaces publish --from-git --token $CARGO_TOKEN
+```
+
 ## References on compiler
 * https://github.com/dinfuehr/dora
 * https://github.com/wren-lang/wren
