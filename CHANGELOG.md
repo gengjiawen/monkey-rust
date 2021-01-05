@@ -1,5 +1,13 @@
 # Changelog
 
+### [0.4.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.0...v0.4.1) (2021-01-05)
+
+
+### Bug Fixes
+
+* add missing id in release job ([6afacf7](https://www.github.com/gengjiawen/monkey-rust/commit/6afacf7a5eb243312ae4d3d5e806342535c27a14))
+* update crates to right version ([43c4977](https://www.github.com/gengjiawen/monkey-rust/commit/43c4977f5189f4f42bddbfed43b661ac3dfe1f88))
+
 ## [0.4.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.3.0...v0.4.0) (2021-01-02)
 
 
