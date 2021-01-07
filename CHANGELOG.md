@@ -1,5 +1,13 @@
 # Changelog
 
+### [0.4.2](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.1...v0.4.2) (2021-01-07)
+
+
+### Bug Fixes
+
+* remove unused interface ([31dad4e](https://www.github.com/gengjiawen/monkey-rust/commit/31dad4ef02ca27e5fe0a01a99ccd711cbaaccd50))
+* use latest Node.js LTS for release ([13394bf](https://www.github.com/gengjiawen/monkey-rust/commit/13394bfd17b39ba4d282126b10b3ea939ee5578b))
+
 ### [0.4.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.0...v0.4.1) (2021-01-05)
 
 
