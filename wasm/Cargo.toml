@@ -1,6 +1,6 @@
 [package]
 name = "monkey-wasm"
-version = "0.4.1"
+version = "0.4.2"
 description = "monkey lang parser wasm version"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
