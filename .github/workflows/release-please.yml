@@ -15,6 +15,12 @@ jobs:
           package-name: release-please-action
       - uses: actions/checkout@v2
       - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 14
+          registry-url: 'https://registry.npmjs.org'
+        if: ${{ steps.release.outputs.release_created }}
+      - run: npx envinfo
       - run: npm publish --access public
         working-directory: wasm/pkg
         env:
