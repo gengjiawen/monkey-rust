@@ -11,11 +11,6 @@ use wasm_bindgen::throw_str;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
-extern {
-    fn alert(s: &str);
-}
-
-#[wasm_bindgen]
 pub fn parse(input: &str) -> String {
     match parse_ast_json_string(input) {
         Ok(node) => {
