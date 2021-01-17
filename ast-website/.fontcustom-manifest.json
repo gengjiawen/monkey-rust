@@ -1,0 +1,81 @@
+{
+  "checksum": {
+    "previous": "45cd59da2a1bc422647cab7f5363931929292afe7ca74b83e1e27f66f99ade81",
+    "current": "45cd59da2a1bc422647cab7f5363931929292afe7ca74b83e1e27f66f99ade81"
+  },
+  "fonts": [
+    "fontcustom/fontcustom_45cd59da2a1bc422647cab7f53639319.ttf",
+    "fontcustom/fontcustom_45cd59da2a1bc422647cab7f53639319.svg",
+    "fontcustom/fontcustom_45cd59da2a1bc422647cab7f53639319.woff",
+    "fontcustom/fontcustom_45cd59da2a1bc422647cab7f53639319.eot",
+    "fontcustom/fontcustom_45cd59da2a1bc422647cab7f53639319.woff2"
+  ],
+  "glyphs": {
+    "GraphQL_Logo": {
+      "codepoint": 61696,
+      "source": "./fontcustom/input-svg/GraphQL_Logo.svg"
+    },
+    "handlebars": {
+      "codepoint": 61697,
+      "source": "./fontcustom/input-svg/handlebars.svg"
+    },
+    "icu": {
+      "codepoint": 61698,
+      "source": "./fontcustom/input-svg/icu.svg"
+    },
+    "java": {
+      "codepoint": 61703,
+      "source": "./fontcustom/input-svg/java.svg"
+    },
+    "ocaml": {
+      "codepoint": 61702,
+      "source": "./fontcustom/input-svg/ocaml.svg"
+    },
+    "reason": {
+      "codepoint": 61701,
+      "source": "./fontcustom/input-svg/reason.svg"
+    },
+    "rust": {
+      "codepoint": 61700,
+      "source": "./fontcustom/input-svg/rust.svg"
+    },
+    "scala": {
+      "codepoint": 61699,
+      "source": "./fontcustom/input-svg/scala.svg"
+    }
+  },
+  "options": {
+    "autowidth": false,
+    "config": "./fontcustom/config.yml",
+    "copyright": "",
+    "css3": false,
+    "css_selector": ".icon-{{glyph}}",
+    "debug": false,
+    "font_ascent": 448,
+    "font_descent": 64,
+    "font_design_size": 16,
+    "font_em": 512,
+    "font_name": "fontcustom",
+    "force": false,
+    "input": {
+      "templates": "./fontcustom/input-svg/",
+      "vectors": "./fontcustom/input-svg/"
+    },
+    "no_hash": false,
+    "output": {
+      "css": "fontcustom",
+      "fonts": "fontcustom",
+      "preview": "fontcustom"
+    },
+    "preprocessor_path": null,
+    "quiet": false,
+    "templates": [
+      "css",
+      "preview"
+    ]
+  },
+  "templates": [
+    "fontcustom/fontcustom.css",
+    "fontcustom/fontcustom-preview.html"
+  ]
+}

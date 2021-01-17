@@ -1,0 +1,23 @@
+{
+  "name": "monkey-rust",
+  "version": "1.0.0",
+  "description": "![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg) [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/gengjiawen/monkey_rust)",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gengjiawen/monkey-rust.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gengjiawen/monkey-rust/issues"
+  },
+  "homepage": "https://github.com/gengjiawen/monkey-rust#readme"
+}
