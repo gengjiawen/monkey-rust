@@ -151,19 +151,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<(Expression, Span), ParseError> {
-        let start = self.current_token.span.start;
+        let mut left_start = self.current_token.span.start;
         let mut left = self.parse_prefix_expression()?;
         while self.peek_token.kind != TokenKind::SEMICOLON && precedence < get_token_precedence(&self.peek_token.kind) {
-            let left_start = self.current_token.span.start;
             match self.parse_infix_expression(
                 &left,
                 left_start
             ) {
                 Some(infix) => {
-                    left = infix?
+                    left = infix?;
+                    if let Expression::INFIX(b) = left.clone() {
+                        left_start = b.span.start;
+                    }
                 }
                 None => return Ok((left, Span {
-                    start,
+                    start: left_start,
                     end: self.current_token.span.end
                 })),
             }
@@ -172,7 +174,7 @@ impl<'a> Parser<'a> {
         let end = self.current_token.span.end;
 
         Ok((left, Span {
-            start,
+            start: left_start,
             end,
         }))
     }

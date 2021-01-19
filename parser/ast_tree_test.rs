@@ -56,6 +56,12 @@ mod tests {
     }
 
     #[test]
+    fn test_binary_nested() {
+        let input = "1+2+3";
+        test_ast_tree("test_binary_nested", input)
+    }
+
+    #[test]
     fn test_if() {
         let input = "if (x < y) { x } else { y }";
         test_ast_tree("test_if", input)
