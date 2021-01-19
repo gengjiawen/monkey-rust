@@ -12,6 +12,10 @@ jobs:
           name: test
           command: |
             cd wasm && wasm-pack build
+      - run:
+          name: test
+          command: |
+            cd ast-website && yarn && yarn build
 
 workflows:
   version: 2
