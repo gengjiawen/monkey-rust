@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.2...v0.5.0) (2021-01-19)
+
+
+### Features
+
+* add ast-explorer ([#29](https://www.github.com/gengjiawen/monkey-rust/issues/29)) ([cc58d93](https://www.github.com/gengjiawen/monkey-rust/commit/cc58d939d04c509a53f38bf112bb97fe7ccef323))
+* add fish to gitpods ([65587f7](https://www.github.com/gengjiawen/monkey-rust/commit/65587f783911c2bd81bf37152b187805f403449f))
+
+
+### Bug Fixes
+
+* add versions back ([197c89e](https://www.github.com/gengjiawen/monkey-rust/commit/197c89e644290d806e7d916889485ed9751c8478))
+* binary expr span issues. ([c543942](https://www.github.com/gengjiawen/monkey-rust/commit/c5439420cd49417bf23dbec2debd872279463498))
+
 ### [0.4.2](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.1...v0.4.2) (2021-01-07)
 
 
