@@ -42,12 +42,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "difference"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
-
-[[package]]
 name = "dtoa"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -72,16 +66,16 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.4.0"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ad34c5249910ef48fc32e776b6609b98e4601f2fea5b5dcd0ac01e296b62f87"
+checksum = "f62fca340815e6190f0ab60fd2729d297a55bcf9863025e5a8a4ce68f50066c4"
 dependencies = [
  "console",
- "difference",
  "lazy_static",
  "serde",
  "serde_json",
  "serde_yaml",
+ "similar",
  "uuid",
 ]
 
@@ -350,6 +344,12 @@ dependencies = [
  "serde",
  "yaml-rust",
 ]
+
+[[package]]
+name = "similar"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c2c5334976f6000d0c36cf95a0b70ff4daa310b935aa4ce190d02f1012c81d0"
 
 [[package]]
 name = "siphasher"
