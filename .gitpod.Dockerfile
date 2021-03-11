@@ -1,4 +1,4 @@
-FROM gitpod/workspace-wasm
+FROM gitpod/workspace-wasm:latest
 
 # Install custom tools, runtimes, etc.
 # For example "bastet", a command-line tetris clone:
