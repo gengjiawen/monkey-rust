@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.5.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.5.0...v0.5.1) (2021-03-11)
+
+
+### Bug Fixes
+
+* change default release name ([ecd5e54](https://www.github.com/gengjiawen/monkey-rust/commit/ecd5e540119eb641b60ab5c6189241627d188ac7))
+
 ## [0.5.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.2...v0.5.0) (2021-01-19)
 
 
