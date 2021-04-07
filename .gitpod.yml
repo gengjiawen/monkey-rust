@@ -4,4 +4,4 @@ image:
 tasks:
   - init: cargo build
     command: cargo test
-  - command: cargo install cargo-workspaces
+    
