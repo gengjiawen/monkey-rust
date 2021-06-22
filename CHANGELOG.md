@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.5.0...v0.6.0) (2021-06-22)
+
+
+### Features
+
+* put cargo-workspace into docker ([053bb27](https://www.github.com/gengjiawen/monkey-rust/commit/053bb276c0e32ccaed1a7024bbddf9006da705e1))
+* refactor token output ([ae2084e](https://www.github.com/gengjiawen/monkey-rust/commit/ae2084e55fbca08e5b3667c4e947641744de0f1b))
+
+
+### Bug Fixes
+
+* change default release name ([ecd5e54](https://www.github.com/gengjiawen/monkey-rust/commit/ecd5e540119eb641b60ab5c6189241627d188ac7))
+
 ## [0.5.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.2...v0.5.0) (2021-01-19)
 
 
