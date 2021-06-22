@@ -165,7 +165,7 @@ mod tests {
     use crate::Lexer;
     use crate::token::TokenKind;
     use super::*;
-    use insta::assert_debug_snapshot;
+    use insta::*;
 
     fn test_token_set(l: &mut Lexer) -> Vec<Token> {
         let mut token_vs: Vec<Token> = vec![];
@@ -181,65 +181,51 @@ mod tests {
         token_vs
     }
 
-    #[test]
-    fn test_lexer_simple() {
-        let mut l = Lexer::new("=+(){},:;");
+    pub fn test_lexer_common(name: &str, input: &str) {
+        let mut l = Lexer::new(input);
         let token_vs = test_token_set(&mut l);
 
-        assert_debug_snapshot!(token_vs)
+        assert_snapshot!(name, serde_json::to_string_pretty(&token_vs).unwrap(), input);
+    }
+
+    #[test]
+    fn test_lexer_simple() {
+        test_lexer_common("simple", "=+(){},:;");
     }
 
     #[test]
     fn test_lexer_let() {
-        let mut l = Lexer::new("let x=5");
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
+        test_lexer_common("let", "let x=5");
     }
 
     #[test]
     fn test_lexer_let_with_space() {
-        let mut l = Lexer::new("let x = 5");
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
+        test_lexer_common("let_with_space", "let x = 5");
     }
 
     #[test]
     fn test_lexer_string() {
-        let mut l = Lexer::new(r#""a""#);
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
+        test_lexer_common("string", r#""a""#);
     }
 
     #[test]
     fn test_lexer_array() {
-        let mut l = Lexer::new("[3]");
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
+        test_lexer_common("array", "[3]");
     }
 
     #[test]
     fn test_lexer_hash() {
-        let mut l = Lexer::new(r#"{"one": 1, "two": 2, "three": 3}"#);
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
+        test_lexer_common("hash", r#"{"one": 1, "two": 2, "three": 3}"#);
     }
 
     #[test]
     fn test_lexer_bool() {
-        let mut l = Lexer::new("let y=true");
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
+        test_lexer_common("bool", "let y=true");
     }
 
     #[test]
     fn test_lexer_complex() {
-        let mut l = Lexer::new("let five = 5;
+        test_lexer_common("complex", "let five = 5;
 let ten = 10;
 
 let add = fn(x, y) {
@@ -258,8 +244,5 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;");
-        let token_vs = test_token_set(&mut l);
-
-        assert_debug_snapshot!(token_vs)
     }
 }

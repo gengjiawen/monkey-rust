@@ -1,0 +1,43 @@
+---
+source: lexer/lib.rs
+expression: "[3]"
+---
+[
+  {
+    "kind": {
+      "type": "LBRACKET"
+    },
+    "span": {
+      "start": 0,
+      "end": 1
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 3
+    },
+    "span": {
+      "start": 1,
+      "end": 2
+    }
+  },
+  {
+    "kind": {
+      "type": "RBRACKET"
+    },
+    "span": {
+      "start": 2,
+      "end": 3
+    }
+  },
+  {
+    "kind": {
+      "type": "EOF"
+    },
+    "span": {
+      "start": 3,
+      "end": 4
+    }
+  }
+]
