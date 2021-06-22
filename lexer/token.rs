@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Token {
-    pub span: Span,
     pub kind: TokenKind,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
@@ -22,7 +22,7 @@ impl fmt::Display for Token {
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "value")]
 pub enum TokenKind {
     ILLEGAL,
     EOF,

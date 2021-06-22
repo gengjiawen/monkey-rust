@@ -4,19 +4,19 @@ expression: token_vs
 ---
 [
     Token {
+        kind: STRING(
+            "a",
+        ),
         span: Span {
             start: 0,
             end: 3,
         },
-        kind: STRING(
-            "a",
-        ),
     },
     Token {
+        kind: EOF,
         span: Span {
             start: 3,
             end: 4,
         },
-        kind: EOF,
     },
 ]

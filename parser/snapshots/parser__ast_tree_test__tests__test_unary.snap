@@ -9,12 +9,12 @@ expression: "-3"
       {
         "type": "UnaryExpression",
         "op": {
+          "kind": {
+            "type": "MINUS"
+          },
           "span": {
             "start": 0,
             "end": 1
-          },
-          "kind": {
-            "type": "MINUS"
           }
         },
         "operand": {

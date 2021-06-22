@@ -9,23 +9,23 @@ expression: 1+2+3
       {
         "type": "BinaryExpression",
         "op": {
+          "kind": {
+            "type": "PLUS"
+          },
           "span": {
             "start": 3,
             "end": 4
-          },
-          "kind": {
-            "type": "PLUS"
           }
         },
         "left": {
           "type": "BinaryExpression",
           "op": {
+            "kind": {
+              "type": "PLUS"
+            },
             "span": {
               "start": 1,
               "end": 2
-            },
-            "kind": {
-              "type": "PLUS"
             }
           },
           "left": {

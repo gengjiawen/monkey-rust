@@ -4,73 +4,73 @@ expression: token_vs
 ---
 [
     Token {
+        kind: ASSIGN,
         span: Span {
             start: 0,
             end: 1,
         },
-        kind: ASSIGN,
     },
     Token {
+        kind: PLUS,
         span: Span {
             start: 1,
             end: 2,
         },
-        kind: PLUS,
     },
     Token {
+        kind: LPAREN,
         span: Span {
             start: 2,
             end: 3,
         },
-        kind: LPAREN,
     },
     Token {
+        kind: RPAREN,
         span: Span {
             start: 3,
             end: 4,
         },
-        kind: RPAREN,
     },
     Token {
+        kind: LBRACE,
         span: Span {
             start: 4,
             end: 5,
         },
-        kind: LBRACE,
     },
     Token {
+        kind: RBRACE,
         span: Span {
             start: 5,
             end: 6,
         },
-        kind: RBRACE,
     },
     Token {
+        kind: COMMA,
         span: Span {
             start: 6,
             end: 7,
         },
-        kind: COMMA,
     },
     Token {
+        kind: COLON,
         span: Span {
             start: 7,
             end: 8,
         },
-        kind: COLON,
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 8,
             end: 9,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: EOF,
         span: Span {
             start: 9,
             end: 10,
         },
-        kind: EOF,
     },
 ]

@@ -11,12 +11,12 @@ expression: "if (x < y) { x } else { y }"
         "condition": {
           "type": "BinaryExpression",
           "op": {
+            "kind": {
+              "type": "LT"
+            },
             "span": {
               "start": 6,
               "end": 7
-            },
-            "kind": {
-              "type": "LT"
             }
           },
           "left": {

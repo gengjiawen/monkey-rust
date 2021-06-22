@@ -4,567 +4,567 @@ expression: token_vs
 ---
 [
     Token {
+        kind: LET,
         span: Span {
             start: 0,
             end: 3,
         },
-        kind: LET,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "five",
+        },
         span: Span {
             start: 4,
             end: 8,
         },
-        kind: IDENTIFIER {
-            name: "five",
-        },
     },
     Token {
+        kind: ASSIGN,
         span: Span {
             start: 9,
             end: 10,
         },
-        kind: ASSIGN,
     },
     Token {
+        kind: INT(
+            5,
+        ),
         span: Span {
             start: 11,
             end: 12,
         },
-        kind: INT(
-            5,
-        ),
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 12,
             end: 13,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: LET,
         span: Span {
             start: 14,
             end: 17,
         },
-        kind: LET,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "ten",
+        },
         span: Span {
             start: 18,
             end: 21,
         },
-        kind: IDENTIFIER {
-            name: "ten",
-        },
     },
     Token {
+        kind: ASSIGN,
         span: Span {
             start: 22,
             end: 23,
         },
-        kind: ASSIGN,
     },
     Token {
+        kind: INT(
+            10,
+        ),
         span: Span {
             start: 24,
             end: 26,
         },
-        kind: INT(
-            10,
-        ),
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 26,
             end: 27,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: LET,
         span: Span {
             start: 29,
             end: 32,
         },
-        kind: LET,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "add",
+        },
         span: Span {
             start: 33,
             end: 36,
         },
-        kind: IDENTIFIER {
-            name: "add",
-        },
     },
     Token {
+        kind: ASSIGN,
         span: Span {
             start: 37,
             end: 38,
         },
-        kind: ASSIGN,
     },
     Token {
+        kind: FUNCTION,
         span: Span {
             start: 39,
             end: 41,
         },
-        kind: FUNCTION,
     },
     Token {
+        kind: LPAREN,
         span: Span {
             start: 41,
             end: 42,
         },
-        kind: LPAREN,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "x",
+        },
         span: Span {
             start: 42,
             end: 43,
         },
-        kind: IDENTIFIER {
-            name: "x",
-        },
     },
     Token {
+        kind: COMMA,
         span: Span {
             start: 43,
             end: 44,
         },
-        kind: COMMA,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "y",
+        },
         span: Span {
             start: 45,
             end: 46,
         },
-        kind: IDENTIFIER {
-            name: "y",
-        },
     },
     Token {
+        kind: RPAREN,
         span: Span {
             start: 46,
             end: 47,
         },
-        kind: RPAREN,
     },
     Token {
+        kind: LBRACE,
         span: Span {
             start: 48,
             end: 49,
         },
-        kind: LBRACE,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "x",
+        },
         span: Span {
             start: 52,
             end: 53,
         },
-        kind: IDENTIFIER {
-            name: "x",
-        },
     },
     Token {
+        kind: PLUS,
         span: Span {
             start: 54,
             end: 55,
         },
-        kind: PLUS,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "y",
+        },
         span: Span {
             start: 56,
             end: 57,
         },
-        kind: IDENTIFIER {
-            name: "y",
-        },
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 57,
             end: 58,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: RBRACE,
         span: Span {
             start: 59,
             end: 60,
         },
-        kind: RBRACE,
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 60,
             end: 61,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: LET,
         span: Span {
             start: 63,
             end: 66,
         },
-        kind: LET,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "result",
+        },
         span: Span {
             start: 67,
             end: 73,
         },
-        kind: IDENTIFIER {
-            name: "result",
-        },
     },
     Token {
+        kind: ASSIGN,
         span: Span {
             start: 74,
             end: 75,
         },
-        kind: ASSIGN,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "add",
+        },
         span: Span {
             start: 76,
             end: 79,
         },
-        kind: IDENTIFIER {
-            name: "add",
-        },
     },
     Token {
+        kind: LPAREN,
         span: Span {
             start: 79,
             end: 80,
         },
-        kind: LPAREN,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "five",
+        },
         span: Span {
             start: 80,
             end: 84,
         },
-        kind: IDENTIFIER {
-            name: "five",
-        },
     },
     Token {
+        kind: COMMA,
         span: Span {
             start: 84,
             end: 85,
         },
-        kind: COMMA,
     },
     Token {
+        kind: IDENTIFIER {
+            name: "ten",
+        },
         span: Span {
             start: 86,
             end: 89,
         },
-        kind: IDENTIFIER {
-            name: "ten",
-        },
     },
     Token {
+        kind: RPAREN,
         span: Span {
             start: 89,
             end: 90,
         },
-        kind: RPAREN,
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 90,
             end: 91,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: BANG,
         span: Span {
             start: 92,
             end: 93,
         },
-        kind: BANG,
     },
     Token {
+        kind: MINUS,
         span: Span {
             start: 93,
             end: 94,
         },
-        kind: MINUS,
     },
     Token {
+        kind: SLASH,
         span: Span {
             start: 94,
             end: 95,
         },
-        kind: SLASH,
     },
     Token {
+        kind: ASTERISK,
         span: Span {
             start: 95,
             end: 96,
         },
-        kind: ASTERISK,
     },
     Token {
+        kind: INT(
+            5,
+        ),
         span: Span {
             start: 96,
             end: 97,
         },
-        kind: INT(
-            5,
-        ),
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 97,
             end: 98,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: INT(
+            5,
+        ),
         span: Span {
             start: 99,
             end: 100,
         },
-        kind: INT(
-            5,
-        ),
     },
     Token {
+        kind: LT,
         span: Span {
             start: 101,
             end: 102,
         },
-        kind: LT,
     },
     Token {
+        kind: INT(
+            10,
+        ),
         span: Span {
             start: 103,
             end: 105,
         },
-        kind: INT(
-            10,
-        ),
     },
     Token {
+        kind: GT,
         span: Span {
             start: 106,
             end: 107,
         },
-        kind: GT,
     },
     Token {
+        kind: INT(
+            5,
+        ),
         span: Span {
             start: 108,
             end: 109,
         },
-        kind: INT(
-            5,
-        ),
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 109,
             end: 110,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: IF,
         span: Span {
             start: 112,
             end: 114,
         },
-        kind: IF,
     },
     Token {
+        kind: LPAREN,
         span: Span {
             start: 115,
             end: 116,
         },
-        kind: LPAREN,
     },
     Token {
+        kind: INT(
+            5,
+        ),
         span: Span {
             start: 116,
             end: 117,
         },
-        kind: INT(
-            5,
-        ),
     },
     Token {
+        kind: LT,
         span: Span {
             start: 118,
             end: 119,
         },
-        kind: LT,
     },
     Token {
+        kind: INT(
+            10,
+        ),
         span: Span {
             start: 120,
             end: 122,
         },
-        kind: INT(
-            10,
-        ),
     },
     Token {
+        kind: RPAREN,
         span: Span {
             start: 122,
             end: 123,
         },
-        kind: RPAREN,
     },
     Token {
+        kind: LBRACE,
         span: Span {
             start: 124,
             end: 125,
         },
-        kind: LBRACE,
     },
     Token {
+        kind: RETURN,
         span: Span {
             start: 127,
             end: 133,
         },
-        kind: RETURN,
     },
     Token {
+        kind: TRUE,
         span: Span {
             start: 134,
             end: 138,
         },
-        kind: TRUE,
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 138,
             end: 139,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: RBRACE,
         span: Span {
             start: 140,
             end: 141,
         },
-        kind: RBRACE,
     },
     Token {
+        kind: ELSE,
         span: Span {
             start: 142,
             end: 146,
         },
-        kind: ELSE,
     },
     Token {
+        kind: LBRACE,
         span: Span {
             start: 147,
             end: 148,
         },
-        kind: LBRACE,
     },
     Token {
+        kind: RETURN,
         span: Span {
             start: 150,
             end: 156,
         },
-        kind: RETURN,
     },
     Token {
+        kind: FALSE,
         span: Span {
             start: 157,
             end: 162,
         },
-        kind: FALSE,
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 162,
             end: 163,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: RBRACE,
         span: Span {
             start: 164,
             end: 165,
         },
-        kind: RBRACE,
     },
     Token {
+        kind: INT(
+            10,
+        ),
         span: Span {
             start: 167,
             end: 169,
         },
-        kind: INT(
-            10,
-        ),
     },
     Token {
+        kind: EQ,
         span: Span {
             start: 171,
             end: 172,
         },
-        kind: EQ,
     },
     Token {
+        kind: INT(
+            10,
+        ),
         span: Span {
             start: 173,
             end: 175,
         },
-        kind: INT(
-            10,
-        ),
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 175,
             end: 176,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: INT(
+            10,
+        ),
         span: Span {
             start: 177,
             end: 179,
         },
-        kind: INT(
-            10,
-        ),
     },
     Token {
+        kind: NotEq,
         span: Span {
             start: 181,
             end: 182,
         },
-        kind: NotEq,
     },
     Token {
+        kind: INT(
+            9,
+        ),
         span: Span {
             start: 183,
             end: 184,
         },
-        kind: INT(
-            9,
-        ),
     },
     Token {
+        kind: SEMICOLON,
         span: Span {
             start: 184,
             end: 185,
         },
-        kind: SEMICOLON,
     },
     Token {
+        kind: EOF,
         span: Span {
             start: 185,
             end: 186,
         },
-        kind: EOF,
     },
 ]
