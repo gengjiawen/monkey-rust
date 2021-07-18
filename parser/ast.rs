@@ -116,6 +116,12 @@ pub struct IDENTIFIER {
     pub span: Span,
 }
 
+impl fmt::Display for IDENTIFIER {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", &self.name)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 #[serde(tag = "type")]
 pub struct UnaryExpression {
@@ -145,7 +151,7 @@ pub struct IF {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 #[serde(tag = "type")]
 pub struct FunctionDeclaration {
-    pub params: Vec<String>,
+    pub params: Vec<IDENTIFIER>,
     pub body: BlockStatement,
     pub span: Span,
 }
@@ -195,7 +201,14 @@ impl fmt::Display for Expression {
                 }
             }
             Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
-                write!(f, "fn({}) {{ {} }}", params.join(", "), body)
+                let func_params =
+                    params
+                        .iter()
+                        .map(|stmt| stmt.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                    ;
+                write!(f, "fn({}) {{ {} }}", func_params, body)
             }
             Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
                 write!(f, "{}({})", callee, format_expressions(arguments))

@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::rc::Rc;
 use crate::environment::Env;
-use parser::ast::BlockStatement;
+use parser::ast::{BlockStatement, IDENTIFIER};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
@@ -18,7 +18,7 @@ pub enum Object {
     Hash(HashMap<Rc<Object>, Rc<Object>>),
     Null,
     ReturnValue(Rc<Object>),
-    Function(Vec<String>, BlockStatement, Env),
+    Function(Vec<IDENTIFIER>, BlockStatement, Env),
     Builtin(BuiltinFunc),
     Error(String),
 }
@@ -32,7 +32,13 @@ impl fmt::Display for Object {
             Object::Null => write!(f, "null"),
             Object::ReturnValue(expr) => write!(f, "{}", expr),
             Object::Function(params, body,  _env) => {
-                write!(f, "fn({}) {{ {} }}", params.join(", "), body)
+                let func_params =
+                    params
+                        .iter()
+                        .map(|stmt| stmt.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ");
+                write!(f, "fn({}) {{ {} }}", func_params, body)
             },
             Object::Builtin(_) => write!(f, "[builtin function]"),
             Object::Error(e) => write!(f, "{}", e),

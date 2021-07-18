@@ -9,7 +9,14 @@ expression: "fn(x) { x };"
       {
         "type": "FunctionDeclaration",
         "params": [
-          "x"
+          {
+            "type": "IDENTIFIER",
+            "name": "x",
+            "span": {
+              "start": 3,
+              "end": 4
+            }
+          }
         ],
         "body": {
           "type": "BlockStatement",

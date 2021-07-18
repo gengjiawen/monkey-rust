@@ -126,7 +126,7 @@ fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Ob
             let mut env = Environment::new_enclosed_environment(&env);
 
             params.iter().enumerate().for_each(|(i, param)| {
-                env.set(param.clone(), args[i].clone());
+                env.set(param.name.clone(), args[i].clone());
             });
 
             let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(env)))?;

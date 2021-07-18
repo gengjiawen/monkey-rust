@@ -345,7 +345,7 @@ impl<'a> Parser<'a> {
         let end = self.current_token.span.end;
 
         Ok(Expression::FUNCTION(FunctionDeclaration {
-            params: params,
+            params,
             body: function_body,
             span: Span {
                 start,
@@ -354,7 +354,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn parse_fn_parameters(&mut self) -> Result<Vec<String>, ParseError> {
+    fn parse_fn_parameters(&mut self) -> Result<Vec<IDENTIFIER>, ParseError> {
         let mut params = Vec::new();
         if self.peek_token_is(&TokenKind::RPAREN) {
             self.next_token();
@@ -364,7 +364,10 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => params.push(name.clone()),
+            TokenKind::IDENTIFIER { name } => params.push(IDENTIFIER {
+                name: name.clone(),
+                span: self.current_token.span.clone(),
+             }),
             token => return Err(format!("expected function params  to be an identifier, got {}", token))
         }
 
@@ -372,7 +375,10 @@ impl<'a> Parser<'a> {
             self.next_token();
             self.next_token();
             match &self.current_token.kind {
-                TokenKind::IDENTIFIER { name } => params.push(name.clone()),
+                TokenKind::IDENTIFIER { name } => params.push(IDENTIFIER {
+                    name: name.clone(),
+                    span: self.current_token.span.clone(),
+                }),
                 token => return Err(format!("expected function params  to be an identifier, got {}", token))
             }
         }
