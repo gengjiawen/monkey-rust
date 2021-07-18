@@ -309,6 +309,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
+        let start = self.current_token.span.start;
         self.next_token();
         let mut block_statement = Vec::new();
 
@@ -320,7 +321,15 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        Ok(BlockStatement::new(block_statement))
+        let end = self.current_token.span.end;
+
+        Ok(BlockStatement {
+            body: block_statement,
+            span: Span {
+                start,
+                end,
+            }
+        })
     }
 
     fn parse_fn_expression(&mut self) -> Result<Expression, ParseError> {

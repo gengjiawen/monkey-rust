@@ -84,17 +84,15 @@ impl fmt::Display for Statement {
 }
 
 #[derive(Clone, Debug, Eq, Hash, Serialize, Deserialize, PartialEq)]
-pub struct BlockStatement(pub Vec<Statement>);
-
-impl BlockStatement {
-    pub fn new(statements: Vec<Statement>) -> BlockStatement {
-        BlockStatement(statements)
-    }
+#[serde(tag = "type")]
+pub struct BlockStatement {
+    pub body: Vec<Statement>,
+    pub span: Span,
 }
 
 impl fmt::Display for BlockStatement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", format_statements(&self.0))
+        write!(f, "{}", format_statements(&self.body))
     }
 }
 

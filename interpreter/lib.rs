@@ -73,10 +73,10 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
         Expression::IF(IF { condition, consequent, alternate, .. }) => {
             let condition = eval_expression(condition, &Rc::clone(env))?;
             if is_truthy(&condition) {
-                eval_block_statements(&(consequent.0), env)
+                eval_block_statements(&(consequent.body), env)
             } else {
                 match alternate {
-                    Some(alt) => eval_block_statements(&(alt.0), env),
+                    Some(alt) => eval_block_statements(&(alt.body), env),
                     None => Ok(Rc::new(Object::Null))
                 }
             }
@@ -129,7 +129,7 @@ fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Ob
                 env.set(param.clone(), args[i].clone());
             });
 
-            let evaluated = eval_block_statements(&body.0, &Rc::new(RefCell::new(env)))?;
+            let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(env)))?;
             return unwrap_return(evaluated);
 
         },
