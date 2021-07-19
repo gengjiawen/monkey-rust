@@ -1,6 +1,6 @@
 [package]
 name = "monkey-lexer"
-version = "0.5.0"
+version = "0.6.0"
 description = "a lexer for monkey lang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
