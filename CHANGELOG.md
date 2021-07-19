@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.5.0...v0.6.0) (2021-07-19)
+
+
+### Features
+
+* add test case to astsexplorer ([c873b23](https://www.github.com/gengjiawen/monkey-rust/commit/c873b23f0f1e6960ecfd766e17bf78f784e4ca5e))
+* put cargo-workspace into docker ([053bb27](https://www.github.com/gengjiawen/monkey-rust/commit/053bb276c0e32ccaed1a7024bbddf9006da705e1))
+* refactor function params to IDENTIFIER type. ([89faebe](https://www.github.com/gengjiawen/monkey-rust/commit/89faebeff7e7e1a484b42f65daf18cae05d2ba34))
+* refactor token output ([ae2084e](https://www.github.com/gengjiawen/monkey-rust/commit/ae2084e55fbca08e5b3667c4e947641744de0f1b))
+
+
+### Bug Fixes
+
+* change default release name ([ecd5e54](https://www.github.com/gengjiawen/monkey-rust/commit/ecd5e540119eb641b60ab5c6189241627d188ac7))
+* if span issue ([0236a30](https://www.github.com/gengjiawen/monkey-rust/commit/0236a303dbd8ccaecef39d5f4c24681841aa794d))
+
 ## [0.5.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.4.2...v0.5.0) (2021-01-19)
 
 
