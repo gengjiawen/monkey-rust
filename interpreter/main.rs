@@ -3,7 +3,7 @@ use std::io::stdin;
 use interpreter::eval;
 use std::rc::Rc;
 use std::cell::RefCell;
-use interpreter::environment::Env;
+use object::environment::Env;
 
 fn main() {
     println!("Welcome to monkey interpreter by gengjiawen");

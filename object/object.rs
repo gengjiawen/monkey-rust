@@ -1,10 +1,14 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Formatter;
-use std::rc::Rc;
-use crate::environment::Env;
-use parser::ast::{BlockStatement, IDENTIFIER};
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
+
+use parser::ast::{BlockStatement, IDENTIFIER};
+
+use crate::environment::Env;
+
+pub mod environment;
 
 pub type EvalError = String;
 pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Rc<Object>;

@@ -1,15 +1,14 @@
-mod builtins;
-mod object;
-pub mod environment;
-
-use parser::ast::*;
-use crate::environment::*;
-use crate::object::{EvalError, Object};
-use parser::lexer::token::{TokenKind, Token};
-use std::rc::Rc;
 use std::cell::RefCell;
-use crate::builtins::BUILTINS;
 use std::collections::HashMap;
+use std::rc::Rc;
+
+use object::environment::*;
+use parser::ast::*;
+use parser::lexer::token::{Token, TokenKind};
+use object::{Object, EvalError};
+use crate::builtins::BUILTINS;
+
+mod builtins;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
     match node {
@@ -272,11 +271,13 @@ fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
 
 #[cfg(test)]
 mod tests {
-    use parser::*;
-    use crate::eval;
-    use std::rc::Rc;
     use std::cell::RefCell;
-    use crate::environment::*;
+    use std::rc::Rc;
+
+    use object::environment::*;
+    use parser::*;
+
+    use crate::eval;
 
     fn apply_test(test_cases: &[(&str, &str)]) {
         let env: Env = Rc::new(RefCell::new(Default::default()));

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::object::Object;
+use crate::Object;
 
 pub type Env = Rc<RefCell<Environment>>;
 

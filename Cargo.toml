@@ -2,6 +2,7 @@
 members = [
   "lexer",
   "parser",
+  "object",
   "interpreter",
   "wasm"
 ]
