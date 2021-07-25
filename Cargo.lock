@@ -131,7 +131,7 @@ checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
 name = "monkey-interpreter"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "monkey-object",
  "monkey-parser",
@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-lexer"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "insta",
  "serde",
@@ -149,7 +149,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-object"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "insta",
  "monkey-parser",
@@ -157,7 +157,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-parser"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "insta",
  "monkey-lexer",
@@ -167,7 +167,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-wasm"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "console_error_panic_hook",
  "monkey-parser",
