@@ -1,6 +1,6 @@
 ---
-source: lexer/lib.rs
-expression: let x = 5
+source: lexer/lexer_test.rs
+expression: let y=true
 ---
 [
   {
@@ -16,7 +16,7 @@ expression: let x = 5
     "kind": {
       "type": "IDENTIFIER",
       "value": {
-        "name": "x"
+        "name": "y"
       }
     },
     "span": {
@@ -29,18 +29,17 @@ expression: let x = 5
       "type": "ASSIGN"
     },
     "span": {
-      "start": 6,
-      "end": 7
+      "start": 5,
+      "end": 6
     }
   },
   {
     "kind": {
-      "type": "INT",
-      "value": 5
+      "type": "TRUE"
     },
     "span": {
-      "start": 8,
-      "end": 9
+      "start": 6,
+      "end": 10
     }
   },
   {
@@ -48,8 +47,8 @@ expression: let x = 5
       "type": "EOF"
     },
     "span": {
-      "start": 9,
-      "end": 10
+      "start": 10,
+      "end": 11
     }
   }
 ]

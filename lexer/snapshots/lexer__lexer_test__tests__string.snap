@@ -1,5 +1,5 @@
 ---
-source: lexer/lib.rs
+source: lexer/lexer_test.rs
 expression: "\"a\""
 ---
 [
