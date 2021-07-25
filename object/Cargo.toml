@@ -1,6 +1,6 @@
 [package]
 name = "monkey-object"
-version = "0.6.0"
+version = "0.7.0"
 description = "a object system for monkey lang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -15,7 +15,7 @@ name = "object"
 path= "object.rs"
 
 [dependencies]
-monkey-parser = { path = "../parser", version = "0.6.0" }
+monkey-parser = { path = "../parser", version = "0.7.0" }
 
 [dev-dependencies]
 insta = "1.7.1"

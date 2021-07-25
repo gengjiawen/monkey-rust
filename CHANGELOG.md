@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.6.0...v0.7.0) (2021-07-25)
+
+
+### Features
+
+* add comment support ([043e2cb](https://www.github.com/gengjiawen/monkey-rust/commit/043e2cb0db4c936a1ea932686e13528e5f7585e6))
+* split lexer test ([2dc9b22](https://www.github.com/gengjiawen/monkey-rust/commit/2dc9b223399257d6c24532cdb93e96917df9f9c7))
+* split object system ([0862556](https://www.github.com/gengjiawen/monkey-rust/commit/08625566ec404c3a6c40fafc8d32bf2cf3e0d418))
+
+
+### Bug Fixes
+
+* add missing keywords ([c685622](https://www.github.com/gengjiawen/monkey-rust/commit/c6856228d042d246daf5b85b1e4b1a655ee27d8c))
+
 ## [0.6.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.5.0...v0.6.0) (2021-07-19)
 
 

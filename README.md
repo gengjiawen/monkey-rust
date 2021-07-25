@@ -29,7 +29,7 @@ $ cargo test
 Version
 ```bash
 cargo install cargo-workspaces
-cargo workspaces version custom 0.4.0 --no-git-commit
+cargo workspaces version custom 0.7.0 --no-git-commit
 ```
 
 Publish
