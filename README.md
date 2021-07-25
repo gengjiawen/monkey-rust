@@ -1,6 +1,8 @@
 # monkey-rust
 ![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/gengjiawen/monkey_rust)
+[![monkey-interpreter](https://img.shields.io/crates/v/monkey-interpreter)](https://crates.io/crates/monkey-interpreter)
+[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-wasm)](https://www.npmjs.com/package/@gengjiawen/monkey-wasm)
 
 An interpreter for the Monkey programming language written in Rust
 
