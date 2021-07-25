@@ -36,6 +36,11 @@ mod tests {
     }
 
     #[test]
+    fn test_comments() {
+        test_lexer_common("comments", "// I am comments");
+    }
+
+    #[test]
     fn test_lexer_let_with_space() {
         test_lexer_common("let_with_space", "let x = 5");
     }
@@ -62,7 +67,9 @@ mod tests {
 
     #[test]
     fn test_lexer_complex() {
-        test_lexer_common("complex", "let five = 5;
+        test_lexer_common("complex", "
+// welcome to monkeylang
+let five = 5;
 let ten = 10;
 
 let add = fn(x, y) {

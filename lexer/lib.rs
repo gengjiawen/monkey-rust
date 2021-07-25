@@ -53,6 +53,7 @@ impl<'a> Lexer<'a> {
     pub fn next_token(&mut self) -> Token {
         // println!("self ch {}, position {} read_position {}", self.ch, self.position, self.read_position);
         self.skip_whitespace();
+        self.skip_comments();
         let t = match self.ch {
             '=' => {
                 if self.peek_char() == '=' {
@@ -110,6 +111,23 @@ impl<'a> Lexer<'a> {
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
+        }
+    }
+
+    fn skip_comments(&mut self) {
+        if self.ch == '/' && self.peek_char() == '/' {
+            self.read_char();
+            self.read_char();
+            loop {
+                self.read_char();
+                if self.ch == '\n' || self.ch == '\u{0}' {
+                    // consume the comments end
+                    if self.ch == '\n' {
+                        self.read_char();
+                    }
+                    break
+                }
+            }
         }
     }
 

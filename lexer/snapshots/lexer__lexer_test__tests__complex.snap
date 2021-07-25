@@ -1,6 +1,6 @@
 ---
 source: lexer/lexer_test.rs
-expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\n\nlet result = add(five, ten);\n!-/*5;\n5 < 10 > 5;\n\nif (5 < 10) {\n\treturn true;\n} else {\n\treturn false;\n}\n\n10 == 10;\n10 != 9;"
+expression: "\n// welcome to monkeylang\nlet five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\n\nlet result = add(five, ten);\n!-/*5;\n5 < 10 > 5;\n\nif (5 < 10) {\n\treturn true;\n} else {\n\treturn false;\n}\n\n10 == 10;\n10 != 9;"
 ---
 [
   {
@@ -8,8 +8,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "LET"
     },
     "span": {
-      "start": 0,
-      "end": 3
+      "start": 26,
+      "end": 29
     }
   },
   {
@@ -20,8 +20,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 4,
-      "end": 8
+      "start": 30,
+      "end": 34
     }
   },
   {
@@ -29,8 +29,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "ASSIGN"
     },
     "span": {
-      "start": 9,
-      "end": 10
+      "start": 35,
+      "end": 36
     }
   },
   {
@@ -39,8 +39,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "value": 5
     },
     "span": {
-      "start": 11,
-      "end": 12
+      "start": 37,
+      "end": 38
     }
   },
   {
@@ -48,8 +48,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "SEMICOLON"
     },
     "span": {
-      "start": 12,
-      "end": 13
+      "start": 38,
+      "end": 39
     }
   },
   {
@@ -57,8 +57,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "LET"
     },
     "span": {
-      "start": 14,
-      "end": 17
+      "start": 40,
+      "end": 43
     }
   },
   {
@@ -69,8 +69,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 18,
-      "end": 21
+      "start": 44,
+      "end": 47
     }
   },
   {
@@ -78,8 +78,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "ASSIGN"
     },
     "span": {
-      "start": 22,
-      "end": 23
+      "start": 48,
+      "end": 49
     }
   },
   {
@@ -88,8 +88,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "value": 10
     },
     "span": {
-      "start": 24,
-      "end": 26
+      "start": 50,
+      "end": 52
     }
   },
   {
@@ -97,8 +97,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "SEMICOLON"
     },
     "span": {
-      "start": 26,
-      "end": 27
+      "start": 52,
+      "end": 53
     }
   },
   {
@@ -106,8 +106,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "LET"
     },
     "span": {
-      "start": 29,
-      "end": 32
+      "start": 55,
+      "end": 58
     }
   },
   {
@@ -118,8 +118,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 33,
-      "end": 36
+      "start": 59,
+      "end": 62
     }
   },
   {
@@ -127,8 +127,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "ASSIGN"
     },
     "span": {
-      "start": 37,
-      "end": 38
+      "start": 63,
+      "end": 64
     }
   },
   {
@@ -136,8 +136,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "FUNCTION"
     },
     "span": {
-      "start": 39,
-      "end": 41
+      "start": 65,
+      "end": 67
     }
   },
   {
@@ -145,8 +145,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "LPAREN"
     },
     "span": {
-      "start": 41,
-      "end": 42
+      "start": 67,
+      "end": 68
     }
   },
   {
@@ -157,8 +157,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 42,
-      "end": 43
+      "start": 68,
+      "end": 69
     }
   },
   {
@@ -166,8 +166,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "COMMA"
     },
     "span": {
-      "start": 43,
-      "end": 44
+      "start": 69,
+      "end": 70
     }
   },
   {
@@ -178,8 +178,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 45,
-      "end": 46
+      "start": 71,
+      "end": 72
     }
   },
   {
@@ -187,103 +187,13 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "RPAREN"
     },
     "span": {
-      "start": 46,
-      "end": 47
-    }
-  },
-  {
-    "kind": {
-      "type": "LBRACE"
-    },
-    "span": {
-      "start": 48,
-      "end": 49
-    }
-  },
-  {
-    "kind": {
-      "type": "IDENTIFIER",
-      "value": {
-        "name": "x"
-      }
-    },
-    "span": {
-      "start": 52,
-      "end": 53
-    }
-  },
-  {
-    "kind": {
-      "type": "PLUS"
-    },
-    "span": {
-      "start": 54,
-      "end": 55
-    }
-  },
-  {
-    "kind": {
-      "type": "IDENTIFIER",
-      "value": {
-        "name": "y"
-      }
-    },
-    "span": {
-      "start": 56,
-      "end": 57
-    }
-  },
-  {
-    "kind": {
-      "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 57,
-      "end": 58
-    }
-  },
-  {
-    "kind": {
-      "type": "RBRACE"
-    },
-    "span": {
-      "start": 59,
-      "end": 60
-    }
-  },
-  {
-    "kind": {
-      "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 60,
-      "end": 61
-    }
-  },
-  {
-    "kind": {
-      "type": "LET"
-    },
-    "span": {
-      "start": 63,
-      "end": 66
-    }
-  },
-  {
-    "kind": {
-      "type": "IDENTIFIER",
-      "value": {
-        "name": "result"
-      }
-    },
-    "span": {
-      "start": 67,
+      "start": 72,
       "end": 73
     }
   },
   {
     "kind": {
-      "type": "ASSIGN"
+      "type": "LBRACE"
     },
     "span": {
       "start": 74,
@@ -294,12 +204,102 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
     "kind": {
       "type": "IDENTIFIER",
       "value": {
+        "name": "x"
+      }
+    },
+    "span": {
+      "start": 78,
+      "end": 79
+    }
+  },
+  {
+    "kind": {
+      "type": "PLUS"
+    },
+    "span": {
+      "start": 80,
+      "end": 81
+    }
+  },
+  {
+    "kind": {
+      "type": "IDENTIFIER",
+      "value": {
+        "name": "y"
+      }
+    },
+    "span": {
+      "start": 82,
+      "end": 83
+    }
+  },
+  {
+    "kind": {
+      "type": "SEMICOLON"
+    },
+    "span": {
+      "start": 83,
+      "end": 84
+    }
+  },
+  {
+    "kind": {
+      "type": "RBRACE"
+    },
+    "span": {
+      "start": 85,
+      "end": 86
+    }
+  },
+  {
+    "kind": {
+      "type": "SEMICOLON"
+    },
+    "span": {
+      "start": 86,
+      "end": 87
+    }
+  },
+  {
+    "kind": {
+      "type": "LET"
+    },
+    "span": {
+      "start": 89,
+      "end": 92
+    }
+  },
+  {
+    "kind": {
+      "type": "IDENTIFIER",
+      "value": {
+        "name": "result"
+      }
+    },
+    "span": {
+      "start": 93,
+      "end": 99
+    }
+  },
+  {
+    "kind": {
+      "type": "ASSIGN"
+    },
+    "span": {
+      "start": 100,
+      "end": 101
+    }
+  },
+  {
+    "kind": {
+      "type": "IDENTIFIER",
+      "value": {
         "name": "add"
       }
     },
     "span": {
-      "start": 76,
-      "end": 79
+      "start": 102,
+      "end": 105
     }
   },
   {
@@ -307,8 +307,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "LPAREN"
     },
     "span": {
-      "start": 79,
-      "end": 80
+      "start": 105,
+      "end": 106
     }
   },
   {
@@ -319,8 +319,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 80,
-      "end": 84
+      "start": 106,
+      "end": 110
     }
   },
   {
@@ -328,8 +328,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "COMMA"
     },
     "span": {
-      "start": 84,
-      "end": 85
+      "start": 110,
+      "end": 111
     }
   },
   {
@@ -340,152 +340,13 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       }
     },
     "span": {
-      "start": 86,
-      "end": 89
+      "start": 112,
+      "end": 115
     }
   },
   {
     "kind": {
       "type": "RPAREN"
-    },
-    "span": {
-      "start": 89,
-      "end": 90
-    }
-  },
-  {
-    "kind": {
-      "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 90,
-      "end": 91
-    }
-  },
-  {
-    "kind": {
-      "type": "BANG"
-    },
-    "span": {
-      "start": 92,
-      "end": 93
-    }
-  },
-  {
-    "kind": {
-      "type": "MINUS"
-    },
-    "span": {
-      "start": 93,
-      "end": 94
-    }
-  },
-  {
-    "kind": {
-      "type": "SLASH"
-    },
-    "span": {
-      "start": 94,
-      "end": 95
-    }
-  },
-  {
-    "kind": {
-      "type": "ASTERISK"
-    },
-    "span": {
-      "start": 95,
-      "end": 96
-    }
-  },
-  {
-    "kind": {
-      "type": "INT",
-      "value": 5
-    },
-    "span": {
-      "start": 96,
-      "end": 97
-    }
-  },
-  {
-    "kind": {
-      "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 97,
-      "end": 98
-    }
-  },
-  {
-    "kind": {
-      "type": "INT",
-      "value": 5
-    },
-    "span": {
-      "start": 99,
-      "end": 100
-    }
-  },
-  {
-    "kind": {
-      "type": "LT"
-    },
-    "span": {
-      "start": 101,
-      "end": 102
-    }
-  },
-  {
-    "kind": {
-      "type": "INT",
-      "value": 10
-    },
-    "span": {
-      "start": 103,
-      "end": 105
-    }
-  },
-  {
-    "kind": {
-      "type": "GT"
-    },
-    "span": {
-      "start": 106,
-      "end": 107
-    }
-  },
-  {
-    "kind": {
-      "type": "INT",
-      "value": 5
-    },
-    "span": {
-      "start": 108,
-      "end": 109
-    }
-  },
-  {
-    "kind": {
-      "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 109,
-      "end": 110
-    }
-  },
-  {
-    "kind": {
-      "type": "IF"
-    },
-    "span": {
-      "start": 112,
-      "end": 114
-    }
-  },
-  {
-    "kind": {
-      "type": "LPAREN"
     },
     "span": {
       "start": 115,
@@ -494,8 +355,7 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
   },
   {
     "kind": {
-      "type": "INT",
-      "value": 5
+      "type": "SEMICOLON"
     },
     "span": {
       "start": 116,
@@ -504,7 +364,7 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
   },
   {
     "kind": {
-      "type": "LT"
+      "type": "BANG"
     },
     "span": {
       "start": 118,
@@ -513,17 +373,35 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
   },
   {
     "kind": {
-      "type": "INT",
-      "value": 10
+      "type": "MINUS"
+    },
+    "span": {
+      "start": 119,
+      "end": 120
+    }
+  },
+  {
+    "kind": {
+      "type": "SLASH"
     },
     "span": {
       "start": 120,
+      "end": 121
+    }
+  },
+  {
+    "kind": {
+      "type": "ASTERISK"
+    },
+    "span": {
+      "start": 121,
       "end": 122
     }
   },
   {
     "kind": {
-      "type": "RPAREN"
+      "type": "INT",
+      "value": 5
     },
     "span": {
       "start": 122,
@@ -532,11 +410,133 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
   },
   {
     "kind": {
+      "type": "SEMICOLON"
+    },
+    "span": {
+      "start": 123,
+      "end": 124
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 5
+    },
+    "span": {
+      "start": 125,
+      "end": 126
+    }
+  },
+  {
+    "kind": {
+      "type": "LT"
+    },
+    "span": {
+      "start": 127,
+      "end": 128
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 10
+    },
+    "span": {
+      "start": 129,
+      "end": 131
+    }
+  },
+  {
+    "kind": {
+      "type": "GT"
+    },
+    "span": {
+      "start": 132,
+      "end": 133
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 5
+    },
+    "span": {
+      "start": 134,
+      "end": 135
+    }
+  },
+  {
+    "kind": {
+      "type": "SEMICOLON"
+    },
+    "span": {
+      "start": 135,
+      "end": 136
+    }
+  },
+  {
+    "kind": {
+      "type": "IF"
+    },
+    "span": {
+      "start": 138,
+      "end": 140
+    }
+  },
+  {
+    "kind": {
+      "type": "LPAREN"
+    },
+    "span": {
+      "start": 141,
+      "end": 142
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 5
+    },
+    "span": {
+      "start": 142,
+      "end": 143
+    }
+  },
+  {
+    "kind": {
+      "type": "LT"
+    },
+    "span": {
+      "start": 144,
+      "end": 145
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 10
+    },
+    "span": {
+      "start": 146,
+      "end": 148
+    }
+  },
+  {
+    "kind": {
+      "type": "RPAREN"
+    },
+    "span": {
+      "start": 148,
+      "end": 149
+    }
+  },
+  {
+    "kind": {
       "type": "LBRACE"
     },
     "span": {
-      "start": 124,
-      "end": 125
+      "start": 150,
+      "end": 151
     }
   },
   {
@@ -544,8 +544,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "RETURN"
     },
     "span": {
-      "start": 127,
-      "end": 133
+      "start": 153,
+      "end": 159
     }
   },
   {
@@ -553,76 +553,13 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "TRUE"
     },
     "span": {
-      "start": 134,
-      "end": 138
+      "start": 160,
+      "end": 164
     }
   },
   {
     "kind": {
       "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 138,
-      "end": 139
-    }
-  },
-  {
-    "kind": {
-      "type": "RBRACE"
-    },
-    "span": {
-      "start": 140,
-      "end": 141
-    }
-  },
-  {
-    "kind": {
-      "type": "ELSE"
-    },
-    "span": {
-      "start": 142,
-      "end": 146
-    }
-  },
-  {
-    "kind": {
-      "type": "LBRACE"
-    },
-    "span": {
-      "start": 147,
-      "end": 148
-    }
-  },
-  {
-    "kind": {
-      "type": "RETURN"
-    },
-    "span": {
-      "start": 150,
-      "end": 156
-    }
-  },
-  {
-    "kind": {
-      "type": "FALSE"
-    },
-    "span": {
-      "start": 157,
-      "end": 162
-    }
-  },
-  {
-    "kind": {
-      "type": "SEMICOLON"
-    },
-    "span": {
-      "start": 162,
-      "end": 163
-    }
-  },
-  {
-    "kind": {
-      "type": "RBRACE"
     },
     "span": {
       "start": 164,
@@ -631,31 +568,47 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
   },
   {
     "kind": {
-      "type": "INT",
-      "value": 10
+      "type": "RBRACE"
     },
     "span": {
-      "start": 167,
-      "end": 169
+      "start": 166,
+      "end": 167
     }
   },
   {
     "kind": {
-      "type": "EQ"
+      "type": "ELSE"
     },
     "span": {
-      "start": 171,
+      "start": 168,
       "end": 172
     }
   },
   {
     "kind": {
-      "type": "INT",
-      "value": 10
+      "type": "LBRACE"
     },
     "span": {
       "start": 173,
-      "end": 175
+      "end": 174
+    }
+  },
+  {
+    "kind": {
+      "type": "RETURN"
+    },
+    "span": {
+      "start": 176,
+      "end": 182
+    }
+  },
+  {
+    "kind": {
+      "type": "FALSE"
+    },
+    "span": {
+      "start": 183,
+      "end": 188
     }
   },
   {
@@ -663,8 +616,17 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "SEMICOLON"
     },
     "span": {
-      "start": 175,
-      "end": 176
+      "start": 188,
+      "end": 189
+    }
+  },
+  {
+    "kind": {
+      "type": "RBRACE"
+    },
+    "span": {
+      "start": 190,
+      "end": 191
     }
   },
   {
@@ -673,8 +635,46 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "value": 10
     },
     "span": {
-      "start": 177,
-      "end": 179
+      "start": 193,
+      "end": 195
+    }
+  },
+  {
+    "kind": {
+      "type": "EQ"
+    },
+    "span": {
+      "start": 197,
+      "end": 198
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 10
+    },
+    "span": {
+      "start": 199,
+      "end": 201
+    }
+  },
+  {
+    "kind": {
+      "type": "SEMICOLON"
+    },
+    "span": {
+      "start": 201,
+      "end": 202
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 10
+    },
+    "span": {
+      "start": 203,
+      "end": 205
     }
   },
   {
@@ -682,8 +682,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "NotEq"
     },
     "span": {
-      "start": 181,
-      "end": 182
+      "start": 207,
+      "end": 208
     }
   },
   {
@@ -692,8 +692,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "value": 9
     },
     "span": {
-      "start": 183,
-      "end": 184
+      "start": 209,
+      "end": 210
     }
   },
   {
@@ -701,8 +701,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "SEMICOLON"
     },
     "span": {
-      "start": 184,
-      "end": 185
+      "start": 210,
+      "end": 211
     }
   },
   {
@@ -710,8 +710,8 @@ expression: "let five = 5;\nlet ten = 10;\n\nlet add = fn(x, y) {\n  x + y;\n};\
       "type": "EOF"
     },
     "span": {
-      "start": 185,
-      "end": 186
+      "start": 211,
+      "end": 212
     }
   }
 ]
