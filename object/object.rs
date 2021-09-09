@@ -75,7 +75,7 @@ impl Hash for Object {
             Object::Integer(i) => i.hash(state),
             Object::Boolean(b) => b.hash(state),
             Object::String(s) => s.hash(state),
-            t => panic!(format!("can't hashable for {}" ,t))
+            t => panic!("can't hashable for {}" ,t)
         }
 
     }
