@@ -19,6 +19,6 @@ name = "monkey-interpreter"
 path = "main.rs"
 
 [dependencies]
-phf = { version = "0.9", features = ["macros"] }
+phf = { version = "0.10", features = ["macros"] }
 monkey-parser = { path = "../parser", version = "0.7.0" }
 monkey-object = { path = "../object", version = "0.7.0" }
