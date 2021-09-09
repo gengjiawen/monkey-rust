@@ -15,6 +15,7 @@ name = "object"
 path= "object.rs"
 
 [dependencies]
+phf = { version = "0.10", features = ["macros"] }
 monkey-parser = { path = "../parser", version = "0.7.0" }
 
 [dev-dependencies]

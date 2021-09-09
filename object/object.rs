@@ -9,6 +9,7 @@ use parser::ast::{BlockStatement, IDENTIFIER};
 use crate::environment::Env;
 
 pub mod environment;
+pub mod builtins;
 
 pub type EvalError = String;
 pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Rc<Object>;

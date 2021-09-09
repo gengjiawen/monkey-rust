@@ -135,7 +135,6 @@ version = "0.7.0"
 dependencies = [
  "monkey-object",
  "monkey-parser",
- "phf",
 ]
 
 [[package]]
@@ -153,6 +152,7 @@ version = "0.7.0"
 dependencies = [
  "insta",
  "monkey-parser",
+ "phf",
 ]
 
 [[package]]

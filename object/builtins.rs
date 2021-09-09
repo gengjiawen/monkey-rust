@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use phf::phf_map;
-use object::{BuiltinFunc, Object};
+use crate::{BuiltinFunc, Object};
 
 pub static BUILTINS: phf::Map<&'static str, BuiltinFunc> = phf_map! {
     "len" => len,

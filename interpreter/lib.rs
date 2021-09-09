@@ -6,9 +6,8 @@ use object::environment::*;
 use parser::ast::*;
 use parser::lexer::token::{Token, TokenKind};
 use object::{Object, EvalError};
-use crate::builtins::BUILTINS;
+use object::builtins::*;
 
-mod builtins;
 mod interpreter_test;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
