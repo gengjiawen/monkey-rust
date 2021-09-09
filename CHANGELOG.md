@@ -1,5 +1,13 @@
 # Changelog
 
+### [0.7.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.7.0...v0.7.1) (2021-09-09)
+
+
+### Bug Fixes
+
+* compiler warning ([c74fde8](https://www.github.com/gengjiawen/monkey-rust/commit/c74fde88291ba44e32d94129d5fd02036c9a5764))
+* interpreter description ([bee0533](https://www.github.com/gengjiawen/monkey-rust/commit/bee05332fa77ea5bfea07121c7f944b62d82affc))
+
 ## [0.7.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.6.0...v0.7.0) (2021-07-25)
 
 
