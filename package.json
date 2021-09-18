@@ -1,13 +1,13 @@
 {
   "name": "monkey-rust",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg) [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/gengjiawen/monkey_rust)",
   "main": "index.js",
   "directories": {
     "example": "examples"
   },
   "scripts": {
-    "ua": "npx @gengjiawen/git-repo-cli clone fkling/astexplorer ./ast-website/",
+    "update-astexplore": "npx @gengjiawen/git-repo-cli clone fkling/astexplorer ./ast-website/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -20,10 +20,5 @@
   "bugs": {
     "url": "https://github.com/gengjiawen/monkey-rust/issues"
   },
-  "homepage": "https://github.com/gengjiawen/monkey-rust#readme",
-  "devDependencies": {
-    "@types/node": "16.9.1",
-    "ts-node": "^10.2.1",
-    "typescript": "^4.4.3"
-  }
+  "homepage": "https://github.com/gengjiawen/monkey-rust#readme"
 }

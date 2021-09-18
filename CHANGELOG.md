@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.8.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.7.0...v0.8.0) (2021-09-18)
+
+
+### Features
+
+* auto publish cargo packages ([#71](https://www.github.com/gengjiawen/monkey-rust/issues/71)) ([8957ca1](https://www.github.com/gengjiawen/monkey-rust/commit/8957ca19cd6d2c7fa5addf282298cf2d21d4ca5d))
+* move built-in to object ([1a40c1c](https://www.github.com/gengjiawen/monkey-rust/commit/1a40c1ce40b11d0427f22d7e8f690130a83fa9df))
+
+
+### Bug Fixes
+
+* compiler warning ([c74fde8](https://www.github.com/gengjiawen/monkey-rust/commit/c74fde88291ba44e32d94129d5fd02036c9a5764))
+* fncall span issue ([07484b1](https://www.github.com/gengjiawen/monkey-rust/commit/07484b1b35a928553ba5d60e8227e8c821a7e702))
+* interpreter description ([bee0533](https://www.github.com/gengjiawen/monkey-rust/commit/bee05332fa77ea5bfea07121c7f944b62d82affc))
+
+
+### Dev
+
+* add dev log ([2c6e9db](https://www.github.com/gengjiawen/monkey-rust/commit/2c6e9db8890db40601ca373f2b649bf3c0b1ba18))
+* auto setup astexplorer ([37097ed](https://www.github.com/gengjiawen/monkey-rust/commit/37097eddc83f4fc513e25d471fd34cd1d54bed0c))
+* remove redundant step ([dd68d9d](https://www.github.com/gengjiawen/monkey-rust/commit/dd68d9d649fdd2ef24d027cef73f0839fbd55e7c))
+* setup astexplorer ([ef803aa](https://www.github.com/gengjiawen/monkey-rust/commit/ef803aa50241b46836341a39335920e7f3a4d842))
+* split interpreter test ([ddf668e](https://www.github.com/gengjiawen/monkey-rust/commit/ddf668e321d82b4d2e3b4d98188278ad3bed7002))
+* split parser test ([73801aa](https://www.github.com/gengjiawen/monkey-rust/commit/73801aa678b3489533b2a7e84571d9d71a779015))
+* use latest node.js ([3bac409](https://www.github.com/gengjiawen/monkey-rust/commit/3bac4095a44357cf9eec4b2e685779e5e075df66))
+
 ## [0.7.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.6.0...v0.7.0) (2021-07-25)
 
 
