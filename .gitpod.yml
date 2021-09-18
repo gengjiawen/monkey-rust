@@ -5,7 +5,8 @@ tasks:
   - init: cargo build
     command: cargo test
   - init: cargo install cargo-insta && exit # cargo insta test && cargo insta accept to update snapshots
-  - init: cd wasm && wasm-pack build --release --scope=gengjiawen && cd ./pkg && yarn link && cd ../../ast-website/website && yarn && yarn link @gengjiawen/monkey-wasm # astexplorer
+  - init: yarn && cd wasm && wasm-pack build --release --scope=gengjiawen && cd ./pkg && yarn link && cd ../../ast-website/website && yarn && yarn link @gengjiawen/monkey-wasm # astexplorer
+  - init: fish
 
 vscode:
   extensions:
@@ -14,3 +15,4 @@ vscode:
     - gengjiawen.vscode-npm-dependency
     - gengjiawen.npm-dependency-links
     - gengjiawen.vscode-wasm
+    - gengjiawen.vscode-postfix-ts

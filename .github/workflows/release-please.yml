@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release_extra
 
 jobs:
   release-please:
@@ -14,7 +15,7 @@ jobs:
         with:
           package-name: monkey-rust
           token: ${{ secrets.GITHUB_TOKEN }}
-          release-type: rust
+          release-type: node
           changelog-types: >
             [{"type":"feat","section":"Features","hidden":false},
             {"type":"fix","section":"Bug Fixes","hidden":false},
@@ -28,6 +29,11 @@ jobs:
           registry-url: "https://registry.npmjs.org"
         if: ${{ steps.release.outputs.release_created }}
       - run: npx envinfo
+      - run: cargo install cargo-workspaces
+      - run: yarn && npx ts-node scripts/bump_cargo_packages.ts
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: 'chore: prepare rust packages'
       - run: npm publish --access public
         working-directory: wasm/pkg
         env:
