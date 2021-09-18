@@ -1,0 +1,15 @@
+{
+  "name": "astexplorer-server",
+  "version": "2.0.0",
+  "main": "index.js",
+  "private": true,
+  "author": "Felix Kling",
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "github-api": "https://github.com/fkling/github.git"
+  },
+  "scripts": {
+    "start": "STATIC=../out node index.js"
+  }
+}

@@ -11,7 +11,7 @@ jobs:
       - run:
           name: test
           command: |
-            cd wasm && wasm-pack build
+            cd wasm && wasm-pack build --scope=gengjiawen
 
 workflows:
   version: 2
