@@ -21,8 +21,10 @@ jobs:
             [{"type":"feat","section":"Features","hidden":false},
             {"type":"fix","section":"Bug Fixes","hidden":false},
             {"type":"dev","section":"Dev","hidden":false},
+            {"type":"doc","section":"Doc","hidden":false},
             {"type":"meta","section":"Miscellaneous","hidden":false}]
       - uses: actions/checkout@v2
+      - run: npx envinfo
       # - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
       - run: ls -lh && cd wasm && wasm-pack build --release --scope=gengjiawen
       - uses: actions/setup-node@v1
@@ -30,7 +32,6 @@ jobs:
           node-version: 14
           registry-url: "https://registry.npmjs.org"
         if: ${{ steps.release.outputs.release_created }}
-      - run: npx envinfo
       - run: npm publish --access public
         working-directory: wasm/pkg
         env:

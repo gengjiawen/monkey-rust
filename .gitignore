@@ -9,3 +9,5 @@ node_modules
 *.log
 dist/
 out/
+
+package-lock.json
