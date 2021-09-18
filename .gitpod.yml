@@ -4,6 +4,6 @@ image:
 tasks:
   - init: cargo build
     command: cargo test
-  # cargo insta test && cargo insta accept to update snapshots
-  - init: cargo install cargo-insta
+  - init: cargo install cargo-insta # cargo insta test && cargo insta accept to update snapshots
+  - init: cd wasm && wasm-pack build && cd ../ast-website/ && yarn # astexplorer
   - init: fish
