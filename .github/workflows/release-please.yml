@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test_github_action_image
 
 jobs:
   release-please:
