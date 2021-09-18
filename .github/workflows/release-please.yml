@@ -26,8 +26,11 @@ jobs:
       - run: npx envinfo
       - uses: actions/checkout@v2
       # - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
-      - run: cargo build
-      - run: cd wasm && wasm-pack build --release --scope=gengjiawen
+      - run: |
+          cargo build
+          cd wasm && wasm-pack build --release --scope=gengjiawen
+        env:
+          CARGO_HOME: /root/.cargo/ 
       - uses: actions/setup-node@v1
         with:
           node-version: 14
