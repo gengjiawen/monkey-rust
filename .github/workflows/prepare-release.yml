@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: cargo install cargo-workspaces
       - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "yarn && npx ts-node scripts/bump_cargo_packages.ts"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
