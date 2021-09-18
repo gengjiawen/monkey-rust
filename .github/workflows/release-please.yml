@@ -29,9 +29,6 @@ jobs:
           registry-url: "https://registry.npmjs.org"
         if: ${{ steps.release.outputs.release_created }}
       - run: npx envinfo
-      - run: cargo install cargo-workspaces
-      - run: yarn && npx ts-node scripts/bump_cargo_packages.ts
-      - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: 'chore: prepare rust packages'
       - run: npm publish --access public
