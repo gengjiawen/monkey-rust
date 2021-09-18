@@ -6,10 +6,10 @@ on:
 jobs:
   prepare-dist:
     runs-on: ubuntu-latest
-    container: gengjiawen/node-build
     steps:
       - uses: actions/checkout@v2
-      - run: yarn && npx ts-node scripts/bump_cargo_packages.ts
+      - run: cargo install cargo-workspaces
+      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "yarn && npx ts-node scripts/bump_cargo_packages.ts"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "chore: prepare rust packages"
