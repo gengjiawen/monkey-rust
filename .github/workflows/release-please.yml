@@ -29,8 +29,6 @@ jobs:
       - run: |
           cargo build
           cd wasm && wasm-pack build --release --scope=gengjiawen
-        env:
-          CARGO_HOME: /root/.cargo/ 
       - uses: actions/setup-node@v1
         with:
           node-version: 14
