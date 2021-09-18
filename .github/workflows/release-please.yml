@@ -29,8 +29,6 @@ jobs:
           registry-url: "https://registry.npmjs.org"
         if: ${{ steps.release.outputs.release_created }}
       - run: npx envinfo
-        with:
-          commit_message: 'chore: prepare rust packages'
       - run: npm publish --access public
         working-directory: wasm/pkg
         env:
