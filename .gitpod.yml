@@ -13,3 +13,4 @@ vscode:
     - vadimcn.vscode-lldb
     - gengjiawen.vscode-npm-dependency
     - gengjiawen.npm-dependency-links
+    - gengjiawen.vscode-wasm
