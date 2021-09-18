@@ -8,5 +8,6 @@ FROM gitpod/workspace-wasm:latest
 
 # fix node.js path and use latest node.js
 RUN brew install n && sudo /home/linuxbrew/.linuxbrew/bin/n latest && sudo /usr/local/bin/npm i -g yarn sao
+RUN brew install --build-from-source wasm-pack
 ENV PATH=/usr/local/bin/:$PATH
 RUN printf "\nexport PATH="/usr/local/bin/:$PATH"\n" >> ~/.bashrc

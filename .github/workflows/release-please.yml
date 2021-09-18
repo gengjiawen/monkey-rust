@@ -24,7 +24,7 @@ jobs:
             {"type":"meta","section":"Miscellaneous","hidden":false}]
       - uses: actions/checkout@v2
       # - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
-      - run: cd wasm && wasm-pack build --release --scope=gengjiawen
+      - run: ls -lh && cd wasm && wasm-pack build --release --scope=gengjiawen
       - uses: actions/setup-node@v1
         with:
           node-version: 14
