@@ -1,4 +1,5 @@
 # monkey-rust
+
 ![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/gengjiawen/monkey_rust)
 [![monkey-interpreter](https://img.shields.io/crates/v/monkey-interpreter)](https://crates.io/crates/monkey-interpreter)
@@ -12,7 +13,7 @@ An interpreter for the Monkey programming language written in Rust
 
 Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **infix operators**, has **first-class** and **higher-order functions**, can handle **closures** with ease and has **integers**, **booleans**, **arrays** and **hashes** built-in.
 
-Official site is: https://monkeylang.org/. It's has various implementation languages :). 
+Official site is: https://monkeylang.org/. It's has various implementation languages :).
 
 There is a book about learning how to make an interpreter: [Writing An Interpreter In Go](https://interpreterbook.com/#the-monkey-programming-language). This is where the Monkey programming language come from.
 
@@ -26,6 +27,7 @@ $ cargo test
 ```
 
 ## References on compiler
-* https://github.com/dinfuehr/dora
-* https://github.com/wren-lang/wren
-* https://github.com/apollographql/federation
+
+- https://github.com/dinfuehr/dora
+- https://github.com/wren-lang/wren
+- https://github.com/apollographql/federation
