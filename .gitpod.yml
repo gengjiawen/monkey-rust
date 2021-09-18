@@ -4,4 +4,6 @@ image:
 tasks:
   - init: cargo build
     command: cargo test
+  # cargo insta test && cargo insta accept to update snapshots
+  - init: cargo install cargo-insta
   - init: fish

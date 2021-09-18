@@ -390,11 +390,22 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
-        let start = self.current_token.span.start;
+        let mut start = self.current_token.span.start;
         let (arguments, ..) = self.parse_expression_list(&TokenKind::RPAREN)?;
         let end = self.current_token.span.end;
+        match &expr {
+            Expression::IDENTIFIER(i) => {
+                start = i.span.start
+            }
+            Expression::FUNCTION(f) => {
+                start = f.span.start
+            }
+            _ => {return Err(format!("expected function"))}
+        }
+        let callee = Box::new(expr);
+
         Ok(Expression::FunctionCall(FunctionCall {
-            callee: Box::new(expr),
+            callee,
             arguments,
             span: Span {
                 start,
