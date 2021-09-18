@@ -9,7 +9,6 @@ on:
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    container: gengjiawen/node-build
     steps:
       - uses: GoogleCloudPlatform/release-please-action@v2
         id: release
@@ -25,8 +24,7 @@ jobs:
             {"type":"meta","section":"Miscellaneous","hidden":false}]
       - run: npx envinfo
       - uses: actions/checkout@v2
-      # - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
-      - run: rustc --version && ls -lh && cd wasm && wasm-pack build --release --scope=gengjiawen
+      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
       - uses: actions/setup-node@v1
         with:
           node-version: 14
@@ -36,6 +34,8 @@ jobs:
         working-directory: wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
+      - run: cargo install cargo-workspaces
         if: ${{ steps.release.outputs.release_created }}
       - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
         env:
