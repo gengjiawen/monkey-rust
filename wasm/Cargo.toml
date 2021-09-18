@@ -5,7 +5,7 @@ description = "monkey lang parser wasm version"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
 authors = ["gengjiawen <technicalcute@gmail.com>"]
-keywords = ["monkeylang", "wasm", "parser", "learn-by-doing", "rust", "compiler", "interpreter"]
+keywords = ["monkeylang", "wasm", "parser", "learn-by-doing", "rust"]
 edition = "2018"
 license = "MIT"
 
