@@ -22,14 +22,14 @@ jobs:
             {"type":"dev","section":"Dev","hidden":false},
             {"type":"meta","section":"Miscellaneous","hidden":false}]
       - uses: actions/checkout@v2
-      # - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
-      - run: cargo install wasm-pack cargo-workspaces && cd wasm && wasm-pack build --release --scope=gengjiawen
+      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
       - uses: actions/setup-node@v1
         with:
           node-version: 14
           registry-url: "https://registry.npmjs.org"
         if: ${{ steps.release.outputs.release_created }}
       - run: npx envinfo
+      - run: cargo install cargo-workspaces
       - run: yarn && npx ts-node scripts/bump_cargo_packages.ts
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
