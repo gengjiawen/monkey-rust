@@ -39,3 +39,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
+      - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
+        env:
+          CARGO_TOKEN: ${{secrets.CARGO_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
