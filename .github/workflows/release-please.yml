@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: gengjiawen/node-build
-      options: -user root 
+      options: --user root 
     steps:
       - uses: GoogleCloudPlatform/release-please-action@v2
         id: release
