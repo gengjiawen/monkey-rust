@@ -9,7 +9,7 @@ on:
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    container: gengjiawen/node-build
+    container: gitpod/workspace-wasm
     steps:
       - uses: GoogleCloudPlatform/release-please-action@v2
         id: release
@@ -28,10 +28,8 @@ jobs:
       # - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
       - run: |
           cargo build
+          brew install --build-from-source wasm-pack && rustup target add wasm32-unknown-unknown
           cd wasm && wasm-pack build --release --scope=gengjiawen
-        env:
-          ENV RUSTUP_HOME: /usr/local/rustup
-          CARGO_HOME: /usr/local/cargo 
       - uses: actions/setup-node@v1
         with:
           node-version: 14
