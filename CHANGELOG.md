@@ -1,5 +1,24 @@
 # Changelog
 
+### [0.8.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.8.0...v0.8.1) (2021-10-02)
+
+
+### Bug Fixes
+
+* limit crates keywords ([8260313](https://www.github.com/gengjiawen/monkey-rust/commit/82603133eead3149165638cdcbf8ac6a64852f64))
+* revert to old way ([a44a2d6](https://www.github.com/gengjiawen/monkey-rust/commit/a44a2d6fce59807ee7a33d765bd0f63dcfcfb4a1))
+* try full docker image ([263875c](https://www.github.com/gengjiawen/monkey-rust/commit/263875c245596a3e0a279b6da69dcf488569fff4))
+
+
+### Doc
+
+* split maintainer job ([70c62e0](https://www.github.com/gengjiawen/monkey-rust/commit/70c62e030dd7bbe26fac6868409e71a339803112))
+
+
+### Dev
+
+* add missing toolchain ([75a505c](https://www.github.com/gengjiawen/monkey-rust/commit/75a505c62e31037de96fd71042e840bdcdf1d24a))
+
 ## [0.8.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.7.0...v0.8.0) (2021-09-18)
 
 
