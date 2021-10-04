@@ -4,10 +4,14 @@
 
 extern crate wasm_bindgen_test;
 use wasm_bindgen_test::*;
+use monkey_wasm::parse;
+use insta::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
 fn pass() {
-    assert_eq!(1 + 1, 2);
+    let input = "let a = 3";
+    let r = parse(input);
+    assert_snapshot!("simple wasm test", r, input);
 }
