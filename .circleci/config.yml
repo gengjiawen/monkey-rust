@@ -13,6 +13,8 @@ jobs:
           command: |
             cd wasm && wasm-pack build --scope=gengjiawen
             wasm-pack test --headless --firefox
+      - store_artifacts:
+          path: wasm/pkg
 
 workflows:
   version: 2
