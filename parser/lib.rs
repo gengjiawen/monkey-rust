@@ -390,6 +390,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
+        // fake positive
+        #[allow(unused_assignments)]
         let mut start = self.current_token.span.start;
         let (arguments, ..) = self.parse_expression_list(&TokenKind::RPAREN)?;
         let end = self.current_token.span.end;
