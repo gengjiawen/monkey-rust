@@ -10,6 +10,5 @@ ENV TRIGGER_REBUILD=1
 
 # fix node.js path and use latest node.js
 RUN brew install n && sudo /home/linuxbrew/.linuxbrew/bin/n latest && sudo /usr/local/bin/npm i -g yarn sao
-RUN cargo install wasm-pack && rustup target add wasm32-unknown-unknown
 ENV PATH=/usr/local/bin/:$PATH
 RUN printf "\nexport PATH="/usr/local/bin/:$PATH"\n" >> ~/.bashrc

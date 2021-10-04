@@ -170,7 +170,6 @@ name = "monkey-wasm"
 version = "0.8.0"
 dependencies = [
  "console_error_panic_hook",
- "insta",
  "monkey-parser",
  "wasm-bindgen",
  "wasm-bindgen-test",
