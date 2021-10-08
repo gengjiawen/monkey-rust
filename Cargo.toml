@@ -4,5 +4,6 @@ members = [
   "parser",
   "object",
   "interpreter",
+  "compiler",
   "wasm"
 ]
