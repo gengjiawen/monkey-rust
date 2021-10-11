@@ -13,7 +13,7 @@ pub struct Definition {
 }
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Hash, Eq, Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Opcode {
     OpConst,
     OpAdd
@@ -29,8 +29,10 @@ lazy_static! {
 }
 
 impl Instructions {
-    pub fn make_instructions(op: Opcode, operands: &Vec<usize>) Instructions {
+    pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Instructions {
         let mut instructions = Vec::new();
+
+        return Instructions {ins: instructions};
     }
 
     // prettify bytecodes
@@ -39,5 +41,6 @@ impl Instructions {
         
         return ret;
     }
+
 
 }
