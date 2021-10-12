@@ -6,7 +6,7 @@ FROM gitpod/workspace-wasm:latest
 #
 # More information: https://www.gitpod.io/docs/config-docker/
 
-ENV TRIGGER_REBUILD=1
+ENV TRIGGER_REBUILD=2
 
 # fix node.js path and use latest node.js
 RUN brew install n && sudo /home/linuxbrew/.linuxbrew/bin/n latest && sudo /usr/local/bin/npm i -g yarn sao
