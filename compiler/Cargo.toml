@@ -18,5 +18,6 @@ path = "main.rs"
 
 [dependencies]
 lazy_static = "1.4.0"
+byteorder = "1.4.3"
 monkey-parser = { path = "../parser", version = "0.8.0" }
 monkey-object = { path = "../object", version = "0.8.0" }

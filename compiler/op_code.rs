@@ -1,11 +1,11 @@
+use byteorder;
 use std::collections::HashMap;
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
 // why not type, see https://stackoverflow.com/a/35569079/1713757
 pub struct Instructions {
-    ins: Vec<u8>,
+    pub data: Vec<u8>,
 }
-
-pub type OpCode = u8;
 
 pub struct Definition {
     name: &'static str,
@@ -16,31 +16,87 @@ pub struct Definition {
 #[derive(Hash, Eq, Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Opcode {
     OpConst,
-    OpAdd
+    OpAdd,
 }
 
 lazy_static! {
-    static ref DEFINITIONS: HashMap<Opcode, Definition> = {
+    pub static ref DEFINITIONS: HashMap<Opcode, Definition> = {
         let mut m = HashMap::new();
-        m.insert(Opcode::OpConst, Definition {name: "OpConst", operand_width: vec![1]});
-        m.insert(Opcode::OpAdd, Definition {name: "OpAdd", operand_width: vec![0]});
+        m.insert(Opcode::OpConst, Definition {name: "OpConst", operand_width: vec![2]});
+        m.insert(Opcode::OpAdd, Definition {name: "OpAdd", operand_width: vec![]});
         m
     };
 }
 
-impl Instructions {
-    pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Instructions {
-        let mut instructions = Vec::new();
+pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Vec<u8> {
+    let mut instructions = Vec::new();
+    instructions.push(op as u8);
+    let widths = &DEFINITIONS.get(&op).unwrap().operand_width;
 
-        return Instructions {ins: instructions};
+    for (o, w) in operands.into_iter().zip(widths) {
+        match w {
+            2 => {
+                instructions.write_u16::<BigEndian>(*o as u16).unwrap();
+            }
+            1 => {
+                instructions.write_u8(*o as u8).unwrap();
+            }
+            _ => { panic!("unsupported operand width {}", w) }
+        }
     }
 
+
+    return instructions;
+}
+
+pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<usize>, usize) {
+    let mut operands = Vec::with_capacity(def.operand_width.len());
+    let mut offset = 0;
+
+    for w in &def.operand_width {
+        match w {
+            2 => {
+                operands.push(BigEndian::read_u16(&ins[offset..offset + 2]) as usize);
+                offset = offset + 2;
+            }
+            1 => {
+                operands.push(ins[offset] as usize);
+                offset = offset + 1;
+            }
+            0 => {},
+            _ => { panic!("unsupported operand width {} for read", w) }
+        }
+    }
+
+    return (operands, offset);
+}
+
+impl Instructions {
     // prettify bytecodes
     pub fn string(&self) -> String {
         let mut ret = String::new();
-        
+        let mut i = 0;
+        while i < self.data.len() {
+            let op: u8 = *self.data.get(i).unwrap();
+            // https://stackoverflow.com/a/42382144/1713757
+            let opcode = unsafe { ::std::mem::transmute(op) };
+
+            let definition = DEFINITIONS.get(&opcode).unwrap();
+            let (operands, read_size) = read_operands(definition, &self.data[i + 1..]);
+            ret.push_str(&format!("{:04} {}\n", i, Self::fmt_instructions(definition, &operands)));
+            i = i + 1 + read_size;
+        }
+
         return ret;
     }
-
-
+    fn fmt_instructions(def: &Definition, operands: &Vec<usize>) -> String {
+        match def.operand_width.len() {
+            2 => format!("{} {} {}", def.name, operands[0], operands[1]),
+            1 => format!("{} {}", def.name, operands[0]),
+            0 => format!("{}", def.name),
+            _ => {
+                panic!("unsupported operand width {}", def.operand_width.len());
+            }
+        }
+    }
 }
