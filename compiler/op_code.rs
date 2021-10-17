@@ -63,7 +63,7 @@ pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<usize>, usize) {
                 operands.push(ins[offset] as usize);
                 offset = offset + 1;
             }
-            0 => {},
+            0 => {}
             _ => { panic!("unsupported operand width {} for read", w) }
         }
     }

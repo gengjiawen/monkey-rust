@@ -8,12 +8,12 @@ mod tests {
         struct Test {
             op: Opcode,
             operands: Vec<usize>,
-            expected: Vec<u8>
+            expected: Vec<u8>,
         }
 
         let tests = vec![
-            Test {op: Opcode::OpConst, operands: vec![65534], expected: vec![OpConst as u8, 255, 254] },
-            Test {op: Opcode::OpAdd, operands: vec![], expected: vec![OpAdd as u8] },
+            Test { op: Opcode::OpConst, operands: vec![65534], expected: vec![OpConst as u8, 255, 254] },
+            Test { op: Opcode::OpAdd, operands: vec![], expected: vec![OpAdd as u8] },
         ];
 
         for t in tests {
@@ -27,12 +27,12 @@ mod tests {
         struct Test {
             op: Opcode,
             operands: Vec<usize>,
-            bytes_read: usize
+            bytes_read: usize,
         }
 
-        let tests = vec!{
-            Test {op: Opcode::OpConst, operands: vec![65534], bytes_read: 2},
-            Test {op: Opcode::OpConst, operands: vec![255], bytes_read: 2},
+        let tests = vec! {
+            Test { op: Opcode::OpConst, operands: vec![65534], bytes_read: 2 },
+            Test { op: Opcode::OpConst, operands: vec![255], bytes_read: 2 },
         };
 
         for t in tests {
@@ -48,7 +48,7 @@ mod tests {
         let ins = vec![
             Instructions { data: make_instructions(OpAdd, &vec![]) },
             Instructions { data: make_instructions(OpConst, &vec![2]) },
-            Instructions { data: make_instructions(OpConst, &vec![65535]) }
+            Instructions { data: make_instructions(OpConst, &vec![65535]) },
         ];
 
         let expected = "0000 OpAdd\n\
