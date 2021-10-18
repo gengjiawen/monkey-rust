@@ -52,8 +52,8 @@ mod tests {
         ];
 
         let expected = "0000 OpAdd\n\
-                              0001 OpConst 2\n\
-                              0004 OpConst 65535\n";
+                             0001 OpConst 2\n\
+                             0004 OpConst 65535\n";
         // how-to-concatenate-immutable-vectors-in-one-line
         // https://stackoverflow.com/a/69578632/1713757
         let merged_ins = ins.iter().fold(vec![], |sum, i| [sum.as_slice(), i.data.as_slice()].concat());
