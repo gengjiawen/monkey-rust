@@ -5,6 +5,7 @@ mod op_code;
 mod compiler;
 mod vm;
 mod op_code_test;
+mod compiler_test;
 
 #[cfg(test)]
 mod tests {

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
 // why not type, see https://stackoverflow.com/a/35569079/1713757
+#[derive(Hash, Eq, Debug, Clone, PartialEq, PartialOrd)]
 pub struct Instructions {
     pub data: Vec<u8>,
 }
@@ -97,6 +98,15 @@ impl Instructions {
             _ => {
                 panic!("unsupported operand width {}", def.operand_width.len());
             }
+        }
+    }
+
+    pub fn merge_instructions(&self, other: &Instructions) -> Instructions {
+        let ins = vec![self, other];
+        // Maybe extend_from_slice, but I have not make it work
+        // https://stackoverflow.com/a/69578632/1713757
+        return Instructions {
+            data: ins.iter().fold(vec![], |sum, &i| [sum.as_slice(), i.data.as_slice()].concat())
         }
     }
 }
