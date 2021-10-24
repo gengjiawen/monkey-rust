@@ -15,8 +15,7 @@ fn run_compiler_test(tests: Vec<CompilerTestCase>) {
     for t in tests {
         let program = parse(t.input).unwrap();
         let mut compiler = Compiler::new();
-        compiler.compile(&program);
-        let bytecodes = compiler.bytecode();
+        let bytecodes = compiler.compile(&program).unwrap();
         test_instructions(&t.expected_instructions, &bytecodes.instructions);
         test_constants(&t.expected_constants, &bytecodes.constants);
     }
