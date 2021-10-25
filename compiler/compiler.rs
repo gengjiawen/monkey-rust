@@ -106,7 +106,6 @@ impl Compiler {
 
     pub fn add_instructions(&mut self, ins: &Instructions) -> usize {
         let pos = self.instructions.data.len();
-        // https://stackoverflow.com/a/69578632/1713757
         self.instructions = self.instructions.merge_instructions(ins);
         return pos;
     }
