@@ -1,5 +1,6 @@
-use byteorder;
 use std::collections::HashMap;
+
+use byteorder;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
 // why not type, see https://stackoverflow.com/a/35569079/1713757
@@ -72,6 +73,11 @@ pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<usize>, usize) {
     return (operands, offset);
 }
 
+pub fn cast_u8_to_opcode(op: u8) -> Opcode {
+    // https://stackoverflow.com/a/42382144/1713757
+    return unsafe { ::std::mem::transmute(op) };
+}
+
 impl Instructions {
     // prettify bytecodes
     pub fn string(&self) -> String {
@@ -79,8 +85,7 @@ impl Instructions {
         let mut i = 0;
         while i < self.data.len() {
             let op: u8 = *self.data.get(i).unwrap();
-            // https://stackoverflow.com/a/42382144/1713757
-            let opcode = unsafe { ::std::mem::transmute(op) };
+            let opcode = cast_u8_to_opcode(op);
 
             let definition = DEFINITIONS.get(&opcode).unwrap();
             let (operands, read_size) = read_operands(definition, &self.data[i + 1..]);
@@ -90,6 +95,7 @@ impl Instructions {
 
         return ret;
     }
+
     fn fmt_instructions(def: &Definition, operands: &Vec<usize>) -> String {
         match def.operand_width.len() {
             2 => format!("{} {} {}", def.name, operands[0], operands[1]),

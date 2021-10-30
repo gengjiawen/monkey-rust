@@ -1,9 +1,11 @@
 use std::error::Error;
-use object::Object;
-use crate::op_code::{Instructions, make_instructions, Opcode};
 use std::rc::Rc;
+
+use object::Object;
 use parser::ast::{Expression, Literal, Node, Statement};
 use parser::lexer::token::{Token, TokenKind};
+
+use crate::op_code::{Instructions, make_instructions, Opcode};
 use crate::op_code::Opcode::{OpAdd, OpConst};
 
 pub struct Compiler {
@@ -72,8 +74,8 @@ impl Compiler {
             }
             Expression::PREFIX(_) => {}
             Expression::INFIX(infix) => {
-                self.compile_expr(&infix.left);
-                self.compile_expr(&infix.right);
+                self.compile_expr(&infix.left).unwrap();
+                self.compile_expr(&infix.right).unwrap();
                 match infix.op.kind {
                     TokenKind::PLUS => {
                         self.emit(OpAdd, &vec![]);
@@ -111,7 +113,7 @@ impl Compiler {
     }
 
     pub fn emit(&mut self, op: Opcode, operands: &Vec<usize>) -> usize {
-        let mut ins = Instructions {
+        let ins = Instructions {
             data: make_instructions(op, operands)
         };
 

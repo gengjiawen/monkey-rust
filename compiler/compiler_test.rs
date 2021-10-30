@@ -1,7 +1,9 @@
 use std::borrow::Borrow;
 use std::rc::Rc;
+
 use object::Object;
 use parser::parse;
+
 use crate::compiler::Compiler;
 use crate::op_code::Instructions;
 
@@ -21,11 +23,10 @@ fn run_compiler_test(tests: Vec<CompilerTestCase>) {
     }
 }
 
-fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
+pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
     assert_eq!(expected.len(), actual.len());
     for (exp, b_got) in expected.iter().zip(actual) {
         let got = b_got.borrow();
-        ;
         match (exp, got) {
             (Object::Integer(exp_val), Object::Integer(got_val)) => {
                 assert_eq!(exp_val, got_val, "integer not equal {} {}", exp_val, got_val);
@@ -61,10 +62,11 @@ fn concat_instructions(expected: &Vec<Instructions>) -> Instructions {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::*;
     use crate::op_code::make_instructions;
     use crate::op_code::Opcode::*;
+
+    use super::*;
 
     #[test]
     fn integer_arithmetic() {
