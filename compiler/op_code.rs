@@ -19,6 +19,7 @@ pub struct Definition {
 pub enum Opcode {
     OpConst,
     OpAdd,
+    // OpPop,
 }
 
 lazy_static! {
@@ -26,6 +27,7 @@ lazy_static! {
         let mut m = HashMap::new();
         m.insert(Opcode::OpConst, Definition {name: "OpConst", operand_width: vec![2]});
         m.insert(Opcode::OpAdd, Definition {name: "OpAdd", operand_width: vec![]});
+        // m.insert(Opcode::OpPop, Definition {name: "OpPop", operand_width: vec![]});
         m
     };
 }
