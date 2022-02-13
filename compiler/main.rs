@@ -28,7 +28,7 @@ fn main() {
         );
         let mut vm = VM::new(bytecodes);
         vm.run();
-        let got = vm.stack_top().unwrap();
+        let got = vm.last_popped_stack_elm().unwrap();
         println!("{}", got);
     }
 }

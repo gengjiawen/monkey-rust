@@ -81,6 +81,20 @@ mod tests {
                     Instructions { data: make_instructions(OpConst, &vec![0]) },
                     Instructions { data: make_instructions(OpConst, &vec![1]) },
                     Instructions { data: make_instructions(OpAdd, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "1; 2",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![1]) },
                 ],
             }
         ];

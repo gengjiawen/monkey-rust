@@ -6,7 +6,7 @@ use parser::ast::{Expression, Literal, Node, Statement};
 use parser::lexer::token::{Token, TokenKind};
 
 use crate::op_code::{Instructions, make_instructions, Opcode};
-use crate::op_code::Opcode::{OpAdd, OpConst};
+use crate::op_code::Opcode::{*};
 
 pub struct Compiler {
     instructions: Instructions,
@@ -52,6 +52,7 @@ impl Compiler {
             Statement::Return(_) => {}
             Statement::Expr(e) => {
                 self.compile_expr(e);
+                self.emit(OpPop, &vec![]);
             }
         }
     }

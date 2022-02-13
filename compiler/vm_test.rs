@@ -26,8 +26,8 @@ mod tests {
     #[test]
     fn test_integer_arithmetic() {
         let tests = vec![
-            // VmTestCase { input: "1", expected: Object::Integer(1) },
-            // VmTestCase { input: "2", expected: Object::Integer(2) },
+            VmTestCase { input: "1", expected: Object::Integer(1) },
+            VmTestCase { input: "2", expected: Object::Integer(2) },
             VmTestCase { input: "1 + 2", expected: Object::Integer(3) },
         ];
 
@@ -42,7 +42,7 @@ mod tests {
             println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
             let mut vm = VM::new(bytecodes);
             vm.run();
-            let got = vm.stack_top().unwrap();
+            let got = vm.last_popped_stack_elm().unwrap();
             test_expected_object(t.expected, got);
         }
     }

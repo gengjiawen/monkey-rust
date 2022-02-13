@@ -52,14 +52,17 @@ impl VM {
                         }
                     }
                 }
+                Opcode::OpPop => {
+                    self.pop();
+                }
             }
             ip += 1;
         }
     }
 
 
-    pub fn stack_top(&self) -> Option<Rc<Object>> {
-        self.stack.get(self.sp - 1).cloned()
+    pub fn last_popped_stack_elm(&self) -> Option<Rc<Object>> {
+        self.stack.get(self.sp).cloned()
     }
 
     fn pop(&mut self) -> Rc<Object> {
