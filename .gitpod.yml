@@ -11,4 +11,6 @@ vscode:
   extensions:
     - vadimcn.vscode-lldb
     - gengjiawen.vscode-wasm
+    - gengjiawen.vscode-postfix-ts
+    - matklad.rust-analyzer
 
