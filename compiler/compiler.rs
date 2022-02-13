@@ -81,6 +81,15 @@ impl Compiler {
                     TokenKind::PLUS => {
                         self.emit(OpAdd, &vec![]);
                     }
+                    TokenKind::MINUS => {
+                        self.emit(OpSub, &vec![]);
+                    }
+                    TokenKind::ASTERISK => {
+                        self.emit(OpMul, &vec![]);
+                    }
+                    TokenKind::SLASH => {
+                        self.emit(OpDiv, &vec![]);
+                    }
                     _ => {
                         return Err(format!("unexpected infix op: {}", infix.op));
                     }

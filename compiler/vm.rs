@@ -40,23 +40,34 @@ impl VM {
                     ip += 2;
                     self.push(Rc::clone(&self.constants[const_index]))
                 }
-                Opcode::OpAdd => {
-                    let right = self.pop();
-                    let left = self.pop();
-                    match (left.borrow(), right.borrow()) {
-                        (Object::Integer(l), Object::Integer(r)) => {
-                            self.push(Rc::from(Object::Integer(l + r)));
-                        }
-                        _ => {
-                            panic!("unsupported add for those types")
-                        }
-                    }
+                Opcode::OpAdd | Opcode::OpSub| Opcode::OpMul| Opcode::OpDiv => {
+                    self.executeBinaryOperation(opcode);
                 }
                 Opcode::OpPop => {
                     self.pop();
                 }
             }
             ip += 1;
+        }
+    }
+
+    fn executeBinaryOperation(&mut self, opcode: Opcode) {
+        let right = self.pop();
+        let left = self.pop();
+        match (left.borrow(), right.borrow()) {
+            (Object::Integer(l), Object::Integer(r)) => {
+                let result = match opcode {
+                    Opcode::OpAdd => l + r,
+                    Opcode::OpSub => l - r,
+                    Opcode::OpMul => l * r,
+                    Opcode::OpDiv => l / r,
+                    _ => panic!("Unknown opcode for int"),
+                };
+                self.push(Rc::from(Object::Integer(result)));
+            }
+            _ => {
+                panic!("unsupported add for those types")
+            }
         }
     }
 

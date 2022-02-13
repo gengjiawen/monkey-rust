@@ -96,7 +96,46 @@ mod tests {
                     Instructions { data: make_instructions(OpConst, &vec![1]) },
                     Instructions { data: make_instructions(OpPop, &vec![1]) },
                 ],
-            }
+            },
+            CompilerTestCase {
+                input: "1 - 2",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpSub, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "1 * 2",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpMul, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "2 / 1",
+                expected_constants: vec![
+                    Object::Integer(2),
+                    Object::Integer(1),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpDiv, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
         ];
 
         run_compiler_test(tests);

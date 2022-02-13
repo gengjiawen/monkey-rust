@@ -25,10 +25,22 @@ mod tests {
 
     #[test]
     fn test_integer_arithmetic() {
-        let tests = vec![
+        let tests: Vec<VmTestCase> = vec![
             VmTestCase { input: "1", expected: Object::Integer(1) },
             VmTestCase { input: "2", expected: Object::Integer(2) },
             VmTestCase { input: "1 + 2", expected: Object::Integer(3) },
+            VmTestCase { input: "4 / 2", expected: Object::Integer(2) },
+            VmTestCase { input: "50 / 2 * 2 + 10 - 5", expected: Object::Integer(55) },
+            VmTestCase { input: "5 * (2 + 10)", expected: Object::Integer(60) },
+            VmTestCase { input: "5 + 5 + 5 + 5 - 10", expected: Object::Integer(10) },
+            VmTestCase { input: "2 * 2 * 2 * 2 * 2", expected: Object::Integer(32) },
+            VmTestCase { input: "5 * 2 + 10", expected: Object::Integer(20) },
+            VmTestCase { input: "5 + 2 * 10", expected: Object::Integer(25) },
+            VmTestCase { input: "5 * (2 + 10)", expected: Object::Integer(60) },
+            // VmTestCase { input: "-5", expected: Object::Integer(-5) },
+            // VmTestCase { input: "-10", expected: Object::Integer(-10) },
+            // VmTestCase { input: "-50 + 100 + -50", expected: Object::Integer(0) },
+            // VmTestCase { input: "(5 + 10 * 2 + 15 / 3) * 2 + -10", expected: Object::Integer(50) },
         ];
 
         run_vm_tests(tests);
