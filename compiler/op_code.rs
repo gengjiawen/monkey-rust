@@ -23,6 +23,8 @@ pub enum Opcode {
     OpSub,
     OpMul,
     OpDiv,
+    OpTrue,
+    OpFalse,
 }
 
 lazy_static! {
@@ -34,6 +36,8 @@ lazy_static! {
         m.insert(Opcode::OpSub, Definition {name: "OpSub", operand_width: vec![]});
         m.insert(Opcode::OpMul, Definition {name: "OpMul", operand_width: vec![]});
         m.insert(Opcode::OpDiv, Definition {name: "OpDiv", operand_width: vec![]});
+        m.insert(Opcode::OpTrue, Definition {name: "OpTrue", operand_width: vec![]});
+        m.insert(Opcode::OpFalse, Definition {name: "OpFalse", operand_width: vec![]});
         m
     };
 }

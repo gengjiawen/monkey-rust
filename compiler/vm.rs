@@ -4,6 +4,7 @@ use std::rc::Rc;
 use byteorder::{BigEndian, ByteOrder};
 
 use object::Object;
+use object::Object::Boolean;
 
 use crate::compiler::Bytecode;
 use crate::op_code::{cast_u8_to_opcode, Instructions, Opcode};
@@ -45,6 +46,12 @@ impl VM {
                 }
                 Opcode::OpPop => {
                     self.pop();
+                }
+                Opcode::OpTrue => {
+                    self.push(Rc::new(Boolean(true)));
+                }
+                Opcode::OpFalse => {
+                    self.push(Rc::new(Boolean(false)));
                 }
             }
             ip += 1;

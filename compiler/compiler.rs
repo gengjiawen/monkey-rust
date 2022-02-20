@@ -67,7 +67,13 @@ impl Compiler {
                         let operands = vec![self.add_constant(int)];
                         self.emit(OpConst, &operands);
                     }
-                    Literal::Boolean(_) => {}
+                    Literal::Boolean(i) => {
+                        if i.raw {
+                            self.emit(OpTrue, &vec![]);
+                        } else {
+                            self.emit(OpFalse, &vec![]);
+                        }
+                    }
                     Literal::String(_) => {}
                     Literal::Array(_) => {}
                     Literal::Hash(_) => {}

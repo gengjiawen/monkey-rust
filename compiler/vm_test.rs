@@ -23,6 +23,19 @@ mod tests {
         test_constants(&vec![expected], &vec![got]);
     }
 
+    fn run_vm_tests(tests: Vec<VmTestCase>) {
+        for t in tests {
+            let program = parse(t.input).unwrap();
+            let mut compiler = Compiler::new();
+            let bytecodes = compiler.compile(&program).unwrap();
+            println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
+            let mut vm = VM::new(bytecodes);
+            vm.run();
+            let got = vm.last_popped_stack_elm().unwrap();
+            test_expected_object(t.expected, got);
+        }
+    }
+
     #[test]
     fn test_integer_arithmetic() {
         let tests: Vec<VmTestCase> = vec![
@@ -46,16 +59,13 @@ mod tests {
         run_vm_tests(tests);
     }
 
-    fn run_vm_tests(tests: Vec<VmTestCase>) {
-        for t in tests {
-            let program = parse(t.input).unwrap();
-            let mut compiler = Compiler::new();
-            let bytecodes = compiler.compile(&program).unwrap();
-            println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
-            let mut vm = VM::new(bytecodes);
-            vm.run();
-            let got = vm.last_popped_stack_elm().unwrap();
-            test_expected_object(t.expected, got);
-        }
+    #[test]
+    fn test_boolean_expressions() {
+        let tests: Vec<VmTestCase> = vec![
+            VmTestCase { input: "true", expected: Object::Boolean(true) },
+            VmTestCase { input: "false", expected: Object::Boolean(false) },
+        ];
+
+        run_vm_tests(tests);
     }
 }

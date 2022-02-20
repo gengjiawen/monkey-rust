@@ -31,6 +31,9 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
             (Object::Integer(exp_val), Object::Integer(got_val)) => {
                 assert_eq!(exp_val, got_val, "integer not equal {} {}", exp_val, got_val);
             },
+            (Object::Boolean(exp_val), Object::Boolean(got_val)) => {
+                assert_eq!(exp_val, got_val, "boolean not equal {} {}", exp_val, got_val);
+            },
             _ => {
                 panic!("can't compare object types");
             }
@@ -140,4 +143,30 @@ mod tests {
 
         run_compiler_test(tests);
     }
+    #[test]
+    fn boolean_expression() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "true",
+                expected_constants: vec![
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "false",
+                expected_constants: vec![
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpFalse, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+        ];
+
+        run_compiler_test(tests);
+    }
 }
+
