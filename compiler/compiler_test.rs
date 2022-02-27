@@ -164,6 +164,80 @@ mod tests {
                     Instructions { data: make_instructions(OpPop, &vec![0]) },
                 ],
             },
+            CompilerTestCase {
+                input: "1 > 2",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpGreaterThan, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "1 < 2",
+                expected_constants: vec![
+                    Object::Integer(2),
+                    Object::Integer(1),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpGreaterThan, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "1 == 2",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpEqual, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "1 != 2",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpConst, &vec![1]) },
+                    Instructions { data: make_instructions(OpNotEqual, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "true == false",
+                expected_constants: vec![
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
+                    Instructions { data: make_instructions(OpFalse, &vec![0]) },
+                    Instructions { data: make_instructions(OpEqual, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "true != false",
+                expected_constants: vec![
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
+                    Instructions { data: make_instructions(OpFalse, &vec![0]) },
+                    Instructions { data: make_instructions(OpNotEqual, &vec![0]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
         ];
 
         run_compiler_test(tests);

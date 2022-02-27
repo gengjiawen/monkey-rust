@@ -64,6 +64,25 @@ mod tests {
         let tests: Vec<VmTestCase> = vec![
             VmTestCase { input: "true", expected: Object::Boolean(true) },
             VmTestCase { input: "false", expected: Object::Boolean(false) },
+            VmTestCase { input: "true", expected: Object::Boolean(true) },
+            VmTestCase { input: "false", expected: Object::Boolean(false) },
+            VmTestCase { input: "1 < 2", expected: Object::Boolean(true) },
+            VmTestCase { input: "1 > 2", expected: Object::Boolean(false) },
+            VmTestCase { input: "1 < 1", expected: Object::Boolean(false) },
+            VmTestCase { input: "1 > 1", expected: Object::Boolean(false) },
+            VmTestCase { input: "1 == 1", expected: Object::Boolean(true) },
+            VmTestCase { input: "1 != 1", expected: Object::Boolean(false) },
+            VmTestCase { input: "1 == 2", expected: Object::Boolean(false) },
+            VmTestCase { input: "1 != 2", expected: Object::Boolean(true) },
+            VmTestCase { input: "true == true", expected: Object::Boolean(true) },
+            VmTestCase { input: "false == false", expected: Object::Boolean(true) },
+            VmTestCase { input: "true == false", expected: Object::Boolean(false) },
+            VmTestCase { input: "true != false", expected: Object::Boolean(true) },
+            VmTestCase { input: "false != true", expected: Object::Boolean(true) },
+            VmTestCase { input: "(1 < 2) == true", expected: Object::Boolean(true) },
+            VmTestCase { input: "(1 < 2) == false", expected: Object::Boolean(false) },
+            VmTestCase { input: "(1 > 2) == true", expected: Object::Boolean(false) },
+            VmTestCase { input: "(1 > 2) == false", expected: Object::Boolean(true) },
         ];
 
         run_vm_tests(tests);

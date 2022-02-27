@@ -25,6 +25,9 @@ pub enum Opcode {
     OpDiv,
     OpTrue,
     OpFalse,
+    OpEqual,
+    OpNotEqual,
+    OpGreaterThan,
 }
 
 lazy_static! {
@@ -38,6 +41,9 @@ lazy_static! {
         m.insert(Opcode::OpDiv, Definition {name: "OpDiv", operand_width: vec![]});
         m.insert(Opcode::OpTrue, Definition {name: "OpTrue", operand_width: vec![]});
         m.insert(Opcode::OpFalse, Definition {name: "OpFalse", operand_width: vec![]});
+        m.insert(Opcode::OpEqual, Definition {name: "OpEqual", operand_width: vec![]});
+        m.insert(Opcode::OpNotEqual, Definition {name: "OpNotEqual", operand_width: vec![]});
+        m.insert(Opcode::OpGreaterThan, Definition {name: "OpGreatThan", operand_width: vec![]});
         m
     };
 }

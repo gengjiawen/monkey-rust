@@ -4,6 +4,7 @@ use std::rc::Rc;
 use object::Object;
 use parser::ast::{Expression, Literal, Node, Statement};
 use parser::lexer::token::{Token, TokenKind};
+use parser::lexer::token::TokenKind::LT;
 
 use crate::op_code::{Instructions, make_instructions, Opcode};
 use crate::op_code::Opcode::{*};
@@ -81,6 +82,12 @@ impl Compiler {
             }
             Expression::PREFIX(_) => {}
             Expression::INFIX(infix) => {
+                if infix.op.kind == TokenKind::LT {
+                    self.compile_expr(&infix.right).unwrap();
+                    self.compile_expr(&infix.left).unwrap();
+                    self.emit(Opcode::OpGreaterThan, &vec![]);
+                    return Ok(());
+                }
                 self.compile_expr(&infix.left).unwrap();
                 self.compile_expr(&infix.right).unwrap();
                 match infix.op.kind {
@@ -95,6 +102,15 @@ impl Compiler {
                     }
                     TokenKind::SLASH => {
                         self.emit(OpDiv, &vec![]);
+                    }
+                    TokenKind::GT => {
+                        self.emit(Opcode::OpGreaterThan, &vec![]);
+                    }
+                    TokenKind::EQ => {
+                        self.emit(Opcode::OpEqual, &vec![]);
+                    }
+                    TokenKind::NotEq => {
+                        self.emit(Opcode::OpNotEqual, &vec![]);
                     }
                     _ => {
                         return Err(format!("unexpected infix op: {}", infix.op));

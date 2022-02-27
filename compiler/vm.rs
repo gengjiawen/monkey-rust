@@ -42,7 +42,7 @@ impl VM {
                     self.push(Rc::clone(&self.constants[const_index]))
                 }
                 Opcode::OpAdd | Opcode::OpSub| Opcode::OpMul| Opcode::OpDiv => {
-                    self.executeBinaryOperation(opcode);
+                    self.execute_binary_operation(opcode);
                 }
                 Opcode::OpPop => {
                     self.pop();
@@ -53,12 +53,15 @@ impl VM {
                 Opcode::OpFalse => {
                     self.push(Rc::new(Boolean(false)));
                 }
+                Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
+                    self.execute_comparison(opcode);
+                }
             }
             ip += 1;
         }
     }
 
-    fn executeBinaryOperation(&mut self, opcode: Opcode) {
+    fn execute_binary_operation(&mut self, opcode: Opcode) {
         let right = self.pop();
         let left = self.pop();
         match (left.borrow(), right.borrow()) {
@@ -71,6 +74,33 @@ impl VM {
                     _ => panic!("Unknown opcode for int"),
                 };
                 self.push(Rc::from(Object::Integer(result)));
+            }
+            _ => {
+                panic!("unsupported add for those types")
+            }
+        }
+    }
+
+    fn execute_comparison(&mut self, opcode: Opcode) {
+        let right = self.pop();
+        let left = self.pop();
+        match (left.borrow(), right.borrow()) {
+            (Object::Integer(l), Object::Integer(r)) => {
+                let result = match opcode {
+                    Opcode::OpEqual => l == r,
+                    Opcode::OpNotEqual => l != r,
+                    Opcode::OpGreaterThan => l > r,
+                    _ => panic!("Unknown opcode for comparing int"),
+                };
+                self.push(Rc::from(Object::Boolean(result)));
+            }
+            (Object::Boolean(l), Object::Boolean(r)) => {
+                let result = match opcode {
+                    Opcode::OpEqual => l == r,
+                    Opcode::OpNotEqual => l != r,
+                    _ => panic!("Unknown opcode for comparing boolean"),
+                };
+                self.push(Rc::from(Object::Boolean(result)));
             }
             _ => {
                 panic!("unsupported add for those types")
