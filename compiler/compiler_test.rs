@@ -139,6 +139,27 @@ mod tests {
                     Instructions { data: make_instructions(OpPop, &vec![0]) },
                 ],
             },
+            CompilerTestCase {
+                input: "-1",
+                expected_constants: vec![
+                    Object::Integer(1),
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpConst, &vec![0]) },
+                    Instructions { data: make_instructions(OpMinus, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
+            CompilerTestCase {
+                input: "!true",
+                expected_constants: vec![
+                ],
+                expected_instructions: vec![
+                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
+                    Instructions { data: make_instructions(OpBang, &vec![1]) },
+                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                ],
+            },
         ];
 
         run_compiler_test(tests);

@@ -80,7 +80,21 @@ impl Compiler {
                     Literal::Hash(_) => {}
                 }
             }
-            Expression::PREFIX(_) => {}
+            Expression::PREFIX(prefix) => {
+                self.compile_expr(&prefix.operand).unwrap();
+                match prefix.op.kind {
+                    TokenKind::MINUS => {
+                        self.emit(OpMinus, &vec![]);
+                    }
+                    TokenKind::BANG => {
+                        self.emit(OpBang, &vec![]);
+                    }
+                    _ => {
+                        return Err(format!("unexpected prefix op: {}", prefix.op));
+                    }
+                }
+
+            }
             Expression::INFIX(infix) => {
                 if infix.op.kind == TokenKind::LT {
                     self.compile_expr(&infix.right).unwrap();

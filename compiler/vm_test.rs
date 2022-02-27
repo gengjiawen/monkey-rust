@@ -50,10 +50,10 @@ mod tests {
             VmTestCase { input: "5 * 2 + 10", expected: Object::Integer(20) },
             VmTestCase { input: "5 + 2 * 10", expected: Object::Integer(25) },
             VmTestCase { input: "5 * (2 + 10)", expected: Object::Integer(60) },
-            // VmTestCase { input: "-5", expected: Object::Integer(-5) },
-            // VmTestCase { input: "-10", expected: Object::Integer(-10) },
-            // VmTestCase { input: "-50 + 100 + -50", expected: Object::Integer(0) },
-            // VmTestCase { input: "(5 + 10 * 2 + 15 / 3) * 2 + -10", expected: Object::Integer(50) },
+            VmTestCase { input: "-5", expected: Object::Integer(-5) },
+            VmTestCase { input: "-10", expected: Object::Integer(-10) },
+            VmTestCase { input: "-50 + 100 + -50", expected: Object::Integer(0) },
+            VmTestCase { input: "(5 + 10 * 2 + 15 / 3) * 2 + -10", expected: Object::Integer(50) },
         ];
 
         run_vm_tests(tests);
@@ -83,6 +83,13 @@ mod tests {
             VmTestCase { input: "(1 < 2) == false", expected: Object::Boolean(false) },
             VmTestCase { input: "(1 > 2) == true", expected: Object::Boolean(false) },
             VmTestCase { input: "(1 > 2) == false", expected: Object::Boolean(true) },
+            VmTestCase { input: "!true", expected: Object::Boolean(false) },
+            VmTestCase { input: "!false", expected: Object::Boolean(true) },
+            VmTestCase { input: "!5", expected: Object::Boolean(false) },
+            VmTestCase { input: "!!true", expected: Object::Boolean(true) },
+            VmTestCase { input: "!!false", expected: Object::Boolean(false) },
+            VmTestCase { input: "!!5", expected: Object::Boolean(true) },
+            // VmTestCase { input: "!(if (false) { 5; })", expected: Object::Boolean(true) },
         ];
 
         run_vm_tests(tests);

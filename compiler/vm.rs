@@ -56,6 +56,12 @@ impl VM {
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
                     self.execute_comparison(opcode);
                 }
+                Opcode::OpMinus => {
+                    self.execute_minus_operation(opcode);
+                }
+                Opcode::OpBang => {
+                    self.execute_bang_operation();
+                }
             }
             ip += 1;
         }
@@ -103,7 +109,30 @@ impl VM {
                 self.push(Rc::from(Object::Boolean(result)));
             }
             _ => {
-                panic!("unsupported add for those types")
+                panic!("unsupported comparison for those types")
+            }
+        }
+    }
+
+    fn execute_minus_operation(&mut self, opcode: Opcode) {
+        let operand = self.pop();
+        match operand.borrow() {
+            (Object::Integer(l)) => {
+                self.push(Rc::from(Object::Integer(-*l)));
+            }
+            _ => {
+                panic!("unsupported types for negation {:?}", opcode)
+            }
+        }
+    }
+    fn execute_bang_operation(&mut self) {
+        let operand = self.pop();
+        match operand.borrow() {
+            (Object::Boolean(l)) => {
+                self.push(Rc::from(Object::Boolean(!*l)));
+            }
+            _ => {
+                self.push(Rc::from(Object::Boolean(false)));
             }
         }
     }
