@@ -1,6 +1,6 @@
 FROM gitpod/workspace-full
 
-ENV TRIGGER_REBUILD=5
+ENV TRIGGER_REBUILD=6
 
 RUN bash -cl "cargo install cargo-wasm cargo-generate \
     && curl -fsSL https://wasmtime.dev/install.sh  | bash; \
