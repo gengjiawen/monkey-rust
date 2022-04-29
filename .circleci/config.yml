@@ -12,7 +12,7 @@ jobs:
           name: test
           command: |
             cd wasm && wasm-pack build --scope=gengjiawen
-            apt install firefox -y
+            apt update && apt install firefox -y
             wasm-pack test --headless --firefox
       - store_artifacts:
           path: wasm/pkg
