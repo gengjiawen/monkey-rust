@@ -46,8 +46,8 @@ lazy_static! {
         m.insert(Opcode::OpEqual, Definition {name: "OpEqual", operand_width: vec![]});
         m.insert(Opcode::OpNotEqual, Definition {name: "OpNotEqual", operand_width: vec![]});
         m.insert(Opcode::OpGreaterThan, Definition {name: "OpGreatThan", operand_width: vec![]});
-        m.insert(Opcode::OpMinus, Definition {name: "OpGreatThan", operand_width: vec![]});
-        m.insert(Opcode::OpBang, Definition {name: "OpGreatThan", operand_width: vec![]});
+        m.insert(Opcode::OpMinus, Definition {name: "OpMinus", operand_width: vec![]});
+        m.insert(Opcode::OpBang, Definition {name: "OpBang", operand_width: vec![]});
         m
     };
 }
