@@ -10,8 +10,8 @@ RUN bash -cl "cargo install cargo-wasm cargo-generate \
 
 RUN mkdir /tmp/wasm-sdk \
     && cd /tmp/wasm-sdk \
-    && wget "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk_14.0_amd64.deb" \
-    && sudo dpkg -i wasi-sdk_14.0_amd64.deb \
+    && wget "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk_16.0_amd64.deb" \
+    && sudo dpkg -i wasi-sdk_16.0_amd64.deb \
     && rm -rf /tmp/wasi-sdk
 
 RUN git clone --depth 1 "https://github.com/emscripten-core/emsdk.git" $HOME/.emsdk \
