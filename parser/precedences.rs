@@ -3,13 +3,13 @@ use lexer::token::TokenKind;
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Precedence {
     LOWEST,
-    EQUALS, // ==
+    EQUALS,      // ==
     LessGreater, // > or <
-    SUM, // + or =
-    PRODUCT, // * or /
-    PREFIX, // -X or !X
-    CALL, // myFunction(x)
-    INDEX, // array[index]
+    SUM,         // + or =
+    PRODUCT,     // * or /
+    PREFIX,      // -X or !X
+    CALL,        // myFunction(x)
+    INDEX,       // array[index]
 }
 
 pub fn get_token_precedence(token: &TokenKind) -> Precedence {

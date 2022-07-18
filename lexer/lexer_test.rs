@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use crate::token::{Token, TokenKind};
     use crate::Lexer;
-    use crate::token::{TokenKind, Token};
     use insta::*;
 
     fn test_token_set(l: &mut Lexer) -> Vec<Token> {
@@ -22,7 +22,11 @@ mod tests {
         let mut l = Lexer::new(input);
         let token_vs = test_token_set(&mut l);
 
-        assert_snapshot!(name, serde_json::to_string_pretty(&token_vs).unwrap(), input);
+        assert_snapshot!(
+            name,
+            serde_json::to_string_pretty(&token_vs).unwrap(),
+            input
+        );
     }
 
     #[test]
@@ -67,7 +71,9 @@ mod tests {
 
     #[test]
     fn test_lexer_complex() {
-        test_lexer_common("complex", "
+        test_lexer_common(
+            "complex",
+            "
 // welcome to monkeylang
 let five = 5;
 let ten = 10;
@@ -87,6 +93,7 @@ if (5 < 10) {
 }
 
 10 == 10;
-10 != 9;");
+10 != 9;",
+        );
     }
 }

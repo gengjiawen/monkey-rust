@@ -1,6 +1,6 @@
-use std::rc::Rc;
-use phf::phf_map;
 use crate::{BuiltinFunc, Object};
+use phf::phf_map;
+use std::rc::Rc;
 
 pub static BUILTINS: phf::Map<&'static str, BuiltinFunc> = phf_map! {
     "len" => len,
@@ -12,7 +12,6 @@ pub static BUILTINS: phf::Map<&'static str, BuiltinFunc> = phf_map! {
     "push" => push,
 };
 
-
 // a failed try
 // rust sucks: https://stackoverflow.com/a/27896014/1713757
 // pub static BUILTINS: HashMap<String, BuiltinFunc> = vec![(String::from("len"), len as BuiltinFunc) ]
@@ -23,7 +22,7 @@ pub fn len(args: Vec<Rc<Object>>) -> Rc<Object> {
     Rc::from(match &*args[0] {
         Object::String(s) => Object::Integer(s.len() as i64),
         Object::Array(a) => Object::Integer(a.len() as i64),
-        o => Object::Error(format!("builtin len not supported for for type {}", o))
+        o => Object::Error(format!("builtin len not supported for for type {}", o)),
     })
 }
 
@@ -34,25 +33,27 @@ pub fn puts(args: Vec<Rc<Object>>) -> Rc<Object> {
 
 pub fn first(args: Vec<Rc<Object>>) -> Rc<Object> {
     match &*args[0] {
-        Object::Array(s) => {
-            match s.first() {
-                Some(obj) => Rc::clone(obj),
-                None => Rc::new(Object::Null),
-            }
+        Object::Array(s) => match s.first() {
+            Some(obj) => Rc::clone(obj),
+            None => Rc::new(Object::Null),
         },
-        o => Rc::new(Object::Error(format!("builtin first not supported for for type {}", o)))
+        o => Rc::new(Object::Error(format!(
+            "builtin first not supported for for type {}",
+            o
+        ))),
     }
 }
 
 pub fn last(args: Vec<Rc<Object>>) -> Rc<Object> {
     match &*args[0] {
-        Object::Array(s) => {
-            match s.last() {
-                Some(obj) => Rc::clone(obj),
-                None => Rc::new(Object::Null),
-            }
+        Object::Array(s) => match s.last() {
+            Some(obj) => Rc::clone(obj),
+            None => Rc::new(Object::Null),
         },
-        o => Rc::new(Object::Error(format!("builtin last not supported for for type {}", o)))
+        o => Rc::new(Object::Error(format!(
+            "builtin last not supported for for type {}",
+            o
+        ))),
     }
 }
 
@@ -64,9 +65,12 @@ pub fn rest(args: Vec<Rc<Object>>) -> Rc<Object> {
                 let new_array = s[1..len].to_vec();
                 return Rc::new(Object::Array(new_array));
             }
-            return Rc::new(Object::Null)
-        },
-        o => Rc::new(Object::Error(format!("builtin rest not supported for for type {}", o)))
+            return Rc::new(Object::Null);
+        }
+        o => Rc::new(Object::Error(format!(
+            "builtin rest not supported for for type {}",
+            o
+        ))),
     }
 }
 
@@ -78,7 +82,10 @@ pub fn push(args: Vec<Rc<Object>>) -> Rc<Object> {
             let mut new_array = s.clone();
             new_array.push(obj);
             return Rc::new(Object::Array(new_array));
-        },
-        o => Rc::new(Object::Error(format!("builtin push not supported for for type {}", o)))
+        }
+        o => Rc::new(Object::Error(format!(
+            "builtin push not supported for for type {}",
+            o
+        ))),
     }
 }

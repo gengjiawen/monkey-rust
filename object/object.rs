@@ -8,8 +8,8 @@ use parser::ast::{BlockStatement, IDENTIFIER};
 
 use crate::environment::Env;
 
-pub mod environment;
 pub mod builtins;
+pub mod environment;
 
 pub type EvalError = String;
 pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Rc<Object>;
@@ -36,25 +36,32 @@ impl fmt::Display for Object {
             Object::String(s) => write!(f, "{}", s),
             Object::Null => write!(f, "null"),
             Object::ReturnValue(expr) => write!(f, "{}", expr),
-            Object::Function(params, body,  _env) => {
-                let func_params =
-                    params
-                        .iter()
-                        .map(|stmt| stmt.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ");
+            Object::Function(params, body, _env) => {
+                let func_params = params
+                    .iter()
+                    .map(|stmt| stmt.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
                 write!(f, "fn({}) {{ {} }}", func_params, body)
-            },
+            }
             Object::Builtin(_) => write!(f, "[builtin function]"),
             Object::Error(e) => write!(f, "{}", e),
-            Object::Array(e) => write!(f, "[{}]", e.iter().map(|o|o.to_string()).collect::<Vec<String>>().join(", ")),
-            Object::Hash(map) => write!(f, "[{}]",
-                  map
-                    .iter()
+            Object::Array(e) => write!(
+                f,
+                "[{}]",
+                e.iter()
+                    .map(|o| o.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Object::Hash(map) => write!(
+                f,
+                "[{}]",
+                map.iter()
                     .map(|(k, v)| format!("{}: {}", k, v))
                     .collect::<Vec<String>>()
                     .join(", ")
-            )
+            ),
         }
     }
 }
@@ -76,9 +83,7 @@ impl Hash for Object {
             Object::Integer(i) => i.hash(state),
             Object::Boolean(b) => b.hash(state),
             Object::String(s) => s.hash(state),
-            t => panic!("can't hashable for {}" ,t)
+            t => panic!("can't hashable for {}", t),
         }
-
     }
 }
-

@@ -1,6 +1,6 @@
-use std::io::stdin;
 use lexer::Lexer;
 use parser::Parser;
+use std::io::stdin;
 
 pub fn main() {
     println!("Welcome to monkey parser by gengjiawen");

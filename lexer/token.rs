@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Formatter;
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct Token {
@@ -14,10 +14,13 @@ pub struct Span {
     pub end: usize,
 }
 
-
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "start: {}, end: {}, kind: {}", self.span.start, self.span.end, self.kind)
+        write!(
+            f,
+            "start: {}, end: {}, kind: {}",
+            self.span.start, self.span.end, self.kind
+        )
     }
 }
 
@@ -28,22 +31,22 @@ pub enum TokenKind {
     EOF,
 
     // Identifiers + literals
-    IDENTIFIER{name: String},
+    IDENTIFIER { name: String },
     INT(i64),
     STRING(String),
 
     // Operators
-    ASSIGN, // =
-    PLUS, // +
-    MINUS, // -
-    BANG, // !
+    ASSIGN,   // =
+    PLUS,     // +
+    MINUS,    // -
+    BANG,     // !
     ASTERISK, // *
-    SLASH, // /
+    SLASH,    // /
 
     LT, // <
     GT, // >
 
-    EQ, // ==
+    EQ,    // ==
     NotEq, // !=
 
     // delimiters
@@ -53,8 +56,8 @@ pub enum TokenKind {
 
     LPAREN,
     RPAREN,
-    LBRACE, // {
-    RBRACE, // }
+    LBRACE,   // {
+    RBRACE,   // }
     LBRACKET, // [
     RBRACKET, // ]
 
@@ -65,7 +68,7 @@ pub enum TokenKind {
     FALSE,
     IF,
     ELSE,
-    RETURN
+    RETURN,
 }
 
 pub fn lookup_identifier(identifier: &str) -> TokenKind {
@@ -77,14 +80,16 @@ pub fn lookup_identifier(identifier: &str) -> TokenKind {
         "if" => TokenKind::IF,
         "else" => TokenKind::ELSE,
         "return" => TokenKind::RETURN,
-        _ => TokenKind::IDENTIFIER { name: identifier.to_string() }
+        _ => TokenKind::IDENTIFIER {
+            name: identifier.to_string(),
+        },
     }
 }
 
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TokenKind::IDENTIFIER {name} => write!(f, "{}", name),
+            TokenKind::IDENTIFIER { name } => write!(f, "{}", name),
             TokenKind::INT(i) => write!(f, "{}", i),
             TokenKind::STRING(s) => write!(f, "{}", s),
             TokenKind::ASSIGN => write!(f, "="),
@@ -114,7 +119,7 @@ impl fmt::Display for TokenKind {
             TokenKind::RETURN => write!(f, "return"),
             TokenKind::ILLEGAL => write!(f, "ILLEGAL"),
             TokenKind::EOF => write!(f, "EOF"),
-            TokenKind::COLON => write!(f, ":")
+            TokenKind::COLON => write!(f, ":"),
         }
     }
 }

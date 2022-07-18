@@ -5,10 +5,8 @@ mod tests {
 
     pub fn test_ast_tree(name: &str, input: &str) {
         let ast = match parse(input) {
-            Ok(node) => {
-                serde_json::to_string_pretty(&node).unwrap()
-            }
-            Err(e) => panic!("parse error: {}", e[0])
+            Ok(node) => serde_json::to_string_pretty(&node).unwrap(),
+            Err(e) => panic!("parse error: {}", e[0]),
         };
         assert_snapshot!(name, ast, input);
     }

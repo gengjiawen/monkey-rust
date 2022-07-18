@@ -138,9 +138,7 @@ mod tests {
 
     #[test]
     fn test_fn_call_else_expression() {
-        let tt = [
-            ("add(1, 2 * 3, 4 + 5);", "add(1, (2 * 3), (4 + 5))")
-        ];
+        let tt = [("add(1, 2 * 3, 4 + 5);", "add(1, (2 * 3), (4 + 5))")];
         verify_program(&tt);
     }
 
@@ -152,29 +150,20 @@ mod tests {
 
     #[test]
     fn test_array_literal_expression() {
-        let test_case = [
-            ("[]", "[]"),
-            ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)]")
-        ];
+        let test_case = [("[]", "[]"), ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)]")];
         verify_program(&test_case);
     }
 
     #[test]
     fn test_index_expression() {
-        let test_case = [
-            ("a[1]", "(a[1])"),
-            ("a[1 + 1]", "(a[(1 + 1)])")
-        ];
+        let test_case = [("a[1]", "(a[1])"), ("a[1 + 1]", "(a[(1 + 1)])")];
         verify_program(&test_case);
     }
 
     #[test]
     fn test_hash_literal_expression() {
         let test_case = [
-            (
-                r#"{"a": 1}"#,
-                r#"{"a": 1}"#,
-            ),
+            (r#"{"a": 1}"#, r#"{"a": 1}"#),
             (
                 r#"{"one": 1, "two": 2, "three": 3}"#,
                 r#"{"one": 1, "two": 2, "three": 3}"#,

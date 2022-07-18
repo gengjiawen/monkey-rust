@@ -29,11 +29,19 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
         let got = b_got.borrow();
         match (exp, got) {
             (Object::Integer(exp_val), Object::Integer(got_val)) => {
-                assert_eq!(exp_val, got_val, "integer not equal {} {}", exp_val, got_val);
-            },
+                assert_eq!(
+                    exp_val, got_val,
+                    "integer not equal {} {}",
+                    exp_val, got_val
+                );
+            }
             (Object::Boolean(exp_val), Object::Boolean(got_val)) => {
-                assert_eq!(exp_val, got_val, "boolean not equal {} {}", exp_val, got_val);
-            },
+                assert_eq!(
+                    exp_val, got_val,
+                    "boolean not equal {} {}",
+                    exp_val, got_val
+                );
+            }
             _ => {
                 panic!("can't compare object types");
             }
@@ -46,7 +54,11 @@ fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
 
     println!("actual: {:?}", actual.string());
     println!("expected: {:?}", concatted.string());
-    assert_eq!(concatted.data.len(), actual.data.len(), "instructions length not right");
+    assert_eq!(
+        concatted.data.len(),
+        actual.data.len(),
+        "instructions length not right"
+    );
 
     for (exp, got) in concatted.data.into_iter().zip(actual.data.clone()) {
         assert_eq!(exp, got)
@@ -54,9 +66,7 @@ fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
 }
 
 fn concat_instructions(expected: &Vec<Instructions>) -> Instructions {
-    let mut out = Instructions {
-        data: vec![],
-    };
+    let mut out = Instructions { data: vec![] };
 
     for instruction in expected {
         out = out.merge_instructions(instruction)
@@ -78,10 +88,7 @@ mod tests {
         let tests = vec![
             CompilerTestCase {
                 input: "1 + 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -91,10 +98,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1; 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpPop, &vec![0]),
@@ -104,10 +108,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 - 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -117,10 +118,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 * 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -130,10 +128,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "2 / 1",
-                expected_constants: vec![
-                    Object::Integer(2),
-                    Object::Integer(1),
-                ],
+                expected_constants: vec![Object::Integer(2), Object::Integer(1)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -143,9 +138,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "-1",
-                expected_constants: vec![
-                    Object::Integer(1),
-                ],
+                expected_constants: vec![Object::Integer(1)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpMinus, &vec![1]),
@@ -154,8 +147,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "!true",
-                expected_constants: vec![
-                ],
+                expected_constants: vec![],
                 expected_instructions: vec![
                     make_instructions(OpTrue, &vec![0]),
                     make_instructions(OpBang, &vec![1]),
@@ -171,8 +163,7 @@ mod tests {
         let tests = vec![
             CompilerTestCase {
                 input: "true",
-                expected_constants: vec![
-                ],
+                expected_constants: vec![],
                 expected_instructions: vec![
                     make_instructions(OpTrue, &vec![0]),
                     make_instructions(OpPop, &vec![0]),
@@ -180,8 +171,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "false",
-                expected_constants: vec![
-                ],
+                expected_constants: vec![],
                 expected_instructions: vec![
                     make_instructions(OpFalse, &vec![0]),
                     make_instructions(OpPop, &vec![0]),
@@ -189,10 +179,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 > 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -202,10 +189,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 < 2",
-                expected_constants: vec![
-                    Object::Integer(2),
-                    Object::Integer(1),
-                ],
+                expected_constants: vec![Object::Integer(2), Object::Integer(1)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -215,10 +199,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 == 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -228,10 +209,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 != 2",
-                expected_constants: vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                ],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
@@ -241,8 +219,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "true == false",
-                expected_constants: vec![
-                ],
+                expected_constants: vec![],
                 expected_instructions: vec![
                     make_instructions(OpTrue, &vec![0]),
                     make_instructions(OpFalse, &vec![0]),
@@ -252,8 +229,7 @@ mod tests {
             },
             CompilerTestCase {
                 input: "true != false",
-                expected_constants: vec![
-                ],
+                expected_constants: vec![],
                 expected_instructions: vec![
                     make_instructions(OpTrue, &vec![0]),
                     make_instructions(OpFalse, &vec![0]),
@@ -268,26 +244,19 @@ mod tests {
 
     #[test]
     fn conditions() {
-        let tests = vec![
-            CompilerTestCase {
-                input: "if (true) { 10 }; 3333;",
-                expected_constants: vec![
-                    Object::Integer(10),
-                    Object::Integer(3333),
-                ],
-                expected_instructions: vec![
-                    make_instructions(OpTrue, &vec![0]),
-                    make_instructions(OpJumpNotTruthy, &vec![7]),
-                    make_instructions(OpConst, &vec![0]),
-                    make_instructions(OpPop, &vec![0]),
-                    make_instructions(OpConst, &vec![1]),
-                    make_instructions(OpPop, &vec![0]),
-                ],
-            }
-        ];
+        let tests = vec![CompilerTestCase {
+            input: "if (true) { 10 }; 3333;",
+            expected_constants: vec![Object::Integer(10), Object::Integer(3333)],
+            expected_instructions: vec![
+                make_instructions(OpTrue, &vec![0]),
+                make_instructions(OpJumpNotTruthy, &vec![7]),
+                make_instructions(OpConst, &vec![0]),
+                make_instructions(OpPop, &vec![0]),
+                make_instructions(OpConst, &vec![1]),
+                make_instructions(OpPop, &vec![0]),
+            ],
+        }];
 
         run_compiler_test(tests);
     }
-
 }
-

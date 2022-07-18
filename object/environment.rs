@@ -1,18 +1,17 @@
+use crate::Object;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
-use crate::Object;
 
 pub type Env = Rc<RefCell<Environment>>;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Environment {
     store: HashMap<String, Rc<Object>>,
-    outer: Option<Env>
+    outer: Option<Env>,
 }
 
 impl Environment {
-    
     pub fn new_enclosed_environment(outer: &Env) -> Self {
         let mut env: Environment = Default::default();
         env.outer = Some(Rc::clone(outer));
@@ -30,7 +29,6 @@ impl Environment {
                 }
             }
         }
-
     }
 
     pub fn set(&mut self, name: String, val: Rc<Object>) {

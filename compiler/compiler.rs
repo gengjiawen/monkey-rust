@@ -2,11 +2,11 @@ use std::rc::Rc;
 
 use object::Object;
 use parser::ast::{BlockStatement, Expression, Literal, Node, Statement};
-use parser::lexer::token::{Token, TokenKind};
 use parser::lexer::token::TokenKind::LT;
+use parser::lexer::token::{Token, TokenKind};
 
-use crate::op_code::{cast_u8_to_opcode, Instructions, make_instructions, Opcode};
-use crate::op_code::Opcode::{*};
+use crate::op_code::Opcode::*;
+use crate::op_code::{cast_u8_to_opcode, make_instructions, Instructions, Opcode};
 
 pub struct Compiler {
     instructions: Instructions,
@@ -41,7 +41,7 @@ impl Compiler {
                 opcode: Opcode::OpPop,
                 position: 0,
             },
-        }
+        };
     }
 
     pub fn compile(&mut self, node: &Node) -> Result<Bytecode, CompileError> {
@@ -59,7 +59,7 @@ impl Compiler {
             }
         }
 
-        return Ok(self.bytecode())
+        return Ok(self.bytecode());
     }
 
     fn compile_stmt(&mut self, s: &Statement) {
@@ -76,25 +76,23 @@ impl Compiler {
     fn compile_expr(&mut self, e: &Expression) -> Result<(), CompileError> {
         match e {
             Expression::IDENTIFIER(_) => {}
-            Expression::LITERAL(l) => {
-                match l {
-                    Literal::Integer(i) => {
-                        let int = Object::Integer(i.raw);
-                        let operands = vec![self.add_constant(int)];
-                        self.emit(OpConst, &operands);
-                    }
-                    Literal::Boolean(i) => {
-                        if i.raw {
-                            self.emit(OpTrue, &vec![]);
-                        } else {
-                            self.emit(OpFalse, &vec![]);
-                        }
-                    }
-                    Literal::String(_) => {}
-                    Literal::Array(_) => {}
-                    Literal::Hash(_) => {}
+            Expression::LITERAL(l) => match l {
+                Literal::Integer(i) => {
+                    let int = Object::Integer(i.raw);
+                    let operands = vec![self.add_constant(int)];
+                    self.emit(OpConst, &operands);
                 }
-            }
+                Literal::Boolean(i) => {
+                    if i.raw {
+                        self.emit(OpTrue, &vec![]);
+                    } else {
+                        self.emit(OpFalse, &vec![]);
+                    }
+                }
+                Literal::String(_) => {}
+                Literal::Array(_) => {}
+                Literal::Hash(_) => {}
+            },
             Expression::PREFIX(prefix) => {
                 self.compile_expr(&prefix.operand).unwrap();
                 match prefix.op.kind {
@@ -108,7 +106,6 @@ impl Compiler {
                         return Err(format!("unexpected prefix op: {}", prefix.op));
                     }
                 }
-
             }
             Expression::INFIX(infix) => {
                 if infix.op.kind == TokenKind::LT {
@@ -155,7 +152,6 @@ impl Compiler {
                 }
                 let after_consequence_location = self.instructions.data.len();
                 self.change_operand(jump_not_truthy, after_consequence_location);
-
             }
             Expression::FUNCTION(_) => {}
             Expression::FunctionCall(_) => {}
@@ -169,7 +165,7 @@ impl Compiler {
         return Bytecode {
             instructions: self.instructions.clone(),
             constants: self.constants.clone(),
-        }
+        };
     }
 
     pub fn add_constant(&mut self, obj: Object) -> usize {
@@ -206,7 +202,8 @@ impl Compiler {
     }
 
     fn remove_last_pop(&mut self) {
-        self.instructions.data = self.instructions.data[..self.instructions.data.len() - 1].to_vec();
+        self.instructions.data =
+            self.instructions.data[..self.instructions.data.len() - 1].to_vec();
         self.last_instruction = self.previous_instruction.clone();
     }
 
@@ -230,4 +227,3 @@ impl Compiler {
         self.replace_instruction(pos, &ins);
     }
 }
-

@@ -1,15 +1,15 @@
 use core::fmt;
 use core::fmt::Result;
-use std::fmt::Formatter;
-use lexer::token::{Token, TokenKind, Span};
+use lexer::token::{Span, Token, TokenKind};
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 
 // still wait for https://github.com/serde-rs/serde/issues/1402
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum Node {
     Program(Program),
     Statement(Statement),
-    Expression(Expression)
+    Expression(Expression),
 }
 
 impl fmt::Display for Node {
@@ -31,10 +31,10 @@ pub struct Program {
 
 impl Program {
     pub fn new() -> Self {
-        Program { body: vec![], span: Span {
-            start: 0,
-            end: 0,
-        } }
+        Program {
+            body: vec![],
+            span: Span { start: 0, end: 0 },
+        }
     }
 }
 
@@ -43,7 +43,6 @@ impl fmt::Display for Program {
         write!(f, "{}", format_statements(&self.body))
     }
 }
-
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
 #[serde(untagged)]
@@ -71,13 +70,19 @@ pub struct ReturnStatement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Statement::Let(Let { identifier: id, expr, .. }) => {
-                if let TokenKind::IDENTIFIER {name} = &id.kind {
-                    return write!(f, "let {} = {};", name, expr)
+            Statement::Let(Let {
+                identifier: id,
+                expr,
+                ..
+            }) => {
+                if let TokenKind::IDENTIFIER { name } = &id.kind {
+                    return write!(f, "let {} = {};", name, expr);
                 }
                 panic!("unreachable")
-            },
-            Statement::Return(ReturnStatement { argument, .. }) => write!(f, "return {};", argument),
+            }
+            Statement::Return(ReturnStatement { argument, .. }) => {
+                write!(f, "return {};", argument)
+            }
             Statement::Expr(expr) => write!(f, "{}", expr),
         }
     }
@@ -177,40 +182,44 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => write!(f, "{}", id),
-            Expression::LITERAL(l) => write!(f, "{}",l),
-            Expression::PREFIX(UnaryExpression { op, operand: expr, .. }) => {
+            Expression::LITERAL(l) => write!(f, "{}", l),
+            Expression::PREFIX(UnaryExpression {
+                op, operand: expr, ..
+            }) => {
                 write!(f, "({}{})", op.kind, expr)
-            },
-            Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
+            }
+            Expression::INFIX(BinaryExpression {
+                op, left, right, ..
+            }) => {
                 write!(f, "({} {} {})", left, op.kind, right)
-            },
-            Expression::IF(IF { condition, consequent, alternate, .. }) => {
+            }
+            Expression::IF(IF {
+                condition,
+                consequent,
+                alternate,
+                ..
+            }) => {
                 if let Some(else_block) = alternate {
-                    write!(f,
-                           "if {} {{ {} }} else {{ {} }}",
-                           condition,
-                           consequent,
-                           else_block,
+                    write!(
+                        f,
+                        "if {} {{ {} }} else {{ {} }}",
+                        condition, consequent, else_block,
                     )
                 } else {
-                    write!(f,
-                           "if {} {{ {} }}",
-                           condition,
-                           consequent,
-                    )
+                    write!(f, "if {} {{ {} }}", condition, consequent,)
                 }
             }
             Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
-                let func_params =
-                    params
-                        .iter()
-                        .map(|stmt| stmt.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                    ;
+                let func_params = params
+                    .iter()
+                    .map(|stmt| stmt.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
                 write!(f, "fn({}) {{ {} }}", func_params, body)
             }
-            Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
+            Expression::FunctionCall(FunctionCall {
+                callee, arguments, ..
+            }) => {
                 write!(f, "{}({})", callee, format_expressions(arguments))
             }
             Expression::Index(Index { object, index, .. }) => {
@@ -285,7 +294,7 @@ fn format_statements(statements: &Vec<Statement>) -> String {
         .iter()
         .map(|stmt| stmt.to_string())
         .collect::<Vec<String>>()
-        .join("")
+        .join("");
 }
 
 fn format_expressions(exprs: &Vec<Expression>) -> String {
@@ -293,5 +302,5 @@ fn format_expressions(exprs: &Vec<Expression>) -> String {
         .iter()
         .map(|stmt| stmt.to_string())
         .collect::<Vec<String>>()
-        .join(", ")
+        .join(", ");
 }

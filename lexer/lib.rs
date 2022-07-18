@@ -1,7 +1,7 @@
-use crate::token::{TokenKind, lookup_identifier, Token, Span};
+use crate::token::{lookup_identifier, Span, Token, TokenKind};
 
-pub mod token;
 mod lexer_test;
+pub mod token;
 
 pub struct Lexer<'a> {
     input: &'a str,
@@ -89,15 +89,24 @@ impl<'a> Lexer<'a> {
             '\u{0}' => TokenKind::EOF,
             '"' => {
                 let (start, end, string) = self.read_string();
-                return Token { span: Span {start, end},  kind: TokenKind::STRING(string) };
-            },
+                return Token {
+                    span: Span { start, end },
+                    kind: TokenKind::STRING(string),
+                };
+            }
             _ => {
                 if is_letter(self.ch) {
                     let (start, end, identifier) = self.read_identifier();
-                    return Token { span: Span {start, end}, kind: lookup_identifier(&identifier) };
+                    return Token {
+                        span: Span { start, end },
+                        kind: lookup_identifier(&identifier),
+                    };
                 } else if is_digit(self.ch) {
                     let (start, end, num) = self.read_number();
-                    return Token { span: Span {start, end}, kind: TokenKind::INT(num) };
+                    return Token {
+                        span: Span { start, end },
+                        kind: TokenKind::INT(num),
+                    };
                 } else {
                     TokenKind::ILLEGAL
                 }
@@ -105,7 +114,13 @@ impl<'a> Lexer<'a> {
         };
 
         self.read_char();
-        return Token { span: Span {start: self.position - 1, end: self.read_position - 1, }, kind: t };
+        return Token {
+            span: Span {
+                start: self.position - 1,
+                end: self.read_position - 1,
+            },
+            kind: t,
+        };
     }
 
     fn skip_whitespace(&mut self) {
@@ -125,7 +140,7 @@ impl<'a> Lexer<'a> {
                     if self.ch == '\n' {
                         self.read_char();
                     }
-                    break
+                    break;
                 }
             }
         }
@@ -138,7 +153,7 @@ impl<'a> Lexer<'a> {
         }
 
         let x = self.input[pos..self.position].to_string();
-        return (pos, self.position, x)
+        return (pos, self.position, x);
     }
 
     fn read_number(&mut self) -> (usize, usize, i64) {
@@ -149,7 +164,7 @@ impl<'a> Lexer<'a> {
 
         let x = self.input[pos..self.position].parse().unwrap();
 
-        return (pos, self.position, x)
+        return (pos, self.position, x);
     }
 
     fn read_string(&mut self) -> (usize, usize, String) {
@@ -157,17 +172,17 @@ impl<'a> Lexer<'a> {
         loop {
             self.read_char();
             if self.ch == '"' || self.ch == '\u{0}' {
-                break
+                break;
             }
         }
-        
+
         let x = self.input[pos..self.position].to_string();
 
         // consume the end "
-        if self.ch == '"'{
+        if self.ch == '"' {
             self.read_char();
         }
-        return (pos - 1, self.position, x)
+        return (pos - 1, self.position, x);
     }
 }
 
@@ -178,4 +193,3 @@ fn is_letter(c: char) -> bool {
 fn is_digit(c: char) -> bool {
     c >= '0' && c <= '9'
 }
-

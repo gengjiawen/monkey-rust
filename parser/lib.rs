@@ -1,14 +1,18 @@
 pub mod ast;
-mod precedences;
 mod ast_tree_test;
 mod parser_test;
+mod precedences;
 
 pub extern crate lexer;
 
-use lexer::token::{TokenKind, Token, Span};
+use crate::ast::{
+    Array, BinaryExpression, BlockStatement, Boolean, Expression, FunctionCall,
+    FunctionDeclaration, Hash, Index, Integer, Let, Literal, Node, Program, ReturnStatement,
+    Statement, StringType, UnaryExpression, IDENTIFIER, IF,
+};
+use crate::precedences::{get_token_precedence, Precedence};
+use lexer::token::{Span, Token, TokenKind};
 use lexer::Lexer;
-use crate::ast::{Program, Statement, Expression, Node, Literal, BlockStatement, Let, Integer, Boolean, StringType, Array, Hash, UnaryExpression, BinaryExpression, IDENTIFIER, IF, FunctionDeclaration, FunctionCall, Index, ReturnStatement};
-use crate::precedences::{Precedence, get_token_precedence};
 
 type ParseError = String;
 type ParseErrors = Vec<ParseError>;
@@ -100,7 +104,7 @@ impl<'a> Parser<'a> {
         let name = self.current_token.clone();
         match &self.current_token.kind {
             TokenKind::IDENTIFIER { name: _ } => {}
-            _ => return Err(format!("{} not an identifier", self.current_token))
+            _ => return Err(format!("{} not an identifier", self.current_token)),
         };
 
         self.expect_peek(&TokenKind::ASSIGN)?;
@@ -117,10 +121,7 @@ impl<'a> Parser<'a> {
         return Ok(Statement::Let(Let {
             identifier: name,
             expr: value,
-            span: Span {
-                start,
-                end,
-            },
+            span: Span { start, end },
         }));
     }
 
@@ -135,11 +136,10 @@ impl<'a> Parser<'a> {
         }
         let end = self.current_token.span.end;
 
-        return Ok(Statement::Return(
-            ReturnStatement {
-                argument: value,
-                span: Span { start, end },
-            }));
+        return Ok(Statement::Return(ReturnStatement {
+            argument: value,
+            span: Span { start, end },
+        }));
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
@@ -151,58 +151,72 @@ impl<'a> Parser<'a> {
         Ok(Statement::Expr(expr))
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Result<(Expression, Span), ParseError> {
+    fn parse_expression(
+        &mut self,
+        precedence: Precedence,
+    ) -> Result<(Expression, Span), ParseError> {
         let mut left_start = self.current_token.span.start;
         let mut left = self.parse_prefix_expression()?;
-        while self.peek_token.kind != TokenKind::SEMICOLON && precedence < get_token_precedence(&self.peek_token.kind) {
-            match self.parse_infix_expression(
-                &left,
-                left_start
-            ) {
+        while self.peek_token.kind != TokenKind::SEMICOLON
+            && precedence < get_token_precedence(&self.peek_token.kind)
+        {
+            match self.parse_infix_expression(&left, left_start) {
                 Some(infix) => {
                     left = infix?;
                     if let Expression::INFIX(b) = left.clone() {
                         left_start = b.span.start;
                     }
                 }
-                None => return Ok((left, Span {
-                    start: left_start,
-                    end: self.current_token.span.end
-                })),
+                None => {
+                    return Ok((
+                        left,
+                        Span {
+                            start: left_start,
+                            end: self.current_token.span.end,
+                        },
+                    ))
+                }
             }
         }
 
         let end = self.current_token.span.end;
 
-        Ok((left, Span {
-            start: left_start,
-            end,
-        }))
+        Ok((
+            left,
+            Span {
+                start: left_start,
+                end,
+            },
+        ))
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => return Ok(Expression::IDENTIFIER(
-                IDENTIFIER {
+            TokenKind::IDENTIFIER { name } => {
+                return Ok(Expression::IDENTIFIER(IDENTIFIER {
                     name: name.clone(),
                     span: self.current_token.clone().span,
-                })),
-            TokenKind::INT(i) => return Ok(Expression::LITERAL(Literal::Integer(
-                Integer {
+                }))
+            }
+            TokenKind::INT(i) => {
+                return Ok(Expression::LITERAL(Literal::Integer(Integer {
                     raw: *i,
                     span: self.current_token.clone().span,
-                }))),
-            TokenKind::STRING(s) => return Ok(Expression::LITERAL(Literal::String(
-                StringType {
+                })))
+            }
+            TokenKind::STRING(s) => {
+                return Ok(Expression::LITERAL(Literal::String(StringType {
                     raw: s.to_string(),
                     span: self.current_token.clone().span,
-                }))),
-            b @ TokenKind::TRUE | b @ TokenKind::FALSE => return Ok(Expression::LITERAL(Literal::Boolean(
-                Boolean {
+                })))
+            }
+            b @ TokenKind::TRUE | b @ TokenKind::FALSE => {
+                return Ok(Expression::LITERAL(Literal::Boolean(Boolean {
                     raw: *b == TokenKind::TRUE,
                     span: self.current_token.clone().span,
-                }))),
+                })))
+            }
             TokenKind::BANG | TokenKind::MINUS => {
                 let start = self.current_token.span.start;
                 let prefix_op = self.current_token.clone();
@@ -213,8 +227,8 @@ impl<'a> Parser<'a> {
                     operand: Box::new(expr),
                     span: Span {
                         start,
-                        end: span.end
-                    }
+                        end: span.end,
+                    },
                 }));
             }
             TokenKind::LPAREN => {
@@ -227,29 +241,33 @@ impl<'a> Parser<'a> {
             TokenKind::FUNCTION => self.parse_fn_expression(),
             TokenKind::LBRACKET => {
                 let (elements, span) = self.parse_expression_list(&TokenKind::RBRACKET)?;
-                return Ok(Expression::LITERAL(Literal::Array(
-                    Array {
-                        elements,
-                        span
-                    })));
+                return Ok(Expression::LITERAL(Literal::Array(Array {
+                    elements,
+                    span,
+                })));
             }
             TokenKind::LBRACE => self.parse_hash_expression(),
-            _ => {
-                Err(format!("no prefix function for token: {}", self.current_token))
-            }
+            _ => Err(format!(
+                "no prefix function for token: {}",
+                self.current_token
+            )),
         }
     }
 
-    fn parse_infix_expression(&mut self, left: &Expression, left_start: usize) -> Option<Result<Expression, ParseError>> {
+    fn parse_infix_expression(
+        &mut self,
+        left: &Expression,
+        left_start: usize,
+    ) -> Option<Result<Expression, ParseError>> {
         match self.peek_token.kind {
-            TokenKind::PLUS |
-            TokenKind::MINUS |
-            TokenKind::ASTERISK |
-            TokenKind::SLASH |
-            TokenKind::EQ |
-            TokenKind::NotEq |
-            TokenKind::LT |
-            TokenKind::GT => {
+            TokenKind::PLUS
+            | TokenKind::MINUS
+            | TokenKind::ASTERISK
+            | TokenKind::SLASH
+            | TokenKind::EQ
+            | TokenKind::NotEq
+            | TokenKind::LT
+            | TokenKind::GT => {
                 self.next_token();
                 let infix_op = self.current_token.clone();
                 let precedence_value = get_token_precedence(&self.current_token.kind);
@@ -261,8 +279,8 @@ impl<'a> Parser<'a> {
                     right: Box::new(right),
                     span: Span {
                         start: left_start,
-                        end: span.end
-                    }
+                        end: span.end,
+                    },
                 })));
             }
             TokenKind::LPAREN => {
@@ -273,7 +291,7 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 return Some(self.parse_index_expression(left.clone()));
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -302,10 +320,7 @@ impl<'a> Parser<'a> {
             condition: Box::new(condition),
             consequent,
             alternate,
-            span: Span {
-                start,
-                end,
-            }
+            span: Span { start, end },
         }));
     }
 
@@ -314,7 +329,8 @@ impl<'a> Parser<'a> {
         self.next_token();
         let mut block_statement = Vec::new();
 
-        while !self.current_token_is(&TokenKind::RBRACE) && !self.current_token_is(&TokenKind::EOF) {
+        while !self.current_token_is(&TokenKind::RBRACE) && !self.current_token_is(&TokenKind::EOF)
+        {
             if let Ok(statement) = self.parse_statement() {
                 block_statement.push(statement)
             }
@@ -326,10 +342,7 @@ impl<'a> Parser<'a> {
 
         Ok(BlockStatement {
             body: block_statement,
-            span: Span {
-                start,
-                end,
-            }
+            span: Span { start, end },
         })
     }
 
@@ -348,10 +361,7 @@ impl<'a> Parser<'a> {
         Ok(Expression::FUNCTION(FunctionDeclaration {
             params,
             body: function_body,
-            span: Span {
-                start,
-                end,
-            }
+            span: Span { start, end },
         }))
     }
 
@@ -368,8 +378,13 @@ impl<'a> Parser<'a> {
             TokenKind::IDENTIFIER { name } => params.push(IDENTIFIER {
                 name: name.clone(),
                 span: self.current_token.span.clone(),
-             }),
-            token => return Err(format!("expected function params  to be an identifier, got {}", token))
+            }),
+            token => {
+                return Err(format!(
+                    "expected function params  to be an identifier, got {}",
+                    token
+                ))
+            }
         }
 
         while self.peek_token_is(&TokenKind::COMMA) {
@@ -380,7 +395,12 @@ impl<'a> Parser<'a> {
                     name: name.clone(),
                     span: self.current_token.span.clone(),
                 }),
-                token => return Err(format!("expected function params  to be an identifier, got {}", token))
+                token => {
+                    return Err(format!(
+                        "expected function params  to be an identifier, got {}",
+                        token
+                    ))
+                }
             }
         }
 
@@ -396,36 +416,29 @@ impl<'a> Parser<'a> {
         let (arguments, ..) = self.parse_expression_list(&TokenKind::RPAREN)?;
         let end = self.current_token.span.end;
         match &expr {
-            Expression::IDENTIFIER(i) => {
-                start = i.span.start
-            }
-            Expression::FUNCTION(f) => {
-                start = f.span.start
-            }
-            _ => {return Err(format!("expected function"))}
+            Expression::IDENTIFIER(i) => start = i.span.start,
+            Expression::FUNCTION(f) => start = f.span.start,
+            _ => return Err(format!("expected function")),
         }
         let callee = Box::new(expr);
 
         Ok(Expression::FunctionCall(FunctionCall {
             callee,
             arguments,
-            span: Span {
-                start,
-                end,
-            }
+            span: Span { start, end },
         }))
     }
 
-    fn parse_expression_list(&mut self, end: &TokenKind) -> Result<(Vec<Expression>, Span), ParseError> {
+    fn parse_expression_list(
+        &mut self,
+        end: &TokenKind,
+    ) -> Result<(Vec<Expression>, Span), ParseError> {
         let start = self.current_token.span.start;
         let mut expr_list = Vec::new();
         if self.peek_token_is(end) {
             self.next_token();
             let end = self.current_token.span.end;
-            return Ok((expr_list, Span {
-                start,
-                end
-            }));
+            return Ok((expr_list, Span { start, end }));
         }
 
         self.next_token();
@@ -441,10 +454,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(end)?;
         let end = self.current_token.span.end;
 
-        return Ok((expr_list, Span {
-            start,
-            end
-        }));
+        return Ok((expr_list, Span { start, end }));
     }
 
     fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
@@ -459,10 +469,7 @@ impl<'a> Parser<'a> {
         return Ok(Expression::Index(Index {
             object: Box::new(left),
             index: Box::new(index),
-            span: Span {
-                start,
-                end,
-            }
+            span: Span { start, end },
         }));
     }
 
@@ -489,14 +496,10 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::RBRACE)?;
         let end = self.current_token.span.end;
 
-        Ok(Expression::LITERAL(Literal::Hash(
-            Hash {
-                elements: map,
-                span: Span {
-                    start,
-                    end,
-                },
-            })))
+        Ok(Expression::LITERAL(Literal::Hash(Hash {
+            elements: map,
+            span: Span { start, end },
+        })))
     }
 }
 
@@ -510,12 +513,9 @@ pub fn parse(input: &str) -> Result<Node, ParseErrors> {
 
 pub fn parse_ast_json_string(input: &str) -> Result<String, ParseErrors> {
     let ast = match parse(input) {
-        Ok(node) => {
-            serde_json::to_string_pretty(&node).unwrap()
-        }
-        Err(e) => return Err(e)
+        Ok(node) => serde_json::to_string_pretty(&node).unwrap(),
+        Err(e) => return Err(e),
     };
 
     return Ok(ast);
 }
-

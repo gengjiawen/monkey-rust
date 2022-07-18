@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate lazy_static;
 
-pub mod op_code;
 pub mod compiler;
-pub mod vm;
-mod op_code_test;
 mod compiler_test;
+pub mod op_code;
+mod op_code_test;
+pub mod vm;
 mod vm_test;

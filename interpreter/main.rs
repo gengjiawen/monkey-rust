@@ -1,9 +1,9 @@
-use parser::parse;
-use std::io::stdin;
 use interpreter::eval;
-use std::rc::Rc;
-use std::cell::RefCell;
 use object::environment::Env;
+use parser::parse;
+use std::cell::RefCell;
+use std::io::stdin;
+use std::rc::Rc;
 
 fn main() {
     println!("Welcome to monkey interpreter by gengjiawen");
@@ -18,13 +18,11 @@ fn main() {
         }
 
         match parse(&input) {
-            Ok(node) => {
-                match eval(node, &env) {
-                    Ok(evaluated) =>  println!("{}", evaluated),
-                    Err(e) => eprintln!("{}", e),
-                }
+            Ok(node) => match eval(node, &env) {
+                Ok(evaluated) => println!("{}", evaluated),
+                Err(e) => eprintln!("{}", e),
             },
-            Err(e) => eprintln!("parse error: {}", e[0])
+            Err(e) => eprintln!("parse error: {}", e[0]),
         }
     }
 }

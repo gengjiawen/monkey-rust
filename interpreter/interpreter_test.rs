@@ -12,13 +12,11 @@ mod tests {
         let env: Env = Rc::new(RefCell::new(Default::default()));
         for (input, expected) in test_cases {
             match parse(input) {
-                Ok(node) => {
-                    match eval(node, &env) {
-                        Ok(evaluated) => assert_eq!(&format!("{}", evaluated), expected),
-                        Err(e) => assert_eq!(&format!("{}", e), expected),
-                    }
-                }
-                Err(e) => panic!("parse error: {}", e[0])
+                Ok(node) => match eval(node, &env) {
+                    Ok(evaluated) => assert_eq!(&format!("{}", evaluated), expected),
+                    Err(e) => assert_eq!(&format!("{}", e), expected),
+                },
+                Err(e) => panic!("parse error: {}", e[0]),
             }
         }
     }
@@ -179,7 +177,6 @@ mod tests {
         apply_test(&test_case);
     }
 
-
     #[test]
     fn test_array_literals() {
         let test_case = [("[1, 2 * 2, 3 + 3]", "[1, 4, 6]")];
@@ -243,5 +240,4 @@ mod tests {
         ];
         apply_test(&test_case);
     }
-
 }

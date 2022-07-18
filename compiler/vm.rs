@@ -41,7 +41,7 @@ impl VM {
                     ip += 2;
                     self.push(Rc::clone(&self.constants[const_index]))
                 }
-                Opcode::OpAdd | Opcode::OpSub| Opcode::OpMul| Opcode::OpDiv => {
+                Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
                     self.execute_binary_operation(opcode);
                 }
                 Opcode::OpPop => {
@@ -119,7 +119,7 @@ impl VM {
     fn execute_minus_operation(&mut self, opcode: Opcode) {
         let operand = self.pop();
         match operand.borrow() {
-            (Object::Integer(l)) => {
+            Object::Integer(l) => {
                 self.push(Rc::from(Object::Integer(-*l)));
             }
             _ => {
@@ -130,7 +130,7 @@ impl VM {
     fn execute_bang_operation(&mut self) {
         let operand = self.pop();
         match operand.borrow() {
-            (Object::Boolean(l)) => {
+            Object::Boolean(l) => {
                 self.push(Rc::from(Object::Boolean(!*l)));
             }
             _ => {
@@ -138,7 +138,6 @@ impl VM {
             }
         }
     }
-
 
     pub fn last_popped_stack_elm(&self) -> Option<Rc<Object>> {
         self.stack.get(self.sp).cloned()

@@ -1,6 +1,6 @@
-use std::io::stdin;
-use lexer::Lexer;
 use lexer::token::TokenKind;
+use lexer::Lexer;
+use std::io::stdin;
 
 pub fn main() {
     println!("Welcome to monkey lexer by gengjiawen");
@@ -17,7 +17,7 @@ pub fn main() {
         loop {
             let t = l.next_token();
             if t.kind == TokenKind::EOF {
-                break
+                break;
             } else {
                 println!("{}", t)
             }
