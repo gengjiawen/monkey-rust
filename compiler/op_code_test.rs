@@ -18,7 +18,7 @@ mod tests {
 
         for t in tests {
             let ins = make_instructions(t.op, &t.operands);
-            assert_eq!(ins, t.expected)
+            assert_eq!(ins.data, t.expected)
         }
     }
 
@@ -37,7 +37,7 @@ mod tests {
 
         for t in tests {
             let ins = make_instructions(t.op, &t.operands);
-            let (operands_read, n) = read_operands(DEFINITIONS.get(&t.op).unwrap(), &ins[1..]);
+            let (operands_read, n) = read_operands(DEFINITIONS.get(&t.op).unwrap(), &ins.data[1..]);
             assert_eq!(operands_read, t.operands);
             assert_eq!(n, t.bytes_read);
         }
@@ -46,9 +46,9 @@ mod tests {
     #[test]
     fn test_instructions_string() {
         let ins = vec![
-            Instructions { data: make_instructions(OpAdd, &vec![]) },
-            Instructions { data: make_instructions(OpConst, &vec![2]) },
-            Instructions { data: make_instructions(OpConst, &vec![65535]) },
+            make_instructions(OpAdd, &vec![]),
+            make_instructions(OpConst, &vec![2]),
+            make_instructions(OpConst, &vec![65535]),
         ];
 
         let expected = "0000 OpAdd\n\

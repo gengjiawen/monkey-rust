@@ -1,22 +1,29 @@
-use std::error::Error;
 use std::rc::Rc;
 
 use object::Object;
-use parser::ast::{Expression, Literal, Node, Statement};
+use parser::ast::{BlockStatement, Expression, Literal, Node, Statement};
 use parser::lexer::token::{Token, TokenKind};
 use parser::lexer::token::TokenKind::LT;
 
-use crate::op_code::{Instructions, make_instructions, Opcode};
+use crate::op_code::{cast_u8_to_opcode, Instructions, make_instructions, Opcode};
 use crate::op_code::Opcode::{*};
 
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Rc<Object>>,
+    last_instruction: EmittedInstruction,
+    previous_instruction: EmittedInstruction,
 }
 
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Rc<Object>>,
+}
+
+#[derive(Clone)]
+pub struct EmittedInstruction {
+    pub opcode: Opcode,
+    pub position: usize,
 }
 
 type CompileError = String;
@@ -26,6 +33,14 @@ impl Compiler {
         return Compiler {
             instructions: Instructions { data: vec![] },
             constants: vec![],
+            last_instruction: EmittedInstruction {
+                opcode: Opcode::OpPop,
+                position: 0,
+            },
+            previous_instruction: EmittedInstruction {
+                opcode: Opcode::OpPop,
+                position: 0,
+            },
         }
     }
 
@@ -131,7 +146,17 @@ impl Compiler {
                     }
                 }
             }
-            Expression::IF(_) => {}
+            Expression::IF(node) => {
+                self.compile_expr(&node.condition);
+                let jump_not_truthy = self.emit(OpJumpNotTruthy, &vec![9527]);
+                self.compile_block_statement(&node.consequent);
+                if self.last_instruction_is(OpPop) {
+                    self.remove_last_pop();
+                }
+                let after_consequence_location = self.instructions.data.len();
+                self.change_operand(jump_not_truthy, after_consequence_location);
+
+            }
             Expression::FUNCTION(_) => {}
             Expression::FunctionCall(_) => {}
             Expression::Index(_) => {}
@@ -159,11 +184,50 @@ impl Compiler {
     }
 
     pub fn emit(&mut self, op: Opcode, operands: &Vec<usize>) -> usize {
-        let ins = Instructions {
-            data: make_instructions(op, operands)
-        };
+        let ins = make_instructions(op, operands);
+        let pos = self.add_instructions(&ins);
+        self.set_last_instruction(op, pos);
 
-        return self.add_instructions(&ins);
+        return pos;
+    }
+
+    fn compile_block_statement(&mut self, block_statement: &BlockStatement) {
+        for stmt in &block_statement.body {
+            self.compile_stmt(stmt);
+        }
+    }
+
+    fn last_instruction_is(&self, op: Opcode) -> bool {
+        return self.last_instruction.opcode == op;
+    }
+
+    fn last_instruction_is_pop(&self) -> bool {
+        return self.last_instruction.opcode == OpPop;
+    }
+
+    fn remove_last_pop(&mut self) {
+        self.instructions.data = self.instructions.data[..self.instructions.data.len() - 1].to_vec();
+        self.last_instruction = self.previous_instruction.clone();
+    }
+
+    fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
+        self.previous_instruction = self.last_instruction.clone();
+        self.last_instruction = EmittedInstruction {
+            opcode: op,
+            position: pos,
+        };
+    }
+
+    fn replace_instruction(&mut self, pos: usize, ins: &Instructions) {
+        for i in 0..ins.data.len() {
+            self.instructions.data[pos + i] = ins.data[i];
+        }
+    }
+
+    fn change_operand(&mut self, pos: usize, operand: usize) {
+        let op = cast_u8_to_opcode(self.instructions.data[pos]);
+        let ins = make_instructions(op, &vec![operand]);
+        self.replace_instruction(pos, &ins);
     }
 }
 

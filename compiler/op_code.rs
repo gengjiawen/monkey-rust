@@ -30,6 +30,8 @@ pub enum Opcode {
     OpGreaterThan,
     OpMinus,
     OpBang,
+    OpJumpNotTruthy,
+    OpJump,
 }
 
 lazy_static! {
@@ -48,11 +50,13 @@ lazy_static! {
         m.insert(Opcode::OpGreaterThan, Definition {name: "OpGreatThan", operand_width: vec![]});
         m.insert(Opcode::OpMinus, Definition {name: "OpMinus", operand_width: vec![]});
         m.insert(Opcode::OpBang, Definition {name: "OpBang", operand_width: vec![]});
+        m.insert(Opcode::OpJumpNotTruthy, Definition {name: "OpJumpNotTruthy", operand_width: vec![2]});
+        m.insert(Opcode::OpJump, Definition {name: "OpJump", operand_width: vec![2]});
         m
     };
 }
 
-pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Vec<u8> {
+pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Instructions {
     let mut instructions = Vec::new();
     instructions.push(op as u8);
     let widths = &DEFINITIONS.get(&op).unwrap().operand_width;
@@ -70,7 +74,7 @@ pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Vec<u8> {
     }
 
 
-    return instructions;
+    return Instructions { data: instructions };
 }
 
 pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<usize>, usize) {

@@ -62,6 +62,8 @@ impl VM {
                 Opcode::OpBang => {
                     self.execute_bang_operation();
                 }
+                Opcode::OpJumpNotTruthy => {}
+                Opcode::OpJump => {}
             }
             ip += 1;
         }

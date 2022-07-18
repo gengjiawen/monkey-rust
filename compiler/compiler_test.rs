@@ -44,7 +44,9 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
 fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
     let concatted = concat_instructions(expected);
 
-    assert_eq!(concatted.data.len(), actual.data.len());
+    println!("actual: {:?}", actual.string());
+    println!("expected: {:?}", concatted.string());
+    assert_eq!(concatted.data.len(), actual.data.len(), "instructions length not right");
 
     for (exp, got) in concatted.data.into_iter().zip(actual.data.clone()) {
         assert_eq!(exp, got)
@@ -81,10 +83,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpAdd, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpAdd, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -94,10 +96,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![1]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpPop, &vec![1]),
                 ],
             },
             CompilerTestCase {
@@ -107,10 +109,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpSub, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpSub, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -120,10 +122,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpMul, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpMul, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -133,10 +135,10 @@ mod tests {
                     Object::Integer(1),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpDiv, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpDiv, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -145,9 +147,9 @@ mod tests {
                     Object::Integer(1),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpMinus, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpMinus, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -155,9 +157,9 @@ mod tests {
                 expected_constants: vec![
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
-                    Instructions { data: make_instructions(OpBang, &vec![1]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpTrue, &vec![0]),
+                    make_instructions(OpBang, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
         ];
@@ -172,8 +174,8 @@ mod tests {
                 expected_constants: vec![
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpTrue, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -181,8 +183,8 @@ mod tests {
                 expected_constants: vec![
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpFalse, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpFalse, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -192,10 +194,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpGreaterThan, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpGreaterThan, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -205,10 +207,10 @@ mod tests {
                     Object::Integer(1),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpGreaterThan, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpGreaterThan, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -218,10 +220,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpEqual, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpEqual, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -231,10 +233,10 @@ mod tests {
                     Object::Integer(2),
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpConst, &vec![0]) },
-                    Instructions { data: make_instructions(OpConst, &vec![1]) },
-                    Instructions { data: make_instructions(OpNotEqual, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpNotEqual, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -242,10 +244,10 @@ mod tests {
                 expected_constants: vec![
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
-                    Instructions { data: make_instructions(OpFalse, &vec![0]) },
-                    Instructions { data: make_instructions(OpEqual, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpTrue, &vec![0]),
+                    make_instructions(OpFalse, &vec![0]),
+                    make_instructions(OpEqual, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
             CompilerTestCase {
@@ -253,15 +255,39 @@ mod tests {
                 expected_constants: vec![
                 ],
                 expected_instructions: vec![
-                    Instructions { data: make_instructions(OpTrue, &vec![0]) },
-                    Instructions { data: make_instructions(OpFalse, &vec![0]) },
-                    Instructions { data: make_instructions(OpNotEqual, &vec![0]) },
-                    Instructions { data: make_instructions(OpPop, &vec![0]) },
+                    make_instructions(OpTrue, &vec![0]),
+                    make_instructions(OpFalse, &vec![0]),
+                    make_instructions(OpNotEqual, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
                 ],
             },
         ];
 
         run_compiler_test(tests);
     }
+
+    #[test]
+    fn conditions() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "if (true) { 10 }; 3333;",
+                expected_constants: vec![
+                    Object::Integer(10),
+                    Object::Integer(3333),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpTrue, &vec![0]),
+                    make_instructions(OpJumpNotTruthy, &vec![7]),
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            }
+        ];
+
+        run_compiler_test(tests);
+    }
+
 }
 
