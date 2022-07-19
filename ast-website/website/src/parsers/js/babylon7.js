@@ -17,9 +17,10 @@ const availablePlugins = [
   // ECMAScript Proposals
   // https://babeljs.io/docs/en/babel-parser.html#ecmascript-proposalshttpsgithubcombabelproposals
   'asyncDoExpressions',
-  'classStaticBlock',
   'decimal',
   'decorators',
+  'decoratorAutoAccessors',
+  'destructuringPrivate',
   'doExpressions',
   'exportDefaultFrom',
   'functionBind',
@@ -28,6 +29,7 @@ const availablePlugins = [
   'partialApplication',
   'pipelineOperator',
   'recordAndTuple',
+  'regexpUnicodeSets',
   'throwExpressions',
 ];
 
@@ -40,18 +42,16 @@ export const defaultOptions = {
   ranges: false,
   tokens: false,
   plugins: [
-    'classStaticBlock',
     'decorators',
+    'decoratorAutoAccessors',
     'doExpressions',
     'exportDefaultFrom',
     'flow',
     'functionBind',
     'importAssertions',
     'jsx',
-    'privateIn',
-    'topLevelAwait',
   ],
-  pipelineOptions: { proposal: 'hack', hackTopicToken: '%' }
+  pipelineOptions: { proposal: 'hack', hackTopicToken: '%' },
 };
 
 export const parserSettingsConfiguration = {
@@ -78,10 +78,10 @@ export const parserSettingsConfiguration = {
       title: 'Pipeline Operator Options',
       fields: [
         ['proposal', ['minimal', 'smart', 'hack', 'fsharp']],
-        ['hackTopicToken', ['%', '#']]
+        ['hackTopicToken', ['%', '#', '^', '^^', '@@']],
       ],
       settings: settings => settings.pipelineOptions || defaultOptions.pipelineOptions,
-    }
+    },
   ],
 };
 
@@ -108,7 +108,7 @@ export default {
     options.plugins = options.plugins.map(plugin => {
       switch (plugin) {
         case 'decorators':
-          return ['decorators', {decoratorsBeforeExport: false}];
+          return ['decorators', {decoratorsBeforeExport: false, version:"2021-12"}];
         case 'pipelineOperator':
           return ['pipelineOperator', {
             proposal: pipelineOptions.proposal,
