@@ -148,10 +148,7 @@ mod tests {
             ("let identity = fn(x) { return x; }; identity(5);", "5"),
             ("let double = fn(x) { x * 2; }; double(5);", "10"),
             ("let add = fn(x, y) { x + y; }; add(5, 5);", "10"),
-            (
-                "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
-                "20",
-            ),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", "20"),
             ("fn(x) { x; }(5)", "5"),
         ];
         apply_test(&test_case);
@@ -189,14 +186,8 @@ mod tests {
             ("let i = 0; [1][i];", "1"),
             ("[1, 2, 3][1 + 1];", "3"),
             ("let myArray = [1, 2, 3]; myArray[2];", "3"),
-            (
-                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
-                "6",
-            ),
-            (
-                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
-                "2",
-            ),
+            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", "6"),
+            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", "2"),
             ("[1, 2, 3][3]", "null"),
             ("[1, 2, 3][-1]", "null"),
         ];

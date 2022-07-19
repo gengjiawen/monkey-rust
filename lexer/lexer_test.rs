@@ -22,11 +22,7 @@ mod tests {
         let mut l = Lexer::new(input);
         let token_vs = test_token_set(&mut l);
 
-        assert_snapshot!(
-            name,
-            serde_json::to_string_pretty(&token_vs).unwrap(),
-            input
-        );
+        assert_snapshot!(name, serde_json::to_string_pretty(&token_vs).unwrap(), input);
     }
 
     #[test]

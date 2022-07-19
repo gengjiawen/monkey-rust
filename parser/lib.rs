@@ -38,12 +38,7 @@ impl<'a> Parser<'a> {
         // let infix_parse_fns = HashMap::new();
         // ```
 
-        let p = Parser {
-            lexer,
-            current_token: cur,
-            peek_token: next,
-            errors,
-        };
+        let p = Parser { lexer, current_token: cur, peek_token: next, errors };
 
         return p;
     }
@@ -168,26 +163,14 @@ impl<'a> Parser<'a> {
                     }
                 }
                 None => {
-                    return Ok((
-                        left,
-                        Span {
-                            start: left_start,
-                            end: self.current_token.span.end,
-                        },
-                    ))
+                    return Ok((left, Span { start: left_start, end: self.current_token.span.end }))
                 }
             }
         }
 
         let end = self.current_token.span.end;
 
-        Ok((
-            left,
-            Span {
-                start: left_start,
-                end,
-            },
-        ))
+        Ok((left, Span { start: left_start, end }))
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
@@ -225,10 +208,7 @@ impl<'a> Parser<'a> {
                 return Ok(Expression::PREFIX(UnaryExpression {
                     op: prefix_op,
                     operand: Box::new(expr),
-                    span: Span {
-                        start,
-                        end: span.end,
-                    },
+                    span: Span { start, end: span.end },
                 }));
             }
             TokenKind::LPAREN => {
@@ -241,16 +221,10 @@ impl<'a> Parser<'a> {
             TokenKind::FUNCTION => self.parse_fn_expression(),
             TokenKind::LBRACKET => {
                 let (elements, span) = self.parse_expression_list(&TokenKind::RBRACKET)?;
-                return Ok(Expression::LITERAL(Literal::Array(Array {
-                    elements,
-                    span,
-                })));
+                return Ok(Expression::LITERAL(Literal::Array(Array { elements, span })));
             }
             TokenKind::LBRACE => self.parse_hash_expression(),
-            _ => Err(format!(
-                "no prefix function for token: {}",
-                self.current_token
-            )),
+            _ => Err(format!("no prefix function for token: {}", self.current_token)),
         }
     }
 
@@ -277,10 +251,7 @@ impl<'a> Parser<'a> {
                     op: infix_op,
                     left: Box::new(left.clone()),
                     right: Box::new(right),
-                    span: Span {
-                        start: left_start,
-                        end: span.end,
-                    },
+                    span: Span { start: left_start, end: span.end },
                 })));
             }
             TokenKind::LPAREN => {
@@ -340,10 +311,7 @@ impl<'a> Parser<'a> {
 
         let end = self.current_token.span.end;
 
-        Ok(BlockStatement {
-            body: block_statement,
-            span: Span { start, end },
-        })
+        Ok(BlockStatement { body: block_statement, span: Span { start, end } })
     }
 
     fn parse_fn_expression(&mut self) -> Result<Expression, ParseError> {
@@ -375,15 +343,10 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => params.push(IDENTIFIER {
-                name: name.clone(),
-                span: self.current_token.span.clone(),
-            }),
+            TokenKind::IDENTIFIER { name } => params
+                .push(IDENTIFIER { name: name.clone(), span: self.current_token.span.clone() }),
             token => {
-                return Err(format!(
-                    "expected function params  to be an identifier, got {}",
-                    token
-                ))
+                return Err(format!("expected function params  to be an identifier, got {}", token))
             }
         }
 
@@ -391,10 +354,8 @@ impl<'a> Parser<'a> {
             self.next_token();
             self.next_token();
             match &self.current_token.kind {
-                TokenKind::IDENTIFIER { name } => params.push(IDENTIFIER {
-                    name: name.clone(),
-                    span: self.current_token.span.clone(),
-                }),
+                TokenKind::IDENTIFIER { name } => params
+                    .push(IDENTIFIER { name: name.clone(), span: self.current_token.span.clone() }),
                 token => {
                     return Err(format!(
                         "expected function params  to be an identifier, got {}",
@@ -422,11 +383,7 @@ impl<'a> Parser<'a> {
         }
         let callee = Box::new(expr);
 
-        Ok(Expression::FunctionCall(FunctionCall {
-            callee,
-            arguments,
-            span: Span { start, end },
-        }))
+        Ok(Expression::FunctionCall(FunctionCall { callee, arguments, span: Span { start, end } }))
     }
 
     fn parse_expression_list(
@@ -496,10 +453,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::RBRACE)?;
         let end = self.current_token.span.end;
 
-        Ok(Expression::LITERAL(Literal::Hash(Hash {
-            elements: map,
-            span: Span { start, end },
-        })))
+        Ok(Expression::LITERAL(Literal::Hash(Hash { elements: map, span: Span { start, end } })))
     }
 }
 

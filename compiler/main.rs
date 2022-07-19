@@ -21,11 +21,7 @@ fn main() {
         let mut compiler = Compiler::new();
 
         let bytecodes = compiler.compile(&program).unwrap();
-        println!(
-            "ins {} for input {}",
-            bytecodes.instructions.string(),
-            input
-        );
+        println!("ins {} for input {}", bytecodes.instructions.string(), input);
         let mut vm = VM::new(bytecodes);
         vm.run();
         let got = vm.last_popped_stack_elm().unwrap();

@@ -37,111 +37,24 @@ pub enum Opcode {
 lazy_static! {
     pub static ref DEFINITIONS: HashMap<Opcode, Definition> = {
         let mut m = HashMap::new();
-        m.insert(
-            Opcode::OpConst,
-            Definition {
-                name: "OpConst",
-                operand_width: vec![2],
-            },
-        );
-        m.insert(
-            Opcode::OpAdd,
-            Definition {
-                name: "OpAdd",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpPop,
-            Definition {
-                name: "OpPop",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpSub,
-            Definition {
-                name: "OpSub",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpMul,
-            Definition {
-                name: "OpMul",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpDiv,
-            Definition {
-                name: "OpDiv",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpTrue,
-            Definition {
-                name: "OpTrue",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpFalse,
-            Definition {
-                name: "OpFalse",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpEqual,
-            Definition {
-                name: "OpEqual",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpNotEqual,
-            Definition {
-                name: "OpNotEqual",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpGreaterThan,
-            Definition {
-                name: "OpGreatThan",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpMinus,
-            Definition {
-                name: "OpMinus",
-                operand_width: vec![],
-            },
-        );
-        m.insert(
-            Opcode::OpBang,
-            Definition {
-                name: "OpBang",
-                operand_width: vec![],
-            },
-        );
+        m.insert(Opcode::OpConst, Definition { name: "OpConst", operand_width: vec![2] });
+        m.insert(Opcode::OpAdd, Definition { name: "OpAdd", operand_width: vec![] });
+        m.insert(Opcode::OpPop, Definition { name: "OpPop", operand_width: vec![] });
+        m.insert(Opcode::OpSub, Definition { name: "OpSub", operand_width: vec![] });
+        m.insert(Opcode::OpMul, Definition { name: "OpMul", operand_width: vec![] });
+        m.insert(Opcode::OpDiv, Definition { name: "OpDiv", operand_width: vec![] });
+        m.insert(Opcode::OpTrue, Definition { name: "OpTrue", operand_width: vec![] });
+        m.insert(Opcode::OpFalse, Definition { name: "OpFalse", operand_width: vec![] });
+        m.insert(Opcode::OpEqual, Definition { name: "OpEqual", operand_width: vec![] });
+        m.insert(Opcode::OpNotEqual, Definition { name: "OpNotEqual", operand_width: vec![] });
+        m.insert(Opcode::OpGreaterThan, Definition { name: "OpGreatThan", operand_width: vec![] });
+        m.insert(Opcode::OpMinus, Definition { name: "OpMinus", operand_width: vec![] });
+        m.insert(Opcode::OpBang, Definition { name: "OpBang", operand_width: vec![] });
         m.insert(
             Opcode::OpJumpNotTruthy,
-            Definition {
-                name: "OpJumpNotTruthy",
-                operand_width: vec![2],
-            },
+            Definition { name: "OpJumpNotTruthy", operand_width: vec![2] },
         );
-        m.insert(
-            Opcode::OpJump,
-            Definition {
-                name: "OpJump",
-                operand_width: vec![2],
-            },
-        );
+        m.insert(Opcode::OpJump, Definition { name: "OpJump", operand_width: vec![2] });
         m
     };
 }
@@ -208,11 +121,7 @@ impl Instructions {
 
             let definition = DEFINITIONS.get(&opcode).unwrap();
             let (operands, read_size) = read_operands(definition, &self.data[i + 1..]);
-            ret.push_str(&format!(
-                "{:04} {}\n",
-                i,
-                Self::fmt_instructions(definition, &operands)
-            ));
+            ret.push_str(&format!("{:04} {}\n", i, Self::fmt_instructions(definition, &operands)));
             i = i + 1 + read_size;
         }
 
@@ -235,9 +144,9 @@ impl Instructions {
         // Maybe extend_from_slice, but I have not make it work
         // https://stackoverflow.com/a/69578632/1713757
         return Instructions {
-            data: ins.iter().fold(vec![], |sum, &i| {
-                [sum.as_slice(), i.data.as_slice()].concat()
-            }),
+            data: ins
+                .iter()
+                .fold(vec![], |sum, &i| [sum.as_slice(), i.data.as_slice()].concat()),
         };
     }
 }

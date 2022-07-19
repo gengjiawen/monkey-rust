@@ -40,11 +40,7 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
             let val = eval_expression(argument, env)?;
             return Ok(Rc::new(Object::ReturnValue(val)));
         }
-        Statement::Let(Let {
-            identifier: id,
-            expr,
-            ..
-        }) => {
+        Statement::Let(Let { identifier: id, expr, .. }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
             if let TokenKind::IDENTIFIER { name } = &id.kind {
@@ -66,25 +62,16 @@ fn is_truthy(obj: &Object) -> bool {
 fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, EvalError> {
     match expression {
         Expression::LITERAL(literal) => eval_literal(literal, env),
-        Expression::PREFIX(UnaryExpression {
-            op, operand: expr, ..
-        }) => {
+        Expression::PREFIX(UnaryExpression { op, operand: expr, .. }) => {
             let right = eval_expression(expr, &Rc::clone(env))?;
             return eval_prefix(op, &right);
         }
-        Expression::INFIX(BinaryExpression {
-            op, left, right, ..
-        }) => {
+        Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
             let left = eval_expression(left, &Rc::clone(env))?;
             let right = eval_expression(right, &Rc::clone(env))?;
             return eval_infix(op, &left, &right);
         }
-        Expression::IF(IF {
-            condition,
-            consequent,
-            alternate,
-            ..
-        }) => {
+        Expression::IF(IF { condition, consequent, alternate, .. }) => {
             let condition = eval_expression(condition, &Rc::clone(env))?;
             if is_truthy(&condition) {
                 eval_block_statements(&(consequent.body), env)
@@ -97,24 +84,14 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
         }
         Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => eval_identifier(&id, env),
         Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
-            return Ok(Rc::new(Object::Function(
-                params.clone(),
-                body.clone(),
-                Rc::clone(env),
-            )));
+            return Ok(Rc::new(Object::Function(params.clone(), body.clone(), Rc::clone(env))));
         }
-        Expression::FunctionCall(FunctionCall {
-            callee, arguments, ..
-        }) => {
+        Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
             let func = eval_expression(callee, &Rc::clone(env))?;
             let args = eval_expressions(arguments, env)?;
             apply_function(&func, &args)
         }
-        Expression::Index(Index {
-            object: left,
-            index,
-            ..
-        }) => {
+        Expression::Index(Index { object: left, index, .. }) => {
             let literal = eval_expression(left, &Rc::clone(env))?;
             let index = eval_expression(index, env)?;
             eval_index_expression(&literal, &index)
@@ -221,10 +198,7 @@ fn eval_infix(op: &Token, left: &Object, right: &Object) -> Result<Rc<Object>, E
         (Object::String(left), Object::String(right)) => {
             return eval_string_infix(op, left.to_string(), right.to_string());
         }
-        _ => Err(format!(
-            "eval infix error for op: {}, left: {}, right: {}",
-            op, left, right
-        )),
+        _ => Err(format!("eval infix error for op: {}, left: {}, right: {}", op, left, right)),
     }
 }
 

@@ -17,11 +17,7 @@ mod tests {
                 operands: vec![65534],
                 expected: vec![OpConst as u8, 255, 254],
             },
-            Test {
-                op: Opcode::OpAdd,
-                operands: vec![],
-                expected: vec![OpAdd as u8],
-            },
+            Test { op: Opcode::OpAdd, operands: vec![], expected: vec![OpAdd as u8] },
         ];
 
         for t in tests {
@@ -39,16 +35,8 @@ mod tests {
         }
 
         let tests = vec![
-            Test {
-                op: Opcode::OpConst,
-                operands: vec![65534],
-                bytes_read: 2,
-            },
-            Test {
-                op: Opcode::OpConst,
-                operands: vec![255],
-                bytes_read: 2,
-            },
+            Test { op: Opcode::OpConst, operands: vec![65534], bytes_read: 2 },
+            Test { op: Opcode::OpConst, operands: vec![255], bytes_read: 2 },
         ];
 
         for t in tests {
@@ -72,9 +60,9 @@ mod tests {
                              0004 OpConst 65535\n";
         // how-to-concatenate-immutable-vectors-in-one-line
         // https://stackoverflow.com/a/69578632/1713757
-        let merged_ins = ins.iter().fold(vec![], |sum, i| {
-            [sum.as_slice(), i.data.as_slice()].concat()
-        });
+        let merged_ins = ins
+            .iter()
+            .fold(vec![], |sum, i| [sum.as_slice(), i.data.as_slice()].concat());
 
         let concatted = Instructions { data: merged_ins }.string();
 

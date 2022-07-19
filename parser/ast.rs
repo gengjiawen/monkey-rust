@@ -31,10 +31,7 @@ pub struct Program {
 
 impl Program {
     pub fn new() -> Self {
-        Program {
-            body: vec![],
-            span: Span { start: 0, end: 0 },
-        }
+        Program { body: vec![], span: Span { start: 0, end: 0 } }
     }
 }
 
@@ -70,11 +67,7 @@ pub struct ReturnStatement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Statement::Let(Let {
-                identifier: id,
-                expr,
-                ..
-            }) => {
+            Statement::Let(Let { identifier: id, expr, .. }) => {
                 if let TokenKind::IDENTIFIER { name } = &id.kind {
                     return write!(f, "let {} = {};", name, expr);
                 }
@@ -183,28 +176,15 @@ impl fmt::Display for Expression {
         match self {
             Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => write!(f, "{}", id),
             Expression::LITERAL(l) => write!(f, "{}", l),
-            Expression::PREFIX(UnaryExpression {
-                op, operand: expr, ..
-            }) => {
+            Expression::PREFIX(UnaryExpression { op, operand: expr, .. }) => {
                 write!(f, "({}{})", op.kind, expr)
             }
-            Expression::INFIX(BinaryExpression {
-                op, left, right, ..
-            }) => {
+            Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
                 write!(f, "({} {} {})", left, op.kind, right)
             }
-            Expression::IF(IF {
-                condition,
-                consequent,
-                alternate,
-                ..
-            }) => {
+            Expression::IF(IF { condition, consequent, alternate, .. }) => {
                 if let Some(else_block) = alternate {
-                    write!(
-                        f,
-                        "if {} {{ {} }} else {{ {} }}",
-                        condition, consequent, else_block,
-                    )
+                    write!(f, "if {} {{ {} }} else {{ {} }}", condition, consequent, else_block,)
                 } else {
                     write!(f, "if {} {{ {} }}", condition, consequent,)
                 }
@@ -217,9 +197,7 @@ impl fmt::Display for Expression {
                     .join(", ");
                 write!(f, "fn({}) {{ {} }}", func_params, body)
             }
-            Expression::FunctionCall(FunctionCall {
-                callee, arguments, ..
-            }) => {
+            Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
                 write!(f, "{}({})", callee, format_expressions(arguments))
             }
             Expression::Index(Index { object, index, .. }) => {

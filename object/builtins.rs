@@ -37,10 +37,7 @@ pub fn first(args: Vec<Rc<Object>>) -> Rc<Object> {
             Some(obj) => Rc::clone(obj),
             None => Rc::new(Object::Null),
         },
-        o => Rc::new(Object::Error(format!(
-            "builtin first not supported for for type {}",
-            o
-        ))),
+        o => Rc::new(Object::Error(format!("builtin first not supported for for type {}", o))),
     }
 }
 
@@ -50,10 +47,7 @@ pub fn last(args: Vec<Rc<Object>>) -> Rc<Object> {
             Some(obj) => Rc::clone(obj),
             None => Rc::new(Object::Null),
         },
-        o => Rc::new(Object::Error(format!(
-            "builtin last not supported for for type {}",
-            o
-        ))),
+        o => Rc::new(Object::Error(format!("builtin last not supported for for type {}", o))),
     }
 }
 
@@ -67,10 +61,7 @@ pub fn rest(args: Vec<Rc<Object>>) -> Rc<Object> {
             }
             return Rc::new(Object::Null);
         }
-        o => Rc::new(Object::Error(format!(
-            "builtin rest not supported for for type {}",
-            o
-        ))),
+        o => Rc::new(Object::Error(format!("builtin rest not supported for for type {}", o))),
     }
 }
 
@@ -83,9 +74,6 @@ pub fn push(args: Vec<Rc<Object>>) -> Rc<Object> {
             new_array.push(obj);
             return Rc::new(Object::Array(new_array));
         }
-        o => Rc::new(Object::Error(format!(
-            "builtin push not supported for for type {}",
-            o
-        ))),
+        o => Rc::new(Object::Error(format!("builtin push not supported for for type {}", o))),
     }
 }

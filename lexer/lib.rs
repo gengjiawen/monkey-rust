@@ -12,12 +12,7 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        let mut l = Lexer {
-            input,
-            position: 0,
-            read_position: 0,
-            ch: 0 as char,
-        };
+        let mut l = Lexer { input, position: 0, read_position: 0, ch: 0 as char };
 
         l.read_char();
         return l;
@@ -89,10 +84,7 @@ impl<'a> Lexer<'a> {
             '\u{0}' => TokenKind::EOF,
             '"' => {
                 let (start, end, string) = self.read_string();
-                return Token {
-                    span: Span { start, end },
-                    kind: TokenKind::STRING(string),
-                };
+                return Token { span: Span { start, end }, kind: TokenKind::STRING(string) };
             }
             _ => {
                 if is_letter(self.ch) {
@@ -103,10 +95,7 @@ impl<'a> Lexer<'a> {
                     };
                 } else if is_digit(self.ch) {
                     let (start, end, num) = self.read_number();
-                    return Token {
-                        span: Span { start, end },
-                        kind: TokenKind::INT(num),
-                    };
+                    return Token { span: Span { start, end }, kind: TokenKind::INT(num) };
                 } else {
                     TokenKind::ILLEGAL
                 }
@@ -115,10 +104,7 @@ impl<'a> Lexer<'a> {
 
         self.read_char();
         return Token {
-            span: Span {
-                start: self.position - 1,
-                end: self.read_position - 1,
-            },
+            span: Span { start: self.position - 1, end: self.read_position - 1 },
             kind: t,
         };
     }

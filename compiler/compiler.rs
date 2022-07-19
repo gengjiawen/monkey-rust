@@ -33,14 +33,8 @@ impl Compiler {
         return Compiler {
             instructions: Instructions { data: vec![] },
             constants: vec![],
-            last_instruction: EmittedInstruction {
-                opcode: Opcode::OpPop,
-                position: 0,
-            },
-            previous_instruction: EmittedInstruction {
-                opcode: Opcode::OpPop,
-                position: 0,
-            },
+            last_instruction: EmittedInstruction { opcode: Opcode::OpPop, position: 0 },
+            previous_instruction: EmittedInstruction { opcode: Opcode::OpPop, position: 0 },
         };
     }
 
@@ -209,10 +203,7 @@ impl Compiler {
 
     fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
         self.previous_instruction = self.last_instruction.clone();
-        self.last_instruction = EmittedInstruction {
-            opcode: op,
-            position: pos,
-        };
+        self.last_instruction = EmittedInstruction { opcode: op, position: pos };
     }
 
     fn replace_instruction(&mut self, pos: usize, ins: &Instructions) {

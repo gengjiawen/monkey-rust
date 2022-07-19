@@ -29,18 +29,10 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
         let got = b_got.borrow();
         match (exp, got) {
             (Object::Integer(exp_val), Object::Integer(got_val)) => {
-                assert_eq!(
-                    exp_val, got_val,
-                    "integer not equal {} {}",
-                    exp_val, got_val
-                );
+                assert_eq!(exp_val, got_val, "integer not equal {} {}", exp_val, got_val);
             }
             (Object::Boolean(exp_val), Object::Boolean(got_val)) => {
-                assert_eq!(
-                    exp_val, got_val,
-                    "boolean not equal {} {}",
-                    exp_val, got_val
-                );
+                assert_eq!(exp_val, got_val, "boolean not equal {} {}", exp_val, got_val);
             }
             _ => {
                 panic!("can't compare object types");
@@ -54,11 +46,7 @@ fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
 
     println!("actual: {:?}", actual.string());
     println!("expected: {:?}", concatted.string());
-    assert_eq!(
-        concatted.data.len(),
-        actual.data.len(),
-        "instructions length not right"
-    );
+    assert_eq!(concatted.data.len(), actual.data.len(), "instructions length not right");
 
     for (exp, got) in concatted.data.into_iter().zip(actual.data.clone()) {
         assert_eq!(exp, got)

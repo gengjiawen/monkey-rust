@@ -16,11 +16,7 @@ pub struct Span {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "start: {}, end: {}, kind: {}",
-            self.span.start, self.span.end, self.kind
-        )
+        write!(f, "start: {}, end: {}, kind: {}", self.span.start, self.span.end, self.kind)
     }
 }
 
@@ -80,9 +76,7 @@ pub fn lookup_identifier(identifier: &str) -> TokenKind {
         "if" => TokenKind::IF,
         "else" => TokenKind::ELSE,
         "return" => TokenKind::RETURN,
-        _ => TokenKind::IDENTIFIER {
-            name: identifier.to_string(),
-        },
+        _ => TokenKind::IDENTIFIER { name: identifier.to_string() },
     }
 }
 
