@@ -17,6 +17,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 monkey-parser = { path = "../parser", version = "0.8.0" }
+monkey-compiler = { path = "../compiler", version = "0.8.0" }
 
 wasm-bindgen = "0.2.80"
 
