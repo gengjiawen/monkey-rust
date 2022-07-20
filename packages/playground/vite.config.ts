@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import wasmPack from 'vite-plugin-wasm-pack';
 import wasm from "vite-plugin-wasm";
 
 
@@ -11,7 +10,6 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    // wasm(),
-    wasmPack([], ['@gengjiawen/monkey-wasm']),
+    wasm(),
   ],
 })

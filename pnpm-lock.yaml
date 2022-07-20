@@ -33,7 +33,7 @@ importers:
       typescript: ^4.7.4
       vite: ^3.0.2
       vite-plugin-top-level-await: ^1.1.0
-      vite-plugin-wasm: ^2
+      vite-plugin-wasm: ^2.1.0
       vite-plugin-wasm-pack: ^0.1.12
     dependencies:
       '@chakra-ui/react': 2.2.4_tij2njokttso6734ktuzwjh5a4
@@ -56,7 +56,7 @@ importers:
       typescript: 4.7.4
       vite: 3.0.2
       vite-plugin-top-level-await: 1.1.0_vite@3.0.2
-      vite-plugin-wasm: 2.0.0_vite@3.0.2
+      vite-plugin-wasm: 2.1.0_vite@3.0.2
       vite-plugin-wasm-pack: 0.1.12
 
   wasm/pkg:
@@ -2773,8 +2773,8 @@ packages:
       narrowing: 1.5.0
     dev: true
 
-  /vite-plugin-wasm/2.0.0_vite@3.0.2:
-    resolution: {integrity: sha512-CLFCXaUnZI32csQHIp9MUoaJOKSnxNnCGPH7OhlFWmDbq4DnW1wWJxiFTkQY12WQpCZ4yPtmH5bS7bOobzaz/w==}
+  /vite-plugin-wasm/2.1.0_vite@3.0.2:
+    resolution: {integrity: sha512-GmesubAJ6d3PIbvcn/HU2ZJTQobIbf+XwaimrcG3x2QpQX9s36vdqxUdkP7qsd51LCULSi6Z2K7JyxnT6zfmNw==}
     peerDependencies:
       vite: ^3
     dependencies:
