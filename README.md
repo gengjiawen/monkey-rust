@@ -17,6 +17,15 @@ Official site is: https://monkeylang.org/. It's has various implementation langu
 
 There is a book about learning how to make an interpreter: [Writing An Interpreter In Go](https://interpreterbook.com/#the-monkey-programming-language). This is where the Monkey programming language come from.
 
+## Features
+* Split packages to make everything minimum
+* location info for ast
+* test for every module
+* **Wasm**: A WebAssembly target.
+
+AST Online playground: 
+https://astexplorer.net/#/gist/e23a81ce309e8fcffe95ddd1b5661061/01d0b4b078304ddd9639eae9f4e6d342e2b9d075
+
 ## Instruction
 
 ### Build and test
@@ -25,9 +34,3 @@ There is a book about learning how to make an interpreter: [Writing An Interpret
 $ cargo build
 $ cargo test
 ```
-
-## References on compiler
-
-- https://github.com/dinfuehr/dora
-- https://github.com/wren-lang/wren
-- https://github.com/apollographql/federation
