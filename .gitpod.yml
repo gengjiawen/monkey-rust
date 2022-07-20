@@ -5,7 +5,7 @@ tasks:
   - init: time cargo build
     command: cargo test
   - init: cargo install cargo-insta && exit # cargo insta test && cargo insta accept to update snapshots
-  - init: yarn && cd wasm && wasm-pack build --release --scope=gengjiawen && cd ./pkg && yarn link && cd ../../ast-website/website && yarn && yarn link @gengjiawen/monkey-wasm # astexplorer
+  - init: cd wasm && wasm-pack build --release --scope=gengjiawen && pnpm i
 
 vscode:
   extensions:
