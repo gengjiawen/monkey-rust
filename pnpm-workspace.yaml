@@ -1,3 +1,4 @@
 packages:
   - packages/*
   - wasm/pkg
+  - ast-website/website
