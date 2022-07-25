@@ -137,15 +137,28 @@ impl Compiler {
                     }
                 }
             }
-            Expression::IF(node) => {
-                self.compile_expr(&node.condition);
+            Expression::IF(if_node) => {
+                self.compile_expr(&if_node.condition);
                 let jump_not_truthy = self.emit(OpJumpNotTruthy, &vec![9527]);
-                self.compile_block_statement(&node.consequent);
+                self.compile_block_statement(&if_node.consequent);
                 if self.last_instruction_is(OpPop) {
                     self.remove_last_pop();
                 }
+
+                let jump_pos = self.emit(OpJump, &vec![9527]);
+
                 let after_consequence_location = self.instructions.data.len();
                 self.change_operand(jump_not_truthy, after_consequence_location);
+
+                if if_node.alternate.is_none() {
+                } else {
+                    self.compile_block_statement(&if_node.clone().alternate.unwrap());
+                    if self.last_instruction_is(OpPop) {
+                        self.remove_last_pop();
+                    }
+                }
+                let after_alternative_location = self.instructions.data.len();
+                self.change_operand(jump_pos, after_alternative_location);
             }
             Expression::FUNCTION(_) => {}
             Expression::FunctionCall(_) => {}

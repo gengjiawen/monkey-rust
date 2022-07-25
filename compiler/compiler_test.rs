@@ -44,7 +44,7 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
 fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
     let concatted = concat_instructions(expected);
 
-    println!("actual: {:?}", actual.string());
+    println!("actual  : {:?}", actual.string());
     println!("expected: {:?}", concatted.string());
     assert_eq!(concatted.data.len(), actual.data.len(), "instructions length not right");
 
@@ -231,16 +231,37 @@ mod tests {
     }
 
     #[test]
-    fn conditions() {
+    fn conditions_only_if() {
         let tests = vec![CompilerTestCase {
             input: "if (true) { 10 }; 3333;",
             expected_constants: vec![Object::Integer(10), Object::Integer(3333)],
             expected_instructions: vec![
                 make_instructions(OpTrue, &vec![0]),
-                make_instructions(OpJumpNotTruthy, &vec![7]),
+                make_instructions(OpJumpNotTruthy, &vec![10]),
                 make_instructions(OpConst, &vec![0]),
+                make_instructions(OpJump, &vec![10]),
                 make_instructions(OpPop, &vec![0]),
                 make_instructions(OpConst, &vec![1]),
+                make_instructions(OpPop, &vec![0]),
+            ],
+        }];
+
+        run_compiler_test(tests);
+    }
+
+    #[test]
+    fn conditions_with_else() {
+        let tests = vec![CompilerTestCase {
+            input: "if (true) { 10 } else { 20 }; 3333;",
+            expected_constants: vec![Object::Integer(10), Object::Integer(20), Object::Integer(3333)],
+            expected_instructions: vec![
+                make_instructions(OpTrue, &vec![0]),
+                make_instructions(OpJumpNotTruthy, &vec![10]),
+                make_instructions(OpConst, &vec![0]),
+                make_instructions(OpJump, &vec![13]),
+                make_instructions(OpConst, &vec![1]),
+                make_instructions(OpPop, &vec![0]),
+                make_instructions(OpConst, &vec![2]),
                 make_instructions(OpPop, &vec![0]),
             ],
         }];
