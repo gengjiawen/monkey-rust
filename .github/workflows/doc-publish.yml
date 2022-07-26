@@ -13,9 +13,7 @@ jobs:
 
       - name: Install and Build 🔧 # This example project is built using npm and outputs the result to the 'build' folder. Replace with the commands required to build your project, or remove this step entirely if your site is pre-built.
         run: |
-          rustup install stable
-          rustup default stable
-          cargo build
+          RUSTUP_TOOLCHAIN=stable cargo build
           cd wasm && wasm-pack build --release --scope=gengjiawen && cd ..
           pnpm i
           cd packages/playground && pnpm build
