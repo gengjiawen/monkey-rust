@@ -14,9 +14,9 @@ jobs:
       - name: Install and Build 🔧 # This example project is built using npm and outputs the result to the 'build' folder. Replace with the commands required to build your project, or remove this step entirely if your site is pre-built.
         run: |
           RUSTUP_TOOLCHAIN=stable cargo build
-          cd wasm && wasm-pack build --release --scope=gengjiawen && cd ..
+          cd wasm && wasm-pack build --release --scope=gengjiawen
           pnpm i
-          pwd && cd packages/playground && pnpm build
+          cd $GITHUB_WORKSPACE/packages/playground && pnpm build
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
