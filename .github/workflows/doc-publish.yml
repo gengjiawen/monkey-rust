@@ -16,7 +16,7 @@ jobs:
           RUSTUP_TOOLCHAIN=stable cargo build
           cd wasm && wasm-pack build --release --scope=gengjiawen && cd ..
           pnpm i
-          cd packages/playground && pnpm build
+          pwd && cd packages/playground && pnpm build
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4

@@ -1,6 +1,6 @@
 FROM gitpod/workspace-full
 
-ENV TRIGGER_REBUILD=6
+ENV TRIGGER_REBUILD=7
 
 RUN rustup target add wasm32-unknown-unknown
 
@@ -20,7 +20,7 @@ RUN git clone --depth 1 "https://github.com/emscripten-core/emsdk.git" $HOME/.em
     && ./emsdk activate latest \
     && printf "\nsource $HOME/.emsdk/emsdk_env.sh\nclear\n" >> ~/.bashrc
 
-RUN brew install binaryen wabt wasm-pack 
+RUN brew install binaryen wabt wasm-pack
 
 # fix Node.js path and use latest Node.js
 RUN brew install n && sudo /home/linuxbrew/.linuxbrew/bin/n latest && sudo /usr/local/bin/npm i -g yarn sao
