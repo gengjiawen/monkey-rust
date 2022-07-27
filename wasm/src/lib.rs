@@ -1,11 +1,11 @@
 mod utils;
 
 use crate::utils::set_panic_hook;
+use compiler::compiler::Compiler;
 use parser::parse as parser_pase;
 use parser::parse_ast_json_string;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::throw_str;
-use compiler::compiler::Compiler;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -31,10 +31,8 @@ pub fn compile(input: &str) -> String {
         Err(e) => throw_str(format!("parse error: {}", e[0]).as_str()),
     };
     let mut compiler = Compiler::new();
-    match  compiler.compile(&program) {
-        Ok(bytecode) => {
-            return bytecode.instructions.string()
-        },
+    match compiler.compile(&program) {
+        Ok(bytecode) => return bytecode.instructions.string(),
         Err(e) => throw_str(format!("compile error: {}", e).as_str()),
     }
 }

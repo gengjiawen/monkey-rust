@@ -5,7 +5,7 @@ use object::Object;
 use parser::parse;
 
 use crate::compiler::Compiler;
-use crate::op_code::Instructions;
+use crate::op_code::{concat_instructions, Instructions};
 
 struct CompilerTestCase<'a> {
     input: &'a str,
@@ -42,25 +42,19 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
 }
 
 fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
-    let concatted = concat_instructions(expected);
+    let expected_ins = concat_instructions(expected);
 
-    println!("actual  : {:?}", actual.string());
-    println!("expected: {:?}", concatted.string());
-    assert_eq!(concatted.data.len(), actual.data.len(), "instructions length not right");
+    assert_eq!(expected_ins.data.len(), actual.data.len(), "instructions length not right");
 
-    for (exp, got) in concatted.data.into_iter().zip(actual.data.clone()) {
-        assert_eq!(exp, got)
+    for (&exp, got) in expected_ins.data.iter().zip(actual.data.clone()) {
+        assert_eq!(
+            exp,
+            got,
+            "instruction not equal\n actual  : {:?}\n expected: {}",
+            actual.string(),
+            expected_ins.string()
+        );
     }
-}
-
-fn concat_instructions(expected: &Vec<Instructions>) -> Instructions {
-    let mut out = Instructions { data: vec![] };
-
-    for instruction in expected {
-        out = out.merge_instructions(instruction)
-    }
-
-    return out;
 }
 
 #[cfg(test)]
@@ -253,7 +247,11 @@ mod tests {
     fn conditions_with_else() {
         let tests = vec![CompilerTestCase {
             input: "if (true) { 10 } else { 20 }; 3333;",
-            expected_constants: vec![Object::Integer(10), Object::Integer(20), Object::Integer(3333)],
+            expected_constants: vec![
+                Object::Integer(10),
+                Object::Integer(20),
+                Object::Integer(3333),
+            ],
             expected_instructions: vec![
                 make_instructions(OpTrue, &vec![0]),
                 make_instructions(OpJumpNotTruthy, &vec![10]),

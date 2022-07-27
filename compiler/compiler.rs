@@ -2,8 +2,7 @@ use std::rc::Rc;
 
 use object::Object;
 use parser::ast::{BlockStatement, Expression, Literal, Node, Statement};
-use parser::lexer::token::TokenKind::LT;
-use parser::lexer::token::{Token, TokenKind};
+use parser::lexer::token::{TokenKind};
 
 use crate::op_code::Opcode::*;
 use crate::op_code::{cast_u8_to_opcode, make_instructions, Instructions, Opcode};

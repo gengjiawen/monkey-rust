@@ -49,8 +49,14 @@ lazy_static! {
         m.insert(Opcode::OpTrue, OpcodeDefinition { name: "OpTrue", operand_width: vec![] });
         m.insert(Opcode::OpFalse, OpcodeDefinition { name: "OpFalse", operand_width: vec![] });
         m.insert(Opcode::OpEqual, OpcodeDefinition { name: "OpEqual", operand_width: vec![] });
-        m.insert(Opcode::OpNotEqual, OpcodeDefinition { name: "OpNotEqual", operand_width: vec![] });
-        m.insert(Opcode::OpGreaterThan, OpcodeDefinition { name: "OpGreatThan", operand_width: vec![] });
+        m.insert(
+            Opcode::OpNotEqual,
+            OpcodeDefinition { name: "OpNotEqual", operand_width: vec![] },
+        );
+        m.insert(
+            Opcode::OpGreaterThan,
+            OpcodeDefinition { name: "OpGreatThan", operand_width: vec![] },
+        );
         m.insert(Opcode::OpMinus, OpcodeDefinition { name: "OpMinus", operand_width: vec![] });
         m.insert(Opcode::OpBang, OpcodeDefinition { name: "OpBang", operand_width: vec![] });
         m.insert(
@@ -106,6 +112,16 @@ pub fn read_operands(def: &OpcodeDefinition, ins: &[u8]) -> (Vec<usize>, usize) 
     }
 
     return (operands, offset);
+}
+
+pub fn concat_instructions(expected: &Vec<Instructions>) -> Instructions {
+    let mut out = Instructions { data: vec![] };
+
+    for instruction in expected {
+        out = out.merge_instructions(instruction)
+    }
+
+    return out;
 }
 
 pub fn cast_u8_to_opcode(op: u8) -> Opcode {
