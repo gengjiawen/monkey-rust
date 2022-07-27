@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+// @ts-ignore
 import topLevelAwait from "vite-plugin-top-level-await"
 import wasm from "vite-plugin-wasm"
-
+import visualizer from 'rollup-plugin-visualizer'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -15,4 +16,9 @@ export default defineConfig({
     wasm(),
     topLevelAwait()
   ],
+  build: {
+    rollupOptions: {
+      plugins: [visualizer()],
+    },
+  },
 })
