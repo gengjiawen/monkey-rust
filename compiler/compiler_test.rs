@@ -2,26 +2,6 @@ use std::borrow::Borrow;
 use std::rc::Rc;
 
 use object::Object;
-use parser::parse;
-
-use crate::compiler::Compiler;
-use crate::op_code::{concat_instructions, Instructions};
-
-struct CompilerTestCase<'a> {
-    input: &'a str,
-    expected_constants: Vec<Object>,
-    expected_instructions: Vec<Instructions>,
-}
-
-fn run_compiler_test(tests: Vec<CompilerTestCase>) {
-    for t in tests {
-        let program = parse(t.input).unwrap();
-        let mut compiler = Compiler::new();
-        let bytecodes = compiler.compile(&program).unwrap();
-        test_instructions(&t.expected_instructions, &bytecodes.instructions);
-        test_constants(&t.expected_constants, &bytecodes.constants);
-    }
-}
 
 pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
     assert_eq!(expected.len(), actual.len());
@@ -40,30 +20,47 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
         }
     }
 }
-
-fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
-    let expected_ins = concat_instructions(expected);
-
-    assert_eq!(expected_ins.data.len(), actual.data.len(), "instructions length not right");
-
-    for (&exp, got) in expected_ins.data.iter().zip(actual.data.clone()) {
-        assert_eq!(
-            exp,
-            got,
-            "instruction not equal\n actual  : {:?}\n expected: {}",
-            actual.string(),
-            expected_ins.string()
-        );
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::compiler::*;
     use crate::op_code::make_instructions;
     use crate::op_code::Opcode::*;
-
+    use parser::parse;
     use super::*;
+
+    use crate::compiler::Compiler;
+    use crate::op_code::{concat_instructions, Instructions};
+
+    struct CompilerTestCase<'a> {
+        input: &'a str,
+        expected_constants: Vec<Object>,
+        expected_instructions: Vec<Instructions>,
+    }
+
+    fn run_compiler_test(tests: Vec<CompilerTestCase>) {
+        for t in tests {
+            let program = parse(t.input).unwrap();
+            let mut compiler = Compiler::new();
+            let bytecodes = compiler.compile(&program).unwrap();
+            test_instructions(&t.expected_instructions, &bytecodes.instructions);
+            test_constants(&t.expected_constants, &bytecodes.constants);
+        }
+    }
+
+    fn test_instructions(expected: &Vec<Instructions>, actual: &Instructions) {
+        let expected_ins = concat_instructions(expected);
+
+        assert_eq!(expected_ins.data.len(), actual.data.len(), "instructions length not right");
+
+        for (&exp, got) in expected_ins.data.iter().zip(actual.data.clone()) {
+            assert_eq!(
+                exp,
+                got,
+                "instruction not equal\n actual  : {:?}\n expected: {}",
+                actual.string(),
+                expected_ins.string()
+            );
+        }
+    }
 
     #[test]
     fn integer_arithmetic() {

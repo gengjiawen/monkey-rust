@@ -203,10 +203,6 @@ impl Compiler {
         return self.last_instruction.opcode == op;
     }
 
-    fn last_instruction_is_pop(&self) -> bool {
-        return self.last_instruction.opcode == OpPop;
-    }
-
     fn remove_last_pop(&mut self) {
         self.instructions.data =
             self.instructions.data[..self.instructions.data.len() - 1].to_vec();

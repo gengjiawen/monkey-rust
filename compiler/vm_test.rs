@@ -7,7 +7,6 @@ struct VmTestCase<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
     use std::rc::Rc;
 
     use object::Object;

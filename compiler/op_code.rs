@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use byteorder;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
-use strum::{EnumCount, IntoEnumIterator};
-use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
+use strum::{EnumCount, EnumIter};
 
 // why not type, see https://stackoverflow.com/a/35569079/1713757
 #[derive(Hash, Eq, Debug, Clone, PartialEq, PartialOrd)]
