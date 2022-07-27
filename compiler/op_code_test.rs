@@ -2,6 +2,7 @@
 mod tests {
     use crate::op_code::Opcode::{OpAdd, OpConst};
     use crate::op_code::*;
+    use strum::EnumCount;
 
     #[test]
     fn test_make() {
@@ -45,6 +46,12 @@ mod tests {
             assert_eq!(operands_read, t.operands);
             assert_eq!(n, t.bytes_read);
         }
+    }
+    #[test]
+    fn test_instructions_legal() {
+        let opcode_count = Opcode::COUNT;
+        let keys_count = DEFINITIONS.keys().count();
+        assert_eq!(opcode_count, keys_count);
     }
 
     #[test]

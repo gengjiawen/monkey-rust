@@ -6,7 +6,6 @@ use parser::parse_ast_json_string;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::throw_str;
 use compiler::compiler::Compiler;
-use parser::ast::Node;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.

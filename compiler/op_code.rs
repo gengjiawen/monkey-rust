@@ -3,19 +3,22 @@ use std::collections::HashMap;
 use byteorder;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
+use strum::{EnumCount, IntoEnumIterator};
+use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
+
 // why not type, see https://stackoverflow.com/a/35569079/1713757
 #[derive(Hash, Eq, Debug, Clone, PartialEq, PartialOrd)]
 pub struct Instructions {
     pub data: Vec<u8>,
 }
 
-pub struct Definition {
+pub struct OpcodeDefinition {
     name: &'static str,
     operand_width: Vec<i32>,
 }
 
 #[repr(u8)]
-#[derive(Hash, Eq, Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Hash, Eq, Clone, Copy, PartialEq, EnumCount, EnumIter)]
 pub enum Opcode {
     OpConst,
     OpAdd,
@@ -35,26 +38,26 @@ pub enum Opcode {
 }
 
 lazy_static! {
-    pub static ref DEFINITIONS: HashMap<Opcode, Definition> = {
+    pub static ref DEFINITIONS: HashMap<Opcode, OpcodeDefinition> = {
         let mut m = HashMap::new();
-        m.insert(Opcode::OpConst, Definition { name: "OpConst", operand_width: vec![2] });
-        m.insert(Opcode::OpAdd, Definition { name: "OpAdd", operand_width: vec![] });
-        m.insert(Opcode::OpPop, Definition { name: "OpPop", operand_width: vec![] });
-        m.insert(Opcode::OpSub, Definition { name: "OpSub", operand_width: vec![] });
-        m.insert(Opcode::OpMul, Definition { name: "OpMul", operand_width: vec![] });
-        m.insert(Opcode::OpDiv, Definition { name: "OpDiv", operand_width: vec![] });
-        m.insert(Opcode::OpTrue, Definition { name: "OpTrue", operand_width: vec![] });
-        m.insert(Opcode::OpFalse, Definition { name: "OpFalse", operand_width: vec![] });
-        m.insert(Opcode::OpEqual, Definition { name: "OpEqual", operand_width: vec![] });
-        m.insert(Opcode::OpNotEqual, Definition { name: "OpNotEqual", operand_width: vec![] });
-        m.insert(Opcode::OpGreaterThan, Definition { name: "OpGreatThan", operand_width: vec![] });
-        m.insert(Opcode::OpMinus, Definition { name: "OpMinus", operand_width: vec![] });
-        m.insert(Opcode::OpBang, Definition { name: "OpBang", operand_width: vec![] });
+        m.insert(Opcode::OpConst, OpcodeDefinition { name: "OpConst", operand_width: vec![2] });
+        m.insert(Opcode::OpAdd, OpcodeDefinition { name: "OpAdd", operand_width: vec![] });
+        m.insert(Opcode::OpPop, OpcodeDefinition { name: "OpPop", operand_width: vec![] });
+        m.insert(Opcode::OpSub, OpcodeDefinition { name: "OpSub", operand_width: vec![] });
+        m.insert(Opcode::OpMul, OpcodeDefinition { name: "OpMul", operand_width: vec![] });
+        m.insert(Opcode::OpDiv, OpcodeDefinition { name: "OpDiv", operand_width: vec![] });
+        m.insert(Opcode::OpTrue, OpcodeDefinition { name: "OpTrue", operand_width: vec![] });
+        m.insert(Opcode::OpFalse, OpcodeDefinition { name: "OpFalse", operand_width: vec![] });
+        m.insert(Opcode::OpEqual, OpcodeDefinition { name: "OpEqual", operand_width: vec![] });
+        m.insert(Opcode::OpNotEqual, OpcodeDefinition { name: "OpNotEqual", operand_width: vec![] });
+        m.insert(Opcode::OpGreaterThan, OpcodeDefinition { name: "OpGreatThan", operand_width: vec![] });
+        m.insert(Opcode::OpMinus, OpcodeDefinition { name: "OpMinus", operand_width: vec![] });
+        m.insert(Opcode::OpBang, OpcodeDefinition { name: "OpBang", operand_width: vec![] });
         m.insert(
             Opcode::OpJumpNotTruthy,
-            Definition { name: "OpJumpNotTruthy", operand_width: vec![2] },
+            OpcodeDefinition { name: "OpJumpNotTruthy", operand_width: vec![2] },
         );
-        m.insert(Opcode::OpJump, Definition { name: "OpJump", operand_width: vec![2] });
+        m.insert(Opcode::OpJump, OpcodeDefinition { name: "OpJump", operand_width: vec![2] });
         m
     };
 }
@@ -81,7 +84,7 @@ pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Instructions {
     return Instructions { data: instructions };
 }
 
-pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<usize>, usize) {
+pub fn read_operands(def: &OpcodeDefinition, ins: &[u8]) -> (Vec<usize>, usize) {
     let mut operands = Vec::with_capacity(def.operand_width.len());
     let mut offset = 0;
 
@@ -128,7 +131,7 @@ impl Instructions {
         return ret;
     }
 
-    fn fmt_instructions(def: &Definition, operands: &Vec<usize>) -> String {
+    fn fmt_instructions(def: &OpcodeDefinition, operands: &Vec<usize>) -> String {
         match def.operand_width.len() {
             2 => format!("{} {} {}", def.name, operands[0], operands[1]),
             1 => format!("{} {}", def.name, operands[0]),
