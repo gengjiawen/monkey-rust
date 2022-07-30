@@ -62,8 +62,18 @@ impl VM {
                 Opcode::OpBang => {
                     self.execute_bang_operation();
                 }
-                Opcode::OpJumpNotTruthy => {}
-                Opcode::OpJump => {}
+                Opcode::OpJump => {
+                    let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    ip = pos - 1;
+                }
+                Opcode::OpJumpNotTruthy => {
+                    let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+                    let condition = self.pop();
+                    if !self.is_truthy(condition) {
+                        ip = pos - 1;
+                    }
+                }
             }
             ip += 1;
         }
@@ -155,5 +165,12 @@ impl VM {
         };
         self.stack[self.sp] = o;
         self.sp += 1;
+    }
+    fn is_truthy(&self, condition: Rc<Object>) -> bool {
+        match condition.borrow() {
+            Object::Boolean(b) => *b,
+            Object::Null => false,
+            _ => true,
+        }
     }
 }

@@ -22,10 +22,10 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
 }
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::op_code::make_instructions;
     use crate::op_code::Opcode::*;
     use parser::parse;
-    use super::*;
 
     use crate::compiler::Compiler;
     use crate::op_code::{concat_instructions, Instructions};

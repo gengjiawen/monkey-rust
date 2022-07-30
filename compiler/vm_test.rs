@@ -92,4 +92,22 @@ mod tests {
 
         run_vm_tests(tests);
     }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = vec![
+            VmTestCase { input: "if (true) { 10 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (true) { 10 } else { 20 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (false) { 10 } else { 20 }", expected: Object::Integer(20) },
+            VmTestCase { input: "if (1) { 10 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (1 < 2) { 10 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (1 < 2) { 10 } else { 20 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (1 > 2) { 10 } else { 20 }", expected: Object::Integer(20) },
+            // VmTestCase{input: "if (1 > 2) { 10 }", expected: Object::Null},
+            // VmTestCase{input: "if (false) { 10 }", expected: Object::Null},
+            // VmTestCase{input: "if ((if (false) { 10 })) { 10 } else { 20 }", expected: Object::Integer(20)},
+        ];
+
+        run_vm_tests(tests);
+    }
 }
