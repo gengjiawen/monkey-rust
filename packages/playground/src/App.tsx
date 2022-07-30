@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Grid,
   GridItem,
-  HStack,
+  HStack, Tab, TabList, TabPanel, TabPanels, Tabs,
   Text,
 } from '@chakra-ui/react'
 import { Editor } from './Editor'
@@ -39,15 +39,22 @@ function App() {
   return (
     <Grid templateColumns="repeat(2, 1fr)" height="100vh" gap={6}>
       <Editor onChange={editorOnchange} code={editor_value} />
-      <GridItem w="100%" h="50%">
-        <HStack>
-          <Text>Bytecode:</Text>
-        </HStack>
-        <Editor
-          code={compiler_out}
-          extra={{ readOnly: true, editable: false }}
-        />
-      </GridItem>
+      <Tabs size='md' variant='enclosed'>
+        <TabList>
+          <Tab>Bytecode</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel padding={0}>
+              <Editor
+                  code={compiler_out}
+                  extra={{ readOnly: true, editable: false }}
+              />
+          </TabPanel>
+          <TabPanel>
+            <p>two!</p>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Grid>
   )
 }
