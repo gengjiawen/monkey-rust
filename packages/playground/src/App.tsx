@@ -9,8 +9,13 @@ import { Editor } from './Editor'
 import debounce from 'lodash.debounce'
 import {compile} from "@gengjiawen/monkey-wasm";
 
+const sample_list = [
+    '1 + 1',
+    'if (true) { 10 }; 3333;',
+]
+
 function App() {
-  let code = `1 + 1\n`
+  let code = sample_list[1]
   let [editor_value] = useState(code)
   const editorOnchange = (value: string) => {
     console.log(value)
