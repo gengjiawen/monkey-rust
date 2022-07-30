@@ -150,6 +150,7 @@ impl Compiler {
                 self.change_operand(jump_not_truthy, after_consequence_location);
 
                 if if_node.alternate.is_none() {
+                    self.emit(OpNull, &vec![]);
                 } else {
                     self.compile_block_statement(&if_node.clone().alternate.unwrap());
                     if self.last_instruction_is(OpPop) {

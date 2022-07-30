@@ -34,6 +34,7 @@ pub enum Opcode {
     OpBang,
     OpJumpNotTruthy,
     OpJump,
+    OpNull,
 }
 
 lazy_static! {
@@ -63,6 +64,7 @@ lazy_static! {
             OpcodeDefinition { name: "OpJumpNotTruthy", operand_width: vec![2] },
         );
         m.insert(Opcode::OpJump, OpcodeDefinition { name: "OpJump", operand_width: vec![2] });
+        m.insert(Opcode::OpNull, OpcodeDefinition { name: "OpNull", operand_width: vec![] });
         m
     };
 }

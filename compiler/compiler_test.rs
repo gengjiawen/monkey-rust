@@ -14,8 +14,9 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
             (Object::Boolean(exp_val), Object::Boolean(got_val)) => {
                 assert_eq!(exp_val, got_val, "boolean not equal {} {}", exp_val, got_val);
             }
+            (Object::Null, Object::Null) => {}
             _ => {
-                panic!("can't compare object types");
+                panic!("can't compare object types, expected {}, got {}", exp, got);
             }
         }
     }
@@ -230,7 +231,8 @@ mod tests {
                 make_instructions(OpTrue, &vec![0]),
                 make_instructions(OpJumpNotTruthy, &vec![10]),
                 make_instructions(OpConst, &vec![0]),
-                make_instructions(OpJump, &vec![10]),
+                make_instructions(OpJump, &vec![11]),
+                make_instructions(OpNull, &vec![0]),
                 make_instructions(OpPop, &vec![0]),
                 make_instructions(OpConst, &vec![1]),
                 make_instructions(OpPop, &vec![0]),

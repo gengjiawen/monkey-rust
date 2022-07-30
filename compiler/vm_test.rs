@@ -87,7 +87,6 @@ mod tests {
             VmTestCase { input: "!!true", expected: Object::Boolean(true) },
             VmTestCase { input: "!!false", expected: Object::Boolean(false) },
             VmTestCase { input: "!!5", expected: Object::Boolean(true) },
-            // VmTestCase { input: "!(if (false) { 5; })", expected: Object::Boolean(true) },
         ];
 
         run_vm_tests(tests);
@@ -103,9 +102,12 @@ mod tests {
             VmTestCase { input: "if (1 < 2) { 10 }", expected: Object::Integer(10) },
             VmTestCase { input: "if (1 < 2) { 10 } else { 20 }", expected: Object::Integer(10) },
             VmTestCase { input: "if (1 > 2) { 10 } else { 20 }", expected: Object::Integer(20) },
-            // VmTestCase{input: "if (1 > 2) { 10 }", expected: Object::Null},
-            // VmTestCase{input: "if (false) { 10 }", expected: Object::Null},
-            // VmTestCase{input: "if ((if (false) { 10 })) { 10 } else { 20 }", expected: Object::Integer(20)},
+            VmTestCase { input: "if (1 > 2) { 10 }", expected: Object::Null },
+            VmTestCase { input: "if (false) { 10 }", expected: Object::Null },
+            VmTestCase {
+                input: "if ((if (false) { 10 })) { 10 } else { 20 }",
+                expected: Object::Integer(20),
+            },
         ];
 
         run_vm_tests(tests);

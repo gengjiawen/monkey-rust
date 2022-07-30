@@ -74,6 +74,9 @@ impl VM {
                         ip = pos - 1;
                     }
                 }
+                Opcode::OpNull => {
+                    self.push(Rc::new(Object::Null));
+                }
             }
             ip += 1;
         }
