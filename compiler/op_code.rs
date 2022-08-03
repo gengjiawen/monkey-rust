@@ -35,6 +35,8 @@ pub enum Opcode {
     OpJumpNotTruthy,
     OpJump,
     OpNull,
+    OpGetGlobal,
+    OpSetGlobal,
 }
 
 lazy_static! {
@@ -65,6 +67,14 @@ lazy_static! {
         );
         m.insert(Opcode::OpJump, OpcodeDefinition { name: "OpJump", operand_width: vec![2] });
         m.insert(Opcode::OpNull, OpcodeDefinition { name: "OpNull", operand_width: vec![] });
+        m.insert(
+            Opcode::OpGetGlobal,
+            OpcodeDefinition { name: "OpGetGlobal", operand_width: vec![2] },
+        );
+        m.insert(
+            Opcode::OpSetGlobal,
+            OpcodeDefinition { name: "OpSetGlobal", operand_width: vec![2] },
+        );
         m
     };
 }

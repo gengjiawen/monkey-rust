@@ -5,5 +5,7 @@ pub mod compiler;
 mod compiler_test;
 pub mod op_code;
 mod op_code_test;
+mod symbol_table;
+mod symbol_table_test;
 pub mod vm;
 mod vm_test;

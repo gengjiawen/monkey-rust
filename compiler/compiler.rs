@@ -6,12 +6,14 @@ use parser::lexer::token::TokenKind;
 
 use crate::op_code::Opcode::*;
 use crate::op_code::{cast_u8_to_opcode, make_instructions, Instructions, Opcode};
+use crate::symbol_table::SymbolTable;
 
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Rc<Object>>,
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
+    symbol_table: SymbolTable,
 }
 
 pub struct Bytecode {
@@ -34,6 +36,7 @@ impl Compiler {
             constants: vec![],
             last_instruction: EmittedInstruction { opcode: Opcode::OpPop, position: 0 },
             previous_instruction: EmittedInstruction { opcode: Opcode::OpPop, position: 0 },
+            symbol_table: SymbolTable::new(),
         };
     }
 
@@ -41,34 +44,54 @@ impl Compiler {
         match node {
             Node::Program(p) => {
                 for stmt in &p.body {
-                    self.compile_stmt(stmt);
+                    self.compile_stmt(stmt)?;
                 }
             }
             Node::Statement(s) => {
-                self.compile_stmt(s);
+                self.compile_stmt(s)?;
             }
             Node::Expression(e) => {
-                self.compile_expr(e);
+                self.compile_expr(e)?;
             }
         }
 
         return Ok(self.bytecode());
     }
 
-    fn compile_stmt(&mut self, s: &Statement) {
+    fn compile_stmt(&mut self, s: &Statement) -> Result<(), CompileError> {
         match s {
-            Statement::Let(_) => {}
-            Statement::Return(_) => {}
+            Statement::Let(let_statement) => {
+                self.compile_expr(&let_statement.expr)?;
+                let symbol = self
+                    .symbol_table
+                    .define(let_statement.identifier.kind.to_string());
+                self.emit(Opcode::OpSetGlobal, &vec![symbol.index]);
+                return Ok(());
+            }
+            Statement::Return(_) => {
+                return Ok(());
+            }
             Statement::Expr(e) => {
-                self.compile_expr(e);
+                self.compile_expr(e)?;
                 self.emit(OpPop, &vec![]);
+                return Ok(());
             }
         }
     }
 
     fn compile_expr(&mut self, e: &Expression) -> Result<(), CompileError> {
         match e {
-            Expression::IDENTIFIER(_) => {}
+            Expression::IDENTIFIER(identifier) => {
+                let symbol = self.symbol_table.resolve(identifier.name.clone());
+                match symbol {
+                    Some(symbol) => {
+                        self.emit(OpGetGlobal, &vec![symbol.index]);
+                    }
+                    None => {
+                        return Err(format!("Undefined variable '{}'", identifier.name));
+                    }
+                }
+            }
             Expression::LITERAL(l) => match l {
                 Literal::Integer(i) => {
                     let int = Object::Integer(i.raw);
@@ -137,9 +160,9 @@ impl Compiler {
                 }
             }
             Expression::IF(if_node) => {
-                self.compile_expr(&if_node.condition);
+                self.compile_expr(&if_node.condition)?;
                 let jump_not_truthy = self.emit(OpJumpNotTruthy, &vec![9527]);
-                self.compile_block_statement(&if_node.consequent);
+                self.compile_block_statement(&if_node.consequent)?;
                 if self.last_instruction_is(OpPop) {
                     self.remove_last_pop();
                 }
@@ -152,7 +175,7 @@ impl Compiler {
                 if if_node.alternate.is_none() {
                     self.emit(OpNull, &vec![]);
                 } else {
-                    self.compile_block_statement(&if_node.clone().alternate.unwrap());
+                    self.compile_block_statement(&if_node.clone().alternate.unwrap())?;
                     if self.last_instruction_is(OpPop) {
                         self.remove_last_pop();
                     }
@@ -194,10 +217,14 @@ impl Compiler {
         return pos;
     }
 
-    fn compile_block_statement(&mut self, block_statement: &BlockStatement) {
+    fn compile_block_statement(
+        &mut self,
+        block_statement: &BlockStatement,
+    ) -> Result<(), CompileError> {
         for stmt in &block_statement.body {
-            self.compile_stmt(stmt);
+            self.compile_stmt(stmt)?;
         }
+        Ok(())
     }
 
     fn last_instruction_is(&self, op: Opcode) -> bool {

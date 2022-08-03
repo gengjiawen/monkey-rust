@@ -26,7 +26,7 @@ mod tests {
             let program = parse(t.input).unwrap();
             let mut compiler = Compiler::new();
             let bytecodes = compiler.compile(&program).unwrap();
-            println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
+            // println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
             let mut vm = VM::new(bytecodes);
             vm.run();
             let got = vm.last_popped_stack_elm().unwrap();
@@ -107,6 +107,23 @@ mod tests {
             VmTestCase {
                 input: "if ((if (false) { 10 })) { 10 } else { 20 }",
                 expected: Object::Integer(20),
+            },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        let tests = vec![
+            VmTestCase { input: "let one = 1; one", expected: Object::Integer(1) },
+            VmTestCase {
+                input: "let one = 1; let two = 2; one + two",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "let one = 1; let two = one + one; one + two",
+                expected: Object::Integer(3),
             },
         ];
 
