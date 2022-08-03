@@ -8,3 +8,10 @@ fn test_define() {
     assert_eq!(symbol.scope, SymbolScope::Global);
     assert_eq!(symbol.index, 0);
 }
+
+#[test]
+fn test_resolve() {
+    let mut symbol_table = SymbolTable::new();
+    let symbol = symbol_table.define("x".to_string());
+    assert_eq!(symbol_table.resolve("x".to_string()), Some(symbol));
+}
