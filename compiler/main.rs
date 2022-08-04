@@ -2,12 +2,17 @@ use compiler::compiler::Compiler;
 use compiler::vm::VM;
 
 use std::io::stdin;
+use std::io::{self, Write};
+use std::rc::Rc;
+use object::Object;
 
 use parser::parse;
 
 fn main() {
     println!("Welcome to monkey compiler by gengjiawen");
     loop {
+        print!("> ");
+        io::stdout().flush().unwrap();
         let mut input = String::new();
         stdin().read_line(&mut input).unwrap();
 
@@ -16,15 +21,31 @@ fn main() {
             std::process::exit(0);
         }
 
-        let program = parse(&input).unwrap();
+        let program = match parse(&input) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("{}", e[0]);
+                continue;
+            }
+        };
 
         let mut compiler = Compiler::new();
 
-        let bytecodes = compiler.compile(&program).unwrap();
-        println!("ins {} for input {}", bytecodes.instructions.string(), input);
+        let bytecodes = match compiler.compile(&program) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("{}", e);
+                continue;
+            },
+        };
         let mut vm = VM::new(bytecodes);
         vm.run();
-        let got = vm.last_popped_stack_elm().unwrap();
-        println!("{}", got);
+        match vm.last_popped_stack_elm() {
+            None => {
+            }
+            Some(got) => {
+                println!("{}", got);
+            }
+        };
     }
 }
