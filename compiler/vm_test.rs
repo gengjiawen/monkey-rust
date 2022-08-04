@@ -1,10 +1,3 @@
-use object::Object;
-
-struct VmTestCase<'a> {
-    input: &'a str,
-    expected: Object,
-}
-
 #[cfg(test)]
 mod tests {
     use std::rc::Rc;
@@ -16,6 +9,11 @@ mod tests {
     use crate::compiler_test::test_constants;
     use crate::vm::VM;
     use crate::vm_test::VmTestCase;
+
+    struct VmTestCase<'a> {
+        input: &'a str,
+        expected: Object,
+    }
 
     fn test_expected_object(expected: Object, got: Rc<Object>) {
         test_constants(&vec![expected], &vec![got]);

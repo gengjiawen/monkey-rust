@@ -3,8 +3,6 @@ use compiler::vm::VM;
 
 use std::io::stdin;
 use std::io::{self, Write};
-use std::rc::Rc;
-use object::Object;
 
 use parser::parse;
 
