@@ -8,7 +8,6 @@ mod tests {
     use crate::compiler::Compiler;
     use crate::compiler_test::test_constants;
     use crate::vm::VM;
-    use crate::vm_test::VmTestCase;
 
     struct VmTestCase<'a> {
         input: &'a str,

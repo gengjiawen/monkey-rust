@@ -10,10 +10,10 @@ use crate::symbol_table::SymbolTable;
 
 pub struct Compiler {
     instructions: Instructions,
-    constants: Vec<Rc<Object>>,
+    pub constants: Vec<Rc<Object>>,
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
-    symbol_table: SymbolTable,
+    pub symbol_table: SymbolTable,
 }
 
 pub struct Bytecode {
@@ -34,9 +34,19 @@ impl Compiler {
         return Compiler {
             instructions: Instructions { data: vec![] },
             constants: vec![],
-            last_instruction: EmittedInstruction { opcode: Opcode::OpPop, position: 0 },
-            previous_instruction: EmittedInstruction { opcode: Opcode::OpPop, position: 0 },
+            last_instruction: EmittedInstruction { opcode: Opcode::OpNull, position: 0 },
+            previous_instruction: EmittedInstruction { opcode: Opcode::OpNull, position: 0 },
             symbol_table: SymbolTable::new(),
+        };
+    }
+
+    pub fn new_with_state(symbol_table: SymbolTable, constants: Vec<Rc<Object>>) -> Compiler {
+        return Compiler {
+            instructions: Instructions { data: vec![] },
+            constants,
+            last_instruction: EmittedInstruction { opcode: Opcode::OpNull, position: 0 },
+            previous_instruction: EmittedInstruction { opcode: Opcode::OpNull, position: 0 },
+            symbol_table,
         };
     }
 

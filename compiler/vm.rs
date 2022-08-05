@@ -10,7 +10,7 @@ use crate::compiler::Bytecode;
 use crate::op_code::{cast_u8_to_opcode, Instructions, Opcode};
 
 const STACK_SIZE: usize = 2048;
-const GLOBAL_SIZE: usize = 65536;
+pub const GLOBAL_SIZE: usize = 65536;
 
 pub struct VM {
     constants: Vec<Rc<Object>>,
@@ -19,7 +19,7 @@ pub struct VM {
     stack: Vec<Rc<Object>>,
     sp: usize, // stack pointer. Always point to the next value. Top of the stack is stack[sp -1]
 
-    globals: Vec<Rc<Object>>,
+    pub globals: Vec<Rc<Object>>,
 }
 
 impl VM {
@@ -30,6 +30,16 @@ impl VM {
             stack: vec![Rc::new(Object::Null); STACK_SIZE],
             sp: 0,
             globals: vec![Rc::new(Object::Null); GLOBAL_SIZE],
+        };
+    }
+
+    pub fn new_with_global_store(bytecode: Bytecode, globals: Vec<Rc<Object>>) -> VM {
+        return VM {
+            constants: bytecode.constants,
+            instructions: bytecode.instructions,
+            stack: vec![Rc::new(Object::Null); STACK_SIZE],
+            sp: 0,
+            globals,
         };
     }
 
