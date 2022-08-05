@@ -19,7 +19,7 @@ pub struct VM {
     stack: Vec<Rc<Object>>,
     sp: usize, // stack pointer. Always point to the next value. Top of the stack is stack[sp -1]
 
-    globals: Vec<Rc<Object>>,
+    pub globals: Vec<Rc<Object>>,
 }
 
 impl VM {

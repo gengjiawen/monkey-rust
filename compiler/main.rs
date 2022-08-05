@@ -33,26 +33,22 @@ fn main() {
             }
         };
 
-        let mut compiler = Compiler::new_with_state(symbol_table, constants.clone());
+        let mut compiler = Compiler::new_with_state(symbol_table, constants);
 
-        let bytecodes = match compiler.compile(&program) {
-            Ok(x) => x,
+        match compiler.compile(&program) {
+            Ok(bytecodes) => {
+                let mut vm = VM::new_with_global_store(bytecodes, globals);
+                vm.run();
+                println!("{}", vm.last_popped_stack_elm().unwrap());
+                globals = vm.globals;
+            },
             Err(e) => {
                 println!("{}", e);
-                continue;
-            }
-        };
-
-
-        let mut vm = VM::new_with_global_store(bytecodes, globals.clone());
-        vm.run();
-        match vm.last_popped_stack_elm() {
-            None => {}
-            Some(got) => {
-                println!("{}", got);
             }
         };
 
         symbol_table = compiler.symbol_table;
+        constants = compiler.constants;
+
     }
 }

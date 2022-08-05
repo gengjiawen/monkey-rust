@@ -10,7 +10,7 @@ use crate::symbol_table::SymbolTable;
 
 pub struct Compiler {
     instructions: Instructions,
-    constants: Vec<Rc<Object>>,
+    pub constants: Vec<Rc<Object>>,
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
     pub symbol_table: SymbolTable,
