@@ -1,13 +1,19 @@
 use compiler::compiler::Compiler;
 use compiler::vm::VM;
 
+use compiler::symbol_table::SymbolTable;
+use object::Object;
 use std::io::stdin;
 use std::io::{self, Write};
+use std::rc::Rc;
 
 use parser::parse;
 
 fn main() {
     println!("Welcome to monkey compiler by gengjiawen");
+    let mut constants = vec![];
+    let mut symbol_table = SymbolTable::new();
+    let mut globals = vec![Rc::new(Object::Null); compiler::vm::GLOBAL_SIZE];
     loop {
         print!("> ");
         io::stdout().flush().unwrap();
@@ -27,23 +33,26 @@ fn main() {
             }
         };
 
-        let mut compiler = Compiler::new();
+        let mut compiler = Compiler::new_with_state(symbol_table, constants.clone());
 
         let bytecodes = match compiler.compile(&program) {
             Ok(x) => x,
             Err(e) => {
                 println!("{}", e);
                 continue;
-            },
+            }
         };
-        let mut vm = VM::new(bytecodes);
+
+
+        let mut vm = VM::new_with_global_store(bytecodes, globals.clone());
         vm.run();
         match vm.last_popped_stack_elm() {
-            None => {
-            }
+            None => {}
             Some(got) => {
                 println!("{}", got);
             }
         };
+
+        symbol_table = compiler.symbol_table;
     }
 }
