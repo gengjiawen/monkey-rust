@@ -25,8 +25,11 @@ impl SymbolTable {
     }
 
     pub fn define(&mut self, name: String) -> Rc<Symbol> {
-        let symbol =
-            Rc::new(Symbol { name: name.clone(), scope: SymbolScope::Global, index: self.num_definitions });
+        let symbol = Rc::new(Symbol {
+            name: name.clone(),
+            scope: SymbolScope::Global,
+            index: self.num_definitions,
+        });
         self.num_definitions += 1;
         self.symbols.insert(name.clone(), Rc::clone(&symbol));
         return symbol;

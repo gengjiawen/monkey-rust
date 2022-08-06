@@ -131,8 +131,37 @@ mod tests {
     fn test_strings() {
         let tests = vec![
             VmTestCase { input: "\"monkey\"", expected: Object::String("monkey".to_string()) },
-            VmTestCase { input: "\"mon\" + \"key\"", expected: Object::String("monkey".to_string()) },
-            VmTestCase { input: "\"mon\" + \"key\" + \"banana\"", expected: Object::String("monkeybanana".to_string()) },
+            VmTestCase {
+                input: "\"mon\" + \"key\"",
+                expected: Object::String("monkey".to_string()),
+            },
+            VmTestCase {
+                input: "\"mon\" + \"key\" + \"banana\"",
+                expected: Object::String("monkeybanana".to_string()),
+            },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_arrays() {
+        fn map_vec_to_object(vec: Vec<i64>) -> Object {
+            let array = vec
+                .iter()
+                .map(|i| {
+                    Rc::new(Object::Integer(*i))
+                })
+                .collect::<Vec<Rc<Object>>>();
+            return Object::Array(array);
+        }
+        let tests = vec![
+            VmTestCase { input: "[]", expected: map_vec_to_object(vec![]) },
+            VmTestCase { input: "[1, 2, 3]", expected: map_vec_to_object(vec![1, 2, 3]) },
+            VmTestCase {
+                input: "[1 + 2, 3 * 4, 5 + 6]",
+                expected: map_vec_to_object(vec![3, 12, 11]),
+            },
         ];
 
         run_vm_tests(tests);

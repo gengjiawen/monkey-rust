@@ -119,8 +119,13 @@ impl Compiler {
                     let string_object = Object::String(s.raw.clone());
                     let operands = vec![self.add_constant(string_object)];
                     self.emit(OpConst, &operands);
-                },
-                Literal::Array(_) => {}
+                }
+                Literal::Array(array) => {
+                    for element in array.elements.iter() {
+                        self.compile_expr(element)?;
+                    }
+                    self.emit(OpArray, &vec![array.elements.len()]);
+                }
                 Literal::Hash(_) => {}
             },
             Expression::PREFIX(prefix) => {

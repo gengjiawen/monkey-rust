@@ -41,7 +41,7 @@ fn main() {
                 vm.run();
                 println!("{}", vm.last_popped_stack_elm().unwrap());
                 globals = vm.globals;
-            },
+            }
             Err(e) => {
                 println!("{}", e);
             }
@@ -49,6 +49,5 @@ fn main() {
 
         symbol_table = compiler.symbol_table;
         constants = compiler.constants;
-
     }
 }

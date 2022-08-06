@@ -299,29 +299,82 @@ mod tests {
     #[test]
     fn test_string() {
         let tests = vec![
-          CompilerTestCase {
-            input: "\"monkey\"",
-            expected_constants: vec![
-                Object::String("monkey".to_string()),
-            ],
-            expected_instructions: vec![
-                make_instructions(OpConst, &vec![0]),
-                make_instructions(OpPop, &vec![0]),
-            ],
-          },
-          CompilerTestCase {
-            input: r#""mon" + "key""#,
-            expected_constants: vec![
-                Object::String("mon".to_string()),
-                Object::String("key".to_string()),
-            ],
-            expected_instructions: vec![
-                make_instructions(OpConst, &vec![0]),
-                make_instructions(OpConst, &vec![1]),
-                make_instructions(OpAdd, &vec![0]),
-                make_instructions(OpPop, &vec![0]),
-            ],
-          }
+            CompilerTestCase {
+                input: "\"monkey\"",
+                expected_constants: vec![Object::String("monkey".to_string())],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: r#""mon" + "key""#,
+                expected_constants: vec![
+                    Object::String("mon".to_string()),
+                    Object::String("key".to_string()),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpAdd, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+        ];
+
+        run_compiler_test(tests);
+    }
+
+    #[test]
+    fn test_array() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "[]",
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    make_instructions(OpArray, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "[1, 2, 3]",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpArray, &vec![3]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "[1 + 2, 3 - 4, 5 * 6]",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpAdd, &vec![0]),
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpConst, &vec![3]),
+                    make_instructions(OpSub, &vec![0]),
+                    make_instructions(OpConst, &vec![4]),
+                    make_instructions(OpConst, &vec![5]),
+                    make_instructions(OpMul, &vec![0]),
+                    make_instructions(OpArray, &vec![3]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
         ];
 
         run_compiler_test(tests);

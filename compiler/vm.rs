@@ -101,6 +101,13 @@ impl VM {
                     ip += 2;
                     self.globals[global_index] = self.pop();
                 }
+                Opcode::OpArray => {
+                    let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+                    let elements = self.build_array(self.sp - count, self.sp);
+                    self.sp = self.sp - count;
+                    self.push(Rc::new(Object::Array(elements)));
+                }
             }
             ip += 1;
         }
@@ -206,5 +213,12 @@ impl VM {
             Object::Null => false,
             _ => true,
         }
+    }
+    fn build_array(&self, start: usize, end: usize) -> Vec<Rc<Object>> {
+        let mut elements = Vec::with_capacity(end - start);
+        for i in start..end {
+            elements.push(Rc::clone(&self.stack[i]));
+        }
+        return elements;
     }
 }

@@ -37,6 +37,7 @@ pub enum Opcode {
     OpNull,
     OpGetGlobal,
     OpSetGlobal,
+    OpArray,
 }
 
 lazy_static! {
@@ -75,6 +76,7 @@ lazy_static! {
             Opcode::OpSetGlobal,
             OpcodeDefinition { name: "OpSetGlobal", operand_width: vec![2] },
         );
+        m.insert(Opcode::OpArray, OpcodeDefinition { name: "OpSetGlobal", operand_width: vec![2] });
         m
     };
 }
