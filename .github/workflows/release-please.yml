@@ -17,12 +17,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: node
           changelog-types: >
-            [{"type":"feat","section":"Features","hidden":false},
-            {"type":"fix","section":"Bug Fixes","hidden":false},
-            {"type":"dev","section":"Dev","hidden":false},
-            {"type":"doc","section":"Doc","hidden":false},
-            {"type":"playground","section":"playground","hidden":false},
-            {"type":"meta","section":"Miscellaneous","hidden":false}]
+            [
+              {"type":"compiler","section":"compiler","hidden":false},
+              {"type":"feat","section":"Features","hidden":false},
+              {"type":"fix","section":"Bug Fixes","hidden":false},
+              {"type":"dev","section":"Dev","hidden":false},
+              {"type":"doc","section":"Doc","hidden":false},
+              {"type":"playground","section":"playground","hidden":false},
+              {"type":"meta","section":"Miscellaneous","hidden":false}
+            ]
       - run: npx envinfo
       - uses: actions/checkout@v2
       - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
