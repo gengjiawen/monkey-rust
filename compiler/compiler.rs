@@ -115,7 +115,11 @@ impl Compiler {
                         self.emit(OpFalse, &vec![]);
                     }
                 }
-                Literal::String(_) => {}
+                Literal::String(s) => {
+                    let string_object = Object::String(s.raw.clone());
+                    let operands = vec![self.add_constant(string_object)];
+                    self.emit(OpConst, &operands);
+                },
                 Literal::Array(_) => {}
                 Literal::Hash(_) => {}
             },

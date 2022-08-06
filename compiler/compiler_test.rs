@@ -7,18 +7,7 @@ pub fn test_constants(expected: &Vec<Object>, actual: &Vec<Rc<Object>>) {
     assert_eq!(expected.len(), actual.len());
     for (exp, b_got) in expected.iter().zip(actual) {
         let got = b_got.borrow();
-        match (exp, got) {
-            (Object::Integer(exp_val), Object::Integer(got_val)) => {
-                assert_eq!(exp_val, got_val, "integer not equal {} {}", exp_val, got_val);
-            }
-            (Object::Boolean(exp_val), Object::Boolean(got_val)) => {
-                assert_eq!(exp_val, got_val, "boolean not equal {} {}", exp_val, got_val);
-            }
-            (Object::Null, Object::Null) => {}
-            _ => {
-                panic!("can't compare object types, expected {}, got {}", exp, got);
-            }
-        }
+        assert_eq!(exp, got);
     }
 }
 #[cfg(test)]
@@ -302,6 +291,37 @@ mod tests {
                     make_instructions(OpPop, &vec![0]),
                 ],
             },
+        ];
+
+        run_compiler_test(tests);
+    }
+
+    #[test]
+    fn test_string() {
+        let tests = vec![
+          CompilerTestCase {
+            input: "\"monkey\"",
+            expected_constants: vec![
+                Object::String("monkey".to_string()),
+            ],
+            expected_instructions: vec![
+                make_instructions(OpConst, &vec![0]),
+                make_instructions(OpPop, &vec![0]),
+            ],
+          },
+          CompilerTestCase {
+            input: r#""mon" + "key""#,
+            expected_constants: vec![
+                Object::String("mon".to_string()),
+                Object::String("key".to_string()),
+            ],
+            expected_instructions: vec![
+                make_instructions(OpConst, &vec![0]),
+                make_instructions(OpConst, &vec![1]),
+                make_instructions(OpAdd, &vec![0]),
+                make_instructions(OpPop, &vec![0]),
+            ],
+          }
         ];
 
         run_compiler_test(tests);

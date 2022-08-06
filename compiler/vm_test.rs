@@ -126,4 +126,15 @@ mod tests {
 
         run_vm_tests(tests);
     }
+
+    #[test]
+    fn test_strings() {
+        let tests = vec![
+            VmTestCase { input: "\"monkey\"", expected: Object::String("monkey".to_string()) },
+            VmTestCase { input: "\"mon\" + \"key\"", expected: Object::String("monkey".to_string()) },
+            VmTestCase { input: "\"mon\" + \"key\" + \"banana\"", expected: Object::String("monkeybanana".to_string()) },
+        ];
+
+        run_vm_tests(tests);
+    }
 }

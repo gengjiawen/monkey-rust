@@ -120,6 +120,13 @@ impl VM {
                 };
                 self.push(Rc::from(Object::Integer(result)));
             }
+            (Object::String(l), Object::String(r)) => {
+                let result = match opcode {
+                    Opcode::OpAdd => l.to_string() + &r.to_string(),
+                    _ => panic!("Unknown opcode for string"),
+                };
+                self.push(Rc::from(Object::String(result)));
+            }
             _ => {
                 panic!("unsupported add for those types")
             }
