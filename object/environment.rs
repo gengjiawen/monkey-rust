@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 pub type Env = Rc<RefCell<Environment>>;
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Eq, Clone, PartialEq)]
 pub struct Environment {
     store: HashMap<String, Rc<Object>>,
     outer: Option<Env>,

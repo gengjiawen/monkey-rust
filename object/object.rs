@@ -14,7 +14,7 @@ pub mod environment;
 pub type EvalError = String;
 pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Rc<Object>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
@@ -74,8 +74,6 @@ impl Object {
         }
     }
 }
-
-impl Eq for Object {}
 
 impl Hash for Object {
     fn hash<H: Hasher>(&self, state: &mut H) {
