@@ -28,7 +28,7 @@
     "@vitejs/plugin-react": "^2.0.0",
     "rollup-plugin-visualizer": "^5.7.1",
     "typescript": "^4.7.4",
-    "vite": "^3.0.2",
+    "vite": "^3.0.4",
     "vite-plugin-top-level-await": "^1.1.1",
     "vite-plugin-wasm": "^2.1.0"
   }

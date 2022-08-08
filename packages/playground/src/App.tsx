@@ -9,13 +9,19 @@ import { Editor } from './Editor'
 import debounce from 'lodash.debounce'
 import {compile} from "@gengjiawen/monkey-wasm";
 
+const big_sample = `
+1 + 1;
+if (true) { 10 }; 3333;
+let a = [1, 2, 3];
+`
 const sample_list = [
     '1 + 1',
     'if (true) { 10 }; 3333;',
+    big_sample,
 ]
 
 function App() {
-  let code = sample_list[1]
+  let code = big_sample.trimStart()
   let [editor_value] = useState(code)
   const editorOnchange = (value: string) => {
     console.log(value)
