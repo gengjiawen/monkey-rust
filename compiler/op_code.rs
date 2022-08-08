@@ -12,7 +12,7 @@ pub struct Instructions {
 }
 
 pub struct OpcodeDefinition {
-    name: &'static str,
+    pub(crate) name: &'static str,
     operand_width: Vec<i32>,
 }
 
@@ -76,7 +76,7 @@ lazy_static! {
             Opcode::OpSetGlobal,
             OpcodeDefinition { name: "OpSetGlobal", operand_width: vec![2] },
         );
-        m.insert(Opcode::OpArray, OpcodeDefinition { name: "OpSetGlobal", operand_width: vec![2] });
+        m.insert(Opcode::OpArray, OpcodeDefinition { name: "OpArray", operand_width: vec![2] });
         m
     };
 }
