@@ -1,10 +1,8 @@
 use core::fmt;
 use core::fmt::Result;
-use std::collections::HashMap;
 use lexer::token::{Span, Token, TokenKind};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
-use std::hash::Hash;
 
 // still wait for https://github.com/serde-rs/serde/issues/1402
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
@@ -216,7 +214,7 @@ pub enum Literal {
     Boolean(Boolean),
     String(StringType),
     Array(Array),
-    Hash(HashLiteral),
+    Hash(Hash),
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
@@ -243,16 +241,10 @@ pub struct Array {
     pub span: Span,
 }
 
-#[derive(Clone, Debug, Eq, Serialize, Deserialize, PartialEq)]
-pub struct HashLiteral {
-    pub elements: HashMap<Expression, Expression>,
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub struct Hash {
+    pub elements: Vec<(Expression, Expression)>,
     pub span: Span,
-}
-
-impl Hash for HashLiteral {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
-        panic!("can't hash for HashLiteral");
-    }
 }
 
 impl fmt::Display for Literal {
@@ -262,12 +254,10 @@ impl fmt::Display for Literal {
             Literal::Boolean(Boolean { raw: b, .. }) => write!(f, "{}", b),
             Literal::String(StringType { raw: s, .. }) => write!(f, "\"{}\"", s),
             Literal::Array(Array { elements: e, .. }) => write!(f, "[{}]", format_expressions(e)),
-            Literal::Hash(HashLiteral { elements: map, .. }) => {
-                let mut keys = map.keys().collect::<Vec<&Expression>>();
-                keys.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
-                let to_string = keys
+            Literal::Hash(Hash { elements: map, .. }) => {
+                let to_string = map
                     .iter()
-                    .map(|key| format!("{}: {}", key, map.get(key).unwrap()))
+                    .map(|(k, v)| format!("{}: {}", k, v))
                     .collect::<Vec<String>>()
                     .join(", ");
 

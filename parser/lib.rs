@@ -4,12 +4,10 @@ mod parser_test;
 mod precedences;
 
 pub extern crate lexer;
-extern crate core;
 
-use std::collections::HashMap;
 use crate::ast::{
     Array, BinaryExpression, BlockStatement, Boolean, Expression, FunctionCall,
-    FunctionDeclaration, HashLiteral, Index, Integer, Let, Literal, Node, Program, ReturnStatement,
+    FunctionDeclaration, Hash, Index, Integer, Let, Literal, Node, Program, ReturnStatement,
     Statement, StringType, UnaryExpression, IDENTIFIER, IF,
 };
 use crate::precedences::{get_token_precedence, Precedence};
@@ -433,7 +431,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_hash_expression(&mut self) -> Result<Expression, ParseError> {
-        let mut map = HashMap::new();
+        let mut map = Vec::new();
         let start = self.current_token.span.start;
         while !self.peek_token_is(&TokenKind::RBRACE) {
             self.next_token();
@@ -445,7 +443,7 @@ impl<'a> Parser<'a> {
             self.next_token();
             let value = self.parse_expression(Precedence::LOWEST)?.0;
 
-            map.insert(key, value);
+            map.push((key, value));
 
             if !self.peek_token_is(&TokenKind::RBRACE) {
                 self.expect_peek(&TokenKind::COMMA)?;
@@ -455,7 +453,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::RBRACE)?;
         let end = self.current_token.span.end;
 
-        Ok(Expression::LITERAL(Literal::Hash(HashLiteral { elements: map, span: Span { start, end } })))
+        Ok(Expression::LITERAL(Literal::Hash(Hash { elements: map, span: Span { start, end } })))
     }
 }
 
