@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder};
@@ -107,6 +108,13 @@ impl VM {
                     let elements = self.build_array(self.sp - count, self.sp);
                     self.sp = self.sp - count;
                     self.push(Rc::new(Object::Array(elements)));
+                }
+                Opcode::OpHash => {
+                    let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+                    let elements = self.build_hash(self.sp - count, self.sp);
+                    self.sp = self.sp - count;
+                    self.push(Rc::new(Object::Hash(elements)));
                 }
             }
             ip += 1;
@@ -218,6 +226,16 @@ impl VM {
         let mut elements = Vec::with_capacity(end - start);
         for i in start..end {
             elements.push(Rc::clone(&self.stack[i]));
+        }
+        return elements;
+    }
+
+    fn build_hash(&self, start: usize, end: usize) -> HashMap<Rc<Object>, Rc<Object>> {
+        let mut elements = HashMap::new();
+        for i in (start..end).step_by(2) {
+            let key = Rc::clone(&self.stack[i]);
+            let value = Rc::clone(&self.stack[i + 1]);
+            elements.insert(key, value);
         }
         return elements;
     }

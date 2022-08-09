@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use crate::op_code::Opcode::{OpAdd, OpConst};
     use crate::op_code::*;
+    use std::collections::HashSet;
     use strum::EnumCount;
 
     #[test]
@@ -52,7 +52,8 @@ mod tests {
     fn test_instructions_legal() {
         let opcode_count = Opcode::COUNT;
         let keys_count = DEFINITIONS.keys().count();
-        let op_keys = DEFINITIONS.values()
+        let op_keys = DEFINITIONS
+            .values()
             .map(|d| d.name.to_string())
             .collect::<HashSet<String>>();
         assert_eq!(opcode_count, keys_count);

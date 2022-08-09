@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::rc::Rc;
 
     use object::Object;
@@ -149,9 +150,7 @@ mod tests {
         fn map_vec_to_object(vec: Vec<i64>) -> Object {
             let array = vec
                 .iter()
-                .map(|i| {
-                    Rc::new(Object::Integer(*i))
-                })
+                .map(|i| Rc::new(Object::Integer(*i)))
                 .collect::<Vec<Rc<Object>>>();
             return Object::Array(array);
         }
@@ -161,6 +160,32 @@ mod tests {
             VmTestCase {
                 input: "[1 + 2, 3 * 4, 5 + 6]",
                 expected: map_vec_to_object(vec![3, 12, 11]),
+            },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_hash() {
+        fn map_vec_to_object(vec: Vec<(i64, i64)>) -> Object {
+            let hash = vec
+                .iter()
+                .fold(HashMap::new(), |mut acc, (k, v)| {
+                    acc.insert(Rc::new(Object::Integer(*k)), Rc::new(Object::Integer(*v)));
+                    acc
+                });
+            return Object::Hash(hash);
+        }
+        let tests = vec![
+            VmTestCase { input: "{}", expected: Object::Hash(HashMap::new()) },
+            VmTestCase {
+                input: "{1: 2, 2: 3}",
+                expected: map_vec_to_object(vec![(1, 2), (2, 3)]),
+            },
+            VmTestCase {
+                input: "{1 + 1: 2 * 2, 3 + 3: 4 * 4}",
+                expected: map_vec_to_object(vec![(2, 4), (6, 16)]),
             },
         ];
 

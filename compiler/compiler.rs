@@ -126,7 +126,13 @@ impl Compiler {
                     }
                     self.emit(OpArray, &vec![array.elements.len()]);
                 }
-                Literal::Hash(_) => {}
+                Literal::Hash(hash) => {
+                    for (key, value) in hash.elements.iter() {
+                        self.compile_expr(&key)?;
+                        self.compile_expr(&value)?;
+                    }
+                    self.emit(OpHash, &vec![hash.elements.len() * 2]);
+                }
             },
             Expression::PREFIX(prefix) => {
                 self.compile_expr(&prefix.operand).unwrap();

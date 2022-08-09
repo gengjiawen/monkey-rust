@@ -379,4 +379,64 @@ mod tests {
 
         run_compiler_test(tests);
     }
+
+    #[test]
+    fn test_hashmap() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "{}",
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    make_instructions(OpHash, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2, 3: 4, 5: 6}",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpConst, &vec![3]),
+                    make_instructions(OpConst, &vec![4]),
+                    make_instructions(OpConst, &vec![5]),
+                    make_instructions(OpHash, &vec![6]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2 + 3, 4: 5 * 6}",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpAdd, &vec![0]),
+                    make_instructions(OpConst, &vec![3]),
+                    make_instructions(OpConst, &vec![4]),
+                    make_instructions(OpConst, &vec![5]),
+                    make_instructions(OpMul, &vec![0]),
+                    make_instructions(OpHash, &vec![4]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+        ];
+
+        run_compiler_test(tests);
+    }
 }
