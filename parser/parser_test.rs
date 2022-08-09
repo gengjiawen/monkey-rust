@@ -161,11 +161,11 @@ mod tests {
     fn test_hash_literal_expression() {
         let test_case = [
             (r#"{"a": 1}"#, r#"{"a": 1}"#),
-            (r#"{"one": 1, "two": 2, "three": 3}"#, r#"{"one": 1, "two": 2, "three": 3}"#),
+            (r#"{"one": 1, "two": 2, "three": 3}"#, r#"{"one": 1, "three": 3, "two": 2}"#),
             (r#"{}"#, r#"{}"#),
             (
                 r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#,
-                r#"{"one": (0 + 1), "two": (10 - 8), "three": (15 / 5)}"#,
+                r#"{"one": (0 + 1), "three": (15 / 5), "two": (10 - 8)}"#,
             ),
         ];
         verify_program(&test_case);

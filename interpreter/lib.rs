@@ -248,7 +248,7 @@ fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
             let list = eval_expressions(elements, env)?;
             return Ok(Rc::from(Object::Array(list)));
         }
-        Literal::Hash(Hash { elements: map, .. }) => {
+        Literal::Hash(HashLiteral { elements: map, .. }) => {
             let mut hash_map = HashMap::new();
 
             for (k, v) in map {
