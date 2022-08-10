@@ -15,10 +15,6 @@ mod tests {
         expected: Object,
     }
 
-    fn test_expected_object(expected: Object, got: Rc<Object>) {
-        test_constants(&vec![expected], &vec![got]);
-    }
-
     fn run_vm_tests(tests: Vec<VmTestCase>) {
         for t in tests {
             let program = parse(t.input).unwrap();
@@ -28,7 +24,8 @@ mod tests {
             let mut vm = VM::new(bytecodes);
             vm.run();
             let got = vm.last_popped_stack_elm().unwrap();
-            test_expected_object(t.expected, got);
+            let expected_argument = t.expected;
+            test_constants(&vec![expected_argument], &vec![got]);
         }
     }
 
@@ -169,24 +166,38 @@ mod tests {
     #[test]
     fn test_hash() {
         fn map_vec_to_object(vec: Vec<(i64, i64)>) -> Object {
-            let hash = vec
-                .iter()
-                .fold(HashMap::new(), |mut acc, (k, v)| {
-                    acc.insert(Rc::new(Object::Integer(*k)), Rc::new(Object::Integer(*v)));
-                    acc
-                });
+            let hash = vec.iter().fold(HashMap::new(), |mut acc, (k, v)| {
+                acc.insert(Rc::new(Object::Integer(*k)), Rc::new(Object::Integer(*v)));
+                acc
+            });
             return Object::Hash(hash);
         }
         let tests = vec![
             VmTestCase { input: "{}", expected: Object::Hash(HashMap::new()) },
-            VmTestCase {
-                input: "{1: 2, 2: 3}",
-                expected: map_vec_to_object(vec![(1, 2), (2, 3)]),
-            },
+            VmTestCase { input: "{1: 2, 2: 3}", expected: map_vec_to_object(vec![(1, 2), (2, 3)]) },
             VmTestCase {
                 input: "{1 + 1: 2 * 2, 3 + 3: 4 * 4}",
                 expected: map_vec_to_object(vec![(2, 4), (6, 16)]),
             },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_index() {
+        let tests = vec![
+            VmTestCase { input: "[1, 2, 3][1]", expected: Object::Integer(2) },
+            VmTestCase { input: "[1, 2, 3][0 + 2]", expected: Object::Integer(3) },
+            VmTestCase { input: "[1, 2, 3][0]", expected: Object::Integer(1) },
+            VmTestCase { input: "[[1, 1, 1]][0][0]", expected: Object::Integer(1) },
+            VmTestCase { input: "[][0]", expected: Object::Null },
+            VmTestCase { input: "[1, 2, 3][99]", expected: Object::Null },
+            VmTestCase { input: "[1][-1]", expected: Object::Null },
+            VmTestCase { input: "{1: 1, 2: 2}[1]", expected: Object::Integer(1) },
+            VmTestCase { input: "{1: 1, 2: 2}[2]", expected: Object::Integer(2) },
+            VmTestCase { input: "{1: 1}[0]", expected: Object::Null },
+            VmTestCase { input: "{}[0]", expected: Object::Null },
         ];
 
         run_vm_tests(tests);

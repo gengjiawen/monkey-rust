@@ -208,9 +208,13 @@ impl Compiler {
                 let after_alternative_location = self.instructions.data.len();
                 self.change_operand(jump_pos, after_alternative_location);
             }
+            Expression::Index(index) => {
+                self.compile_expr(&index.object)?;
+                self.compile_expr(&index.index)?;
+                self.emit(OpIndex, &vec![]);
+            }
             Expression::FUNCTION(_) => {}
             Expression::FunctionCall(_) => {}
-            Expression::Index(_) => {}
         }
 
         return Ok(());

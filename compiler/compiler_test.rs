@@ -46,7 +46,7 @@ mod tests {
             assert_eq!(
                 exp,
                 got,
-                "instruction not equal\n actual  : {:?}\n expected: {}",
+                "instruction not equal\n actual  : \n{}\n expected: \n{}",
                 actual.string(),
                 expected_ins.string()
             );
@@ -432,6 +432,54 @@ mod tests {
                     make_instructions(OpConst, &vec![5]),
                     make_instructions(OpMul, &vec![0]),
                     make_instructions(OpHash, &vec![4]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+        ];
+
+        run_compiler_test(tests);
+    }
+
+    #[test]
+    fn test_index() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "[1, 2, 3][1 + 1]",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(1),
+                    Object::Integer(1),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpArray, &vec![3]),
+                    make_instructions(OpConst, &vec![3]),
+                    make_instructions(OpConst, &vec![4]),
+                    make_instructions(OpAdd, &vec![0]),
+                    make_instructions(OpIndex, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2 }[2 -1]",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(2),
+                    Object::Integer(1),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpConst, &vec![1]),
+                    make_instructions(OpHash, &vec![2]),
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpConst, &vec![3]),
+                    make_instructions(OpSub, &vec![0]),
+                    make_instructions(OpIndex, &vec![0]),
                     make_instructions(OpPop, &vec![0]),
                 ],
             },

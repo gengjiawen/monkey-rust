@@ -5,7 +5,6 @@ use std::rc::Rc;
 use byteorder::{BigEndian, ByteOrder};
 
 use object::Object;
-use object::Object::Boolean;
 
 use crate::compiler::Bytecode;
 use crate::op_code::{cast_u8_to_opcode, Instructions, Opcode};
@@ -63,10 +62,10 @@ impl VM {
                     self.pop();
                 }
                 Opcode::OpTrue => {
-                    self.push(Rc::new(Boolean(true)));
+                    self.push(Rc::new(Object::Boolean(true)));
                 }
                 Opcode::OpFalse => {
-                    self.push(Rc::new(Boolean(false)));
+                    self.push(Rc::new(Object::Boolean(false)));
                 }
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
                     self.execute_comparison(opcode);
@@ -115,6 +114,11 @@ impl VM {
                     let elements = self.build_hash(self.sp - count, self.sp);
                     self.sp = self.sp - count;
                     self.push(Rc::new(Object::Hash(elements)));
+                }
+                Opcode::OpIndex => {
+                    let index = self.pop();
+                    let left = self.pop();
+                    self.execute_index_operation(left, index);
                 }
             }
             ip += 1;
@@ -238,5 +242,43 @@ impl VM {
             elements.insert(key, value);
         }
         return elements;
+    }
+
+    fn execute_index_operation(&mut self, left: Rc<Object>, index: Rc<Object>) {
+        match (left.borrow(), index.borrow()) {
+            (Object::Array(l), Object::Integer(i)) => {
+                self.execute_array_index(l, *i);
+            }
+            (Object::Hash(l), _) => {
+                self.execute_hash_index(l, index);
+            }
+            _ => {
+                panic!("unsupported index operation for those types")
+            }
+        }
+    }
+
+    fn execute_array_index(&mut self, array: &Vec<Rc<Object>>, index: i64) {
+        if index < array.len() as i64 && index >= 0 {
+            self.push(Rc::clone(&array[index as usize]));
+        } else {
+            self.push(Rc::new(Object::Null));
+        }
+    }
+
+    fn execute_hash_index(&mut self, hash: &HashMap<Rc<Object>, Rc<Object>>, index: Rc<Object>) {
+        match &*index {
+            Object::Integer(_) | Object::Boolean(_) | Object::String(_) => match hash.get(&index) {
+                Some(el) => {
+                    self.push(Rc::clone(el));
+                }
+                None => {
+                    self.push(Rc::new(Object::Null));
+                }
+            },
+            _ => {
+                panic!("unsupported hash index operation for those types {}", index)
+            }
+        }
     }
 }

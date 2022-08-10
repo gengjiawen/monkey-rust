@@ -9,7 +9,8 @@ mod tests {
                 Ok(x) => x,
                 Err(e) => {
                     println!("{:?}", node);
-                    panic!("serde_json error: {} for input {}", e, input) },
+                    panic!("serde_json error: {} for input {}", e, input)
+                }
             },
             Err(e) => panic!("parse error: {} for input {}", e[0], input),
         };
