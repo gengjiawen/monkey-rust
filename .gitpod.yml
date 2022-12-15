@@ -12,4 +12,4 @@ vscode:
     - vadimcn.vscode-lldb
     - gengjiawen.vscode-wasm
     - gengjiawen.vscode-postfix-ts
-    - matklad.rust-analyzer
+    - rust-lang.rust-analyzer
