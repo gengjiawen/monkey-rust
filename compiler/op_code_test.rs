@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::op_code::Opcode::{OpAdd, OpConst};
+    use crate::op_code::Opcode::{OpAdd, OpConst, OpGetLocal};
     use crate::op_code::*;
     use std::collections::HashSet;
     use strum::EnumCount;
@@ -20,6 +20,11 @@ mod tests {
                 expected: vec![OpConst as u8, 255, 254],
             },
             Test { op: Opcode::OpAdd, operands: vec![], expected: vec![OpAdd as u8] },
+            Test {
+                op: Opcode::OpGetLocal,
+                operands: vec![255],
+                expected: vec![OpGetLocal as u8, 255],
+            },
         ];
 
         for t in tests {

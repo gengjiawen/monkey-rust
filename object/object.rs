@@ -26,6 +26,7 @@ pub enum Object {
     Function(Vec<IDENTIFIER>, BlockStatement, Env),
     Builtin(BuiltinFunc),
     Error(String),
+    CompiledFunction(CompiledFunction),
 }
 
 impl fmt::Display for Object {
@@ -62,6 +63,9 @@ impl fmt::Display for Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Object::CompiledFunction(_) => {
+                write!(f, "[compiled function]")
+            }
         }
     }
 }
@@ -84,4 +88,11 @@ impl Hash for Object {
             t => panic!("can't hashable for {}", t),
         }
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct CompiledFunction {
+    pub instructions: Vec<u8>,
+    pub num_locals: usize,
+    pub num_parameters: usize,
 }

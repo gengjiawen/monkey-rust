@@ -40,6 +40,11 @@ pub enum Opcode {
     OpArray,
     OpHash,
     OpIndex,
+    OpCall,
+    OpReturnValue,
+    OpReturn,
+    OpGetLocal,
+    OpSetLocal,
 }
 
 lazy_static! {
@@ -81,7 +86,21 @@ lazy_static! {
         m.insert(Opcode::OpArray, OpcodeDefinition { name: "OpArray", operand_width: vec![2] });
         m.insert(Opcode::OpHash, OpcodeDefinition { name: "OpHash", operand_width: vec![2] });
         m.insert(Opcode::OpIndex, OpcodeDefinition { name: "OpIndex", operand_width: vec![] });
-        m
+        m.insert(Opcode::OpCall, OpcodeDefinition { name: "OpCall", operand_width: vec![1] });
+        m.insert(Opcode::OpReturn, OpcodeDefinition { name: "OpReturn", operand_width: vec![] });
+        m.insert(
+            Opcode::OpReturnValue,
+            OpcodeDefinition { name: "OpReturnValue", operand_width: vec![] },
+        );
+        m.insert(
+            Opcode::OpGetLocal,
+            OpcodeDefinition { name: "OpGetLocal", operand_width: vec![1] },
+        );
+        m.insert(
+            Opcode::OpSetLocal,
+            OpcodeDefinition { name: "OpSetLocal", operand_width: vec![1] },
+        );
+        return m;
     };
 }
 

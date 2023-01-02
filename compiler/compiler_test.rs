@@ -487,4 +487,77 @@ mod tests {
 
         run_compiler_test(tests);
     }
+
+    #[test]
+    fn test_functions() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "fn() { return 5 + 10; }",
+                expected_constants: vec![
+                    Object::Integer(5),
+                    Object::Integer(10),
+                    Object::CompiledFunction(object::CompiledFunction {
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpConst, &vec![0]),
+                            make_instructions(OpConst, &vec![1]),
+                            make_instructions(OpAdd, &vec![0]),
+                            make_instructions(OpReturnValue, &vec![0]),
+                        ])
+                        .data,
+                        num_locals: 0,
+                        num_parameters: 0,
+                    }),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "fn() { return 5 + 10; }",
+                expected_constants: vec![
+                    Object::Integer(5),
+                    Object::Integer(10),
+                    Object::CompiledFunction(object::CompiledFunction {
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpConst, &vec![0]),
+                            make_instructions(OpConst, &vec![1]),
+                            make_instructions(OpAdd, &vec![0]),
+                            make_instructions(OpReturnValue, &vec![0]),
+                        ])
+                        .data,
+                        num_locals: 0,
+                        num_parameters: 0,
+                    }),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "fn() { 1; 2}",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::CompiledFunction(object::CompiledFunction {
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpConst, &vec![0]),
+                            make_instructions(OpPop, &vec![0]),
+                            make_instructions(OpConst, &vec![1]),
+                            make_instructions(OpReturnValue, &vec![0]),
+                        ])
+                        .data,
+                        num_locals: 0,
+                        num_parameters: 0,
+                    }),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![2]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+        ];
+        run_compiler_test(tests);
+    }
 }

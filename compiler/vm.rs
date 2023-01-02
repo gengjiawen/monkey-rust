@@ -7,52 +7,76 @@ use byteorder::{BigEndian, ByteOrder};
 use object::Object;
 
 use crate::compiler::Bytecode;
-use crate::op_code::{cast_u8_to_opcode, Instructions, Opcode};
+use crate::frame::Frame;
+use crate::op_code::{cast_u8_to_opcode, Opcode};
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 65536;
+const MAX_FRAMES: usize = 1024;
 
 pub struct VM {
     constants: Vec<Rc<Object>>,
-    instructions: Instructions,
 
     stack: Vec<Rc<Object>>,
     sp: usize, // stack pointer. Always point to the next value. Top of the stack is stack[sp -1]
 
     pub globals: Vec<Rc<Object>>,
+
+    frames: Vec<Frame>,
+    frame_index: usize,
 }
 
 impl VM {
     pub fn new(bytecode: Bytecode) -> VM {
+        let main_fn = object::CompiledFunction {
+            instructions: bytecode.instructions.data,
+            num_locals: 0,
+            num_parameters: 0,
+        };
+
+        // it's rust, it's verbose. You can't just grow your vector size.
+        let empty_frame = Frame::new(
+            object::CompiledFunction { instructions: vec![], num_locals: 0, num_parameters: 0 },
+            0,
+        );
+
+        let main_frame = Frame::new(main_fn, 0);
+        let mut frames = vec![empty_frame; MAX_FRAMES];
+        frames[0] = main_frame;
+
         return VM {
             constants: bytecode.constants,
-            instructions: bytecode.instructions,
             stack: vec![Rc::new(Object::Null); STACK_SIZE],
             sp: 0,
             globals: vec![Rc::new(Object::Null); GLOBAL_SIZE],
+            frames,
+            frame_index: 1,
         };
     }
 
     pub fn new_with_global_store(bytecode: Bytecode, globals: Vec<Rc<Object>>) -> VM {
-        return VM {
-            constants: bytecode.constants,
-            instructions: bytecode.instructions,
-            stack: vec![Rc::new(Object::Null); STACK_SIZE],
-            sp: 0,
-            globals,
-        };
+        let mut vm = VM::new(bytecode);
+        vm.globals = globals;
+        return vm;
     }
 
     pub fn run(&mut self) {
         let mut ip = 0;
-        let ins = self.instructions.data.clone();
-        while ip < ins.len() {
+        let mut ins: Vec<u8>;
+        while self.current_frame().ip
+            < self.current_frame().instructions().data.clone().len() as i32 - 1
+        {
+            self.current_frame().ip += 1;
+            ip = self.current_frame().ip as usize;
+            ins = self.current_frame().instructions().data.clone();
+
             let op: u8 = *ins.get(ip).unwrap();
             let opcode = cast_u8_to_opcode(op);
+
             match opcode {
                 Opcode::OpConst => {
                     let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    self.current_frame().ip += 2;
                     self.push(Rc::clone(&self.constants[const_index]))
                 }
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
@@ -78,14 +102,14 @@ impl VM {
                 }
                 Opcode::OpJump => {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip = pos - 1;
+                    self.current_frame().ip = pos as i32 - 1;
                 }
                 Opcode::OpJumpNotTruthy => {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    self.current_frame().ip += 2;
                     let condition = self.pop();
                     if !self.is_truthy(condition) {
-                        ip = pos - 1;
+                        self.current_frame().ip = pos as i32 - 1;
                     }
                 }
                 Opcode::OpNull => {
@@ -93,24 +117,24 @@ impl VM {
                 }
                 Opcode::OpGetGlobal => {
                     let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    self.current_frame().ip += 2;
                     self.push(Rc::clone(&self.globals[global_index]));
                 }
                 Opcode::OpSetGlobal => {
                     let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    self.current_frame().ip += 2;
                     self.globals[global_index] = self.pop();
                 }
                 Opcode::OpArray => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    self.current_frame().ip += 2;
                     let elements = self.build_array(self.sp - count, self.sp);
                     self.sp = self.sp - count;
                     self.push(Rc::new(Object::Array(elements)));
                 }
                 Opcode::OpHash => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    self.current_frame().ip += 2;
                     let elements = self.build_hash(self.sp - count, self.sp);
                     self.sp = self.sp - count;
                     self.push(Rc::new(Object::Hash(elements)));
@@ -120,8 +144,35 @@ impl VM {
                     let left = self.pop();
                     self.execute_index_operation(left, index);
                 }
+                Opcode::OpReturnValue => {
+                    let return_value = self.pop();
+                    let frame = self.pop_frame();
+                    self.sp = frame.base_pointer - 1;
+                    self.push(return_value);
+                }
+                Opcode::OpReturn => {
+                    let frame = self.pop_frame();
+                    self.sp = frame.base_pointer - 1;
+                    self.push(Rc::new(object::Object::Null));
+                }
+                Opcode::OpCall => {
+                    let num_args = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+                    self.call_function(num_args);
+                }
+                Opcode::OpSetLocal => {
+                    let local_index = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+                    let base = self.current_frame().base_pointer;
+                    self.stack[base + local_index] = self.pop();
+                }
+                Opcode::OpGetLocal => {
+                    let local_index = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+                    let base = self.current_frame().base_pointer;
+                    self.push(Rc::clone(&self.stack[base + local_index]));
+                }
             }
-            ip += 1;
         }
     }
 
@@ -280,5 +331,33 @@ impl VM {
                 panic!("unsupported hash index operation for those types {}", index)
             }
         }
+    }
+
+    fn current_frame(&mut self) -> &mut Frame {
+        &mut self.frames[self.frame_index - 1]
+    }
+
+    fn push_frame(&mut self, frame: Frame) {
+        self.frames[self.frame_index] = frame;
+        self.frame_index += 1;
+    }
+
+    fn pop_frame(&mut self) -> Frame {
+        self.frame_index -= 1;
+        return self.frames[self.frame_index].clone();
+    }
+
+    fn call_function(&mut self, num_args: usize) {
+        if let Object::CompiledFunction(cf) = &*self.stack[self.sp - 1 - num_args] {
+            if cf.num_parameters != num_args {
+                panic!("wrong number of arguments: want={}, got={}", cf.num_parameters, num_args);
+            }
+
+            let frame = Frame::new(cf.clone(), self.sp - num_args);
+            self.sp = frame.base_pointer + cf.num_locals;
+            self.push_frame(frame);
+        } else {
+            panic!("calling non-function")
+        };
     }
 }
