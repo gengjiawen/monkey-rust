@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 pub mod compiler;
+mod compiler_function_test;
 mod compiler_test;
 mod frame;
 pub mod op_code;
