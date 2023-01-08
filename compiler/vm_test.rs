@@ -1,33 +1,35 @@
+use object::Object;
+use parser::parse;
+use crate::compiler::Compiler;
+use crate::compiler_test::test_constants;
+use crate::vm::VM;
+
+pub struct VmTestCase<'a> {
+    pub(crate) input: &'a str,
+    pub(crate) expected: Object,
+}
+
+pub fn run_vm_tests(tests: Vec<VmTestCase>) {
+    for t in tests {
+        let program = parse(t.input).unwrap();
+        let mut compiler = Compiler::new();
+        let bytecodes = compiler.compile(&program).unwrap();
+        // println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
+        let mut vm = VM::new(bytecodes);
+        vm.run();
+        let got = vm.last_popped_stack_elm().unwrap();
+        let expected_argument = t.expected;
+        test_constants(&vec![expected_argument], &vec![got]);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
     use std::rc::Rc;
-
     use object::Object;
-    use parser::parse;
 
-    use crate::compiler::Compiler;
-    use crate::compiler_test::test_constants;
-    use crate::vm::VM;
-
-    struct VmTestCase<'a> {
-        input: &'a str,
-        expected: Object,
-    }
-
-    fn run_vm_tests(tests: Vec<VmTestCase>) {
-        for t in tests {
-            let program = parse(t.input).unwrap();
-            let mut compiler = Compiler::new();
-            let bytecodes = compiler.compile(&program).unwrap();
-            // println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
-            let mut vm = VM::new(bytecodes);
-            vm.run();
-            let got = vm.last_popped_stack_elm().unwrap();
-            let expected_argument = t.expected;
-            test_constants(&vec![expected_argument], &vec![got]);
-        }
-    }
+    use crate::vm_test::{run_vm_tests, VmTestCase};
 
     #[test]
     fn test_integer_arithmetic() {
@@ -198,27 +200,6 @@ mod tests {
             VmTestCase { input: "{1: 1, 2: 2}[2]", expected: Object::Integer(2) },
             VmTestCase { input: "{1: 1}[0]", expected: Object::Null },
             VmTestCase { input: "{}[0]", expected: Object::Null },
-        ];
-
-        run_vm_tests(tests);
-    }
-
-    #[test]
-    fn test_function_without_arguments() {
-        let tests = vec![
-            VmTestCase {
-                input: "let fivePlusTen= fn() { 5 + 10; }; fivePlusTen();",
-                expected: Object::Integer(15),
-            },
-            VmTestCase {
-                input: "let one = fn() { 1; }; let two = fn() { 2; }; one() + two();",
-                expected: Object::Integer(3),
-            },
-            VmTestCase {
-                input:
-                    "let a = fn() { 1 }; let b = fn() { a() + 1 }; let c = fn() { b() + 1 }; c();",
-                expected: Object::Integer(3),
-            },
         ];
 
         run_vm_tests(tests);
