@@ -1,8 +1,8 @@
-use object::Object;
-use parser::parse;
 use crate::compiler::Compiler;
 use crate::compiler_test::test_constants;
 use crate::vm::VM;
+use object::Object;
+use parser::parse;
 
 pub struct VmTestCase<'a> {
     pub(crate) input: &'a str,
@@ -25,9 +25,9 @@ pub fn run_vm_tests(tests: Vec<VmTestCase>) {
 
 #[cfg(test)]
 mod tests {
+    use object::Object;
     use std::collections::HashMap;
     use std::rc::Rc;
-    use object::Object;
 
     use crate::vm_test::{run_vm_tests, VmTestCase};
 
