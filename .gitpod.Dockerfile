@@ -1,4 +1,4 @@
-FROM gitpod/workspace-full-vnc
+FROM gitpod/workspace-full-vnc:2023-03-06-18-43-51
 
 ENV TRIGGER_REBUILD=10
 
