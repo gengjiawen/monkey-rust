@@ -1,16 +1,17 @@
 use crate::{BuiltinFunc, Object};
-use phf::phf_map;
 use std::rc::Rc;
 
-pub static BUILTINS: phf::Map<&'static str, BuiltinFunc> = phf_map! {
-    "len" => len,
-    "puts" => puts,
-    "print" => puts,
-    "first" => first,
-    "last" => last,
-    "rest" => rest,
-    "push" => push,
-};
+lazy_static! {
+    pub static ref BuiltIns: Vec<(&'static str, BuiltinFunc)> = vec![
+        ("len", len),
+        ("puts", puts),
+        ("first", first),
+        ("last", last),
+        ("rest", rest),
+        ("push", push),
+        ("print", puts)
+    ];
+}
 
 // a failed try
 // rust sucks: https://stackoverflow.com/a/27896014/1713757
@@ -19,6 +20,12 @@ pub static BUILTINS: phf::Map<&'static str, BuiltinFunc> = phf_map! {
 //     .collect();
 
 pub fn len(args: Vec<Rc<Object>>) -> Rc<Object> {
+    if args.len() != 1 {
+        return Rc::from(Object::Error(format!(
+            "builtin len expected 1 argument, got {}",
+            args.len()
+        )));
+    }
     Rc::from(match &*args[0] {
         Object::String(s) => Object::Integer(s.len() as i64),
         Object::Array(a) => Object::Integer(a.len() as i64),

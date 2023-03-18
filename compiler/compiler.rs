@@ -1,3 +1,4 @@
+use object::builtins::BuiltIns;
 use std::rc::Rc;
 
 use object::Object;
@@ -6,8 +7,7 @@ use parser::lexer::token::TokenKind;
 
 use crate::op_code::Opcode::*;
 use crate::op_code::{cast_u8_to_opcode, make_instructions, Instructions, Opcode};
-use crate::symbol_table::SymbolScope::Global;
-use crate::symbol_table::SymbolTable;
+use crate::symbol_table::{Symbol, SymbolScope, SymbolTable};
 
 struct CompilationScope {
     instructions: Instructions,
@@ -43,9 +43,14 @@ impl Compiler {
             previous_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
         };
 
+        let mut symbol_table = SymbolTable::new();
+        for (key, value) in BuiltIns.iter().enumerate() {
+            symbol_table.define_builtin(key, value.0.to_string());
+        }
+
         return Compiler {
             constants: vec![],
-            symbol_table: SymbolTable::new(),
+            symbol_table,
             scopes: vec![main_scope],
             scope_index: 0,
         };
@@ -83,7 +88,7 @@ impl Compiler {
                 let symbol = self
                     .symbol_table
                     .define(let_statement.identifier.kind.to_string());
-                if symbol.scope == Global {
+                if symbol.scope == SymbolScope::Global {
                     self.emit(Opcode::OpSetGlobal, &vec![symbol.index]);
                 } else {
                     self.emit(Opcode::OpSetLocal, &vec![symbol.index]);
@@ -109,11 +114,7 @@ impl Compiler {
                 let symbol = self.symbol_table.resolve(identifier.name.clone());
                 match symbol {
                     Some(symbol) => {
-                        if symbol.scope == Global {
-                            self.emit(OpGetGlobal, &vec![symbol.index]);
-                        } else {
-                            self.emit(OpGetLocal, &vec![symbol.index]);
-                        }
+                        self.load_symbol(&symbol);
                     }
                     None => {
                         return Err(format!("Undefined variable '{}'", identifier.name));
@@ -265,6 +266,20 @@ impl Compiler {
         }
 
         return Ok(());
+    }
+
+    fn load_symbol(&mut self, symbol: &Rc<Symbol>) {
+        match symbol.scope {
+            SymbolScope::Global => {
+                self.emit(OpGetGlobal, &vec![symbol.index]);
+            }
+            SymbolScope::LOCAL => {
+                self.emit(OpGetLocal, &vec![symbol.index]);
+            }
+            SymbolScope::Builtin => {
+                self.emit(OpGetBuiltin, &vec![symbol.index]);
+            }
+        }
     }
 
     pub fn bytecode(&self) -> Bytecode {

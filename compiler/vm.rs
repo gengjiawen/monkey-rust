@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder};
+use object::builtins::BuiltIns;
 
-use object::Object;
+use object::{BuiltinFunc, CompiledFunction, Object};
 
 use crate::compiler::Bytecode;
 use crate::frame::Frame;
@@ -158,7 +159,7 @@ impl VM {
                 Opcode::OpCall => {
                     let num_args = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
-                    self.call_function(num_args);
+                    self.execute_call(num_args);
                 }
                 Opcode::OpSetLocal => {
                     let local_index = ins[ip + 1] as usize;
@@ -171,6 +172,12 @@ impl VM {
                     self.current_frame().ip += 1;
                     let base = self.current_frame().base_pointer;
                     self.push(Rc::clone(&self.stack[base + local_index]));
+                }
+                Opcode::OpGetBuiltin => {
+                    let built_index = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+                    let definition = BuiltIns.get(built_index).unwrap().1;
+                    self.push(Rc::new(Object::Builtin(definition)));
                 }
             }
         }
@@ -347,17 +354,34 @@ impl VM {
         return self.frames[self.frame_index].clone();
     }
 
-    fn call_function(&mut self, num_args: usize) {
-        if let Object::CompiledFunction(cf) = &*self.stack[self.sp - 1 - num_args] {
-            if cf.num_parameters != num_args {
-                panic!("wrong number of arguments: want={}, got={}", cf.num_parameters, num_args);
+    fn execute_call(&mut self, num_args: usize) {
+        let callee = &*self.stack[self.sp - 1 - num_args];
+        match callee {
+            Object::CompiledFunction(cf) => {
+                self.call_function(cf.clone(), num_args);
             }
+            Object::Builtin(bt) => {
+                self.call_builtin(bt.clone(), num_args);
+            }
+            _ => {
+                panic!("calling non-function")
+            }
+        }
+    }
+    fn call_function(&mut self, func: CompiledFunction, num_args: usize) {
+        if func.num_parameters != num_args {
+            panic!("wrong number of arguments: want={}, got={}", func.num_parameters, num_args);
+        }
 
-            let frame = Frame::new(cf.clone(), self.sp - num_args);
-            self.sp = frame.base_pointer + cf.num_locals;
-            self.push_frame(frame);
-        } else {
-            panic!("calling non-function")
-        };
+        let frame = Frame::new(func.clone(), self.sp - num_args);
+        self.sp = frame.base_pointer + func.num_locals;
+        self.push_frame(frame);
+    }
+
+    fn call_builtin(&mut self, bt: BuiltinFunc, num_args: usize) {
+        let args = self.stack[self.sp - num_args..self.sp].to_vec();
+        let result = bt(args);
+        self.sp = self.sp - num_args - 1;
+        self.push(result);
     }
 }

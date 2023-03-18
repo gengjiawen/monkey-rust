@@ -5,6 +5,7 @@ use std::rc::Rc;
 pub enum SymbolScope {
     LOCAL,
     Global,
+    Builtin,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,5 +50,11 @@ impl SymbolTable {
             return self.outer.as_ref().unwrap().resolve(name);
         }
         return symbol.cloned();
+    }
+
+    pub fn define_builtin(&mut self, index: usize, name: String) -> Rc<Symbol> {
+        let symbol = Rc::new(Symbol { name: name.clone(), index, scope: SymbolScope::Builtin });
+        self.symbols.insert(name.clone(), Rc::clone(&symbol));
+        return symbol;
     }
 }

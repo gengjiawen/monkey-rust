@@ -154,12 +154,12 @@ fn eval_expressions(exprs: &Vec<Expression>, env: &Env) -> Result<Vec<Rc<Object>
     Ok(list)
 }
 
-fn eval_identifier(id: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
-    match env.borrow().get(id) {
+fn eval_identifier(identifier: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
+    match env.borrow().get(identifier) {
         Some(obj) => Ok(obj.clone()),
-        None => match BUILTINS.get(id) {
-            Some(obj) => Ok(Rc::new(Object::Builtin(*obj))),
-            None => Err(format!("unknown identifier {}", id)),
+        None => match BuiltIns.iter().find(|&&b| b.0 == identifier) {
+            Some(obj) => Ok(Rc::new(Object::Builtin(obj.1))),
+            None => Err(format!("unknown identifier {}", identifier)),
         },
     }
 }

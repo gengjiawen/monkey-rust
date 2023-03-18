@@ -45,6 +45,7 @@ pub enum Opcode {
     OpReturn,
     OpGetLocal,
     OpSetLocal,
+    OpGetBuiltin,
 }
 
 lazy_static! {
@@ -99,6 +100,10 @@ lazy_static! {
         m.insert(
             Opcode::OpSetLocal,
             OpcodeDefinition { name: "OpSetLocal", operand_width: vec![1] },
+        );
+        m.insert(
+            Opcode::OpGetBuiltin,
+            OpcodeDefinition { name: "OpGetBuiltin", operand_width: vec![1] },
         );
         return m;
     };

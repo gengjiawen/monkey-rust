@@ -274,4 +274,44 @@ mod tests {
         ];
         run_compiler_test(tests);
     }
+
+    #[test]
+    fn test_builtins() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "len([]); push([], 1);",
+                expected_constants: vec![Object::Integer(1)],
+                expected_instructions: vec![
+                    make_instructions(OpGetBuiltin, &vec![0]),
+                    make_instructions(OpArray, &vec![0]),
+                    make_instructions(OpCall, &vec![1]),
+                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpGetBuiltin, &vec![5]),
+                    make_instructions(OpArray, &vec![0]),
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpCall, &vec![2]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "fn() { len([]) }",
+                expected_constants: vec![Object::CompiledFunction(object::CompiledFunction {
+                    instructions: concat_instructions(&vec![
+                        make_instructions(OpGetBuiltin, &vec![0]),
+                        make_instructions(OpArray, &vec![0]),
+                        make_instructions(OpCall, &vec![1]),
+                        make_instructions(OpReturnValue, &vec![0]),
+                    ])
+                    .data,
+                    num_locals: 0,
+                    num_parameters: 0,
+                })],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &vec![0]),
+                    make_instructions(OpPop, &vec![0]),
+                ],
+            },
+        ];
+        run_compiler_test(tests);
+    }
 }
