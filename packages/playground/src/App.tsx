@@ -32,11 +32,15 @@ function App() {
 
   let [compiler_out, setCompilerout] = useState('')
   const getRes = () => {
-    const bytecode = compile(editor_value)
-    setCompilerout(bytecode)
+    try {
+      const bytecode = compile(editor_value)
+      setCompilerout(bytecode)
+    } catch(e: any) {
+      setCompilerout(e.toString())
+    }
   }
 
-  const debouncedChangeHandler = useMemo(() => debounce(getRes, 500), [getRes])
+  const debouncedChangeHandler = useMemo(() => debounce(getRes, 200), [getRes])
 
   useEffect(() => {
     getRes()
