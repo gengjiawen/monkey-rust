@@ -152,6 +152,7 @@ pub struct FunctionDeclaration {
     pub params: Vec<IDENTIFIER>,
     pub body: BlockStatement,
     pub span: Span,
+    pub name: String,
 }
 
 // function can be Identifier or FunctionLiteral (think iife)
@@ -189,13 +190,13 @@ impl fmt::Display for Expression {
                     write!(f, "if {} {{ {} }}", condition, consequent,)
                 }
             }
-            Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
+            Expression::FUNCTION(FunctionDeclaration { name, params, body, .. }) => {
                 let func_params = params
                     .iter()
                     .map(|stmt| stmt.to_string())
                     .collect::<Vec<String>>()
                     .join(", ");
-                write!(f, "fn({}) {{ {} }}", func_params, body)
+                write!(f, "fn {}({}) {{ {} }}", name, func_params, body)
             }
             Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
                 write!(f, "{}({})", callee, format_expressions(arguments))

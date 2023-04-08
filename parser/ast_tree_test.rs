@@ -100,4 +100,10 @@ mod tests {
         let input = "a[1]";
         test_ast_tree("test_index", input)
     }
+
+    #[test]
+    fn test_func_with_name() {
+        let input = "let my_func = fn(x) { x };";
+        test_ast_tree("test_func_with_name", input)
+    }
 }

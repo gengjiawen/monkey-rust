@@ -97,15 +97,24 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let name = self.current_token.clone();
+        let mut identifier_name = "".to_string();
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name: _ } => {}
+            TokenKind::IDENTIFIER { name } => {
+                identifier_name = name.to_string();
+            }
             _ => return Err(format!("{} not an identifier", self.current_token)),
         };
 
         self.expect_peek(&TokenKind::ASSIGN)?;
         self.next_token();
 
-        let value = self.parse_expression(Precedence::LOWEST)?.0;
+        let mut value = self.parse_expression(Precedence::LOWEST)?.0;
+        match value {
+            Expression::FUNCTION(ref mut f) => {
+                f.name = identifier_name;
+            }
+            _ => {}
+        }
 
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
@@ -330,6 +339,7 @@ impl<'a> Parser<'a> {
             params,
             body: function_body,
             span: Span { start, end },
+            name: "".to_string(),
         }))
     }
 
