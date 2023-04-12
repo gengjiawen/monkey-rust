@@ -126,9 +126,9 @@ mod tests {
     #[test]
     fn test_fn_else_expression() {
         let tt = [
-            ("fn() {};", "fn() {  }"),
-            ("fn(x) {};", "fn(x) {  }"),
-            ("fn(x, y, z) { x };", "fn(x, y, z) { x }"),
+            ("fn() {};", "fn () {  }"),
+            ("fn(x) {};", "fn (x) {  }"),
+            ("fn(x, y, z) { x };", "fn (x, y, z) { x }"),
         ];
         verify_program(&tt);
     }
