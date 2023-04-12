@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::op_code::Opcode::{OpAdd, OpConst, OpGetLocal};
+    use crate::op_code::Opcode::{OpAdd, OpClosure, OpConst, OpGetLocal};
     use crate::op_code::*;
     use std::collections::HashSet;
     use strum::EnumCount;
@@ -70,13 +70,17 @@ mod tests {
     fn test_instructions_string() {
         let ins = vec![
             make_instructions(OpAdd, &vec![]),
+            make_instructions(OpGetLocal, &vec![1]),
             make_instructions(OpConst, &vec![2]),
             make_instructions(OpConst, &vec![65535]),
+            make_instructions(OpClosure, &vec![65535, 255])
         ];
 
         let expected = "0000 OpAdd\n\
-                             0001 OpConst 2\n\
-                             0004 OpConst 65535\n";
+                             0001 OpGetLocal 1\n\
+                             0003 OpConst 2\n\
+                             0006 OpConst 65535\n\
+                             0009 OpClosure 65535 255\n";
         // how-to-concatenate-immutable-vectors-in-one-line
         // https://stackoverflow.com/a/69578632/1713757
         let merged_ins = ins

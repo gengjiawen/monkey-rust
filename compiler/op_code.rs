@@ -46,6 +46,9 @@ pub enum Opcode {
     OpGetLocal,
     OpSetLocal,
     OpGetBuiltin,
+    OpClosure,
+    OpGetFree,
+    OpCurrentClosure,
 }
 
 lazy_static! {
@@ -104,6 +107,18 @@ lazy_static! {
         m.insert(
             Opcode::OpGetBuiltin,
             OpcodeDefinition { name: "OpGetBuiltin", operand_width: vec![1] },
+        );
+        m.insert(
+            Opcode::OpClosure,
+            OpcodeDefinition { name: "OpClosure", operand_width: vec![2, 1] },
+        );
+        m.insert(
+            Opcode::OpGetFree,
+            OpcodeDefinition { name: "OpGetFree", operand_width: vec![1] },
+        );
+        m.insert(
+            Opcode::OpCurrentClosure,
+            OpcodeDefinition { name: "OpCurrentClosure", operand_width: vec![] },
         );
         return m;
     };

@@ -179,6 +179,9 @@ impl VM {
                     let definition = BuiltIns.get(built_index).unwrap().1;
                     self.push(Rc::new(Object::Builtin(definition)));
                 }
+                Opcode::OpClosure => {}
+                Opcode::OpGetFree => {}
+                Opcode::OpCurrentClosure => {}
             }
         }
     }

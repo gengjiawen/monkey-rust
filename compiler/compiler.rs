@@ -84,10 +84,10 @@ impl Compiler {
     fn compile_stmt(&mut self, s: &Statement) -> Result<(), CompileError> {
         match s {
             Statement::Let(let_statement) => {
-                self.compile_expr(&let_statement.expr)?;
                 let symbol = self
                     .symbol_table
                     .define(let_statement.identifier.kind.to_string());
+                self.compile_expr(&let_statement.expr)?;
                 if symbol.scope == SymbolScope::Global {
                     self.emit(Opcode::OpSetGlobal, &vec![symbol.index]);
                 } else {
@@ -234,6 +234,7 @@ impl Compiler {
             }
             Expression::FUNCTION(f) => {
                 self.enter_scope();
+                // f.name
                 for param in f.params.iter() {
                     self.symbol_table.define(param.name.clone());
                 }
