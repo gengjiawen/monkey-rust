@@ -5,17 +5,17 @@ importers:
   .:
     devDependencies:
       '@types/node':
-        specifier: 16.9.1
-        version: 16.9.1
+        specifier: 18.15.11
+        version: 18.15.11
       prettier:
-        specifier: ^2.7.1
-        version: 2.7.1
+        specifier: ^2.8.7
+        version: 2.8.7
       ts-node:
-        specifier: ^10.2.1
-        version: 10.9.1(@types/node@16.9.1)(typescript@4.7.4)
+        specifier: ^10.9.1
+        version: 10.9.1(@types/node@18.15.11)(typescript@5.0.4)
       typescript:
-        specifier: ^4.4.3
-        version: 4.7.4
+        specifier: ^5.0.4
+        version: 5.0.4
 
   ast-website/website:
     dependencies:
@@ -132,7 +132,7 @@ importers:
         version: 5.65.7
       codemirror-graphql:
         specifier: ^0.11.6
-        version: 0.11.6(@types/node@16.9.1)(codemirror@5.65.7)(graphql@15.8.0)(typescript@4.7.4)
+        version: 0.11.6(@types/node@18.15.11)(codemirror@5.65.7)(graphql@15.8.0)(typescript@4.7.4)
       css:
         specifier: ^2.2.1
         version: 2.2.4
@@ -3197,7 +3197,7 @@ packages:
       value-or-promise: 1.0.11
     dev: false
 
-  /@graphql-tools/url-loader@7.12.4(@types/node@16.9.1)(graphql@15.8.0):
+  /@graphql-tools/url-loader@7.12.4(@types/node@18.15.11)(graphql@15.8.0):
     resolution: {integrity: sha512-2y3at6sTWd8By0hmtEw/4uE7M55zJ5DmsNcrPus+Vh6p7AD1Jp2oc9elQYkmxYhq2y9ySx4ISJTi5PBPMB+giQ==}
     peerDependencies:
       graphql: ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
@@ -3213,7 +3213,7 @@ packages:
       graphql: 15.8.0
       graphql-ws: 5.9.1(graphql@15.8.0)
       isomorphic-ws: 5.0.0(ws@8.8.1)
-      meros: 1.2.0(@types/node@16.9.1)
+      meros: 1.2.0(@types/node@18.15.11)
       sync-fetch: 0.4.1
       tslib: 2.4.0
       value-or-promise: 1.0.11
@@ -3693,8 +3693,8 @@ packages:
     resolution: {integrity: sha512-iiUgKzV9AuaEkZqkOLDIvlQiL6ltuZd9tGcW3gwpnX8JbuiuhFlEGmmFXEXkN50Cvq7Os88IY2v0dkDqXYWVgA==}
     dev: false
 
-  /@types/node@16.9.1:
-    resolution: {integrity: sha512-QpLcX9ZSsq3YYUUnD3nFDY8H7wctAhQj/TFKL8Ya8v5fMm3CFXxo8zStsLAl780ltoYoo1WvKUVGBQK+1ifr7g==}
+  /@types/node@18.15.11:
+    resolution: {integrity: sha512-E5Kwq2n4SbMzQOn6wnmBjuK9ouqlURrcZDVfbo9ftDDTFt3nk7ZKK4GMOzoYgnpQJKcxwQw+lGaBvvlMo0qN/Q==}
 
   /@types/parse-json@4.0.0:
     resolution: {integrity: sha512-//oorEZjL6sbPcKUaCdIGlIUeH26mgzimjBB77G6XRgnDl/L5wOnpyBGRe/Mmf5CVW3PwEBE1NjiMZ/ssFh4wA==}
@@ -3748,7 +3748,7 @@ packages:
   /@types/vfile@3.0.2:
     resolution: {integrity: sha512-b3nLFGaGkJ9rzOcuXRfHkZMdjsawuDD0ENL9fzTophtBg8FJHSGbH7daXkEpcwy3v7Xol3pAvsmlYyFhR4pqJw==}
     dependencies:
-      '@types/node': 16.9.1
+      '@types/node': 18.15.11
       '@types/unist': 2.0.6
       '@types/vfile-message': 2.0.0
     dev: false
@@ -3756,7 +3756,7 @@ packages:
   /@types/ws@8.5.3:
     resolution: {integrity: sha512-6YOoWjruKj1uLf3INHH7D3qTXwFfEsg1kf3c0uDdSBJwfa/llkwIjrAGV7j7mVgGNbzTQ3HiHKKDXl6bJPD97w==}
     dependencies:
-      '@types/node': 16.9.1
+      '@types/node': 18.15.11
     dev: false
 
   /@typescript-eslint/parser@5.30.7(eslint@8.20.0)(typescript@4.7.4):
@@ -6076,7 +6076,7 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: false
 
-  /codemirror-graphql@0.11.6(@types/node@16.9.1)(codemirror@5.65.7)(graphql@15.8.0)(typescript@4.7.4):
+  /codemirror-graphql@0.11.6(@types/node@18.15.11)(codemirror@5.65.7)(graphql@15.8.0)(typescript@4.7.4):
     resolution: {integrity: sha512-/zVKgOVS2/hfjAY0yoBkLz9ESHnWKBWpBNXQSoFF4Hl5q5AS2DmM22coonWKJcCvNry6TLak2F+QkzPeKVv3Eg==}
     peerDependencies:
       codemirror: ^5.26.0
@@ -6084,8 +6084,8 @@ packages:
     dependencies:
       codemirror: 5.65.7
       graphql: 15.8.0
-      graphql-language-service-interface: 2.10.2(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
-      graphql-language-service-parser: 1.10.4(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-interface: 2.10.2(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-parser: 1.10.4(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
@@ -8546,7 +8546,7 @@ packages:
     resolution: {integrity: sha512-bzh50DW9kTPM00T8y4o8vQg89Di9oLJVLW/KaOGIXJWP/iqCN6WKYkbNOF04vFLJhwcpYUh9ydh/+5vpOqV4YQ==}
     dev: false
 
-  /graphql-config@4.3.1(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4):
+  /graphql-config@4.3.1(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4):
     resolution: {integrity: sha512-czBWzJSGaLJfOHBLuUTZVRTjfgohPfvlaeN1B5nXBVptFARpiFuS7iI4FnRhCGwm6qt1h2j1g05nkg0OIGA6bg==}
     engines: {node: '>= 10.0.0'}
     peerDependencies:
@@ -8557,7 +8557,7 @@ packages:
       '@graphql-tools/json-file-loader': 7.4.0(graphql@15.8.0)
       '@graphql-tools/load': 7.7.0(graphql@15.8.0)
       '@graphql-tools/merge': 8.3.0(graphql@15.8.0)
-      '@graphql-tools/url-loader': 7.12.4(@types/node@16.9.1)(graphql@15.8.0)
+      '@graphql-tools/url-loader': 7.12.4(@types/node@18.15.11)(graphql@15.8.0)
       '@graphql-tools/utils': 8.8.0(graphql@15.8.0)
       cosmiconfig: 7.0.1
       cosmiconfig-toml-loader: 1.0.0
@@ -8572,16 +8572,16 @@ packages:
       - utf-8-validate
     dev: false
 
-  /graphql-language-service-interface@2.10.2(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4):
+  /graphql-language-service-interface@2.10.2(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4):
     resolution: {integrity: sha512-RKIEBPhRMWdXY3fxRs99XysTDnEgAvNbu8ov/5iOlnkZsWQNzitjtd0O0l1CutQOQt3iXoHde7w8uhCnKL4tcg==}
     peerDependencies:
       graphql: ^15.5.0 || ^16.0.0
     dependencies:
       graphql: 15.8.0
-      graphql-config: 4.3.1(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
-      graphql-language-service-parser: 1.10.4(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
-      graphql-language-service-types: 1.8.7(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
-      graphql-language-service-utils: 2.7.1(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-config: 4.3.1(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-parser: 1.10.4(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-types: 1.8.7(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-utils: 2.7.1(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
       vscode-languageserver-types: 3.17.2
     transitivePeerDependencies:
       - '@types/node'
@@ -8591,13 +8591,13 @@ packages:
       - utf-8-validate
     dev: false
 
-  /graphql-language-service-parser@1.10.4(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4):
+  /graphql-language-service-parser@1.10.4(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4):
     resolution: {integrity: sha512-duDE+0aeKLFVrb9Kf28U84ZEHhHcvTjWIT6dJbIAQJWBaDoht0D4BK9EIhd94I3DtKRc1JCJb2+70y1lvP/hiA==}
     peerDependencies:
       graphql: ^15.5.0 || ^16.0.0
     dependencies:
       graphql: 15.8.0
-      graphql-language-service-types: 1.8.7(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-types: 1.8.7(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
@@ -8606,13 +8606,13 @@ packages:
       - utf-8-validate
     dev: false
 
-  /graphql-language-service-types@1.8.7(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4):
+  /graphql-language-service-types@1.8.7(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4):
     resolution: {integrity: sha512-LP/Mx0nFBshYEyD0Ny6EVGfacJAGVx+qXtlJP4hLzUdBNOGimfDNtMVIdZANBXHXcM41MDgMHTnyEx2g6/Ttbw==}
     peerDependencies:
       graphql: ^15.5.0 || ^16.0.0
     dependencies:
       graphql: 15.8.0
-      graphql-config: 4.3.1(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-config: 4.3.1(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
       vscode-languageserver-types: 3.17.2
     transitivePeerDependencies:
       - '@types/node'
@@ -8622,14 +8622,14 @@ packages:
       - utf-8-validate
     dev: false
 
-  /graphql-language-service-utils@2.7.1(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4):
+  /graphql-language-service-utils@2.7.1(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4):
     resolution: {integrity: sha512-Wci5MbrQj+6d7rfvbORrA9uDlfMysBWYaG49ST5TKylNaXYFf3ixFOa74iM1KtM9eidosUbI3E1JlWi0JaidJA==}
     peerDependencies:
       graphql: ^15.5.0 || ^16.0.0
     dependencies:
       '@types/json-schema': 7.0.9
       graphql: 15.8.0
-      graphql-language-service-types: 1.8.7(@types/node@16.9.1)(graphql@15.8.0)(typescript@4.7.4)
+      graphql-language-service-types: 1.8.7(@types/node@18.15.11)(graphql@15.8.0)(typescript@4.7.4)
       nullthrows: 1.1.1
     transitivePeerDependencies:
       - '@types/node'
@@ -10339,7 +10339,7 @@ packages:
     engines: {node: '>=10.4.0'}
     dev: false
 
-  /meros@1.2.0(@types/node@16.9.1):
+  /meros@1.2.0(@types/node@18.15.11):
     resolution: {integrity: sha512-3QRZIS707pZQnijHdhbttXRWwrHhZJ/gzolneoxKVz9N/xmsvY/7Ls8lpnI9gxbgxjcHsAVEW3mgwiZCo6kkJQ==}
     engines: {node: '>=12'}
     peerDependencies:
@@ -10348,7 +10348,7 @@ packages:
       '@types/node':
         optional: true
     dependencies:
-      '@types/node': 16.9.1
+      '@types/node': 18.15.11
     dev: false
 
   /micromark-core-commonmark@1.0.6:
@@ -11612,6 +11612,13 @@ packages:
     resolution: {integrity: sha512-ujppO+MkdPqoVINuDFDRLClm7D78qbDt0/NR+wp5FqEZOoTNAjPHWj17QRhu7geIHJfcNhRk1XVQmF8Bp3ye+g==}
     engines: {node: '>=10.13.0'}
     hasBin: true
+    dev: false
+
+  /prettier@2.8.7:
+    resolution: {integrity: sha512-yPngTo3aXUUmyuTjeTUT75txrf+aMh9FiD7q9ZE/i6r0bPb22g4FsE6Y338PQX1bmfy08i9QQCB7/rcUAVntfw==}
+    engines: {node: '>=10.13.0'}
+    hasBin: true
+    dev: true
 
   /pretty-error@2.1.2:
     resolution: {integrity: sha512-EY5oDzmsX5wvuynAByrmY0P0hcp+QpnAKbJng2A2MPjVKXCxrDSUkzghVJ4ZGPIv+JC4gX8fPUWscC0RtjsWGw==}
@@ -13660,7 +13667,7 @@ packages:
     resolution: {integrity: sha512-2+ilNA00DGvbUYYbRrm3ux+snbo7I6uPXMw8I4p/QMl7HUOWBBZFbk+Mpr8/IAPDQE+LQ8vOdlI6xEzjc+e/BQ==}
     dev: false
 
-  /ts-node@10.9.1(@types/node@16.9.1)(typescript@4.7.4):
+  /ts-node@10.9.1(@types/node@18.15.11)(typescript@5.0.4):
     resolution: {integrity: sha512-NtVysVPkxxrwFGUUxGYhfux8k78pQB3JqYBXlLRZgdGUqTO5wU/UyHop5p70iEbGhB7q5KmiZiU0Y3KlJrScEw==}
     hasBin: true
     peerDependencies:
@@ -13679,14 +13686,14 @@ packages:
       '@tsconfig/node12': 1.0.11
       '@tsconfig/node14': 1.0.3
       '@tsconfig/node16': 1.0.3
-      '@types/node': 16.9.1
+      '@types/node': 18.15.11
       acorn: 8.7.1
       acorn-walk: 8.2.0
       arg: 4.1.3
       create-require: 1.1.1
       diff: 4.0.2
       make-error: 1.3.6
-      typescript: 4.7.4
+      typescript: 5.0.4
       v8-compile-cache-lib: 3.0.1
       yn: 3.1.1
     dev: true
@@ -13841,6 +13848,12 @@ packages:
     resolution: {integrity: sha512-C0WQT0gezHuw6AdY1M2jxUO83Rjf0HP7Sk1DtXj6j1EwkQNZrHAg2XPWlq62oqEhYvONq5pkC2Y9oPljWToLmQ==}
     engines: {node: '>=4.2.0'}
     hasBin: true
+
+  /typescript@5.0.4:
+    resolution: {integrity: sha512-cW9T5W9xY37cc+jfEnaUvX91foxtHkza3Nw3wkoF4sSlKn0MONdkdEndig/qPBWXNkmplh3NzayQzCiHM4/hqw==}
+    engines: {node: '>=12.20'}
+    hasBin: true
+    dev: true
 
   /uglify-es@3.3.9:
     resolution: {integrity: sha512-r+MU0rfv4L/0eeW3xZrd16t4NZfK8Ld4SWVglYBb7ez5uXFWHuVRs6xCTrf1yirs9a4j4Y27nn7SRfO6v67XsQ==}

@@ -23,6 +23,6 @@ RUN git clone --depth 1 "https://github.com/emscripten-core/emsdk.git" $HOME/.em
 RUN brew install binaryen wabt wasm-pack
 
 # fix Node.js path and use latest Node.js
-RUN brew install n && sudo /home/linuxbrew/.linuxbrew/bin/n latest && sudo /usr/local/bin/npm i -g yarn sao pnpm
+RUN brew install n && sudo /home/linuxbrew/.linuxbrew/bin/n latest && sudo /usr/local/bin/npm i -g yarn npm pnpm npm-check-updates
 ENV PATH=/usr/local/bin/:$PATH
 RUN printf "\nexport PATH="/usr/local/bin/:$PATH"\n" >> ~/.bashrc
