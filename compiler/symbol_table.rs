@@ -6,6 +6,8 @@ pub enum SymbolScope {
     LOCAL,
     Global,
     Builtin,
+    Free,
+    Function,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -19,16 +21,17 @@ pub struct Symbol {
 pub struct SymbolTable {
     pub outer: Option<Rc<SymbolTable>>,
     symbols: HashMap<String, Rc<Symbol>>,
+    free_symbols: Vec<Rc<Symbol>>,
     pub num_definitions: usize,
 }
 
 impl SymbolTable {
     pub fn new() -> SymbolTable {
-        SymbolTable { symbols: HashMap::new(), num_definitions: 0, outer: None }
+        SymbolTable { symbols: HashMap::new(), free_symbols: vec![], num_definitions: 0, outer: None }
     }
 
     pub fn new_enclosed_symbol_table(outer: SymbolTable) -> SymbolTable {
-        SymbolTable { symbols: HashMap::new(), num_definitions: 0, outer: Some(Rc::new(outer)) }
+        SymbolTable { symbols: HashMap::new(), free_symbols: vec![], num_definitions: 0, outer: Some(Rc::new(outer)) }
     }
 
     pub fn define(&mut self, name: String) -> Rc<Symbol> {
@@ -55,6 +58,19 @@ impl SymbolTable {
     pub fn define_builtin(&mut self, index: usize, name: String) -> Rc<Symbol> {
         let symbol = Rc::new(Symbol { name: name.clone(), index, scope: SymbolScope::Builtin });
         self.symbols.insert(name.clone(), Rc::clone(&symbol));
+        return symbol;
+    }
+
+    pub fn define_function_name(&mut self, name: String) -> Rc<Symbol> {
+        let symbol = Rc::new(Symbol { name: name.clone(), index: 0, scope: SymbolScope::Function });
+        self.symbols.insert(name.clone(), Rc::clone(&symbol));
+        return symbol;
+    }
+
+    pub fn define_free(&mut self, original: Rc<Symbol>) -> Rc<Symbol> {
+        self.free_symbols.push(Rc::clone(&original));
+        let symbol = Rc::new(Symbol { name: original.name.clone(), index: self.free_symbols.len() - 1, scope: SymbolScope::Free });
+        self.symbols.insert(original.name.clone(), Rc::clone(&symbol));
         return symbol;
     }
 }
