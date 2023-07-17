@@ -1,5 +1,110 @@
 # Changelog
 
+## [0.9.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.8.0...v0.9.0) (2023-07-17)
+
+
+### Features
+
+* add auto deploy ([e8b03de](https://www.github.com/gengjiawen/monkey-rust/commit/e8b03ded807240d55777cf25211f9aca620ae668))
+* add binary calculate for compiler ([22f53d0](https://www.github.com/gengjiawen/monkey-rust/commit/22f53d0691a15f300d4172fcfddd287b81e442e7))
+* add bundle visualizer ([11d2dc8](https://www.github.com/gengjiawen/monkey-rust/commit/11d2dc82a7f880e3601b4a49c10433f32bd47ccd))
+* add compiler to wasm ([7cd371a](https://www.github.com/gengjiawen/monkey-rust/commit/7cd371aa1f507210726abb3fc29780e3b355708f))
+* add console hook for wasm ([34dc010](https://www.github.com/gengjiawen/monkey-rust/commit/34dc0105eace8da751a0a529c7014560b1afdd92))
+* add equal notEqual greatThan lessThan support ([9b8fee6](https://www.github.com/gengjiawen/monkey-rust/commit/9b8fee68df6798f143c81ac4138e45c6300afa80))
+* add error handing ([bf4219f](https://www.github.com/gengjiawen/monkey-rust/commit/bf4219fc38ea8099e817c5be3551554555c66f22))
+* add func name in parser ([ca64af0](https://www.github.com/gengjiawen/monkey-rust/commit/ca64af0e8bb9e5666f7acd05e0c7002190e094d9))
+* add if node alternate support ([56ff64e](https://www.github.com/gengjiawen/monkey-rust/commit/56ff64e5cbe850381b40aa6988003f6706726872))
+* add more compiler test ([c6c5df3](https://www.github.com/gengjiawen/monkey-rust/commit/c6c5df3ee228703ec727cab055853edf71f61913))
+* add more vm test ([aed972d](https://www.github.com/gengjiawen/monkey-rust/commit/aed972deb2b38963aa2cb2946c036a3a6a8dd6fb))
+* add null ([6c19dd0](https://www.github.com/gengjiawen/monkey-rust/commit/6c19dd079453183a1a29970febd6d9a2a86c4a47))
+* add prefix support ([016ae79](https://www.github.com/gengjiawen/monkey-rust/commit/016ae7901866f135cb4ce382b71db5b2938ceed3))
+* expose more opcode method ([513a15d](https://www.github.com/gengjiawen/monkey-rust/commit/513a15d28a5b693d17acc3aeae5eebd37f30bcde))
+* finish builtins ([843ce30](https://www.github.com/gengjiawen/monkey-rust/commit/843ce3086dea1c5b23020c5aea59a15d29fadd71))
+* finish condition execute ([ad3860e](https://www.github.com/gengjiawen/monkey-rust/commit/ad3860e1d39559ea217b29da9c6cc6a310ab0620))
+* finish condition feature ([3b223ff](https://www.github.com/gengjiawen/monkey-rust/commit/3b223ff74485cbac6eb55a05cf1aa529253e69fe))
+* finish name bindings ([43df97e](https://www.github.com/gengjiawen/monkey-rust/commit/43df97e211d4bf78648c6824b7560be88b0b172f))
+* implement boolean ([32e3fdb](https://www.github.com/gengjiawen/monkey-rust/commit/32e3fdb6a6bf1bdadf54b6e539a9d4e276fbbb9a))
+* implement eq for object ([1c1c3e2](https://www.github.com/gengjiawen/monkey-rust/commit/1c1c3e25b890793f002d357e1359d7c1be93a117))
+* initial compiler ([#78](https://www.github.com/gengjiawen/monkey-rust/issues/78)) ([7866b8f](https://www.github.com/gengjiawen/monkey-rust/commit/7866b8fab120adc391a51c36cdd5a7f153400f14))
+* initial function impl ([723de32](https://www.github.com/gengjiawen/monkey-rust/commit/723de324ce0dec1e148a56490e36b21fe491d8a9))
+* initial online playground ([ec7732f](https://www.github.com/gengjiawen/monkey-rust/commit/ec7732f2fec8cc31abb1e7bf1c67234cc7605c6f))
+* reformat use rules ([1f7c47a](https://www.github.com/gengjiawen/monkey-rust/commit/1f7c47af9e39f9de8e68f6471670e17b33a97441))
+* split vm test ([001405c](https://www.github.com/gengjiawen/monkey-rust/commit/001405cbb1bc905313992f878fc86589db69bcab))
+* start use cargo fmt ([e52c502](https://www.github.com/gengjiawen/monkey-rust/commit/e52c502334842535842b179c3503e039e78e6499))
+* support closure ([#147](https://www.github.com/gengjiawen/monkey-rust/issues/147)) ([397284c](https://www.github.com/gengjiawen/monkey-rust/commit/397284ce3dc84a09fde4094e8517ac1358a24930))
+* update ast-site ([949b9ad](https://www.github.com/gengjiawen/monkey-rust/commit/949b9ad59885ded047010cce92a9fbd658cce8f6))
+* use new sample ([b88bbd1](https://www.github.com/gengjiawen/monkey-rust/commit/b88bbd18ae9e9e78fb7a20f211804e361979d5cf))
+* use wasm back ([e1db4ce](https://www.github.com/gengjiawen/monkey-rust/commit/e1db4ce47f539fb5edf6341da91b5701538f7491))
+
+
+### Bug Fixes
+
+* add initial wasm test ([c9fe06e](https://www.github.com/gengjiawen/monkey-rust/commit/c9fe06e78139365a6af7a9e19a6cc44ed8412871))
+* add more concrete test for opcode ([ad7fe4d](https://www.github.com/gengjiawen/monkey-rust/commit/ad7fe4d5868cb557d3910aea9cb214ef938d7232))
+* add test for symbol tables ([0effa16](https://www.github.com/gengjiawen/monkey-rust/commit/0effa1663613b89c24919089028a35bc0882f59f))
+* circle CI ([befb04e](https://www.github.com/gengjiawen/monkey-rust/commit/befb04e3bfccd33bd64a6209f336d96021fa12ac))
+* circleCI ([8683cc3](https://www.github.com/gengjiawen/monkey-rust/commit/8683cc378a437b1e859e787f13c035a391438277))
+* compiler repl ([#109](https://www.github.com/gengjiawen/monkey-rust/issues/109)) ([34b23a8](https://www.github.com/gengjiawen/monkey-rust/commit/34b23a8676de6d0e268cc2a91ca581f8da9306f1))
+* compiler warnings ([0af35a8](https://www.github.com/gengjiawen/monkey-rust/commit/0af35a8ab17125eb6ed0915d7f0de7d2f654eff2))
+* compiler warnings ([4d858f6](https://www.github.com/gengjiawen/monkey-rust/commit/4d858f65fbfac5a1ea7f4603cf2a377b3de4826d))
+* dev docker name ([35485ce](https://www.github.com/gengjiawen/monkey-rust/commit/35485ce9c5f596cd1982a1be53f84a2edbefdd2b))
+* docker setup ([bb4f698](https://www.github.com/gengjiawen/monkey-rust/commit/bb4f6988e14a6fd663db42965bf2cd54bdd7fa5f))
+* fn test ([589b322](https://www.github.com/gengjiawen/monkey-rust/commit/589b322e298f69b212862cd100322c83f10f6c40))
+* gh deploy with vite ([fcd7a38](https://www.github.com/gengjiawen/monkey-rust/commit/fcd7a382c0a3edcf89a3102dd3404242521ca067))
+* github action patch ([#103](https://www.github.com/gengjiawen/monkey-rust/issues/103)) ([2c35ac3](https://www.github.com/gengjiawen/monkey-rust/commit/2c35ac3e3b5c7bdb3b1506d88eddf5c405af8d22))
+* limit crates keywords ([8260313](https://www.github.com/gengjiawen/monkey-rust/commit/82603133eead3149165638cdcbf8ac6a64852f64))
+* opArray description ([64971df](https://www.github.com/gengjiawen/monkey-rust/commit/64971dfeacbac06033577dbacd8aad5496ed5a80))
+* opcode description ([9ef1450](https://www.github.com/gengjiawen/monkey-rust/commit/9ef1450140909eeed4f5804e9e289a7965d86b9e))
+* pnpm 8 issues ([7ef925b](https://www.github.com/gengjiawen/monkey-rust/commit/7ef925b5338f1997ccab7468735ab845229804a7))
+* prod build ([5ddbc95](https://www.github.com/gengjiawen/monkey-rust/commit/5ddbc95156a91def6a27f7459142968627acf982))
+* refactor hash elements ([d5c7d3d](https://www.github.com/gengjiawen/monkey-rust/commit/d5c7d3d6a3bcaad98ba2f5979a4a1da3834789b5))
+* revert to old way ([a44a2d6](https://www.github.com/gengjiawen/monkey-rust/commit/a44a2d6fce59807ee7a33d765bd0f63dcfcfb4a1))
+* test wasm on headless browsers ([0eb9e07](https://www.github.com/gengjiawen/monkey-rust/commit/0eb9e07bf9841c5cb5f7eaef81698f05f3bdd7ad))
+* try full docker image ([263875c](https://www.github.com/gengjiawen/monkey-rust/commit/263875c245596a3e0a279b6da69dcf488569fff4))
+* use new rust analyser ([6bd438e](https://www.github.com/gengjiawen/monkey-rust/commit/6bd438eac4149819a2dcdb06daca6ecf20036b19))
+* vite wasm ([3fa01b6](https://www.github.com/gengjiawen/monkey-rust/commit/3fa01b6a24c7707631f9180947e71314aab7557f))
+* wrong compiler warning ([2f9c32d](https://www.github.com/gengjiawen/monkey-rust/commit/2f9c32ddb7ad0796eff348146fb1b411d9dfa362))
+
+
+### playground
+
+* add sample list ([c958cf3](https://www.github.com/gengjiawen/monkey-rust/commit/c958cf3c6a92b5c0dd1e0cfb1a95c7d170fa958e))
+
+
+### Doc
+
+* add favicon ([f4bd89e](https://www.github.com/gengjiawen/monkey-rust/commit/f4bd89e32a81c02a2f1c45ce2d79585d71241c9e))
+* only publish main ([26a619b](https://www.github.com/gengjiawen/monkey-rust/commit/26a619bac00cb59b155ff4039bd888c692a32287))
+* split maintainer job ([70c62e0](https://www.github.com/gengjiawen/monkey-rust/commit/70c62e030dd7bbe26fac6868409e71a339803112))
+* update README ([76f6472](https://www.github.com/gengjiawen/monkey-rust/commit/76f6472aa7282e33abdd13ac9e70729bb1df1ecb))
+* update README ([4691b46](https://www.github.com/gengjiawen/monkey-rust/commit/4691b46e0fe143dfa954b6a7ff8734701b0c7b3d))
+* Update README ([d423e0c](https://www.github.com/gengjiawen/monkey-rust/commit/d423e0c99641b814ea7d303c83daab3ec86f7112))
+
+
+### compiler
+
+* finish array ([e1c1ee5](https://www.github.com/gengjiawen/monkey-rust/commit/e1c1ee5dbdc5e71b2c0019cffb884d36c8096d91))
+* finish hashmap ([dc59660](https://www.github.com/gengjiawen/monkey-rust/commit/dc59660ba66c3e7a93c3e3ca9d9b0df133a90e9f))
+* finish index ([2940eab](https://www.github.com/gengjiawen/monkey-rust/commit/2940eab1b9e0bf2989b767c8dfa73f6095c1356b))
+* fix repl ([5c51ede](https://www.github.com/gengjiawen/monkey-rust/commit/5c51ede0b83dda5b1feea4c05422978ac4fd30ff))
+* implement string ([ac53c64](https://www.github.com/gengjiawen/monkey-rust/commit/ac53c6464eb30c2df67f0839d194ba57b5cb8e92))
+
+
+### Dev
+
+* add ast website to workspaces ([372701c](https://www.github.com/gengjiawen/monkey-rust/commit/372701cbdc6ac80ca16da10c6b27a138ba5a92fa))
+* add compiler to dev log ([bc36cc5](https://www.github.com/gengjiawen/monkey-rust/commit/bc36cc5f70461eb63bbc71e41193e26594576445))
+* add missing toolchain ([75a505c](https://www.github.com/gengjiawen/monkey-rust/commit/75a505c62e31037de96fd71042e840bdcdf1d24a))
+* add prettier ([e08322b](https://www.github.com/gengjiawen/monkey-rust/commit/e08322b7cca388f3a08e3e291cded6fe09e6cc66))
+* bump base image ([75cc281](https://www.github.com/gengjiawen/monkey-rust/commit/75cc28132801277a609aad9d6738c724d24305f0))
+* bump env ([ba4473f](https://www.github.com/gengjiawen/monkey-rust/commit/ba4473f89c956bc271f75f5349e48b9ca717e5ba))
+* bump wasi-sdk ([#97](https://www.github.com/gengjiawen/monkey-rust/issues/97)) ([507ea65](https://www.github.com/gengjiawen/monkey-rust/commit/507ea656f9bc16f0d4b5fbe2145382e0a48fe2ab))
+* switch to pnpm ([ce34c05](https://www.github.com/gengjiawen/monkey-rust/commit/ce34c05fee2408a6f2b9ebabd10f45f73d33ce28))
+* trigger gitpod rebuild ([5113204](https://www.github.com/gengjiawen/monkey-rust/commit/5113204efb882196ec4720bfa88b83b7e27d6df7))
+* update base docker ([ad0b292](https://www.github.com/gengjiawen/monkey-rust/commit/ad0b292edb03ade0893bfa9d0c2d55d7c210b3ee))
+* update base env ([ecec748](https://www.github.com/gengjiawen/monkey-rust/commit/ecec748201348754ad4f03b65616803e9939240e))
+* use vnc since it bundled chrome ([ec71046](https://www.github.com/gengjiawen/monkey-rust/commit/ec710469ec7f0ea05e4b5057758f2e0056c7f677))
+
 ## [0.8.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.7.0...v0.8.0) (2021-09-18)
 
 
