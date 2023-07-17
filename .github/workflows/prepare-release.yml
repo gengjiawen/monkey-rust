@@ -11,7 +11,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v3
-      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "pnpm i && pnpx ts-node scripts/bump_cargo_packages.ts"
+      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "pnpx ts-node scripts/bump_cargo_packages.ts"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: 'chore: prepare rust packages'
