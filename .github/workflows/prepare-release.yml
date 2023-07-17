@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       # npx not work in this cases due to some weird npm permission issues
-      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "yarn && node node_modules/.bin/ts-node scripts/bump_cargo_packages.ts"
+      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "pnpm i && pnpx ts-node scripts/bump_cargo_packages.ts"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: 'chore: prepare rust packages'
