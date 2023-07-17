@@ -1,3 +1,4 @@
+use std::io::{self, Write};
 use crate::compiler::Compiler;
 use crate::compiler_test::test_constants;
 use crate::vm::VM;
@@ -14,7 +15,8 @@ pub fn run_vm_tests(tests: Vec<VmTestCase>) {
         let program = parse(t.input).unwrap();
         let mut compiler = Compiler::new();
         let bytecodes = compiler.compile(&program).unwrap();
-        // println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
+        let s = bytecodes.instructions.string();
+        println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
         let mut vm = VM::new(bytecodes);
         vm.run();
         let got = vm.last_popped_stack_elm().unwrap();

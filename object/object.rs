@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Formatter, write};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -29,7 +29,8 @@ pub enum Object {
     Function(Vec<IDENTIFIER>, BlockStatement, Env),
     Builtin(BuiltinFunc),
     Error(String),
-    CompiledFunction(CompiledFunction),
+    CompiledFunction(Rc<CompiledFunction>),
+    ClosureObj(Closure)
 }
 
 impl fmt::Display for Object {
@@ -69,6 +70,9 @@ impl fmt::Display for Object {
             Object::CompiledFunction(_) => {
                 write!(f, "[compiled function]")
             }
+            Object::ClosureObj(_) => {
+                write!(f, "[closure function]")
+            }
         }
     }
 }
@@ -98,4 +102,10 @@ pub struct CompiledFunction {
     pub instructions: Vec<u8>,
     pub num_locals: usize,
     pub num_parameters: usize,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Closure {
+    pub func: Rc<CompiledFunction>,
+    pub free: Vec<Rc<Object>>,
 }

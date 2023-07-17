@@ -84,10 +84,10 @@ impl Compiler {
     fn compile_stmt(&mut self, s: &Statement) -> Result<(), CompileError> {
         match s {
             Statement::Let(let_statement) => {
-                self.compile_expr(&let_statement.expr)?;
                 let symbol = self
                     .symbol_table
                     .define(let_statement.identifier.kind.to_string());
+                self.compile_expr(&let_statement.expr)?;
                 if symbol.scope == SymbolScope::Global {
                     self.emit(Opcode::OpSetGlobal, &vec![symbol.index]);
                 } else {
@@ -234,6 +234,7 @@ impl Compiler {
             }
             Expression::FUNCTION(f) => {
                 self.enter_scope();
+                // f.name
                 for param in f.params.iter() {
                     self.symbol_table.define(param.name.clone());
                 }
@@ -245,16 +246,20 @@ impl Compiler {
                     self.emit(OpReturn, &vec![]);
                 }
                 let num_locals = self.symbol_table.num_definitions;
+                let free_symbols = self.symbol_table.free_symbols.clone();
                 let instructions = self.leave_scope();
+                for x in free_symbols.clone() {
+                    self.load_symbol(&x);
+                }
 
-                let compiled_function = object::CompiledFunction {
+                let compiled_function = Rc::from(object::CompiledFunction {
                     instructions: instructions.data,
                     num_locals,
                     num_parameters: f.params.len(),
-                };
+                });
 
-                let operands = vec![self.add_constant(Object::CompiledFunction(compiled_function))];
-                self.emit(OpConst, &operands);
+                let operands = vec![self.add_constant(Object::CompiledFunction(compiled_function)), free_symbols.len()];
+                self.emit(OpClosure, &operands);
             }
             Expression::FunctionCall(fc) => {
                 self.compile_expr(&fc.callee)?;
@@ -278,6 +283,12 @@ impl Compiler {
             }
             SymbolScope::Builtin => {
                 self.emit(OpGetBuiltin, &vec![symbol.index]);
+            }
+            SymbolScope::Free => {
+                self.emit(OpGetFree, &vec![symbol.index]);
+            }
+            SymbolScope::Function => {
+                self.emit(OpCurrentClosure, &vec![]);
             }
         }
     }
