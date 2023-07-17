@@ -5,7 +5,8 @@ use std::rc::Rc;
 use byteorder::{BigEndian, ByteOrder};
 use object::builtins::BuiltIns;
 
-use object::{BuiltinFunc, CompiledFunction, Object};
+use object::{BuiltinFunc, Closure, CompiledFunction, Object};
+use object::Object::ClosureObj;
 
 use crate::compiler::Bytecode;
 use crate::frame::Frame;
@@ -29,19 +30,22 @@ pub struct VM {
 
 impl VM {
     pub fn new(bytecode: Bytecode) -> VM {
-        let main_fn = object::CompiledFunction {
-            instructions: bytecode.instructions.data,
-            num_locals: 0,
-            num_parameters: 0,
-        };
-
         // it's rust, it's verbose. You can't just grow your vector size.
         let empty_frame = Frame::new(
-            object::CompiledFunction { instructions: vec![], num_locals: 0, num_parameters: 0 },
+            Closure {
+                func: Rc::from(object::CompiledFunction { instructions: vec![], num_locals: 0, num_parameters: 0 }),
+                free: vec![]
+            },
             0,
         );
 
-        let main_frame = Frame::new(main_fn, 0);
+        let main_fn = Rc::from(object::CompiledFunction {
+            instructions: bytecode.instructions.data,
+            num_locals: 0,
+            num_parameters: 0,
+        });
+        let main_closure = Closure {func: main_fn, free: vec![] };
+        let main_frame = Frame::new(main_closure, 0);
         let mut frames = vec![empty_frame; MAX_FRAMES];
         frames[0] = main_frame;
 
@@ -179,9 +183,22 @@ impl VM {
                     let definition = BuiltIns.get(built_index).unwrap().1;
                     self.push(Rc::new(Object::Builtin(definition)));
                 }
-                Opcode::OpClosure => {}
-                Opcode::OpGetFree => {}
-                Opcode::OpCurrentClosure => {}
+                Opcode::OpClosure => {
+                    let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let num_free = ins[ip + 3] as usize;
+                    self.current_frame().ip += 3;
+                    self.push_closure(const_index, num_free);
+                }
+                Opcode::OpGetFree => {
+                    let free_index = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+                    let current_closure = self.current_frame().cl.clone();
+                    self.push(current_closure.free[free_index].clone());
+                }
+                Opcode::OpCurrentClosure => {
+                    let current_closure = self.current_frame().cl.clone();
+                    self.push(Rc::new(Object::ClosureObj(current_closure)));
+                }
             }
         }
     }
@@ -360,24 +377,24 @@ impl VM {
     fn execute_call(&mut self, num_args: usize) {
         let callee = &*self.stack[self.sp - 1 - num_args];
         match callee {
-            Object::CompiledFunction(cf) => {
-                self.call_function(cf.clone(), num_args);
+            Object::ClosureObj(cf) => {
+                self.call_closure(cf.clone(), num_args);
             }
             Object::Builtin(bt) => {
                 self.call_builtin(bt.clone(), num_args);
             }
             _ => {
-                panic!("calling non-function")
+                panic!("calling non-closure")
             }
         }
     }
-    fn call_function(&mut self, func: CompiledFunction, num_args: usize) {
-        if func.num_parameters != num_args {
-            panic!("wrong number of arguments: want={}, got={}", func.num_parameters, num_args);
+    fn call_closure(&mut self, cl: Closure, num_args: usize) {
+        if cl.func.num_parameters != num_args {
+            panic!("wrong number of arguments: want={}, got={}", cl.func.num_parameters, num_args);
         }
 
-        let frame = Frame::new(func.clone(), self.sp - num_args);
-        self.sp = frame.base_pointer + func.num_locals;
+        let frame = Frame::new(cl.clone(), self.sp - num_args);
+        self.sp = frame.base_pointer + cl.func.num_locals;
         self.push_frame(frame);
     }
 
@@ -386,5 +403,27 @@ impl VM {
         let result = bt(args);
         self.sp = self.sp - num_args - 1;
         self.push(result);
+    }
+
+    fn push_closure(&mut self, const_index: usize, num_free: usize) {
+        match &*self.constants[const_index] {
+            Object::CompiledFunction(f) => {
+                let mut free = Vec::with_capacity(num_free);
+                for i in 0..num_free {
+                    let f = self.stack[self.sp - num_free + i].clone();
+                    free[i] = f;
+                }
+                self.sp = self.sp - num_free;
+                let closure = ClosureObj (Closure {
+                    func: f.clone(),
+                    free,
+                });
+                self.push(Rc::new(closure));
+            }
+            o => {
+                panic!("not a function {}", o);
+            }
+        }
+
     }
 }
