@@ -2,7 +2,7 @@ name: prepare-dist
 on:
   push:
     branches:
-      - release-*
+      - 'release-**'
 jobs:
   prepare-dist:
     runs-on: ubuntu-latest
