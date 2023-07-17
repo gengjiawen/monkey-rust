@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'release-**'
+      - release-v0.9.1
 jobs:
   prepare-dist:
     runs-on: ubuntu-latest
