@@ -6,9 +6,10 @@ on:
 jobs:
   prepare-dist:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v2
-      # npx not work in this cases due to some weird npm permission issues
+      - uses: actions/checkout@v3
       - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "pnpm i && pnpx ts-node scripts/bump_cargo_packages.ts"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
