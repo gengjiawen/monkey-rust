@@ -19,4 +19,4 @@ lazy_static = "1.4.0"
 monkey-parser = { path = "../parser", version = "0.9.1" }
 
 [dev-dependencies]
-insta = "1.29.0"
+insta = "1.31.0"
