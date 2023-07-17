@@ -1,5 +1,14 @@
 # Changelog
 
+### [0.9.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.0...v0.9.1) (2023-07-17)
+
+
+### Bug Fixes
+
+* prepare rust tag issue ([4b4932e](https://www.github.com/gengjiawen/monkey-rust/commit/4b4932ea880ce650d95b60e6eb73977e637cde09))
+* script update ([873e2ad](https://www.github.com/gengjiawen/monkey-rust/commit/873e2adfa265564b6fe0760f1d293c3508b354c8))
+* Update prepare-release.yml ([f1e85c9](https://www.github.com/gengjiawen/monkey-rust/commit/f1e85c9ace989d35faf3faa04be34f2508cc0864))
+
 ## [0.9.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.8.0...v0.9.0) (2023-07-17)
 
 
