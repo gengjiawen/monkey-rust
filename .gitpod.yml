@@ -5,6 +5,7 @@ tasks:
   - init: time cargo build
     command: cargo test
   - init: cargo install cargo-insta && exit # cargo insta test && cargo insta accept to update snapshots
+  - init: cargo install cargo-workspaces
   - init: cd wasm && wasm-pack build --release --scope=gengjiawen && cd .. && pnpm i
 
 vscode:
