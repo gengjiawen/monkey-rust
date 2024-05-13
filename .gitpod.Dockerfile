@@ -1,6 +1,6 @@
 FROM gitpod/workspace-full-vnc
 
-ENV TRIGGER_REBUILD=11
+ENV TRIGGER_REBUILD=12
 
 RUN rustup target add wasm32-unknown-unknown
 
