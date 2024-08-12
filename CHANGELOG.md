@@ -1,5 +1,18 @@
 # Changelog
 
+### [0.9.2](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.1...v0.9.2) (2024-08-12)
+
+
+### Bug Fixes
+
+* bump base docker ([393f3c4](https://www.github.com/gengjiawen/monkey-rust/commit/393f3c4d3af47dacf8d7f399153435daec9222f7))
+* remove redux ([66ff65b](https://www.github.com/gengjiawen/monkey-rust/commit/66ff65b60df664d65982cb3551f18889b62e3b09))
+
+
+### Dev
+
+* bump dev env ([bc54a13](https://www.github.com/gengjiawen/monkey-rust/commit/bc54a13c985c5bcdf2a4b72a58e22717d0682bd8))
+
 ### [0.9.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.0...v0.9.1) (2023-07-17)
 
 
