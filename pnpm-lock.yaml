@@ -540,9 +540,6 @@ importers:
       react-dom:
         specifier: 18.2.0
         version: 18.2.0(react@18.2.0)
-      react-redux:
-        specifier: ^8.0.2
-        version: 8.0.2(@types/react-dom@18.0.6)(@types/react@18.0.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.0)
     devDependencies:
       '@types/lodash.debounce':
         specifier: ^4.0.7
@@ -9997,7 +9994,8 @@ snapshots:
 
   '@types/unist@2.0.6': {}
 
-  '@types/use-sync-external-store@0.0.3': {}
+  '@types/use-sync-external-store@0.0.3':
+    optional: true
 
   '@types/vfile-message@2.0.0':
     dependencies:
@@ -15454,7 +15452,8 @@ snapshots:
 
   react-is@17.0.2: {}
 
-  react-is@18.2.0: {}
+  react-is@18.2.0:
+    optional: true
 
   react-redux@7.2.8(react-dom@16.14.0(react@16.14.0))(react@16.14.0):
     dependencies:
@@ -15482,6 +15481,7 @@ snapshots:
       '@types/react-dom': 18.0.6
       react-dom: 18.2.0(react@18.2.0)
       redux: 4.2.0
+    optional: true
 
   react-refresh@0.14.0: {}
 
@@ -16924,6 +16924,7 @@ snapshots:
   use-sync-external-store@1.2.0(react@18.2.0):
     dependencies:
       react: 18.2.0
+    optional: true
 
   use@3.1.1: {}
 
