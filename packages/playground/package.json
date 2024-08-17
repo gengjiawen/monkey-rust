@@ -12,7 +12,6 @@
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@gengjiawen/monkey-wasm": "workspace:^0.9.1",
-    "@reduxjs/toolkit": "^1.8.3",
     "@replit/codemirror-vim": "^6.0.1",
     "@uiw/react-codemirror": "^4.11.4",
     "framer-motion": "^6",
