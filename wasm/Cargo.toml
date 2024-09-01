@@ -19,7 +19,7 @@ default = ["console_error_panic_hook"]
 monkey-parser = { path = "../parser", version = "0.9.1" }
 monkey-compiler = { path = "../compiler", version = "0.9.1" }
 
-wasm-bindgen = "0.2.80"
+wasm-bindgen = "0.2.93"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
