@@ -222,7 +222,7 @@ fn eval_boolean_infix(op: &Token, left: bool, right: bool) -> Result<Rc<Object>,
     let result = match &op.kind {
         TokenKind::EQ => Object::Boolean(left == right),
         TokenKind::NotEq => Object::Boolean(left != right),
-        op => return Err(format!("Invalid infix operator for int: {}", op)),
+        op => return Err(format!("Invalid infix operator for boolean: {}", op)),
     };
 
     Ok(Rc::from(result))
