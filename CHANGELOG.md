@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.9.3](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.2...v0.9.3) (2025-04-02)
+
+
+### Bug Fixes
+
+* remove deprecated packages ([0f04fe6](https://www.github.com/gengjiawen/monkey-rust/commit/0f04fe61bed552c0700cc0efe367d98abf1fdebb))
+
 ### [0.9.2](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.1...v0.9.2) (2024-08-12)
 
 
