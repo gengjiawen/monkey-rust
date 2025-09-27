@@ -19,7 +19,7 @@ path = "main.rs"
 [dependencies]
 lazy_static = "1.5.0"
 byteorder = "1.5.0"
-strum = { version = "0.25.0", features = ["derive"]}
+strum = { version = "0.27.2", features = ["derive"]}
 strum_macros = "0.26"
 monkey-parser = { path = "../parser", version = "0.9.1" }
 monkey-object = { path = "../object", version = "0.9.1" }
