@@ -43262,7 +43262,7 @@ mark	line	col
       __wbg_wbindgenthrow_451ec1a8469d7eb6: VQ,
       __wbindgen_init_externref_table: HQ
     }
-  }, "/monkey-rust/assets/monkey_wasm_bg.28dcd43f.wasm?init"), jQ = is.memory, WQ = is.parse, UQ = is.compile, KQ = is.__wbindgen_free, qQ = is.__wbindgen_malloc, GQ = is.__wbindgen_realloc, YQ = is.__wbindgen_export_3, o_ = is.__wbindgen_start, XQ = Object.freeze(Object.defineProperty({
+  }, "/monkey-rust/assets/monkey_wasm_bg.14c86bc8.wasm?init"), jQ = is.memory, WQ = is.parse, UQ = is.compile, KQ = is.__wbindgen_free, qQ = is.__wbindgen_malloc, GQ = is.__wbindgen_realloc, YQ = is.__wbindgen_export_3, o_ = is.__wbindgen_start, XQ = Object.freeze(Object.defineProperty({
     __proto__: null,
     memory: jQ,
     parse: WQ,
