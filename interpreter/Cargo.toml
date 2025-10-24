@@ -1,6 +1,6 @@
 [package]
 name = "monkey-interpreter"
-version = "0.10.0"
+version = "0.10.1"
 description = "an interpreter for monkeylang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"

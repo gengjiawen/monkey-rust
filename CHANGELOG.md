@@ -1,5 +1,13 @@
 # Changelog
 
+### [0.10.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.10.0...v0.10.1) (2025-10-24)
+
+
+### Bug Fixes
+
+* ci publish ([868506c](https://www.github.com/gengjiawen/monkey-rust/commit/868506c0819b885f7b90b558db88ba4ed4facff1))
+* version bump ([639585d](https://www.github.com/gengjiawen/monkey-rust/commit/639585dce22b89aba58188248ef4830589a05769))
+
 ## [0.10.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.2...v0.10.0) (2025-10-24)
 
 
