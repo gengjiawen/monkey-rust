@@ -28,7 +28,14 @@ jobs:
             ]
       - run: npx envinfo
       - uses: actions/checkout@v2
+      - run: cargo install cargo-workspaces
+        if: ${{ steps.release.outputs.release_created }}
+      - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
+        env:
+          CARGO_TOKEN: ${{secrets.CARGO_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
       - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
+        if: ${{ steps.release.outputs.release_created }}
       - uses: actions/setup-node@v1
         with:
           node-version: 14
@@ -38,10 +45,4 @@ jobs:
         working-directory: wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
-      - run: cargo install cargo-workspaces
-        if: ${{ steps.release.outputs.release_created }}
-      - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
-        env:
-          CARGO_TOKEN: ${{secrets.CARGO_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
