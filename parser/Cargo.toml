@@ -1,6 +1,6 @@
 [package]
 name = "monkey-parser"
-version = "0.9.1"
+version = "0.10.0"
 description = "a parser for monkey lang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -19,7 +19,7 @@ name = "monkey-parser"
 path = "main.rs"
 
 [dependencies]
-monkey-lexer = { path = "../lexer", version = "0.9.1" }
+monkey-lexer = { path = "../lexer", version = "0.10.0" }
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 

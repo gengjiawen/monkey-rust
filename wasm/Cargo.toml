@@ -1,6 +1,6 @@
 [package]
 name = "monkey-wasm"
-version = "0.9.1"
+version = "0.10.0"
 description = "monkey lang parser wasm version"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -16,8 +16,8 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-monkey-parser = { path = "../parser", version = "0.9.1" }
-monkey-compiler = { path = "../compiler", version = "0.9.1" }
+monkey-parser = { path = "../parser", version = "0.10.0" }
+monkey-compiler = { path = "../compiler", version = "0.10.0" }
 
 wasm-bindgen = "0.2.88"
 
