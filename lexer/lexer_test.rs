@@ -64,6 +64,15 @@ mod tests {
     fn test_lexer_bool() {
         test_lexer_common("bool", "let y=true");
     }
+    
+    #[test]
+    fn test_comments_then_blank_line() {
+        // Ensure comments followed by a blank line are skipped correctly
+        // and do not yield ILLEGAL tokens.
+        test_lexer_common("comments_then_blank_line", "// comment\n\nlet x = 5");
+    }
+
+
 
     #[test]
     fn test_lexer_complex() {

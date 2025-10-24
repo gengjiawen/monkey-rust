@@ -1,0 +1,55 @@
+---
+source: lexer/lexer_test.rs
+expression: "// comment\n\nlet x = 5"
+---
+[
+  {
+    "kind": {
+      "type": "LET"
+    },
+    "span": {
+      "start": 12,
+      "end": 15
+    }
+  },
+  {
+    "kind": {
+      "type": "IDENTIFIER",
+      "value": {
+        "name": "x"
+      }
+    },
+    "span": {
+      "start": 16,
+      "end": 17
+    }
+  },
+  {
+    "kind": {
+      "type": "ASSIGN"
+    },
+    "span": {
+      "start": 18,
+      "end": 19
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 5
+    },
+    "span": {
+      "start": 20,
+      "end": 21
+    }
+  },
+  {
+    "kind": {
+      "type": "EOF"
+    },
+    "span": {
+      "start": 21,
+      "end": 22
+    }
+  }
+]
