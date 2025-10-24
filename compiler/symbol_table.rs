@@ -47,12 +47,39 @@ impl SymbolTable {
         return symbol;
     }
 
-    pub fn resolve(&self, name: String) -> Option<Rc<Symbol>> {
-        let symbol = self.symbols.get(&name);
-        if symbol.is_none() && self.outer.is_some() {
-            return self.outer.as_ref().unwrap().resolve(name);
+    // Resolve a name in the current scope, capturing free variables from outers when needed.
+    pub fn resolve(&mut self, name: String) -> Option<Rc<Symbol>> {
+        if let Some(sym) = self.symbols.get(&name) {
+            return Some(sym.clone());
         }
-        return symbol.cloned();
+
+        // If not found locally, try outer scopes.
+        if let Some(outer) = &self.outer {
+            // We can't mutate outer here, so use a read-only helper to locate the original symbol.
+            if let Some(original) = outer.resolve_readonly(&name) {
+                return match original.scope {
+                    // Globals and builtins are accessed directly.
+                    SymbolScope::Global | SymbolScope::Builtin => Some(original),
+                    // Locals (from outer scope) or already-free symbols should be captured as a new free symbol here.
+                    SymbolScope::LOCAL | SymbolScope::Free | SymbolScope::Function => {
+                        Some(self.define_free(original))
+                    }
+                };
+            }
+        }
+
+        None
+    }
+
+    // Read-only resolver used internally to search outer scopes without mutating them.
+    fn resolve_readonly(&self, name: &str) -> Option<Rc<Symbol>> {
+        if let Some(sym) = self.symbols.get(name) {
+            return Some(sym.clone());
+        }
+        if let Some(outer) = &self.outer {
+            return outer.resolve_readonly(name);
+        }
+        None
     }
 
     pub fn define_builtin(&mut self, index: usize, name: String) -> Rc<Symbol> {

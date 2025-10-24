@@ -411,7 +411,7 @@ impl VM {
                 let mut free = Vec::with_capacity(num_free);
                 for i in 0..num_free {
                     let f = self.stack[self.sp - num_free + i].clone();
-                    free[i] = f;
+                    free.push(f);
                 }
                 self.sp = self.sp - num_free;
                 let closure = ClosureObj (Closure {
