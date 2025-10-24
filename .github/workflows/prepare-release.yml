@@ -2,8 +2,13 @@ name: prepare-dist
 on:
   push:
     branches:
-      - 'release-**'
-      - release-v0.9.1
+      - 'release-*'
+      - 'release/*'
+  create:
+    branches:
+      - 'release-*'
+      - 'release/*'
+  workflow_dispatch:
 jobs:
   prepare-dist:
     runs-on: ubuntu-latest
