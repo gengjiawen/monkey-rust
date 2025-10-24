@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.10.2](https://www.github.com/gengjiawen/monkey-rust/compare/v0.10.1...v0.10.2) (2025-10-24)
+
+
+### Bug Fixes
+
+* playground wasm version ([e3fbb64](https://www.github.com/gengjiawen/monkey-rust/commit/e3fbb64f96581553d05a44c422c04faa2746fbba))
+
 ### [0.10.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.10.0...v0.10.1) (2025-10-24)
 
 
