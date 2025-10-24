@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.2...v0.10.0) (2025-10-24)
+
+
+### Features
+
+* fix compatibility with latest rust ([63bc3f1](https://www.github.com/gengjiawen/monkey-rust/commit/63bc3f1016a3338e145d0af7deb26c1325f0530a))
+
+
+### Bug Fixes
+
+* compiler symbol resolve bug ([4f0c3eb](https://www.github.com/gengjiawen/monkey-rust/commit/4f0c3ebac18f4ecc5a8f6594475dc92db5efa839))
+* lexer parse comment bug ([51014cc](https://www.github.com/gengjiawen/monkey-rust/commit/51014ccb7282a6ca23622cf606cc4026ab8ab3cf))
+* remove deprecated packages ([0f04fe6](https://www.github.com/gengjiawen/monkey-rust/commit/0f04fe61bed552c0700cc0efe367d98abf1fdebb))
+
 ### [0.9.2](https://www.github.com/gengjiawen/monkey-rust/compare/v0.9.1...v0.9.2) (2024-08-12)
 
 
