@@ -38,11 +38,23 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
       - uses: actions/setup-node@v1
         with:
-          node-version: 14
+          node-version: lts/*
           registry-url: 'https://registry.npmjs.org'
         if: ${{ steps.release.outputs.release_created }}
       - run: npm publish --access public
         working-directory: wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
+      # Build and publish prettier-plugin-monkey (depends on @gengjiawen/monkey-wasm)
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+        if: ${{ steps.release.outputs.release_created }}
+      - run: pnpm install --filter prettier-plugin-monkey... && pnpm --filter prettier-plugin-monkey run build
+        if: ${{ steps.release.outputs.release_created }}
+      - run: npm publish --access public
+        working-directory: packages/prettier-plugin-monkey
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}

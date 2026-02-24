@@ -4,6 +4,7 @@
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/?workspaceClass=g1-large&editor=code#https://github.com/gengjiawen/monkey-rust)
 [![monkey-interpreter](https://img.shields.io/crates/v/monkey-interpreter)](https://crates.io/crates/monkey-interpreter)
 [![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-wasm)](https://www.npmjs.com/package/@gengjiawen/monkey-wasm)
+[![npm version](https://img.shields.io/npm/v/prettier-plugin-monkey?label=prettier-plugin-monkey)](https://www.npmjs.com/package/prettier-plugin-monkey)
 
 An interpreter for the Monkey programming language written in Rust
 
@@ -24,6 +25,7 @@ There is a book about learning how to make an interpreter: [Writing An Interpret
 - location info for ast
 - test for every module
 - **Wasm**: A WebAssembly target, thus run monkey on browser is directly supported.
+- **Prettier Plugin**: Format Monkey source code with [Prettier](https://prettier.io/) via `prettier-plugin-monkey`.
 - bytecode viewer from source
 
 ### AST Online playground
