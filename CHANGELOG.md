@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.10.1...v0.11.0) (2026-02-24)
+
+
+### Features
+
+* **prettier-plugin:** add monkey prettier plugin and development guide ([e294acd](https://www.github.com/gengjiawen/monkey-rust/commit/e294acd6ca1939450999ef0897ec25be7867d01e))
+
+
+### Bug Fixes
+
+* playground wasm version ([e3fbb64](https://www.github.com/gengjiawen/monkey-rust/commit/e3fbb64f96581553d05a44c422c04faa2746fbba))
+
 ### [0.10.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.10.0...v0.10.1) (2025-10-24)
 
 
