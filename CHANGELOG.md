@@ -1,5 +1,13 @@
 # Changelog
 
+### [0.11.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.11.0...v0.11.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* **ci:** use setup-node v4 for lts/* in release workflow ([c17b1d5](https://www.github.com/gengjiawen/monkey-rust/commit/c17b1d580f9c628d71b67035675149d18ec96acd))
+* **playground:** use workspace:* for monkey-wasm dependency ([eb393a0](https://www.github.com/gengjiawen/monkey-rust/commit/eb393a07d3505352fbd738a1be03b9109865ffe9))
+
 ## [0.11.0](https://www.github.com/gengjiawen/monkey-rust/compare/v0.10.1...v0.11.0) (2026-02-24)
 
 
