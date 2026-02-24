@@ -1,0 +1,41 @@
+{
+  "name": "prettier-plugin-monkey",
+  "version": "0.1.0",
+  "description": "Prettier plugin for Monkey programming language",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "prettier",
+    "plugin",
+    "monkey",
+    "monkeylang",
+    "formatter"
+  ],
+  "author": "gengjiawen <technicalcute@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gengjiawen/monkey-rust"
+  },
+  "peerDependencies": {
+    "prettier": "^3.0.0"
+  },
+  "dependencies": {
+    "@gengjiawen/monkey-wasm": "^0.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
