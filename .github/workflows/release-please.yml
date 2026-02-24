@@ -36,7 +36,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
       - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
         if: ${{ steps.release.outputs.release_created }}
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         with:
           node-version: lts/*
           registry-url: 'https://registry.npmjs.org'
