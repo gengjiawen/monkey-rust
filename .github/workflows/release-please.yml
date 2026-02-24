@@ -5,13 +5,22 @@ on:
     branches:
       - main
       - release_extra
+  workflow_dispatch:
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    container:
+      image: gengjiawen/node-build
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      id-token: write
     steps:
-      - uses: GoogleCloudPlatform/release-please-action@v2
-        id: release
+      - id: release
+        uses: googleapis/release-please-action@v4
         with:
           package-name: monkey-rust
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -26,30 +35,52 @@ jobs:
               {"type":"playground","section":"playground","hidden":false},
               {"type":"meta","section":"Miscellaneous","hidden":false}
             ]
+      - name: Trigger prepare-release for open release PR
+        uses: actions/github-script@v7
+        if: ${{ steps.release.outputs.release_created != 'true' }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo
+            const baseBranch = context.ref.replace('refs/heads/', '')
+            const { data: pulls } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              base: baseBranch,
+              per_page: 100,
+            })
+
+            const releasePr = pulls.find((pr) => {
+              const byRef = pr.head.ref.startsWith('release-') || pr.head.ref.startsWith('release/')
+              const byTitle = /^chore: release\b/i.test(pr.title)
+              return byRef || byTitle
+            })
+
+            if (!releasePr) {
+              core.info('No open release PR found, skipping prepare-release dispatch.')
+              return
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'prepare-release.yml',
+              ref: releasePr.head.ref,
+            })
+            core.info(`Triggered prepare-release.yml on ${releasePr.head.ref}`)
+      - uses: actions/checkout@v4
       - run: npx envinfo
-      - uses: actions/checkout@v2
-      - run: cargo install cargo-workspaces
-        if: ${{ steps.release.outputs.release_created }}
       - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
         env:
           CARGO_TOKEN: ${{secrets.CARGO_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
-      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "cd wasm && wasm-pack build --release --scope=gengjiawen"
-        if: ${{ steps.release.outputs.release_created }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          registry-url: 'https://registry.npmjs.org'
+      - run: cd wasm && wasm-pack build --release --scope=gengjiawen
         if: ${{ steps.release.outputs.release_created }}
       - run: npm publish --access public
         working-directory: wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
-      # Build and publish prettier-plugin-monkey (depends on @gengjiawen/monkey-wasm)
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 9
         if: ${{ steps.release.outputs.release_created }}
       - run: pnpm install --filter prettier-plugin-monkey... && pnpm --filter prettier-plugin-monkey run build
         if: ${{ steps.release.outputs.release_created }}

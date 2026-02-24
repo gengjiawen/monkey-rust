@@ -50,7 +50,7 @@ try {
   console.warn("Failed to update playground dependency:", e)
 }
 
-// Also bump prettier-plugin-monkey dependency on @gengjiawen/monkey-wasm
+// Also keep prettier-plugin-monkey package version and wasm dependency in sync
 try {
   const prettierPluginPkgPath = join(
     __dirname,
@@ -61,6 +61,21 @@ try {
   )
   const prettierPluginRaw = readFileSync(prettierPluginPkgPath, "utf-8")
   const prettierPlugin = JSON.parse(prettierPluginRaw)
+  let prettierPluginChanged = false
+
+  if (prettierPlugin.version !== pak.version) {
+    const prevVersion = prettierPlugin.version
+    prettierPlugin.version = pak.version
+    prettierPluginChanged = true
+    console.log(
+      `Updated prettier-plugin-monkey version: ${prevVersion} -> ${pak.version}`,
+    )
+  } else {
+    console.log(
+      `prettier-plugin-monkey version already up-to-date: ${prettierPlugin.version}`,
+    )
+  }
+
   if (
     prettierPlugin.dependencies &&
     prettierPlugin.dependencies["@gengjiawen/monkey-wasm"]
@@ -69,11 +84,7 @@ try {
     const prev = prettierPlugin.dependencies["@gengjiawen/monkey-wasm"]
     if (prev !== newRange) {
       prettierPlugin.dependencies["@gengjiawen/monkey-wasm"] = newRange
-      writeFileSync(
-        prettierPluginPkgPath,
-        JSON.stringify(prettierPlugin, null, 2) + "\n",
-        "utf-8",
-      )
+      prettierPluginChanged = true
       console.log(
         `Updated prettier-plugin-monkey dependency @gengjiawen/monkey-wasm: ${prev} -> ${newRange}`,
       )
@@ -85,6 +96,14 @@ try {
   } else {
     console.log(
       "prettier-plugin-monkey package.json missing @gengjiawen/monkey-wasm dependency; skipped.",
+    )
+  }
+
+  if (prettierPluginChanged) {
+    writeFileSync(
+      prettierPluginPkgPath,
+      JSON.stringify(prettierPlugin, null, 2) + "\n",
+      "utf-8",
     )
   }
 } catch (e) {
