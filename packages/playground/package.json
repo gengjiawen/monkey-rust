@@ -11,7 +11,7 @@
     "@chakra-ui/react": "^2.2.4",
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
-    "@gengjiawen/monkey-wasm": "workspace:^0.10.1",
+    "@gengjiawen/monkey-wasm": "workspace:*",
     "@replit/codemirror-vim": "^6.0.1",
     "@uiw/react-codemirror": "^4.11.4",
     "framer-motion": "^6",
