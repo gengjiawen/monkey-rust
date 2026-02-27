@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/gengjiawen/monkey-rust/compare/v0.11.1...v0.12.0) (2026-02-27)
+
+
+### Features
+
+* **playground:** integrate prettier-plugin-monkey for code formatting ([bf52a0a](https://github.com/gengjiawen/monkey-rust/commit/bf52a0a1e6ad4e32a40d46144ecf0ce88787b68f))
+
+
+### Bug Fixes
+
+* **release:** sync prettier plugin version and refresh workflow ([3608f04](https://github.com/gengjiawen/monkey-rust/commit/3608f0471e62feaec5d322fa93bfdf0d4464ba39))
+
 ### [0.11.1](https://www.github.com/gengjiawen/monkey-rust/compare/v0.11.0...v0.11.1) (2026-02-24)
 
 
