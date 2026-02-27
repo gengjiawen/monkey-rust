@@ -531,6 +531,12 @@ importers:
       lodash.debounce:
         specifier: ^4.0.8
         version: 4.0.8
+      prettier:
+        specifier: ^3.0.0
+        version: 3.6.2
+      prettier-plugin-monkey:
+        specifier: workspace:*
+        version: link:../prettier-plugin-monkey
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -569,8 +575,8 @@ importers:
   packages/prettier-plugin-monkey:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^0.10.1
-        version: 0.10.1
+        specifier: workspace:*
+        version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -1874,9 +1880,6 @@ packages:
 
   '@formatjs/ecma402-abstract@1.6.4':
     resolution: {integrity: sha512-ukFjGD9dLsxcD9D5AEshJqQElPQeUAlTALT/lzIV6OcYojyuU81gw/uXDUOrs6XW79jtOJwQDkLqHbCJBJMOTw==}
-
-  '@gengjiawen/monkey-wasm@0.10.1':
-    resolution: {integrity: sha512-+84RgaCFf4bxZDkz6s14xB664GYHYMEFvpZn9imKS2fYd5R37496s279RqEz7ZdmlePIqJ+hiAaQjScw/PWvug==}
 
   '@gengjiawen/monkey-wasm@0.7.0':
     resolution: {integrity: sha512-z+tWr4U0VUL+IrqYwLH8qvPrZ7dVZh0SRWjDZvUWaZsKr12GLWG44No3RT/h6u1/1gjMnC0WeFFJLE5kg6hrHA==}
@@ -10133,8 +10136,6 @@ snapshots:
   '@formatjs/ecma402-abstract@1.6.4':
     dependencies:
       tslib: 2.4.0
-
-  '@gengjiawen/monkey-wasm@0.10.1': {}
 
   '@gengjiawen/monkey-wasm@0.7.0': {}
 

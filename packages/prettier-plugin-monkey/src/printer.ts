@@ -1,4 +1,4 @@
-import type { AstPath, Doc, Options } from 'prettier';
+import { doc, type AstPath, type Doc, type Options } from 'prettier';
 import type {
   Program,
   BlockStatement,
@@ -20,7 +20,6 @@ import type {
   MonkeyComment,
 } from './types';
 
-// Import Prettier's document builders
 const {
   group,
   indent,
@@ -29,7 +28,7 @@ const {
   hardline,
   join,
   ifBreak,
-} = require('prettier').doc.builders;
+} = doc.builders;
 
 export function print(
   path: AstPath,

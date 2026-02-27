@@ -12,6 +12,8 @@
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@gengjiawen/monkey-wasm": "workspace:*",
+    "prettier": "^3.0.0",
+    "prettier-plugin-monkey": "workspace:*",
     "@replit/codemirror-vim": "^6.0.1",
     "@uiw/react-codemirror": "^4.11.4",
     "framer-motion": "^6",
