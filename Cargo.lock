@@ -61,6 +61,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
+name = "heck"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
 name = "insta"
 version = "1.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -129,19 +135,19 @@ checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
 name = "monkey-compiler"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "byteorder",
  "lazy_static",
  "monkey-object",
  "monkey-parser",
  "strum",
- "strum_macros 0.26.2",
+ "strum_macros 0.28.0",
 ]
 
 [[package]]
 name = "monkey-interpreter"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "monkey-object",
  "monkey-parser",
@@ -149,7 +155,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-lexer"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "insta",
  "serde",
@@ -158,7 +164,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-object"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "insta",
  "lazy_static",
@@ -167,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-parser"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "insta",
  "monkey-lexer",
@@ -177,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-wasm"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "console_error_panic_hook",
  "monkey-compiler",
@@ -313,7 +319,7 @@ version = "0.25.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "rustversion",
@@ -322,14 +328,13 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.26.2"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6cf59daf282c0a494ba14fd21610a0325f9f90ec9d1231dea26bcb1d696c946"
+checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
 dependencies = [
- "heck",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
- "rustversion",
  "syn",
 ]
 
