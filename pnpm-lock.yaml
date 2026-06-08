@@ -33,7 +33,7 @@ importers:
         specifier: ^11
         version: 11.9.3(@babel/core@7.18.9)(@emotion/react@11.9.3(@babel/core@7.18.9)(@types/react@18.0.15)(react@18.2.0))(@types/react@18.0.15)(react@18.2.0)
       '@gengjiawen/monkey-wasm':
-        specifier: workspace:*
+        specifier: workspace:^0.12.0
         version: link:../../wasm/pkg
       '@replit/codemirror-vim':
         specifier: ^6.0.1
@@ -91,8 +91,8 @@ importers:
   packages/prettier-plugin-monkey:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: workspace:*
-        version: link:../../wasm/pkg
+        specifier: ^0.12.0
+        version: 0.12.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -814,6 +814,9 @@ packages:
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
+
+  '@gengjiawen/monkey-wasm@0.12.0':
+    resolution: {integrity: sha512-SCFjOsKldfecOiyrx6ImGkUEhca5JnWagHwc0g9CoR31EyqH10WvuqF4rLZsRBc2ikd5/CsnMdIsS60L387KfA==}
 
   '@jest/schemas@29.6.3':
     resolution: {integrity: sha512-mo5j5X+jIZmJQveBKeS/clAueipV7KgiX1vMgCxam1RNYiqE1w62n0/tJJnHtjW8ZHcQco5gY85jA3mi0L+nSA==}
@@ -1891,6 +1894,7 @@ packages:
 
   sourcemap-codec@1.4.8:
     resolution: {integrity: sha512-9NykojV5Uih4lgo5So5dtw+f0JgJX30KCNI8gwhz2J9A15wD0Ml6tjHKwf6fTSa6fAdVBdZeNOs9eJ71qCk8vA==}
+    deprecated: Please use @jridgewell/sourcemap-codec instead
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -3034,6 +3038,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.21.5':
     optional: true
+
+  '@gengjiawen/monkey-wasm@0.12.0': {}
 
   '@jest/schemas@29.6.3':
     dependencies:
