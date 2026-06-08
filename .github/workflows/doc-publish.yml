@@ -18,11 +18,13 @@ jobs:
       - name: Install and Build
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          npm i -g pnpm@8
+          npm i -g pnpm@9
           cargo build
           cd wasm && wasm-pack build --release --scope=gengjiawen
-          pnpm i
-          cd $GITHUB_WORKSPACE/packages/playground && pnpm build
+          cd $GITHUB_WORKSPACE
+          pnpm install --frozen-lockfile
+          pnpm --filter prettier-plugin-monkey build
+          pnpm -C packages/playground build
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
