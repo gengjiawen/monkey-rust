@@ -1,6 +1,6 @@
 [package]
 name = "monkey-compiler"
-version = "0.10.1"
+version = "0.12.0"
 description = "a compiler for monkeylang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -21,5 +21,5 @@ lazy_static = "1.5.0"
 byteorder = "1.5.0"
 strum = { version = "0.25.0", features = ["derive"]}
 strum_macros = "0.26"
-monkey-parser = { path = "../parser", version = "0.10.0" }
-monkey-object = { path = "../object", version = "0.10.0" }
+monkey-parser = { path = "../parser", version = "0.12.0" }
+monkey-object = { path = "../object", version = "0.12.0" }
