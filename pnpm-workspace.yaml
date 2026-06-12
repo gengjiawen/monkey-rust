@@ -9,9 +9,10 @@ allowBuilds:
   keytar: true
   sharp: true
 
+minimumReleaseAge: 0
+
 minimumReleaseAgeExclude:
   - '@gengjiawen/monkey-wasm@0.12.1'
-  - ovsx@1.0.1
 
 onlyBuiltDependencies:
   - '@swc/core'
