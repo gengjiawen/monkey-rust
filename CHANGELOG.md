@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/gengjiawen/monkey-rust/compare/v0.12.1...v0.13.0) (2026-06-12)
+
+
+### Features
+
+* add VS Code extension ([#245](https://github.com/gengjiawen/monkey-rust/issues/245)) ([ddb5547](https://github.com/gengjiawen/monkey-rust/commit/ddb554734983c2d16a78d0240231492c3c238c61))
+* **playground:** migrate to Next.js ([#247](https://github.com/gengjiawen/monkey-rust/issues/247)) ([95a338a](https://github.com/gengjiawen/monkey-rust/commit/95a338a25cc198d19d7ca7af80d4b2b0cdcc9581))
+
+
+### Bug Fixes
+
+* **ci:** allow pnpm 11 dependency builds ([#244](https://github.com/gengjiawen/monkey-rust/issues/244)) ([75a3f62](https://github.com/gengjiawen/monkey-rust/commit/75a3f621f725c332a857aff3ec0cd03a89cfc4a3))
+
 ## [0.12.1](https://github.com/gengjiawen/monkey-rust/compare/v0.12.0...v0.12.1) (2026-06-12)
 
 
