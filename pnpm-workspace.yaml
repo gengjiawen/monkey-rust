@@ -7,6 +7,7 @@ allowBuilds:
   '@vscode/vsce-sign': true
   esbuild: true
   keytar: true
+  sharp: true
 
 minimumReleaseAgeExclude:
   - '@gengjiawen/monkey-wasm@0.12.1'
@@ -16,3 +17,4 @@ onlyBuiltDependencies:
   - '@vscode/vsce-sign'
   - esbuild
   - keytar
+  - sharp
