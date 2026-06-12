@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Button, Flex, SegmentedControl, Tabs } from '@radix-ui/themes'
+import { Box, Button, Flex, SegmentedControl } from '@radix-ui/themes'
 import { compile, parse } from '@gengjiawen/monkey-wasm'
 import debounce from 'lodash.debounce'
 import type { Plugin } from 'prettier'
@@ -14,12 +14,15 @@ if (true) { 10 }; 3333;
 let a = [1, 2, 3];
 `.trimStart()
 
+type OutputView = 'ast' | 'bytecode'
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
 function App() {
   const [code, setCode] = useState(initialCode)
+  const [outputView, setOutputView] = useState<OutputView>('ast')
   const [astOutput, setAstOutput] = useState('')
   const [compilerOutput, setCompilerOutput] = useState('')
   const [vimMode, setVimMode] = useState(true)
@@ -72,6 +75,8 @@ function App() {
 
   useEffect(() => () => debouncedCompile.cancel(), [debouncedCompile])
 
+  const outputCode = outputView === 'ast' ? astOutput : compilerOutput
+
   return (
     <Flex className="playground-shell">
       <Flex direction="column" className="panel editor-column">
@@ -94,28 +99,24 @@ function App() {
       </Flex>
 
       <Flex direction="column" className="panel output-column">
-        <Tabs.Root defaultValue="ast" className="output-tabs">
-          <Tabs.List size="2">
-            <Tabs.Trigger value="ast">AST</Tabs.Trigger>
-            <Tabs.Trigger value="bytecode">Bytecode</Tabs.Trigger>
-          </Tabs.List>
-          <Tabs.Content value="ast" p="0" className="output-content">
-            <Editor
-              code={astOutput}
-              extra={{ readOnly: true, editable: false }}
-              vimMode={false}
-              fill
-            />
-          </Tabs.Content>
-          <Tabs.Content value="bytecode" p="0" className="output-content">
-            <Editor
-              code={compilerOutput}
-              extra={{ readOnly: true, editable: false }}
-              vimMode={false}
-              fill
-            />
-          </Tabs.Content>
-        </Tabs.Root>
+        <Flex className="toolbar" align="center" px="3" py="2">
+          <SegmentedControl.Root
+            size="2"
+            value={outputView}
+            onValueChange={(value) => setOutputView(value as OutputView)}
+          >
+            <SegmentedControl.Item value="ast">AST</SegmentedControl.Item>
+            <SegmentedControl.Item value="bytecode">Bytecode</SegmentedControl.Item>
+          </SegmentedControl.Root>
+        </Flex>
+        <Box className="editor-frame">
+          <Editor
+            code={outputCode}
+            extra={{ readOnly: true, editable: false }}
+            vimMode={false}
+            fill
+          />
+        </Box>
       </Flex>
     </Flex>
   )

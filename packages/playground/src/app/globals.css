@@ -34,30 +34,11 @@ body {
   background: var(--color-background);
 }
 
-.editor-frame,
-.output-tabs,
-.output-content {
+.editor-frame {
   min-height: 0;
   flex: 1;
-}
-
-.output-tabs {
   display: flex;
   flex-direction: column;
-  height: 100%;
-}
-
-.output-tabs [role='tablist'] {
-  flex-shrink: 0;
-}
-
-.output-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.output-content[data-state='inactive'] {
-  display: none;
 }
 
 .editor-fill {
