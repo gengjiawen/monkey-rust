@@ -71,10 +71,10 @@
     }
   },
   "scripts": {
-    "build": "node scripts/build.cjs",
+    "build": "node scripts/build.js",
     "watch": "tsc -w -p .",
     "vscode:prepublish": "pnpm run build",
-    "package": "node scripts/package.cjs"
+    "package": "node scripts/package.js"
   },
   "dependencies": {
     "@gengjiawen/monkey-wasm": "^0.12.0"

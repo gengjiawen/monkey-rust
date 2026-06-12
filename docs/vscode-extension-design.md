@@ -46,7 +46,7 @@
 | 解析诊断   | `src/extension.ts`                   | 保存/打开/编辑时调用 WASM parser             |
 | 查看 AST   | `monkey.showAST`                     | 将当前文档解析为 JSON AST 并在新编辑器展示   |
 | 编译字节码 | `monkey.compileToBytecode`           | 将当前文档编译为字节码文本并在新编辑器展示   |
-| VSIX 打包  | `scripts/package.cjs`                | 在临时目录中安装生产依赖并生成可安装包       |
+| VSIX 打包  | `scripts/package.js`                 | 在临时目录中安装生产依赖并生成可安装包       |
 
 ### 2.2 暂不覆盖的能力
 
@@ -71,8 +71,8 @@ packages/vscode-extension/
 ├── language-configuration.json   # VS Code 语言配置
 ├── package.json                  # VS Code extension manifest
 ├── scripts/
-│   ├── build.cjs                 # 从 workspace root 调用 TypeScript
-│   └── package.cjs               # 生成 VSIX 的稳定打包脚本
+│   ├── build.js                  # 从 workspace root 调用 TypeScript
+│   └── package.js                # 生成 VSIX 的稳定打包脚本
 ├── snippets/
 │   └── monkey.json               # Monkey 代码片段
 ├── src/
@@ -362,11 +362,11 @@ pnpm -C packages/vscode-extension run build
 
 ```json
 {
-  "build": "node scripts/build.cjs"
+  "build": "node scripts/build.js"
 }
 ```
 
-`scripts/build.cjs` 不直接依赖 extension 子目录下的 `.bin/tsc`，而是从 workspace root 查找：
+`scripts/build.js` 不直接依赖 extension 子目录下的 `.bin/tsc`，而是从 workspace root 查找：
 
 ```text
 node_modules/.bin/tsc
@@ -382,7 +382,7 @@ node_modules/.bin/tsc
 pnpm -C packages/vscode-extension run package
 ```
 
-`scripts/package.cjs` 的流程：
+`scripts/package.js` 的流程：
 
 1. 调用 build 脚本生成 `dist/`。
 2. 创建临时 staging 目录。
@@ -559,8 +559,8 @@ NODE
 ./node_modules/.bin/prettier --check \
   docs/vscode-extension-design.md \
   packages/vscode-extension/package.json \
-  packages/vscode-extension/scripts/build.cjs \
-  packages/vscode-extension/scripts/package.cjs \
+  packages/vscode-extension/scripts/build.js \
+  packages/vscode-extension/scripts/package.js \
   packages/vscode-extension/src/extension.ts
 
 git diff --check

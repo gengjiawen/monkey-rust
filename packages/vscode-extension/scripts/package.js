@@ -12,7 +12,7 @@ const { basename, join, resolve } = require('path')
 
 const extensionRoot = resolve(__dirname, '..')
 const repoRoot = resolve(extensionRoot, '..', '..')
-const buildScript = join(extensionRoot, 'scripts', 'build.cjs')
+const buildScript = join(extensionRoot, 'scripts', 'build.js')
 const packageJsonPath = join(extensionRoot, 'package.json')
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
 const stagingDir = join(tmpdir(), `monkey-extension-package-${process.pid}`)

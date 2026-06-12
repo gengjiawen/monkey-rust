@@ -1,14 +1,13 @@
 # Monkey Language VS Code Extension
 
-Provides syntax highlighting, lightweight diagnostics using the Monkey WASM parser, and a couple of convenience commands.
+First-class VS Code support for Monkey source files, including syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
 
 ## Features
 
-- Syntax highlighting for `.monkey` files
-- Diagnostics via `@gengjiawen/monkey-wasm`
-- Commands:
-  - "Monkey: Compile To Bytecode" - compile current file and show bytecode
-  - "Monkey: Show AST (JSON)" - parse and view AST JSON
+- **Editor support for `.monkey` files**: language registration, TextMate syntax highlighting, bracket/comment behavior, and snippets for common Monkey constructs.
+- **WASM-powered diagnostics**: parses the current document through `@gengjiawen/monkey-wasm` and reports parser errors directly in the editor.
+- **AST preview**: run "Monkey: Show AST (JSON)" to inspect the parser output for the active file.
+- **Bytecode compilation**: run "Monkey: Compile To Bytecode" to compile the active file and inspect the compiler output.
 
 ## Development
 
