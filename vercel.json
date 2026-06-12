@@ -1,0 +1,7 @@
+{
+  "framework": null,
+  "installCommand": "curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal && . \"$HOME/.cargo/env\" && rustup target add wasm32-unknown-unknown && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && cd wasm && wasm-pack build --release --scope=gengjiawen && cd .. && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm -C packages/playground build",
+  "outputDirectory": "packages/playground/out",
+  "devCommand": "pnpm -C packages/playground dev"
+}
