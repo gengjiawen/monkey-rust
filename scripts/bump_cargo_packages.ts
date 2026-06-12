@@ -1,131 +1,169 @@
-import { execSync } from "child_process"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs"
-import { join } from "path"
+import { execSync } from 'child_process'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { join } from 'path'
 
-const rootPath = join(__dirname, "..")
-const pkgPath = join(rootPath, "package.json")
-const pak = JSON.parse(readFileSync(pkgPath, "utf-8"))
+type PackageJson = {
+  version?: string
+  dependencies?: Record<string, string>
+  [key: string]: unknown
+}
 
-const bump_cmd = `cargo workspaces version custom ${pak.version} --no-git-commit -y`
+const rootPath = join(__dirname, '..')
+
+function repoPath(...parts: string[]) {
+  return join(rootPath, ...parts)
+}
+
+function readPackageJson(path: string): PackageJson {
+  return JSON.parse(readFileSync(path, 'utf-8')) as PackageJson
+}
+
+function writePackageJson(path: string, packageJson: PackageJson) {
+  writeFileSync(path, JSON.stringify(packageJson, null, 2) + '\n', 'utf-8')
+}
+
+function syncPackageVersion(
+  packageJson: PackageJson,
+  packageName: string,
+  nextVersion: string
+) {
+  if (packageJson.version !== nextVersion) {
+    const prevVersion = packageJson.version
+    packageJson.version = nextVersion
+    console.log(
+      `Updated ${packageName} version: ${prevVersion} -> ${nextVersion}`
+    )
+    return true
+  }
+
+  console.log(
+    `${packageName} version already up-to-date: ${packageJson.version}`
+  )
+  return false
+}
+
+function syncDependencyRange(
+  packageJson: PackageJson,
+  packageName: string,
+  dependencyName: string,
+  nextRange: string
+) {
+  if (!packageJson.dependencies || !packageJson.dependencies[dependencyName]) {
+    console.log(
+      `${packageName} package.json missing ${dependencyName} dependency; skipped.`
+    )
+    return false
+  }
+
+  const prev = packageJson.dependencies[dependencyName]
+  if (prev !== nextRange) {
+    packageJson.dependencies[dependencyName] = nextRange
+    console.log(
+      `Updated ${packageName} dependency ${dependencyName}: ${prev} -> ${nextRange}`
+    )
+    return true
+  }
+
+  console.log(`${packageName} dependency already up-to-date: ${prev}`)
+  return false
+}
+
+const pkgPath = repoPath('package.json')
+const rootPackage = readPackageJson(pkgPath)
+if (
+  typeof rootPackage.version !== 'string' ||
+  rootPackage.version.length === 0
+) {
+  throw new Error('Root package.json is missing a valid version')
+}
+
+const nextVersion = rootPackage.version
+const bump_cmd = `cargo workspaces version custom ${nextVersion} --no-git-commit -y`
 console.log(bump_cmd)
 execSync(bump_cmd)
 
 // Also bump playground dependency on @gengjiawen/monkey-wasm
 try {
-  const playgroundPkgPath = join(
-    __dirname,
-    "..",
-    "packages",
-    "playground",
-    "package.json",
+  const playgroundPkgPath = repoPath('packages', 'playground', 'package.json')
+  const playground = readPackageJson(playgroundPkgPath)
+  const changed = syncDependencyRange(
+    playground,
+    'playground',
+    '@gengjiawen/monkey-wasm',
+    `workspace:^${nextVersion}`
   )
-  const playgroundRaw = readFileSync(playgroundPkgPath, "utf-8")
-  const playground = JSON.parse(playgroundRaw)
-  if (
-    playground.dependencies &&
-    playground.dependencies["@gengjiawen/monkey-wasm"]
-  ) {
-    const newRange = `workspace:^${pak.version}`
-    const prev = playground.dependencies["@gengjiawen/monkey-wasm"]
-    if (prev !== newRange) {
-      playground.dependencies["@gengjiawen/monkey-wasm"] = newRange
-      writeFileSync(
-        playgroundPkgPath,
-        JSON.stringify(playground, null, 2) + "\n",
-        "utf-8",
-      )
-      console.log(
-        `Updated playground dependency @gengjiawen/monkey-wasm: ${prev} -> ${newRange}`,
-      )
-    } else {
-      console.log(
-        `Playground dependency already up-to-date: ${prev}`,
-      )
-    }
-  } else {
-    console.log(
-      "Playground package.json missing @gengjiawen/monkey-wasm dependency; skipped.",
-    )
+  if (changed) {
+    writePackageJson(playgroundPkgPath, playground)
   }
 } catch (e) {
-  console.warn("Failed to update playground dependency:", e)
+  console.warn('Failed to update playground dependency:', e)
 }
 
 // Also keep prettier-plugin-monkey package version and wasm dependency in sync
 try {
-  const prettierPluginPkgPath = join(
-    __dirname,
-    "..",
-    "packages",
-    "prettier-plugin-monkey",
-    "package.json",
+  const prettierPluginPkgPath = repoPath(
+    'packages',
+    'prettier-plugin-monkey',
+    'package.json'
   )
-  const prettierPluginRaw = readFileSync(prettierPluginPkgPath, "utf-8")
-  const prettierPlugin = JSON.parse(prettierPluginRaw)
+  const prettierPlugin = readPackageJson(prettierPluginPkgPath)
   let prettierPluginChanged = false
 
-  if (prettierPlugin.version !== pak.version) {
-    const prevVersion = prettierPlugin.version
-    prettierPlugin.version = pak.version
-    prettierPluginChanged = true
-    console.log(
-      `Updated prettier-plugin-monkey version: ${prevVersion} -> ${pak.version}`,
-    )
-  } else {
-    console.log(
-      `prettier-plugin-monkey version already up-to-date: ${prettierPlugin.version}`,
-    )
-  }
-
-  if (
-    prettierPlugin.dependencies &&
-    prettierPlugin.dependencies["@gengjiawen/monkey-wasm"]
-  ) {
-    const newRange = `^${pak.version}`
-    const prev = prettierPlugin.dependencies["@gengjiawen/monkey-wasm"]
-    if (prev !== newRange) {
-      prettierPlugin.dependencies["@gengjiawen/monkey-wasm"] = newRange
-      prettierPluginChanged = true
-      console.log(
-        `Updated prettier-plugin-monkey dependency @gengjiawen/monkey-wasm: ${prev} -> ${newRange}`,
-      )
-    } else {
-      console.log(
-        `prettier-plugin-monkey dependency already up-to-date: ${prev}`,
-      )
-    }
-  } else {
-    console.log(
-      "prettier-plugin-monkey package.json missing @gengjiawen/monkey-wasm dependency; skipped.",
-    )
-  }
+  prettierPluginChanged =
+    syncPackageVersion(prettierPlugin, 'prettier-plugin-monkey', nextVersion) ||
+    prettierPluginChanged
+  prettierPluginChanged =
+    syncDependencyRange(
+      prettierPlugin,
+      'prettier-plugin-monkey',
+      '@gengjiawen/monkey-wasm',
+      `^${nextVersion}`
+    ) || prettierPluginChanged
 
   if (prettierPluginChanged) {
-    writeFileSync(
-      prettierPluginPkgPath,
-      JSON.stringify(prettierPlugin, null, 2) + "\n",
-      "utf-8",
-    )
+    writePackageJson(prettierPluginPkgPath, prettierPlugin)
   }
 } catch (e) {
-  console.warn("Failed to update prettier-plugin-monkey dependency:", e)
+  console.warn('Failed to update prettier-plugin-monkey dependency:', e)
+}
+
+// Also keep vscode-extension package version in sync
+try {
+  const vscodeExtensionPkgPath = repoPath(
+    'packages',
+    'vscode-extension',
+    'package.json'
+  )
+  const vscodeExtension = readPackageJson(vscodeExtensionPkgPath)
+  let vscodeExtensionChanged = false
+
+  vscodeExtensionChanged =
+    syncPackageVersion(vscodeExtension, 'vscode-extension', nextVersion) ||
+    vscodeExtensionChanged
+  vscodeExtensionChanged =
+    syncDependencyRange(
+      vscodeExtension,
+      'vscode-extension',
+      '@gengjiawen/monkey-wasm',
+      'workspace:*'
+    ) || vscodeExtensionChanged
+
+  if (vscodeExtensionChanged) {
+    writePackageJson(vscodeExtensionPkgPath, vscodeExtension)
+  }
+} catch (e) {
+  console.warn('Failed to update vscode-extension version:', e)
 }
 
 // Keep pnpm-lock.yaml in sync with release-please package.json updates.
 // wasm/pkg is generated later by wasm-pack, so create a minimal manifest
 // temporarily when refreshing the lockfile on a release PR branch.
-const wasmPkgDir = join(rootPath, "wasm", "pkg")
-const wasmPkgPath = join(wasmPkgDir, "package.json")
+const wasmPkgDir = repoPath('wasm', 'pkg')
+const wasmPkgPath = repoPath('wasm', 'pkg', 'package.json')
 const hadWasmPkgDir = existsSync(wasmPkgDir)
 const hadWasmPkgPackage = existsSync(wasmPkgPath)
 const originalWasmPkgPackage = hadWasmPkgPackage
-  ? readFileSync(wasmPkgPath, "utf-8")
+  ? readFileSync(wasmPkgPath, 'utf-8')
   : undefined
 
 try {
@@ -134,22 +172,22 @@ try {
     wasmPkgPath,
     JSON.stringify(
       {
-        name: "@gengjiawen/monkey-wasm",
-        version: pak.version,
+        name: '@gengjiawen/monkey-wasm',
+        version: nextVersion,
       },
       null,
-      2,
-    ) + "\n",
-    "utf-8",
+      2
+    ) + '\n',
+    'utf-8'
   )
 
-  execSync("pnpm install --lockfile-only --link-workspace-packages=true", {
+  execSync('pnpm install --lockfile-only --link-workspace-packages=true', {
     cwd: rootPath,
-    stdio: "inherit",
+    stdio: 'inherit',
   })
 } finally {
   if (hadWasmPkgPackage && originalWasmPkgPackage !== undefined) {
-    writeFileSync(wasmPkgPath, originalWasmPkgPackage, "utf-8")
+    writeFileSync(wasmPkgPath, originalWasmPkgPackage, 'utf-8')
   } else {
     rmSync(wasmPkgPath, { force: true })
   }

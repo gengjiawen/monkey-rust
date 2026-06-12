@@ -26,12 +26,15 @@ There is a book about learning how to make an interpreter: [Writing An Interpret
 - test for every module
 - **Wasm**: A WebAssembly target, thus run monkey on browser is directly supported.
 - **Prettier Plugin**: Format Monkey source code with [Prettier](https://prettier.io/) via `prettier-plugin-monkey`.
+- **VS Code Extension**: First-class editor support with syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
 - bytecode viewer from source
 
 ### AST Online playground
+
 https://astexplorer.net/#/gist/e23a81ce309e8fcffe95ddd1b5661061/01d0b4b078304ddd9639eae9f4e6d342e2b9d075
 
 ### Compiler playground
+
 https://gengjiawen.github.io/monkey-rust/
 
 ## Instruction
