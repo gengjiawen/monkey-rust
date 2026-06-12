@@ -29,7 +29,7 @@
 - 编辑辅助：提供 TextMate 语法高亮、括号/注释配置和代码片段。
 - 运行时能力：通过 `@gengjiawen/monkey-wasm` 提供解析诊断、AST 查看和字节码编译命令。
 
-整体设计优先保持扩展轻量，不在 extension 包内重新构建 Rust/WASM，而是依赖已经发布到 npm 的 `@gengjiawen/monkey-wasm`。
+整体设计优先保持扩展轻量，不在 extension 包内重新构建 Rust/WASM，而是直接消费仓库内 `wasm/pkg` 生成的 `@gengjiawen/monkey-wasm` workspace 包，构建时由 esbuild 打进扩展 bundle。
 
 ---
 
@@ -46,7 +46,7 @@
 | 解析诊断   | `src/extension.ts`                   | 保存/打开/编辑时调用 WASM parser             |
 | 查看 AST   | `monkey.showAST`                     | 将当前文档解析为 JSON AST 并在新编辑器展示   |
 | 编译字节码 | `monkey.compileToBytecode`           | 将当前文档编译为字节码文本并在新编辑器展示   |
-| VSIX 打包  | `scripts/package.js`                 | 在临时目录中安装生产依赖并生成可安装包       |
+| VSIX 打包  | `vsce package`                       | 基于 esbuild bundle 直接生成可安装包         |
 
 ### 2.2 暂不覆盖的能力
 
@@ -67,18 +67,19 @@
 ```
 packages/vscode-extension/
 ├── .vscodeignore                 # VSIX 打包排除规则
+├── LICENSE                       # 随 VSIX 分发的许可证（与仓库根 LICENSE 一致）
 ├── README.md                     # 扩展使用说明
 ├── language-configuration.json   # VS Code 语言配置
 ├── package.json                  # VS Code extension manifest
 ├── scripts/
-│   └── package.js                # 生成 VSIX 的稳定打包脚本
+│   └── build.js                  # esbuild bundle + wasm 资产复制
 ├── snippets/
 │   └── monkey.json               # Monkey 代码片段
 ├── src/
 │   └── extension.ts              # 扩展运行时入口
 ├── syntaxes/
 │   └── monkey.tmLanguage.json    # TextMate grammar
-└── tsconfig.json                 # 扩展 TypeScript 配置
+└── tsconfig.json                 # TypeScript 类型检查配置（noEmit）
 ```
 
 生成物不进入 Git：
@@ -87,7 +88,7 @@ packages/vscode-extension/
 - `node_modules/`
 - `*.vsix`
 
-其中 `dist/` 是 TypeScript 编译输出，`*.vsix` 是本地打包产物，`node_modules/` 由包管理器安装生成。
+其中 `dist/` 是 esbuild bundle 输出（`extension.js` 和 `monkey_wasm_bg.wasm`），`*.vsix` 是本地打包产物，`node_modules/` 由包管理器安装生成。
 
 ---
 
@@ -180,21 +181,7 @@ flowchart TD
 
 ### 6.1 为什么不直接 `import('@gengjiawen/monkey-wasm')`
 
-扩展 TypeScript 当前编译为 CommonJS：
-
-```json
-{
-  "module": "commonjs"
-}
-```
-
-如果直接写：
-
-```typescript
-await import('@gengjiawen/monkey-wasm')
-```
-
-TypeScript 在 CommonJS 输出中可能会降级为 `require('@gengjiawen/monkey-wasm')`。而 `@gengjiawen/monkey-wasm` 是 ESM 包，并且入口依赖 `.wasm` module import：
+`@gengjiawen/monkey-wasm` 是 ESM 包，并且入口依赖 `.wasm` module import：
 
 ```js
 import * as wasm from './monkey_wasm_bg.wasm'
@@ -204,37 +191,35 @@ import * as wasm from './monkey_wasm_bg.wasm'
 
 ### 6.2 当前实现
 
-当前扩展手动加载 wasm-bindgen 生成物：
+扩展源码通过 wasm-bindgen 生成的 package 入口复用 `parse` 和 `compile` 类型，同时从 bindings 子路径加载运行时代码；esbuild 会把 bindings 打进 CommonJS bundle，`.wasm` 字节则在运行时手动实例化：
 
-1. 通过 `require.resolve()` 找到包内文件：
-   - `monkey_wasm_bg.js`
-   - `monkey_wasm_bg.wasm`
-2. 通过 `new Function('specifier', 'return import(specifier)')` 保留原生 dynamic import。
-3. 用 `pathToFileURL()` 将 bindings 文件路径转为 file URL。
+1. `typeof import('@gengjiawen/monkey-wasm')` 复用 `wasm/pkg/monkey_wasm.d.ts` 中的公开 API 类型。
+2. `require('@gengjiawen/monkey-wasm/monkey_wasm_bg.js')` 加载实际 bindings，构建时被 bundle 进 `dist/extension.js`。
+3. 构建脚本把 `monkey_wasm_bg.wasm` 复制到 `dist/`，运行时通过 `join(__dirname, 'monkey_wasm_bg.wasm')` 定位。
 4. 用 `readFileSync()` 读取 `.wasm` 字节。
-5. 调用 `WebAssembly.instantiate(bytes, imports)`。
+5. 调用 `WebAssembly.instantiate(bytes, imports)`，imports 指向 bundle 内的 bindings。
 6. 调用 bindings 的 `__wbg_set_wasm(instance.exports)`。
 7. 如存在 `__wbindgen_start`，调用它完成初始化。
+
+bindings 子路径没有自带类型声明，因此 extension 只在本地补充内部 `__wbg_set_wasm` 类型；`parse` 和 `compile` 类型来自生成包自带的 `monkey_wasm.d.ts`。
 
 简化流程如下：
 
 ```mermaid
 sequenceDiagram
-    participant Extension
-    participant Bindings as monkey_wasm_bg.js
-    participant Wasm as monkey_wasm_bg.wasm
+    participant Extension as dist/extension.js（含 bindings）
+    participant Wasm as dist/monkey_wasm_bg.wasm
 
-    Extension->>Bindings: dynamic import(file URL)
     Extension->>Wasm: readFileSync()
     Extension->>Wasm: WebAssembly.instantiate(bytes, imports)
-    Extension->>Bindings: __wbg_set_wasm(instance.exports)
+    Extension->>Extension: __wbg_set_wasm(instance.exports)
     Extension->>Wasm: __wbindgen_start()
-    Extension->>Bindings: parse() / compile()
+    Extension->>Extension: parse() / compile()
 ```
 
 ### 6.3 依赖布局
 
-仓库开发时，运行时依赖使用 pnpm workspace 协议指向本地 `wasm/pkg`：
+运行时依赖使用 pnpm workspace 协议指向本地 `wasm/pkg`：
 
 ```json
 {
@@ -246,9 +231,11 @@ sequenceDiagram
 
 选择 `workspace:*` 的原因：
 
-- 本地开发和 workspace 校验始终使用同一个仓库内的 WASM 生成包。
-- extension 是仓库内的 private package，不需要在开发 manifest 中重复维护 wasm 的 semver range。
-- VSIX 打包阶段会把 staging manifest 中的 `workspace:*` 转换为普通 semver range，例如 `^0.12.1`，再执行 `npm install --omit=dev` 安装可随 VSIX 分发的运行时依赖。
+- 本地开发、打包和 workspace 校验始终使用同一个仓库内的 WASM 生成包。
+- VSIX 里的内容就是本地 `wasm/pkg` 的构建产物，不依赖 npm registry 上已发布的版本。
+- extension 是仓库内的 private package，不需要维护 wasm 的 semver range。
+
+由于扩展被完整 bundle，`dependencies` 只在构建期参与解析，VSIX 中不包含 `node_modules`。
 
 ---
 
@@ -361,20 +348,18 @@ pnpm -C packages/vscode-extension run build
 
 ```json
 {
-  "build": "tsc -p ."
+  "typecheck": "tsc -p .",
+  "build": "pnpm run typecheck && node scripts/build.js",
+  "watch": "node scripts/build.js --watch"
 }
 ```
 
-`typescript` 是 extension 的 devDependency，因此 `build` 和 `watch` 直接使用 package manager 注入到 npm script PATH 的 `tsc`：
+构建分为两步：
 
-```json
-{
-  "build": "tsc -p .",
-  "watch": "tsc -w -p ."
-}
-```
+1. `tsc -p .` 只做类型检查（tsconfig 配置了 `noEmit`）。
+2. `scripts/build.js` 用 esbuild 把 `src/extension.ts` bundle 成 `dist/extension.js`（CommonJS、`platform: node`、`external: ['vscode']`），并把 `monkey_wasm_bg.wasm` 从 workspace 依赖复制到 `dist/`。
 
-这样保持了普通 TypeScript package 的约定，也避免脚本绑定具体的 `node_modules` 目录布局。
+`@gengjiawen/monkey-wasm` 的 bindings JS 被直接打进 bundle，运行时只剩 bundle 本身和旁边的 `.wasm` 资产。
 
 ### 9.2 Package
 
@@ -384,62 +369,35 @@ pnpm -C packages/vscode-extension run build
 pnpm -C packages/vscode-extension run package
 ```
 
-`scripts/package.js` 的流程：
+`package` 就是普通的 `vsce package`：
 
-1. 调用 npm script PATH 中的 `tsc` 生成 `dist/`。
-2. 创建临时 staging 目录。
-3. 复制扩展运行所需文件：
-   - `.vscodeignore`
-   - `README.md`
-   - `dist/`
-   - `language-configuration.json`
-   - `snippets/`
-   - `syntaxes/`
-4. 从仓库根复制 `LICENSE`。
-5. 写入精简后的 `package.json`，去掉 `devDependencies` 和 `scripts`。
-6. 在 staging 目录执行：
+- manifest 中配置了 `"vsce": { "dependencies": false }`（等价于 `--no-dependencies`），`vsce` 不再分析或打包 `node_modules`，因此 pnpm 的 symlink 布局和 `workspace:*` 协议都不会造成问题。这也是 oxc-vscode 等扩展使用的方案。
+- `vsce` 会自动执行 `vscode:prepublish`（即 `pnpm run build`），保证打包内容是最新构建。
+- `LICENSE` 直接提交在 `packages/vscode-extension/` 下（与仓库根 LICENSE 一致），随 VSIX 分发。
 
-   ```bash
-   npm install --omit=dev --package-lock=false --ignore-scripts
-   ```
-
-7. 在 staging 目录执行：
-
-   ```bash
-   vsce package
-   ```
-
-8. 将生成的 `.vsix` 复制回 `packages/vscode-extension/`。
-
-### 9.3 为什么使用 staging 目录
-
-直接在 pnpm workspace 子包中运行 `vsce package` 容易遇到两个问题：
-
-- `node_modules` 是 pnpm symlink 布局，`vsce` 对依赖收集不总是符合最终 VSIX 预期。
-- workspace 依赖或 generated package 可能不会被正确包含。
-
-staging 目录使用 npm 安装生产依赖，生成更接近普通发布包的目录结构。这样 VSIX 中会包含：
+VSIX 中的 runtime 内容：
 
 ```text
 extension/
-├── dist/extension.js
-└── node_modules/@gengjiawen/monkey-wasm/
-    ├── monkey_wasm_bg.js
+└── dist/
+    ├── extension.js          # 含 bindings 的完整 bundle
     └── monkey_wasm_bg.wasm
 ```
 
-### 9.4 VSIX 排除规则
+### 9.3 VSIX 排除规则
 
 `.vscodeignore` 排除开发期文件：
 
 ```gitignore
 src/**
 scripts/**
+node_modules/**
 tsconfig.json
+dist/**/*.map
 *.vsix
 ```
 
-`dist/` 不排除，因为它是 extension runtime 入口。
+`dist/` 不排除，因为它是 extension runtime 入口；sourcemap 只用于本地调试，不进入 VSIX。
 
 ---
 
@@ -467,15 +425,7 @@ VS Code extension 在仓库内使用 workspace 依赖：
 }
 ```
 
-当仓库版本升级到 `x.y.z` 时，release 脚本会同步为：
-
-```json
-{
-  "@gengjiawen/monkey-wasm": "workspace:*"
-}
-```
-
-`scripts/package.js` 写入临时 VSIX manifest 时会把 `workspace:*` 转换成当前 extension 版本对应的 semver range，例如 `^0.12.1`，确保 staging 目录中的 `npm install --omit=dev` 可以安装发布后的 npm 包。
+由于扩展运行时代码完整 bundle 进 `dist/extension.js`，`workspace:*` 只在构建期解析到本地 `wasm/pkg`，打包阶段不需要任何版本转换或依赖安装。
 
 ### 10.3 pnpm v11 build approval
 
@@ -508,44 +458,41 @@ pnpm -C packages/vscode-extension run package
 
 ```bash
 unzip -l packages/vscode-extension/monkey-extension-0.12.1.vsix \
-  | rg 'extension/(dist/extension.js$|node_modules/@gengjiawen/monkey-wasm/monkey_wasm_bg.wasm$|node_modules/@gengjiawen/monkey-wasm/monkey_wasm_bg.js$|package.json$|LICENSE.txt$)'
+  | rg 'extension/(dist/extension.js$|dist/monkey_wasm_bg.wasm$|package.json$|LICENSE.txt$)'
 ```
 
 期望至少包含：
 
 - `extension/dist/extension.js`
+- `extension/dist/monkey_wasm_bg.wasm`
 - `extension/package.json`
 - `extension/LICENSE.txt`
-- `extension/node_modules/@gengjiawen/monkey-wasm/monkey_wasm_bg.js`
-- `extension/node_modules/@gengjiawen/monkey-wasm/monkey_wasm_bg.wasm`
+
+不应包含 `node_modules/`、`src/`、`scripts/` 或 `*.map`。
 
 ### 11.3 手动 WASM smoke test
 
-可以用 Node 验证手动加载路径是否能执行 parser/compiler：
+可以用 Node 验证 bundle 后的 wasm 加载路径是否能执行 parser/compiler（构建后运行）：
 
 ```bash
 node - <<'NODE'
 const { readFileSync } = require('fs')
-const { pathToFileURL } = require('url')
-const dynamicImport = new Function('specifier', 'return import(specifier)')
 
 async function main() {
-  const bindingsPath = require.resolve(
+  const distDir = 'packages/vscode-extension/dist'
+  const bindings = require.resolve(
     '@gengjiawen/monkey-wasm/monkey_wasm_bg.js',
     { paths: ['packages/vscode-extension'] }
   )
-  const wasmPath = require.resolve(
-    '@gengjiawen/monkey-wasm/monkey_wasm_bg.wasm',
-    { paths: ['packages/vscode-extension'] }
+  const mod = await import(require('url').pathToFileURL(bindings).href)
+  const { instance } = await WebAssembly.instantiate(
+    readFileSync(`${distDir}/monkey_wasm_bg.wasm`),
+    { './monkey_wasm_bg.js': mod }
   )
-  const bindings = await dynamicImport(pathToFileURL(bindingsPath).href)
-  const { instance } = await WebAssembly.instantiate(readFileSync(wasmPath), {
-    './monkey_wasm_bg.js': bindings,
-  })
-  bindings.__wbg_set_wasm(instance.exports)
+  mod.__wbg_set_wasm(instance.exports)
   instance.exports.__wbindgen_start()
-  console.log(bindings.parse('let x = 1;').includes('Program'))
-  console.log(bindings.compile('let x = 1;').length > 0)
+  console.log(mod.parse('let x = 1;').includes('Program'))
+  console.log(mod.compile('let x = 1;').length > 0)
 }
 
 main().catch((error) => {
@@ -563,7 +510,7 @@ NODE
 ./node_modules/.bin/prettier --check \
   docs/vscode-extension-design.md \
   packages/vscode-extension/package.json \
-  packages/vscode-extension/scripts/package.js \
+  packages/vscode-extension/scripts/build.js \
   packages/vscode-extension/src/extension.ts
 
 git diff --check

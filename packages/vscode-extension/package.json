@@ -71,10 +71,14 @@
     }
   },
   "scripts": {
-    "build": "tsc -p .",
-    "watch": "tsc -w -p .",
+    "typecheck": "tsc -p .",
+    "build": "pnpm run typecheck && node scripts/build.js",
+    "watch": "node scripts/build.js --watch",
     "vscode:prepublish": "pnpm run build",
-    "package": "node scripts/package.js"
+    "package": "vsce package"
+  },
+  "vsce": {
+    "dependencies": false
   },
   "dependencies": {
     "@gengjiawen/monkey-wasm": "workspace:*"
@@ -83,6 +87,7 @@
     "@types/node": "18.15.11",
     "@types/vscode": "1.74.0",
     "@vscode/vsce": "3.7.1",
+    "esbuild": "^0.28.0",
     "typescript": "5.0.4"
   }
 }

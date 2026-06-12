@@ -1,10 +1,10 @@
 import { readFileSync } from 'fs'
-import { pathToFileURL } from 'url'
+import { join } from 'path'
 import * as vscode from 'vscode'
 
-type MonkeyWasm = {
-  parse: (input: string) => string
-  compile: (input: string) => string
+type MonkeyWasm = typeof import('@gengjiawen/monkey-wasm')
+type MonkeyWasmBindings = MonkeyWasm & {
+  __wbg_set_wasm: (wasm: Record<string, unknown>) => void
 }
 type WasmInstance = {
   exports: Record<string, unknown>
@@ -16,23 +16,14 @@ type WebAssemblyRuntime = {
   ) => Promise<{ instance: WasmInstance }>
 }
 
+const bindings =
+  require('@gengjiawen/monkey-wasm/monkey_wasm_bg.js') as MonkeyWasmBindings
+
 let wasmPromise: Promise<MonkeyWasm> | null = null
-type MonkeyWasmBindings = MonkeyWasm & {
-  __wbg_set_wasm: (wasm: Record<string, unknown>) => void
-}
-
-const dynamicImport = new Function('specifier', 'return import(specifier)') as (
-  specifier: string
-) => Promise<MonkeyWasmBindings>
-
-function resolveWasmAsset(fileName: string): string {
-  return require.resolve(`@gengjiawen/monkey-wasm/${fileName}`)
-}
 
 async function createWasmBindings(): Promise<MonkeyWasm> {
-  const bindingsPath = resolveWasmAsset('monkey_wasm_bg.js')
-  const wasmPath = resolveWasmAsset('monkey_wasm_bg.wasm')
-  const bindings = await dynamicImport(pathToFileURL(bindingsPath).href)
+  // The bundle and the .wasm asset are emitted side by side into dist/.
+  const wasmPath = join(__dirname, 'monkey_wasm_bg.wasm')
   const wasmRuntime = (
     globalThis as unknown as {
       WebAssembly: WebAssemblyRuntime

@@ -8,6 +8,9 @@ allowBuilds:
   esbuild: true
   keytar: true
 
+minimumReleaseAgeExclude:
+  - '@gengjiawen/monkey-wasm@0.12.1'
+
 onlyBuiltDependencies:
   - '@swc/core'
   - '@vscode/vsce-sign'
