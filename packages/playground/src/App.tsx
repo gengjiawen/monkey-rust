@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Button, Flex, SegmentedControl } from '@radix-ui/themes'
+import { Box, Button, Flex, SegmentedControl, Tabs } from '@radix-ui/themes'
 import { compile, parse } from '@gengjiawen/monkey-wasm'
 import debounce from 'lodash.debounce'
 import type { Plugin } from 'prettier'
@@ -94,24 +94,26 @@ function App() {
       </section>
 
       <section className="output-column">
-        <div className="output-panes">
-          <div className="output-pane">
-            <div className="pane-header">AST</div>
+        <Tabs.Root defaultValue="ast" className="output-tabs">
+          <Tabs.List className="tabs-list">
+            <Tabs.Trigger value="ast">AST</Tabs.Trigger>
+            <Tabs.Trigger value="bytecode">Bytecode</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="ast" className="output-content">
             <Editor
               code={astOutput}
               extra={{ readOnly: true, editable: false }}
               vimMode={false}
             />
-          </div>
-          <div className="output-pane">
-            <div className="pane-header">Bytecode</div>
+          </Tabs.Content>
+          <Tabs.Content value="bytecode" className="output-content">
             <Editor
               code={compilerOutput}
               extra={{ readOnly: true, editable: false }}
               vimMode={false}
             />
-          </div>
-        </div>
+          </Tabs.Content>
+        </Tabs.Root>
       </section>
     </main>
   )

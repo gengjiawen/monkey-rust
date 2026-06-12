@@ -32,7 +32,7 @@ body {
 }
 
 .toolbar,
-.pane-header {
+.tabs-list {
   min-height: 48px;
   flex-shrink: 0;
   border-bottom: 1px solid #dfe3e6;
@@ -43,34 +43,24 @@ body {
   padding: 8px 12px;
 }
 
-.pane-header {
-  display: flex;
-  align-items: center;
+.tabs-list {
   padding: 0 12px;
-  font-size: 14px;
-  font-weight: 500;
 }
 
 .editor-frame,
-.output-panes,
-.output-pane {
+.output-tabs,
+.output-content {
   min-height: 0;
   flex: 1;
 }
 
-.output-panes {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.output-pane {
+.output-tabs {
   display: flex;
-  min-width: 0;
   flex-direction: column;
 }
 
-.output-pane + .output-pane {
-  border-left: 1px solid #dfe3e6;
+.output-content {
+  display: flex;
 }
 
 .cm-editor {
@@ -94,15 +84,5 @@ body {
   .editor-column {
     border-right: 0;
     border-bottom: 1px solid #dfe3e6;
-  }
-
-  .output-panes {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  .output-pane + .output-pane {
-    border-top: 1px solid #dfe3e6;
-    border-left: 0;
   }
 }
