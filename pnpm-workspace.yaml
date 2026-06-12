@@ -9,6 +9,8 @@ allowBuilds:
   keytar: true
   sharp: true
 
+minimumReleaseAge: 0
+
 minimumReleaseAgeExclude:
   - '@gengjiawen/monkey-wasm@0.12.1'
 

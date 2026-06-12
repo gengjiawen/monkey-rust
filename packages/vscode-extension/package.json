@@ -3,7 +3,7 @@
   "displayName": "Monkey Language",
   "description": "Syntax highlighting, diagnostics, and commands for Monkey language.",
   "version": "0.12.1",
-  "publisher": "monkey",
+  "publisher": "gengjiawen",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -88,6 +88,7 @@
     "@types/vscode": "1.74.0",
     "@vscode/vsce": "3.7.1",
     "esbuild": "^0.28.0",
+    "ovsx": "1.0.1",
     "typescript": "5.0.4"
   }
 }
