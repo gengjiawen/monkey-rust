@@ -4,8 +4,12 @@ packages:
 
 allowBuilds:
   '@swc/core': true
+  '@vscode/vsce-sign': true
   esbuild: true
+  keytar: true
 
 onlyBuiltDependencies:
   - '@swc/core'
+  - '@vscode/vsce-sign'
   - esbuild
+  - keytar

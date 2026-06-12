@@ -24,6 +24,8 @@
   "homepage": "https://github.com/gengjiawen/monkey-rust#readme",
   "devDependencies": {
     "@types/node": "18.15.11",
+    "@types/vscode": "1.74.0",
+    "@vscode/vsce": "3.7.1",
     "prettier": "^2.8.7",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4"

@@ -1,0 +1,88 @@
+{
+  "name": "monkey-extension",
+  "displayName": "Monkey Language",
+  "description": "Syntax highlighting, diagnostics, and commands for Monkey language.",
+  "version": "0.12.0",
+  "publisher": "monkey",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gengjiawen/monkey-rust"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:monkey",
+    "onCommand:monkey.compileToBytecode",
+    "onCommand:monkey.showAST"
+  ],
+  "main": "dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "monkey",
+        "aliases": [
+          "Monkey"
+        ],
+        "extensions": [
+          ".monkey"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "monkey",
+        "scopeName": "source.monkey",
+        "path": "./syntaxes/monkey.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "monkey",
+        "path": "./snippets/monkey.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "monkey.compileToBytecode",
+        "title": "Monkey: Compile To Bytecode"
+      },
+      {
+        "command": "monkey.showAST",
+        "title": "Monkey: Show AST (JSON)"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Monkey",
+      "properties": {
+        "monkey.enableWasmDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable parser diagnostics powered by the Monkey WASM package."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "watch": "tsc -w -p .",
+    "vscode:prepublish": "pnpm run build",
+    "package": "node scripts/package.cjs"
+  },
+  "dependencies": {
+    "@gengjiawen/monkey-wasm": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "18.15.11",
+    "@types/vscode": "1.74.0",
+    "@vscode/vsce": "3.7.1",
+    "typescript": "5.0.4"
+  }
+}

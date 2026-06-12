@@ -1,0 +1,28 @@
+{
+  "Let Statement": {
+    "prefix": "let",
+    "body": ["let ${1:name} = ${2:value};"],
+    "description": "Insert a let statement"
+  },
+  "Function": {
+    "prefix": "fn",
+    "body": ["fn ${1:name}(${2:params}) {", "  ${3:// body}", "}"],
+    "description": "Insert a function declaration"
+  },
+  "If Else": {
+    "prefix": "if",
+    "body": [
+      "if (${1:cond}) {",
+      "  ${2:// then}",
+      "} else {",
+      "  ${3:// else}",
+      "}"
+    ],
+    "description": "Insert an if/else block"
+  },
+  "Return": {
+    "prefix": "ret",
+    "body": ["return ${1:value};"],
+    "description": "Insert a return statement"
+  }
+}
