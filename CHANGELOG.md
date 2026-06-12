@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/gengjiawen/monkey-rust/compare/v0.12.0...v0.12.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* **ci:** build prettier plugin before playground ([#240](https://github.com/gengjiawen/monkey-rust/issues/240)) ([d689b0b](https://github.com/gengjiawen/monkey-rust/commit/d689b0b778c1099b05454a433a2e672894cfb728))
+* **release:** refresh pnpm lock for plugin publish ([#242](https://github.com/gengjiawen/monkey-rust/issues/242)) ([28fc384](https://github.com/gengjiawen/monkey-rust/commit/28fc384dde56178d2784f967b8acd1fb1563ec9f))
+
 ## [0.12.0](https://github.com/gengjiawen/monkey-rust/compare/v0.11.1...v0.12.0) (2026-03-07)
 
 
