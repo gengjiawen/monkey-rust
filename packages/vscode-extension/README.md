@@ -1,35 +1,21 @@
 # Monkey Language VS Code Extension
 
-First-class VS Code support for Monkey source files, including syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
+First-class VS Code support for Monkey source files.
 
 ## Features
 
-- **Editor support for `.monkey` files**: language registration, TextMate syntax highlighting, bracket/comment behavior, and snippets for common Monkey constructs.
-- **WASM-powered diagnostics**: parses the current document through `@gengjiawen/monkey-wasm` and reports parser errors directly in the editor.
-- **AST preview**: run "Monkey: Show AST (JSON)" to inspect the parser output for the active file.
-- **Bytecode compilation**: run "Monkey: Compile To Bytecode" to compile the active file and inspect the compiler output.
+- **Syntax highlighting** for `.monkey` files.
+- **Language-aware editing** with bracket matching, comment toggling, and auto-closing pairs.
+- **Snippets** for common Monkey constructs such as `let`, `fn`, and `if`.
+- **WASM-powered diagnostics** that report parser errors while editing.
+- **AST preview** for inspecting the parsed JSON tree of the active file.
+- **Bytecode compilation** for viewing compiler output from the active file.
 
-## Development
+## Commands
 
-Install dependencies and build the extension:
+- **Monkey: Show AST (JSON)**: parse the active Monkey file and open the AST as JSON.
+- **Monkey: Compile To Bytecode**: compile the active Monkey file and open the bytecode output.
 
-```
-pnpm i
-pnpm --filter monkey-extension run build
-```
-
-Package a VSIX:
-
-```
-pnpm --filter monkey-extension run package
-```
-
-The extension depends on the published `@gengjiawen/monkey-wasm` package so VSIX packaging can include runtime dependencies without relying on the ignored `wasm/pkg` workspace output.
-
-## Settings
+## Configuration
 
 - `monkey.enableWasmDiagnostics` (default: true)
-
-## Notes
-
-- The diagnostics currently use error messages thrown by the wasm parser and mark the first line. We can extend the wasm API to return structured spans for precise ranges later.
