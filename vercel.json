@@ -1,7 +1,7 @@
 {
   "framework": null,
   "installCommand": "bash scripts/vercel-install.sh",
-  "buildCommand": "pnpm -C packages/playground build",
+  "buildCommand": "npx --yes pnpm@11.5.1 -C packages/playground build",
   "outputDirectory": "packages/playground/out",
   "devCommand": "pnpm -C packages/playground dev"
 }

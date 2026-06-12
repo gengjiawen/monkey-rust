@@ -21,6 +21,8 @@ fi
 
 corepack enable
 corepack prepare pnpm@11.5.1 --activate
+npm install -g pnpm@11.5.1
+pnpm --version
 
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
