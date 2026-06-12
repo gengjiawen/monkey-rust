@@ -35,7 +35,7 @@ https://astexplorer.net/#/gist/e23a81ce309e8fcffe95ddd1b5661061/01d0b4b078304ddd
 
 ### Compiler playground
 
-https://gengjiawen.github.io/monkey-rust/
+https://monkey-lang-playground-jw.vercel.app/
 
 ## Instruction
 
