@@ -71,8 +71,8 @@
     }
   },
   "scripts": {
-    "build": "node ../../node_modules/typescript/bin/tsc -p .",
-    "watch": "node ../../node_modules/typescript/bin/tsc -w -p .",
+    "build": "tsc -p .",
+    "watch": "tsc -w -p .",
     "vscode:prepublish": "pnpm run build",
     "package": "node scripts/package.js"
   },

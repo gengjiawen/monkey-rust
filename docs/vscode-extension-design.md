@@ -361,17 +361,20 @@ pnpm -C packages/vscode-extension run build
 
 ```json
 {
-  "build": "node ../../node_modules/typescript/bin/tsc -p ."
+  "build": "tsc -p ."
 }
 ```
 
-`build` 不直接依赖 extension 子目录下的 `.bin/tsc`，而是显式调用 workspace root 的 TypeScript：
+`typescript` 是 extension 的 devDependency，因此 `build` 和 `watch` 直接使用 package manager 注入到 npm script PATH 的 `tsc`：
 
-```text
-../../node_modules/typescript/bin/tsc
+```json
+{
+  "build": "tsc -p .",
+  "watch": "tsc -w -p ."
+}
 ```
 
-这样做是为了避免 pnpm 在某些生命周期或 production install 状态下裁剪子包 devDependencies，导致 `tsc` 或类型包不可用。
+这样保持了普通 TypeScript package 的约定，也避免脚本绑定具体的 `node_modules` 目录布局。
 
 ### 9.2 Package
 
@@ -383,7 +386,7 @@ pnpm -C packages/vscode-extension run package
 
 `scripts/package.js` 的流程：
 
-1. 从 workspace root 调用 TypeScript 生成 `dist/`。
+1. 调用 npm script PATH 中的 `tsc` 生成 `dist/`。
 2. 创建临时 staging 目录。
 3. 复制扩展运行所需文件：
    - `.vscodeignore`
