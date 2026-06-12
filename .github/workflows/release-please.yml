@@ -69,7 +69,7 @@ jobs:
               ref: releasePr.head.ref,
             })
             core.info(`Triggered prepare-release.yml on ${releasePr.head.ref}`)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: npx envinfo
       - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
         env:
