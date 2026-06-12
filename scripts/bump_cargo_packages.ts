@@ -142,7 +142,7 @@ try {
     )
   }
 
-  execSync("pnpm install --lockfile-only", {
+  execSync("pnpm install --lockfile-only --link-workspace-packages=true", {
     cwd: rootPath,
     stdio: "inherit",
   })
