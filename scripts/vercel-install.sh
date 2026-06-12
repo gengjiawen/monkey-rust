@@ -19,6 +19,9 @@ if command -v rustup >/dev/null 2>&1; then
   rustup target add wasm32-unknown-unknown
 fi
 
+corepack enable
+corepack prepare pnpm@11.5.1 --activate
+
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 (
