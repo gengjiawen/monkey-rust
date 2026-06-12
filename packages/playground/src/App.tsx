@@ -1,7 +1,7 @@
 'use client'
 
-import { Box, Button, Flex, SegmentedControl, Tabs } from '@radix-ui/themes'
-import { compile } from '@gengjiawen/monkey-wasm'
+import { Box, Button, Flex, SegmentedControl } from '@radix-ui/themes'
+import { compile, parse } from '@gengjiawen/monkey-wasm'
 import debounce from 'lodash.debounce'
 import type { Plugin } from 'prettier'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -20,10 +20,18 @@ function getErrorMessage(error: unknown) {
 
 function App() {
   const [code, setCode] = useState(initialCode)
+  const [astOutput, setAstOutput] = useState('')
   const [compilerOutput, setCompilerOutput] = useState('')
   const [vimMode, setVimMode] = useState(true)
 
   const compileCode = useCallback((source: string) => {
+    try {
+      const astJson = parse(source)
+      setAstOutput(JSON.stringify(JSON.parse(astJson), null, 2))
+    } catch (error) {
+      setAstOutput(getErrorMessage(error))
+    }
+
     try {
       setCompilerOutput(compile(source))
     } catch (error) {
@@ -52,7 +60,9 @@ function App() {
       setCode(formatted)
       compileCode(formatted)
     } catch (error) {
-      setCompilerOutput(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setAstOutput(message)
+      setCompilerOutput(message)
     }
   }, [code, compileCode])
 
@@ -84,18 +94,24 @@ function App() {
       </section>
 
       <section className="output-column">
-        <Tabs.Root defaultValue="bytecode" className="output-tabs">
-          <Tabs.List className="tabs-list">
-            <Tabs.Trigger value="bytecode">Bytecode</Tabs.Trigger>
-          </Tabs.List>
-          <Tabs.Content value="bytecode" className="output-content">
+        <div className="output-panes">
+          <div className="output-pane">
+            <div className="pane-header">AST</div>
+            <Editor
+              code={astOutput}
+              extra={{ readOnly: true, editable: false }}
+              vimMode={false}
+            />
+          </div>
+          <div className="output-pane">
+            <div className="pane-header">Bytecode</div>
             <Editor
               code={compilerOutput}
               extra={{ readOnly: true, editable: false }}
               vimMode={false}
             />
-          </Tabs.Content>
-        </Tabs.Root>
+          </div>
+        </div>
       </section>
     </main>
   )
