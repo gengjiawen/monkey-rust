@@ -73,9 +73,9 @@ function App() {
   useEffect(() => () => debouncedCompile.cancel(), [debouncedCompile])
 
   return (
-    <main className="playground-shell">
-      <section className="editor-column">
-        <Flex className="toolbar" align="center" justify="between" gap="3">
+    <Flex className="playground-shell">
+      <Flex direction="column" className="panel editor-column">
+        <Flex className="toolbar" align="center" justify="between" gap="3" px="3" py="2">
           <Button size="2" onClick={formatCode}>
             Format
           </Button>
@@ -89,33 +89,35 @@ function App() {
           </SegmentedControl.Root>
         </Flex>
         <Box className="editor-frame">
-          <Editor code={code} onChange={editorOnChange} vimMode={vimMode} />
+          <Editor code={code} onChange={editorOnChange} vimMode={vimMode} fill />
         </Box>
-      </section>
+      </Flex>
 
-      <section className="output-column">
+      <Flex direction="column" className="panel output-column">
         <Tabs.Root defaultValue="ast" className="output-tabs">
-          <Tabs.List className="tabs-list">
+          <Tabs.List size="2">
             <Tabs.Trigger value="ast">AST</Tabs.Trigger>
             <Tabs.Trigger value="bytecode">Bytecode</Tabs.Trigger>
           </Tabs.List>
-          <Tabs.Content value="ast" className="output-content">
+          <Tabs.Content value="ast" p="0" className="output-content">
             <Editor
               code={astOutput}
               extra={{ readOnly: true, editable: false }}
               vimMode={false}
+              fill
             />
           </Tabs.Content>
-          <Tabs.Content value="bytecode" className="output-content">
+          <Tabs.Content value="bytecode" p="0" className="output-content">
             <Editor
               code={compilerOutput}
               extra={{ readOnly: true, editable: false }}
               vimMode={false}
+              fill
             />
           </Tabs.Content>
         </Tabs.Root>
-      </section>
-    </main>
+      </Flex>
+    </Flex>
   )
 }
 
