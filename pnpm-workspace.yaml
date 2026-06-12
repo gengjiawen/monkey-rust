@@ -11,6 +11,7 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@gengjiawen/monkey-wasm@0.12.1'
+  - ovsx@1.0.1
 
 onlyBuiltDependencies:
   - '@swc/core'

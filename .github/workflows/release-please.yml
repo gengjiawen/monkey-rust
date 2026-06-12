@@ -84,6 +84,16 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
       - run: pnpm install --filter prettier-plugin-monkey... && pnpm --filter prettier-plugin-monkey run build
         if: ${{ steps.release.outputs.release_created }}
+      - name: Publish VS Code extension to Open VSX
+        if: ${{ steps.release.outputs.release_created }}
+        working-directory: packages/vscode-extension
+        env:
+          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
+        run: |
+          pnpm install --filter monkey-extension... --frozen-lockfile
+          rm -f *.vsix
+          pnpm run package
+          pnpm exec ovsx publish --skip-duplicate --pat "$OVSX_PAT" *.vsix
       - run: npm publish --access public
         working-directory: packages/prettier-plugin-monkey
         env:
