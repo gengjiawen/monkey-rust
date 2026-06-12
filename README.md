@@ -1,7 +1,6 @@
 # monkey-rust
 
 ![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)
-[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/?workspaceClass=g1-large&editor=code#https://github.com/gengjiawen/monkey-rust)
 [![monkey-interpreter](https://img.shields.io/crates/v/monkey-interpreter)](https://crates.io/crates/monkey-interpreter)
 [![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-wasm)](https://www.npmjs.com/package/@gengjiawen/monkey-wasm)
 [![npm version](https://img.shields.io/npm/v/prettier-plugin-monkey?label=prettier-plugin-monkey)](https://www.npmjs.com/package/prettier-plugin-monkey)
@@ -35,7 +34,7 @@ https://astexplorer.net/#/gist/e23a81ce309e8fcffe95ddd1b5661061/01d0b4b078304ddd
 
 ### Compiler playground
 
-https://gengjiawen.github.io/monkey-rust/
+https://monkey-lang-playground-jw.vercel.app/
 
 ## Instruction
 

@@ -184,7 +184,6 @@
 * bump env ([ba4473f](https://www.github.com/gengjiawen/monkey-rust/commit/ba4473f89c956bc271f75f5349e48b9ca717e5ba))
 * bump wasi-sdk ([#97](https://www.github.com/gengjiawen/monkey-rust/issues/97)) ([507ea65](https://www.github.com/gengjiawen/monkey-rust/commit/507ea656f9bc16f0d4b5fbe2145382e0a48fe2ab))
 * switch to pnpm ([ce34c05](https://www.github.com/gengjiawen/monkey-rust/commit/ce34c05fee2408a6f2b9ebabd10f45f73d33ce28))
-* trigger gitpod rebuild ([5113204](https://www.github.com/gengjiawen/monkey-rust/commit/5113204efb882196ec4720bfa88b83b7e27d6df7))
 * update base docker ([ad0b292](https://www.github.com/gengjiawen/monkey-rust/commit/ad0b292edb03ade0893bfa9d0c2d55d7c210b3ee))
 * update base env ([ecec748](https://www.github.com/gengjiawen/monkey-rust/commit/ecec748201348754ad4f03b65616803e9939240e))
 * use vnc since it bundled chrome ([ec71046](https://www.github.com/gengjiawen/monkey-rust/commit/ec710469ec7f0ea05e4b5057758f2e0056c7f677))
@@ -251,7 +250,6 @@
 ### Features
 
 * add ast-explorer ([#29](https://www.github.com/gengjiawen/monkey-rust/issues/29)) ([cc58d93](https://www.github.com/gengjiawen/monkey-rust/commit/cc58d939d04c509a53f38bf112bb97fe7ccef323))
-* add fish to gitpods ([65587f7](https://www.github.com/gengjiawen/monkey-rust/commit/65587f783911c2bd81bf37152b187805f403449f))
 
 
 ### Bug Fixes
