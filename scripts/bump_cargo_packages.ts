@@ -1,8 +1,15 @@
 import { execSync } from "child_process"
-import { readFileSync, writeFileSync } from "fs"
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs"
 import { join } from "path"
 
-const pkgPath = join(__dirname, "..", "package.json")
+const rootPath = join(__dirname, "..")
+const pkgPath = join(rootPath, "package.json")
 const pak = JSON.parse(readFileSync(pkgPath, "utf-8"))
 
 const bump_cmd = `cargo workspaces version custom ${pak.version} --no-git-commit -y`
@@ -108,4 +115,45 @@ try {
   }
 } catch (e) {
   console.warn("Failed to update prettier-plugin-monkey dependency:", e)
+}
+
+// Keep pnpm-lock.yaml in sync with release-please package.json updates.
+// wasm/pkg is generated later by wasm-pack, so create a minimal manifest
+// temporarily when refreshing the lockfile on a release PR branch.
+const wasmPkgDir = join(rootPath, "wasm", "pkg")
+const wasmPkgPath = join(wasmPkgDir, "package.json")
+const hadWasmPkgDir = existsSync(wasmPkgDir)
+const hadWasmPkgPackage = existsSync(wasmPkgPath)
+const originalWasmPkgPackage = hadWasmPkgPackage
+  ? readFileSync(wasmPkgPath, "utf-8")
+  : undefined
+
+try {
+  mkdirSync(wasmPkgDir, { recursive: true })
+  writeFileSync(
+    wasmPkgPath,
+    JSON.stringify(
+      {
+        name: "@gengjiawen/monkey-wasm",
+        version: pak.version,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf-8",
+  )
+
+  execSync("pnpm install --lockfile-only --link-workspace-packages=true", {
+    cwd: rootPath,
+    stdio: "inherit",
+  })
+} finally {
+  if (hadWasmPkgPackage && originalWasmPkgPackage !== undefined) {
+    writeFileSync(wasmPkgPath, originalWasmPkgPackage, "utf-8")
+  } else {
+    rmSync(wasmPkgPath, { force: true })
+  }
+  if (!hadWasmPkgDir) {
+    rmSync(wasmPkgDir, { recursive: true, force: true })
+  }
 }
