@@ -117,7 +117,7 @@ importers:
     dependencies:
       '@gengjiawen/monkey-wasm':
         specifier: ^0.12.0
-        version: 0.12.0
+        version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
         specifier: 18.15.11
@@ -897,9 +897,6 @@ packages:
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
-
-  '@gengjiawen/monkey-wasm@0.12.0':
-    resolution: {integrity: sha512-SCFjOsKldfecOiyrx6ImGkUEhca5JnWagHwc0g9CoR31EyqH10WvuqF4rLZsRBc2ikd5/CsnMdIsS60L387KfA==}
 
   '@isaacs/cliui@9.0.0':
     resolution: {integrity: sha512-AokJm4tuBHillT+FpMtxQ60n8ObyXBatq7jD2/JA9dxbDDokKQm8KMht5ibGzLVU9IJDIKK4TPKgMHEYMn3lMg==}
@@ -4237,8 +4234,6 @@ snapshots:
 
   '@esbuild/win32-x64@0.21.5':
     optional: true
-
-  '@gengjiawen/monkey-wasm@0.12.0': {}
 
   '@isaacs/cliui@9.0.0': {}
 
