@@ -18,7 +18,7 @@ jobs:
       - name: Install and Build
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          npm i -g pnpm@9
+          npm i -g pnpm@11
           cargo build
           cd wasm && wasm-pack build --release --scope=gengjiawen
           cd $GITHUB_WORKSPACE

@@ -1,3 +1,11 @@
 packages:
   - packages/*
   - wasm/pkg
+
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+
+onlyBuiltDependencies:
+  - '@swc/core'
+  - esbuild
