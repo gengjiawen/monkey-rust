@@ -2,7 +2,7 @@
   "name": "monkey-rust",
   "version": "0.12.1",
   "packageManager": "pnpm@11.5.1",
-  "description": "![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg) [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/gengjiawen/monkey_rust)",
+  "description": "![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)",
   "main": "index.js",
   "directories": {
     "example": "examples"
