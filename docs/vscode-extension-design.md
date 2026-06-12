@@ -71,7 +71,6 @@ packages/vscode-extension/
 ├── language-configuration.json   # VS Code 语言配置
 ├── package.json                  # VS Code extension manifest
 ├── scripts/
-│   ├── build.js                  # 从 workspace root 调用 TypeScript
 │   └── package.js                # 生成 VSIX 的稳定打包脚本
 ├── snippets/
 │   └── monkey.json               # Monkey 代码片段
@@ -362,14 +361,14 @@ pnpm -C packages/vscode-extension run build
 
 ```json
 {
-  "build": "node scripts/build.js"
+  "build": "node ../../node_modules/typescript/bin/tsc -p ."
 }
 ```
 
-`scripts/build.js` 不直接依赖 extension 子目录下的 `.bin/tsc`，而是从 workspace root 查找：
+`build` 不直接依赖 extension 子目录下的 `.bin/tsc`，而是显式调用 workspace root 的 TypeScript：
 
 ```text
-node_modules/.bin/tsc
+../../node_modules/typescript/bin/tsc
 ```
 
 这样做是为了避免 pnpm 在某些生命周期或 production install 状态下裁剪子包 devDependencies，导致 `tsc` 或类型包不可用。
@@ -384,7 +383,7 @@ pnpm -C packages/vscode-extension run package
 
 `scripts/package.js` 的流程：
 
-1. 调用 build 脚本生成 `dist/`。
+1. 从 workspace root 调用 TypeScript 生成 `dist/`。
 2. 创建临时 staging 目录。
 3. 复制扩展运行所需文件：
    - `.vscodeignore`
@@ -559,7 +558,6 @@ NODE
 ./node_modules/.bin/prettier --check \
   docs/vscode-extension-design.md \
   packages/vscode-extension/package.json \
-  packages/vscode-extension/scripts/build.js \
   packages/vscode-extension/scripts/package.js \
   packages/vscode-extension/src/extension.ts
 

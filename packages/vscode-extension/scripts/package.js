@@ -2,6 +2,7 @@ const { execFileSync } = require('child_process')
 const {
   copyFileSync,
   cpSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -12,12 +13,12 @@ const { basename, join, resolve } = require('path')
 
 const extensionRoot = resolve(__dirname, '..')
 const repoRoot = resolve(extensionRoot, '..', '..')
-const buildScript = join(extensionRoot, 'scripts', 'build.js')
 const packageJsonPath = join(extensionRoot, 'package.json')
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
 const stagingDir = join(tmpdir(), `monkey-extension-package-${process.pid}`)
 const vsixName = `${packageJson.name}-${packageJson.version}.vsix`
 const binDir = join(repoRoot, 'node_modules', '.bin')
+const tscBin = join(binDir, process.platform === 'win32' ? 'tsc.cmd' : 'tsc')
 const vsceBin = join(binDir, process.platform === 'win32' ? 'vsce.cmd' : 'vsce')
 
 function copyEntry(entry) {
@@ -26,11 +27,17 @@ function copyEntry(entry) {
   })
 }
 
+for (const bin of [tscBin, vsceBin]) {
+  if (!existsSync(bin)) {
+    throw new Error(`Missing required binary: ${bin}`)
+  }
+}
+
 rmSync(stagingDir, { recursive: true, force: true })
 mkdirSync(stagingDir, { recursive: true })
 
-execFileSync(process.execPath, [buildScript], {
-  cwd: repoRoot,
+execFileSync(tscBin, ['-p', '.'], {
+  cwd: extensionRoot,
   stdio: 'inherit',
 })
 
