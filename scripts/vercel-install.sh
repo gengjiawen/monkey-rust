@@ -21,8 +21,7 @@ fi
 
 corepack enable
 corepack prepare pnpm@11.5.1 --activate
-npm install -g pnpm@11.5.1
-pnpm --version
+npx --yes pnpm@11.5.1 --version
 
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
@@ -31,4 +30,4 @@ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
   wasm-pack build --release --scope=gengjiawen
 )
 
-pnpm install --frozen-lockfile
+npx --yes pnpm@11.5.1 install --frozen-lockfile
