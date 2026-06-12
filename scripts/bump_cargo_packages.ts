@@ -124,30 +124,33 @@ const wasmPkgDir = join(rootPath, "wasm", "pkg")
 const wasmPkgPath = join(wasmPkgDir, "package.json")
 const hadWasmPkgDir = existsSync(wasmPkgDir)
 const hadWasmPkgPackage = existsSync(wasmPkgPath)
+const originalWasmPkgPackage = hadWasmPkgPackage
+  ? readFileSync(wasmPkgPath, "utf-8")
+  : undefined
 
 try {
-  if (!hadWasmPkgPackage) {
-    mkdirSync(wasmPkgDir, { recursive: true })
-    writeFileSync(
-      wasmPkgPath,
-      JSON.stringify(
-        {
-          name: "@gengjiawen/monkey-wasm",
-          version: pak.version,
-        },
-        null,
-        2,
-      ) + "\n",
-      "utf-8",
-    )
-  }
+  mkdirSync(wasmPkgDir, { recursive: true })
+  writeFileSync(
+    wasmPkgPath,
+    JSON.stringify(
+      {
+        name: "@gengjiawen/monkey-wasm",
+        version: pak.version,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf-8",
+  )
 
   execSync("pnpm install --lockfile-only --link-workspace-packages=true", {
     cwd: rootPath,
     stdio: "inherit",
   })
 } finally {
-  if (!hadWasmPkgPackage) {
+  if (hadWasmPkgPackage && originalWasmPkgPackage !== undefined) {
+    writeFileSync(wasmPkgPath, originalWasmPkgPackage, "utf-8")
+  } else {
     rmSync(wasmPkgPath, { force: true })
   }
   if (!hadWasmPkgDir) {
