@@ -9,6 +9,7 @@ interface EditorProps {
   code?: string
   onChange?: (code: string) => void
   vimMode?: boolean
+  fill?: boolean
 }
 
 export function Editor({
@@ -16,14 +17,16 @@ export function Editor({
   code = '',
   onChange,
   vimMode = true,
+  fill = false,
 }: EditorProps) {
   const extensions = useMemo(() => (vimMode ? [vim()] : []), [vimMode])
 
   return (
     <CodeMirror
       {...extra}
+      className={fill ? 'editor-fill' : undefined}
       value={code}
-      height="100%"
+      height={fill ? undefined : '100%'}
       extensions={extensions}
       onChange={onChange}
     />
