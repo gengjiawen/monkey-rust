@@ -19,6 +19,28 @@ const vsixName = `${packageJson.name}-${packageJson.version}.vsix`
 const tscBin = process.platform === 'win32' ? 'tsc.cmd' : 'tsc'
 const vsceBin = process.platform === 'win32' ? 'vsce.cmd' : 'vsce'
 
+function normalizeWorkspaceRange(range) {
+  if (!range.startsWith('workspace:')) {
+    return range
+  }
+
+  const workspaceRange = range.slice('workspace:'.length)
+  return workspaceRange === '*' ? `^${packageJson.version}` : workspaceRange
+}
+
+function normalizeDependencies(dependencies) {
+  if (!dependencies) {
+    return dependencies
+  }
+
+  return Object.fromEntries(
+    Object.entries(dependencies).map(([name, range]) => [
+      name,
+      normalizeWorkspaceRange(range),
+    ])
+  )
+}
+
 function copyEntry(entry) {
   cpSync(join(extensionRoot, entry), join(stagingDir, entry), {
     recursive: true,
@@ -48,6 +70,7 @@ copyFileSync(join(repoRoot, 'LICENSE'), join(stagingDir, 'LICENSE'))
 
 const packagedManifest = {
   ...packageJson,
+  dependencies: normalizeDependencies(packageJson.dependencies),
 }
 delete packagedManifest.devDependencies
 delete packagedManifest.scripts

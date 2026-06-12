@@ -116,7 +116,7 @@ importers:
   packages/vscode-extension:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^0.12.0
+        specifier: workspace:*
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':

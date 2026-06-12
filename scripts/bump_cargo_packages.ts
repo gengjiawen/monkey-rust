@@ -145,7 +145,7 @@ try {
       vscodeExtension,
       'vscode-extension',
       '@gengjiawen/monkey-wasm',
-      `^${nextVersion}`
+      'workspace:*'
     ) || vscodeExtensionChanged
 
   if (vscodeExtensionChanged) {

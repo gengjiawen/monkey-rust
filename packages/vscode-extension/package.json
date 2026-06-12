@@ -2,7 +2,7 @@
   "name": "monkey-extension",
   "displayName": "Monkey Language",
   "description": "Syntax highlighting, diagnostics, and commands for Monkey language.",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "publisher": "monkey",
   "private": true,
   "license": "MIT",
@@ -77,7 +77,7 @@
     "package": "node scripts/package.js"
   },
   "dependencies": {
-    "@gengjiawen/monkey-wasm": "^0.12.0"
+    "@gengjiawen/monkey-wasm": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "18.15.11",
