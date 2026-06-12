@@ -13,3 +13,4 @@ out/
 package-lock.json
 .pnpm-store/
 *.vsix
+.vercel

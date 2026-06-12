@@ -1,21 +1,31 @@
-import React from 'react';
-import CodeMirror, { ReactCodeMirrorProps } from '@uiw/react-codemirror';
-import { vim } from '@replit/codemirror-vim';
+'use client'
+
+import { vim } from '@replit/codemirror-vim'
+import CodeMirror, { type ReactCodeMirrorProps } from '@uiw/react-codemirror'
+import { useMemo } from 'react'
 
 interface EditorProps {
-  extra?: ReactCodeMirrorProps,
-  code?: string,
-  onChange?: (code: string) => void;
+  extra?: ReactCodeMirrorProps
+  code?: string
+  onChange?: (code: string) => void
+  vimMode?: boolean
 }
 
-export function Editor(editorProps? : EditorProps) {
+export function Editor({
+  extra,
+  code = '',
+  onChange,
+  vimMode = true,
+}: EditorProps) {
+  const extensions = useMemo(() => (vimMode ? [vim()] : []), [vimMode])
+
   return (
     <CodeMirror
-      {...editorProps?.extra}
-      value= { editorProps?.code}
+      {...extra}
+      value={code}
       height="100%"
-      extensions={[vim()]}
-      onChange={editorProps?.onChange}
+      extensions={extensions}
+      onChange={onChange}
     />
-  );
+  )
 }

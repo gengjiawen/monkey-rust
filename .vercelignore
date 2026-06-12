@@ -1,0 +1,17 @@
+.git
+.vercel
+.turbo
+
+node_modules
+**/node_modules
+
+target
+**/target
+wasm/pkg
+
+packages/playground/.next
+packages/playground/out
+packages/playground/stats.html
+
+*.log
+.DS_Store
