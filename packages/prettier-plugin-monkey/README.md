@@ -2,6 +2,11 @@
 
 A Prettier plugin for the [Monkey programming language](https://monkeylang.org/).
 
+### Compiler playground
+https://monkey-lang-playground-jw.vercel.app/
+
+Repo: https://github.com/gengjiawen/monkey-rust
+
 ## Features
 
 - 🚀 Fast parsing using WebAssembly (powered by [@gengjiawen/monkey-wasm](https://www.npmjs.com/package/@gengjiawen/monkey-wasm))

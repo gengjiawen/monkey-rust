@@ -2,6 +2,11 @@
 
 First-class VS Code support for Monkey source files.
 
+### Compiler playground
+https://monkey-lang-playground-jw.vercel.app/
+
+Repo: https://github.com/gengjiawen/monkey-rust
+
 ## Features
 
 - **Syntax highlighting** for `.monkey` files.
