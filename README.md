@@ -11,11 +11,14 @@ An interpreter for the Monkey programming language written in Rust
 
 ## What’s Monkey?
 
+### Compiler playground
+https://monkey-lang-playground-jw.vercel.app/
+
+### AST Online playground
+https://astexplorer.net/#/gist/e23a81ce309e8fcffe95ddd1b5661061/01d0b4b078304ddd9639eae9f4e6d342e2b9d075
+
+
 Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **infix operators**, has **first-class** and **higher-order functions**, can handle **closures** with ease and has **integers**, **booleans**, **arrays** and **hashes** built-in.
-
-Official site is: https://monkeylang.org/. It's has various implementation languages :).
-
-There is a book about learning how to make an interpreter: [Writing An Interpreter In Go](https://interpreterbook.com/#the-monkey-programming-language). This is where the Monkey programming language come from.
 
 ## Features
 
@@ -28,19 +31,7 @@ There is a book about learning how to make an interpreter: [Writing An Interpret
 - **VS Code Extension**: First-class editor support with syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
 - bytecode viewer from source
 
-### AST Online playground
+## Resources
+Official site is: https://monkeylang.org/. It's has various implementation languages :).
 
-https://astexplorer.net/#/gist/e23a81ce309e8fcffe95ddd1b5661061/01d0b4b078304ddd9639eae9f4e6d342e2b9d075
-
-### Compiler playground
-
-https://monkey-lang-playground-jw.vercel.app/
-
-## Instruction
-
-### Build and test
-
-```bash
-$ cargo build
-$ cargo test
-```
+There is a book about learning how to make an interpreter: [Writing An Interpreter In Go](https://interpreterbook.com/#the-monkey-programming-language). This is where the Monkey programming language come from.
