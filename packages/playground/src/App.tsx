@@ -1,18 +1,70 @@
 'use client'
 
-import { Box, Button, Flex, SegmentedControl } from '@radix-ui/themes'
+import { Box, Button, Flex, SegmentedControl, Select } from '@radix-ui/themes'
 import { compile, parse } from '@gengjiawen/monkey-wasm'
+import { useAtom } from 'jotai'
+import { atomWithStorage } from 'jotai/utils'
 import debounce from 'lodash.debounce'
 import type { Plugin } from 'prettier'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Editor } from './Editor'
 
-const initialCode = `
+interface Snippet {
+  label: string
+  code: string
+}
+
+const snippets: Snippet[] = [
+  {
+    label: 'Intro',
+    code: `
 1 + 1;
 if (true) { 10 }; 3333;
 let a = [1, 2, 3];
-`.trimStart()
+`.trimStart(),
+  },
+  {
+    label: 'Functions',
+    code: `
+let add = fn(a, b) { a + b };
+let multiply = fn(a, b) { a * b };
+add(2, multiply(3, 4));
+`.trimStart(),
+  },
+  {
+    label: 'Closure',
+    code: `
+let makeAdder = fn(x) { fn(y) { x + y } };
+let addTwo = makeAdder(2);
+addTwo(5);
+`.trimStart(),
+  },
+  {
+    label: 'Fibonacci',
+    code: `
+let fibonacci = fn(n) {
+  if (n == 0) { 0 } else {
+    if (n == 1) { return 1 } else {
+      fibonacci(n - 1) + fibonacci(n - 2);
+    }
+  }
+};
+fibonacci(10);
+`.trimStart(),
+  },
+  {
+    label: 'Hash map',
+    code: `
+let person = {"name": "Anna", "age": 24};
+let people = [
+  {"name": "Anna", "age": 24},
+  {"name": "Bob", "age": 99}
+];
+people[0]["name"];
+`.trimStart(),
+  },
+]
 
 type OutputView = 'ast' | 'bytecode'
 
@@ -20,8 +72,11 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
+const snippetIndexAtom = atomWithStorage('monkey-playground-snippet', 0)
+
 function App() {
-  const [code, setCode] = useState(initialCode)
+  const [snippetIndex, setSnippetIndex] = useAtom(snippetIndexAtom)
+  const [code, setCode] = useState(snippets[snippetIndex].code)
   const [outputView, setOutputView] = useState<OutputView>('ast')
   const [astOutput, setAstOutput] = useState('')
   const [compilerOutput, setCompilerOutput] = useState('')
@@ -75,15 +130,39 @@ function App() {
 
   useEffect(() => () => debouncedCompile.cancel(), [debouncedCompile])
 
+  useEffect(() => {
+    const index = Math.min(Math.max(snippetIndex, 0), snippets.length - 1)
+    if (index !== snippetIndex) {
+      setSnippetIndex(index)
+    }
+    setCode(snippets[index].code)
+  }, [snippetIndex, setSnippetIndex])
+
   const outputCode = outputView === 'ast' ? astOutput : compilerOutput
 
   return (
     <Flex className="playground-shell">
       <Flex direction="column" className="panel editor-column">
         <Flex className="toolbar" align="center" justify="between" gap="3" px="3" py="2">
-          <Button size="2" onClick={formatCode}>
-            Format
-          </Button>
+          <Flex align="center" gap="3">
+            <Button size="2" onClick={formatCode}>
+              Format
+            </Button>
+            <Select.Root
+              size="2"
+              value={String(snippetIndex)}
+              onValueChange={(value) => setSnippetIndex(Number(value))}
+            >
+              <Select.Trigger />
+              <Select.Content>
+                {snippets.map((snippet, index) => (
+                  <Select.Item key={snippet.label} value={String(index)}>
+                    {snippet.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </Flex>
           <SegmentedControl.Root
             size="2"
             value={vimMode ? 'vim' : 'plain'}

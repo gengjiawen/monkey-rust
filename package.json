@@ -9,6 +9,7 @@
   "scripts": {
     "format": "npx prettier .github/**/*.yml *.yml README.md Maintainer.md --write",
     "ua": "npx @gengjiawen/git-repo-cli clone fkling/astexplorer ./ast-website/",
+    "playground": "pnpm --filter monkey-playground dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
