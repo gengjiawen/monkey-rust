@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/gengjiawen/monkey-rust/compare/v0.13.0...v0.14.0) (2026-06-13)
+
+
+### Features
+
+* **playground:** add AST view beside bytecode output ([#251](https://github.com/gengjiawen/monkey-rust/issues/251)) ([b3c8b80](https://github.com/gengjiawen/monkey-rust/commit/b3c8b80e745c666dce49ea4fa4a7326b3afa02f5))
+* **playground:** add code snippet dropdown with localStorage persistence ([00786e8](https://github.com/gengjiawen/monkey-rust/commit/00786e8e3c2a6e8e8e8b14b933173a882d5266b2))
+
+
+### Bug Fixes
+
+* **playground:** show compiled function constants ([404457a](https://github.com/gengjiawen/monkey-rust/commit/404457ab98794400a73bc25145f169aaeb0de183))
+* **vscode:** add extension icon ([4922764](https://github.com/gengjiawen/monkey-rust/commit/4922764fd12439574bf32ccd32a525da16d74a24))
+
 ## [0.13.0](https://github.com/gengjiawen/monkey-rust/compare/v0.12.1...v0.13.0) (2026-06-12)
 
 
