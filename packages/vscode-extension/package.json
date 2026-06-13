@@ -4,6 +4,7 @@
   "description": "Syntax highlighting, diagnostics, and commands for Monkey language.",
   "version": "0.13.0",
   "publisher": "gengjiawen",
+  "icon": "images/icon.png",
   "private": true,
   "license": "MIT",
   "repository": {

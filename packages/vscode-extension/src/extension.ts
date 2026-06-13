@@ -46,6 +46,7 @@ async function createWasmBindings(): Promise<MonkeyWasm> {
   return {
     parse: bindings.parse,
     compile: bindings.compile,
+    compile_detail: bindings.compile_detail,
   }
 }
 
