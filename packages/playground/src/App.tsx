@@ -1,7 +1,7 @@
 'use client'
 
 import { Box, Button, Flex, SegmentedControl, Select } from '@radix-ui/themes'
-import { compile, parse } from '@gengjiawen/monkey-wasm'
+import { compile_detail, parse } from '@gengjiawen/monkey-wasm'
 import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import debounce from 'lodash.debounce'
@@ -91,7 +91,7 @@ function App() {
     }
 
     try {
-      setCompilerOutput(compile(source))
+      setCompilerOutput(compile_detail(source))
     } catch (error) {
       setCompilerOutput(getErrorMessage(error))
     }

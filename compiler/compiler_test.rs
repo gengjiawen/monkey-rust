@@ -128,6 +128,24 @@ mod tests {
 
         run_compiler_test(tests);
     }
+
+    #[test]
+    fn bytecode_string_includes_compiled_function_constants() {
+        let program = parse("let add = fn(a, b) { a + b };").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+        let output = bytecode.string();
+
+        assert!(output.contains("Instructions:\n0000 OpClosure 0 0\n0004 OpSetGlobal 0\n"));
+        assert!(
+            output.contains("Constants:\n0000 CompiledFunction(num_locals=2, num_parameters=2)\n")
+        );
+        assert!(output.contains("       0000 OpGetLocal 0\n"));
+        assert!(output.contains("       0002 OpGetLocal 1\n"));
+        assert!(output.contains("       0004 OpAdd\n"));
+        assert!(output.contains("       0005 OpReturnValue\n"));
+    }
+
     #[test]
     fn boolean_expression() {
         let tests = vec![

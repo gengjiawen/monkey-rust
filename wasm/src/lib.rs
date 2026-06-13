@@ -36,3 +36,18 @@ pub fn compile(input: &str) -> String {
         Err(e) => throw_str(format!("compile error: {}", e).as_str()),
     }
 }
+
+#[wasm_bindgen]
+pub fn compile_detail(input: &str) -> String {
+    set_panic_hook();
+
+    let program = match parser_pase(input) {
+        Ok(ast) => ast,
+        Err(e) => throw_str(format!("parse error: {}", e[0]).as_str()),
+    };
+    let mut compiler = Compiler::new();
+    match compiler.compile(&program) {
+        Ok(bytecode) => return bytecode.string(),
+        Err(e) => throw_str(format!("compile error: {}", e).as_str()),
+    }
+}

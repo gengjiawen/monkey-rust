@@ -27,6 +27,41 @@ pub struct Bytecode {
     pub constants: Vec<Rc<Object>>,
 }
 
+impl Bytecode {
+    pub fn string(&self) -> String {
+        let mut output = String::new();
+
+        output.push_str("Instructions:\n");
+        output.push_str(&self.instructions.string());
+        output.push_str("\nConstants:\n");
+
+        if self.constants.is_empty() {
+            output.push_str("(none)\n");
+            return output;
+        }
+
+        for (index, constant) in self.constants.iter().enumerate() {
+            match constant.as_ref() {
+                Object::CompiledFunction(function) => {
+                    output.push_str(&format!(
+                        "{:04} CompiledFunction(num_locals={}, num_parameters={})\n",
+                        index, function.num_locals, function.num_parameters
+                    ));
+                    output.push_str("     Instructions:\n");
+
+                    let instructions = Instructions { data: function.instructions.clone() };
+                    for line in instructions.string().lines() {
+                        output.push_str(&format!("       {}\n", line));
+                    }
+                }
+                value => output.push_str(&format!("{:04} {}\n", index, value)),
+            }
+        }
+
+        output
+    }
+}
+
 #[derive(Clone)]
 pub struct EmittedInstruction {
     pub opcode: Opcode,
@@ -258,7 +293,10 @@ impl Compiler {
                     num_parameters: f.params.len(),
                 });
 
-                let operands = vec![self.add_constant(Object::CompiledFunction(compiled_function)), free_symbols.len()];
+                let operands = vec![
+                    self.add_constant(Object::CompiledFunction(compiled_function)),
+                    free_symbols.len(),
+                ];
                 self.emit(OpClosure, &operands);
             }
             Expression::FunctionCall(fc) => {
