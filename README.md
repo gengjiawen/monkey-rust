@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-wasm)](https://www.npmjs.com/package/@gengjiawen/monkey-wasm)
 [![npm version](https://img.shields.io/npm/v/prettier-plugin-monkey?label=prettier-plugin-monkey)](https://www.npmjs.com/package/prettier-plugin-monkey)
 
-An interpreter for the Monkey programming language written in Rust
+An interpreter and compiler for the Monkey programming language written in Rust
 
 ![The Monkey Programming Language](https://cloud.githubusercontent.com/assets/1013641/22617482/9c60c27c-eb09-11e6-9dfa-b04c7fe498ea.png)
 
