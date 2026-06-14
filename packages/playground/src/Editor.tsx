@@ -1,6 +1,5 @@
 'use client'
 
-import { oneDark } from '@codemirror/theme-one-dark'
 import { vim } from '@replit/codemirror-vim'
 import { StateEffect, StateField } from '@codemirror/state'
 import {
@@ -10,33 +9,52 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import CodeMirror, { type ReactCodeMirrorProps } from '@uiw/react-codemirror'
-import { useTheme } from 'next-themes'
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
-  useState,
 } from 'react'
 
 const setHighlight = StateEffect.define<{ from: number; to: number } | null>()
 
 const highlightMark = Decoration.mark({ class: 'cm-ast-highlight' })
 
-function createHighlightTheme(isDark: boolean) {
-  return EditorView.baseTheme({
-    '.cm-ast-highlight': {
-      backgroundColor: isDark
-        ? 'rgba(96, 165, 250, 0.2)'
-        : 'rgba(47, 111, 237, 0.16)',
-      borderBottom: isDark
-        ? '1.5px solid rgba(96, 165, 250, 0.55)'
-        : '1.5px solid rgba(47, 111, 237, 0.55)',
+const playgroundEditorTheme = EditorView.theme({
+  '&': {
+    backgroundColor: 'var(--color-background)',
+    color: 'var(--gray-12)',
+  },
+  '.cm-content': {
+    caretColor: 'var(--accent-9)',
+  },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftColor: 'var(--accent-9)',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection':
+    {
+      backgroundColor: 'var(--accent-a5) !important',
     },
-  })
-}
+  '.cm-gutters': {
+    backgroundColor: 'var(--gray-2)',
+    color: 'var(--gray-9)',
+    borderRight: '1px solid var(--gray-a5)',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'var(--gray-a3)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'var(--gray-a2)',
+  },
+})
+
+const highlightTheme = EditorView.baseTheme({
+  '.cm-ast-highlight': {
+    backgroundColor: 'var(--accent-a4)',
+    borderBottom: '1.5px solid var(--accent-a8)',
+  },
+})
 
 const highlightField = StateField.define<DecorationSet>({
   create() {
@@ -89,14 +107,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null)
-  const { resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  const isDark = mounted && resolvedTheme === 'dark'
   const {
     extensions: extraExtensions,
     onCreateEditor: extraOnCreateEditor,
@@ -130,16 +140,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   )
 
   const extensions = useMemo(() => {
-    const next = vimMode ? [vim()] : []
-    next.push(highlightField, createHighlightTheme(isDark))
-    if (isDark) {
-      next.push(oneDark)
+    const next = [playgroundEditorTheme, highlightField, highlightTheme]
+    if (vimMode) {
+      next.push(vim())
     }
     if (extraExtensions) {
       next.push(...extraExtensions)
     }
     return next
-  }, [extraExtensions, isDark, vimMode])
+  }, [extraExtensions, vimMode])
 
   const handleCreateEditor = useCallback(
     (
@@ -169,6 +178,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       className={fill ? 'editor-fill' : undefined}
       value={code}
       height={fill ? undefined : '100%'}
+      theme="none"
       extensions={extensions}
       onChange={onChange}
       onCreateEditor={handleCreateEditor}
