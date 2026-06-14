@@ -11,11 +11,45 @@ body {
   box-sizing: border-box;
 }
 
+.playground-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 .playground-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  height: 100vh;
-  height: 100dvh;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.playground-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--gray-a5);
+  background: var(--color-background);
+}
+
+.playground-logo {
+  display: block;
+  width: auto;
+  height: 28px;
+}
+
+.playground-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.github-link {
+  color: var(--gray-12);
+  text-decoration: none;
+}
+
+.github-link:hover {
+  color: var(--accent-11);
 }
 
 .panel {
@@ -156,5 +190,11 @@ details[open] > .tree-summary {
   .editor-column {
     border-right: 0;
     border-bottom: 1px solid var(--gray-a5);
+  }
+}
+
+@media (max-width: 640px) {
+  .github-link-text {
+    display: none;
   }
 }
