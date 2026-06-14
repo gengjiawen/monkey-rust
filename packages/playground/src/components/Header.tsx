@@ -1,5 +1,7 @@
 import { Flex, Heading } from '@radix-ui/themes'
 
+import { ThemeToggle } from '@/components/ThemeToggle'
+
 const GITHUB_URL = 'https://github.com/gengjiawen/monkey-rust'
 
 function GitHubIcon() {
@@ -31,17 +33,20 @@ export function Header() {
           </Heading>
         </Flex>
 
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="github-link"
-        >
-          <Flex align="center" gap="2">
-            <GitHubIcon />
-            <span className="github-link-text">GitHub</span>
-          </Flex>
-        </a>
+        <Flex align="center" gap="2">
+          <ThemeToggle />
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="github-link"
+          >
+            <Flex align="center" gap="2">
+              <GitHubIcon />
+              <span className="github-link-text">GitHub</span>
+            </Flex>
+          </a>
+        </Flex>
       </Flex>
     </header>
   )

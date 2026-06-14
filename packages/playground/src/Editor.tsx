@@ -21,6 +21,41 @@ const setHighlight = StateEffect.define<{ from: number; to: number } | null>()
 
 const highlightMark = Decoration.mark({ class: 'cm-ast-highlight' })
 
+const playgroundEditorTheme = EditorView.theme({
+  '&': {
+    backgroundColor: 'var(--color-background)',
+    color: 'var(--gray-12)',
+  },
+  '.cm-content': {
+    caretColor: 'var(--accent-9)',
+  },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftColor: 'var(--accent-9)',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection':
+    {
+      backgroundColor: 'var(--accent-a5) !important',
+    },
+  '.cm-gutters': {
+    backgroundColor: 'var(--gray-2)',
+    color: 'var(--gray-9)',
+    borderRight: '1px solid var(--gray-a5)',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'var(--gray-a3)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'var(--gray-a2)',
+  },
+})
+
+const highlightTheme = EditorView.baseTheme({
+  '.cm-ast-highlight': {
+    backgroundColor: 'var(--accent-a4)',
+    borderBottom: '1.5px solid var(--accent-a8)',
+  },
+})
+
 const highlightField = StateField.define<DecorationSet>({
   create() {
     return Decoration.none
@@ -44,13 +79,6 @@ const highlightField = StateField.define<DecorationSet>({
     return decorations
   },
   provide: (field) => EditorView.decorations.from(field),
-})
-
-const highlightTheme = EditorView.baseTheme({
-  '.cm-ast-highlight': {
-    backgroundColor: 'rgba(47, 111, 237, 0.16)',
-    borderBottom: '1.5px solid rgba(47, 111, 237, 0.55)',
-  },
 })
 
 export interface EditorHandle {
@@ -112,8 +140,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   )
 
   const extensions = useMemo(() => {
-    const next = vimMode ? [vim()] : []
-    next.push(highlightField, highlightTheme)
+    const next = [playgroundEditorTheme, highlightField, highlightTheme]
+    if (vimMode) {
+      next.push(vim())
+    }
     if (extraExtensions) {
       next.push(...extraExtensions)
     }
@@ -148,6 +178,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       className={fill ? 'editor-fill' : undefined}
       value={code}
       height={fill ? undefined : '100%'}
+      theme="none"
       extensions={extensions}
       onChange={onChange}
       onCreateEditor={handleCreateEditor}
