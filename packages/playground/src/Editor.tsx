@@ -177,7 +177,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       {...extraProps}
       className={fill ? 'editor-fill' : undefined}
       value={code}
-      height={fill ? undefined : '100%'}
+      height="100%"
       theme="none"
       extensions={extensions}
       onChange={onChange}

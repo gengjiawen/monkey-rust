@@ -229,22 +229,23 @@ function App() {
           </SegmentedControl.Root>
         </Flex>
         <Box className="editor-frame">
-          {outputView === 'ast' && astData !== null ? (
-            <Box className="ast-frame">
+          {astData !== null ? (
+            <Box className="ast-frame" hidden={outputView !== 'ast'}>
               <AstTreeView
                 data={astData}
                 selection={selection}
                 onNodeSelect={handleNodeSelect}
               />
             </Box>
-          ) : (
+          ) : null}
+          <Box hidden={outputView === 'ast' && astData !== null} className="output-editor">
             <Editor
               code={outputView === 'ast' ? astOutput : compilerOutput}
               extra={{ readOnly: true, editable: false }}
               vimMode={false}
               fill
             />
-          )}
+          </Box>
         </Box>
       </Flex>
     </Flex>
