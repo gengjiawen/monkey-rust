@@ -60,6 +60,93 @@ body {
     'Courier New', monospace;
 }
 
+.ast-frame {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px 16px;
+  background: var(--color-background);
+}
+
+.ast-tree {
+  color: var(--gray-12);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tree-children {
+  padding-left: 18px;
+}
+
+.tree-leaf {
+  min-height: 21px;
+  padding-left: 16px;
+  white-space: nowrap;
+}
+
+.tree-summary {
+  border-radius: 4px;
+  cursor: default;
+  list-style: disclosure-closed;
+  outline: none;
+  padding: 0 3px;
+  white-space: nowrap;
+}
+
+details[open] > .tree-summary {
+  list-style: disclosure-open;
+}
+
+.tree-summary:hover {
+  background: var(--gray-a3);
+}
+
+.tree-clickable {
+  cursor: pointer;
+}
+
+.tree-clickable:hover {
+  background: var(--gray-a4);
+}
+
+.tree-on-path {
+  background: var(--blue-a2);
+}
+
+.tree-active {
+  background: var(--blue-a4);
+  box-shadow: inset 2px 0 0 var(--accent-9);
+}
+
+.tree-key {
+  color: var(--blue-11);
+}
+
+.tree-type {
+  color: var(--green-11);
+  font-weight: 600;
+}
+
+.tree-string {
+  color: var(--amber-11);
+}
+
+.tree-number {
+  color: var(--orange-11);
+}
+
+.tree-null {
+  color: var(--gray-10);
+  font-style: italic;
+}
+
+.tree-bracket {
+  color: var(--gray-10);
+}
+
 @media (max-width: 780px) {
   .playground-shell {
     grid-template-columns: 1fr;

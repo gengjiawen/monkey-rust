@@ -6,9 +6,10 @@ import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import debounce from 'lodash.debounce'
 import type { Plugin } from 'prettier'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Editor } from './Editor'
+import { AstTreeView } from './AstTreeView'
+import { Editor, type EditorHandle } from './Editor'
 
 interface Snippet {
   label: string
@@ -79,16 +80,26 @@ function App() {
   const [code, setCode] = useState(snippets[snippetIndex].code)
   const [outputView, setOutputView] = useState<OutputView>('ast')
   const [astOutput, setAstOutput] = useState('')
+  const [astData, setAstData] = useState<unknown | null>(null)
+  const [selection, setSelection] = useState<{
+    from: number
+    to: number
+  } | null>(null)
   const [compilerOutput, setCompilerOutput] = useState('')
   const [vimMode, setVimMode] = useState(true)
   const [isFormatting, setIsFormatting] = useState(false)
+  const editorRef = useRef<EditorHandle>(null)
 
   const compileCode = useCallback((source: string) => {
     try {
       const astJson = parse(source)
-      setAstOutput(JSON.stringify(JSON.parse(astJson), null, 2))
+      const ast = JSON.parse(astJson) as unknown
+      setAstData(ast)
+      setAstOutput(JSON.stringify(ast, null, 2))
     } catch (error) {
-      setAstOutput(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setAstData(null)
+      setAstOutput(message)
     }
 
     try {
@@ -98,7 +109,10 @@ function App() {
     }
   }, [])
 
-  const debouncedCompile = useMemo(() => debounce(compileCode, 200), [compileCode])
+  const debouncedCompile = useMemo(
+    () => debounce(compileCode, 200),
+    [compileCode],
+  )
 
   const editorOnChange = useCallback(
     (value: string) => {
@@ -112,15 +126,18 @@ function App() {
     setIsFormatting(true)
     try {
       const prettier = await import('prettier/standalone')
-      const monkeyPlugin = await import('../../prettier-plugin-monkey/src/index')
+      const monkeyPlugin =
+        await import('../../prettier-plugin-monkey/src/index')
       const formatted = await prettier.format(code, {
         parser: 'monkey',
         plugins: [monkeyPlugin.default as unknown as Plugin],
       })
       setCode(formatted)
+      setSelection(null)
       compileCode(formatted)
     } catch (error) {
       const message = getErrorMessage(error)
+      setAstData(null)
       setAstOutput(message)
       setCompilerOutput(message)
     } finally {
@@ -139,15 +156,25 @@ function App() {
     if (index !== snippetIndex) {
       setSnippetIndex(index)
     }
+    setSelection(null)
     setCode(snippets[index].code)
   }, [snippetIndex, setSnippetIndex])
 
-  const outputCode = outputView === 'ast' ? astOutput : compilerOutput
+  const handleNodeSelect = useCallback((start: number, end: number) => {
+    editorRef.current?.highlightRange(start, end)
+  }, [])
 
   return (
     <Flex className="playground-shell">
       <Flex direction="column" className="panel editor-column">
-        <Flex className="toolbar" align="center" justify="between" gap="3" px="3" py="2">
+        <Flex
+          className="toolbar"
+          align="center"
+          justify="between"
+          gap="3"
+          px="3"
+          py="2"
+        >
           <Flex align="center" gap="3">
             <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
@@ -177,7 +204,14 @@ function App() {
           </SegmentedControl.Root>
         </Flex>
         <Box className="editor-frame">
-          <Editor code={code} onChange={editorOnChange} vimMode={vimMode} fill />
+          <Editor
+            ref={editorRef}
+            code={code}
+            onChange={editorOnChange}
+            onSelectionChange={setSelection}
+            vimMode={vimMode}
+            fill
+          />
         </Box>
       </Flex>
 
@@ -189,16 +223,28 @@ function App() {
             onValueChange={(value) => setOutputView(value as OutputView)}
           >
             <SegmentedControl.Item value="ast">AST</SegmentedControl.Item>
-            <SegmentedControl.Item value="bytecode">Bytecode</SegmentedControl.Item>
+            <SegmentedControl.Item value="bytecode">
+              Bytecode
+            </SegmentedControl.Item>
           </SegmentedControl.Root>
         </Flex>
         <Box className="editor-frame">
-          <Editor
-            code={outputCode}
-            extra={{ readOnly: true, editable: false }}
-            vimMode={false}
-            fill
-          />
+          {outputView === 'ast' && astData !== null ? (
+            <Box className="ast-frame">
+              <AstTreeView
+                data={astData}
+                selection={selection}
+                onNodeSelect={handleNodeSelect}
+              />
+            </Box>
+          ) : (
+            <Editor
+              code={outputView === 'ast' ? astOutput : compilerOutput}
+              extra={{ readOnly: true, editable: false }}
+              vimMode={false}
+              fill
+            />
+          )}
         </Box>
       </Flex>
     </Flex>
