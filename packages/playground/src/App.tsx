@@ -81,6 +81,7 @@ function App() {
   const [astOutput, setAstOutput] = useState('')
   const [compilerOutput, setCompilerOutput] = useState('')
   const [vimMode, setVimMode] = useState(true)
+  const [isFormatting, setIsFormatting] = useState(false)
 
   const compileCode = useCallback((source: string) => {
     try {
@@ -108,6 +109,7 @@ function App() {
   )
 
   const formatCode = useCallback(async () => {
+    setIsFormatting(true)
     try {
       const prettier = await import('prettier/standalone')
       const monkeyPlugin = await import('../../prettier-plugin-monkey/src/index')
@@ -121,6 +123,8 @@ function App() {
       const message = getErrorMessage(error)
       setAstOutput(message)
       setCompilerOutput(message)
+    } finally {
+      setIsFormatting(false)
     }
   }, [code, compileCode])
 
@@ -145,7 +149,7 @@ function App() {
       <Flex direction="column" className="panel editor-column">
         <Flex className="toolbar" align="center" justify="between" gap="3" px="3" py="2">
           <Flex align="center" gap="3">
-            <Button size="2" onClick={formatCode}>
+            <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
             </Button>
             <Select.Root
