@@ -1,7 +1,7 @@
 {
   "name": "monkey-rust",
   "version": "0.14.0",
-  "description": "![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)",
+  "description": "An interpreter and compiler for the Monkey programming language written in Rust",
   "main": "index.js",
   "directories": {
     "example": "examples"
