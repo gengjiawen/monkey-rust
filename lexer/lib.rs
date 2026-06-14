@@ -20,28 +20,24 @@ impl<'a> Lexer<'a> {
 
     fn read_char(&mut self) {
         if self.read_position >= self.input.len() {
-            self.ch = 0 as char
+            self.ch = '\0';
         } else {
-            if let Some(ch) = self.input.chars().nth(self.read_position) {
-                self.ch = ch;
-            } else {
-                panic!("read out of range")
-            }
+            self.ch = self.input[self.read_position..].chars().next().unwrap();
         }
 
         self.position = self.read_position;
-        self.read_position += 1;
+        if self.read_position < self.input.len() && self.ch != '\0' {
+            self.read_position += self.ch.len_utf8();
+        } else {
+            self.read_position += 1;
+        }
     }
 
     fn peek_char(&self) -> char {
         if self.read_position >= self.input.len() {
-            0 as char
+            '\0'
         } else {
-            if let Some(ch) = self.input.chars().nth(self.read_position) {
-                ch
-            } else {
-                panic!("read out of range")
-            }
+            self.input[self.read_position..].chars().next().unwrap()
         }
     }
 
