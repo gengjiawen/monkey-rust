@@ -1,5 +1,5 @@
 # monkey-rust
-![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)
+![Rust](https://github.com/gengjiawen/monkey-rust/actions/workflows/rust.yml/badge.svg?branch=main&event=push)
 
 This is a parser for the Monkey programming language written in Rust
 

@@ -1,4 +1,4 @@
-![Rust](https://github.com/gengjiawen/monkey-rust/workflows/Rust/badge.svg)
+![Rust](https://github.com/gengjiawen/monkey-rust/actions/workflows/rust.yml/badge.svg?branch=main&event=push)
 
 This lib designed for compiling monkey-parser into WebAssembly and
 publishing the resulting package to NPM.
