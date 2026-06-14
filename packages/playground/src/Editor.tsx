@@ -1,5 +1,6 @@
 'use client'
 
+import { oneDark } from '@codemirror/theme-one-dark'
 import { vim } from '@replit/codemirror-vim'
 import { StateEffect, StateField } from '@codemirror/state'
 import {
@@ -9,17 +10,33 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import CodeMirror, { type ReactCodeMirrorProps } from '@uiw/react-codemirror'
+import { useTheme } from 'next-themes'
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react'
 
 const setHighlight = StateEffect.define<{ from: number; to: number } | null>()
 
 const highlightMark = Decoration.mark({ class: 'cm-ast-highlight' })
+
+function createHighlightTheme(isDark: boolean) {
+  return EditorView.baseTheme({
+    '.cm-ast-highlight': {
+      backgroundColor: isDark
+        ? 'rgba(96, 165, 250, 0.2)'
+        : 'rgba(47, 111, 237, 0.16)',
+      borderBottom: isDark
+        ? '1.5px solid rgba(96, 165, 250, 0.55)'
+        : '1.5px solid rgba(47, 111, 237, 0.55)',
+    },
+  })
+}
 
 const highlightField = StateField.define<DecorationSet>({
   create() {
@@ -44,13 +61,6 @@ const highlightField = StateField.define<DecorationSet>({
     return decorations
   },
   provide: (field) => EditorView.decorations.from(field),
-})
-
-const highlightTheme = EditorView.baseTheme({
-  '.cm-ast-highlight': {
-    backgroundColor: 'rgba(47, 111, 237, 0.16)',
-    borderBottom: '1.5px solid rgba(47, 111, 237, 0.55)',
-  },
 })
 
 export interface EditorHandle {
@@ -79,6 +89,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null)
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isDark = mounted && resolvedTheme === 'dark'
   const {
     extensions: extraExtensions,
     onCreateEditor: extraOnCreateEditor,
@@ -113,12 +131,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   const extensions = useMemo(() => {
     const next = vimMode ? [vim()] : []
-    next.push(highlightField, highlightTheme)
+    next.push(highlightField, createHighlightTheme(isDark))
+    if (isDark) {
+      next.push(oneDark)
+    }
     if (extraExtensions) {
       next.push(...extraExtensions)
     }
     return next
-  }, [extraExtensions, vimMode])
+  }, [extraExtensions, isDark, vimMode])
 
   const handleCreateEditor = useCallback(
     (

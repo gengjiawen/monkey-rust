@@ -1,11 +1,11 @@
 import '@radix-ui/themes/styles.css'
 import './globals.css'
 
-import { Theme } from '@radix-ui/themes'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
 import { Header } from '@/components/Header'
+import { PlaygroundTheme } from '@/components/PlaygroundTheme'
 
 export const metadata: Metadata = {
   title: 'Monkey Playground',
@@ -14,14 +14,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <Theme accentColor="blue" grayColor="slate" radius="small">
+        <PlaygroundTheme>
           <div className="playground-root">
             <Header />
             {children}
           </div>
-        </Theme>
+        </PlaygroundTheme>
       </body>
     </html>
   )
