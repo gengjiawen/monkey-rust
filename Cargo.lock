@@ -173,6 +173,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "monkey-gc"
+version = "0.14.0"
+dependencies = [
+ "byteorder",
+ "insta",
+ "monkey-compiler",
+ "monkey-object",
+ "monkey-parser",
+]
+
+[[package]]
 name = "monkey-interpreter"
 version = "0.14.0"
 dependencies = [

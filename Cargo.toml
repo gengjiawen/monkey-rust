@@ -2,6 +2,7 @@
 members = [
   "lexer",
   "parser",
+  "gc",
   "object",
   "interpreter",
   "compiler",
