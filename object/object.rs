@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::fmt::{Formatter, write};
+use std::fmt::{write, Formatter};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -30,7 +30,7 @@ pub enum Object {
     Builtin(BuiltinFunc),
     Error(String),
     CompiledFunction(Rc<CompiledFunction>),
-    ClosureObj(Closure)
+    ClosureObj(Closure),
 }
 
 impl fmt::Display for Object {

@@ -38,7 +38,12 @@ impl<'a> Parser<'a> {
         // let infix_parse_fns = HashMap::new();
         // ```
 
-        let p = Parser { lexer, current_token: cur, peek_token: next, errors };
+        let p = Parser {
+            lexer,
+            current_token: cur,
+            peek_token: next,
+            errors,
+        };
 
         return p;
     }
@@ -99,7 +104,9 @@ impl<'a> Parser<'a> {
         let name = self.current_token.clone();
         let mut identifier_name = "".to_string();
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => {
+            TokenKind::IDENTIFIER {
+                name,
+            } => {
                 identifier_name = name.to_string();
             }
             _ => return Err(format!("{} not an identifier", self.current_token)),
@@ -125,7 +132,10 @@ impl<'a> Parser<'a> {
         return Ok(Statement::Let(Let {
             identifier: name,
             expr: value,
-            span: Span { start, end },
+            span: Span {
+                start,
+                end,
+            },
         }));
     }
 
@@ -142,7 +152,10 @@ impl<'a> Parser<'a> {
 
         return Ok(Statement::Return(ReturnStatement {
             argument: value,
-            span: Span { start, end },
+            span: Span {
+                start,
+                end,
+            },
         }));
     }
 
@@ -172,20 +185,34 @@ impl<'a> Parser<'a> {
                     }
                 }
                 None => {
-                    return Ok((left, Span { start: left_start, end: self.current_token.span.end }))
+                    return Ok((
+                        left,
+                        Span {
+                            start: left_start,
+                            end: self.current_token.span.end,
+                        },
+                    ))
                 }
             }
         }
 
         let end = self.current_token.span.end;
 
-        Ok((left, Span { start: left_start, end }))
+        Ok((
+            left,
+            Span {
+                start: left_start,
+                end,
+            },
+        ))
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         // this is prefix fn map :)
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => {
+            TokenKind::IDENTIFIER {
+                name,
+            } => {
                 return Ok(Expression::IDENTIFIER(IDENTIFIER {
                     name: name.clone(),
                     span: self.current_token.clone().span,
@@ -217,7 +244,10 @@ impl<'a> Parser<'a> {
                 return Ok(Expression::PREFIX(UnaryExpression {
                     op: prefix_op,
                     operand: Box::new(expr),
-                    span: Span { start, end: span.end },
+                    span: Span {
+                        start,
+                        end: span.end,
+                    },
                 }));
             }
             TokenKind::LPAREN => {
@@ -230,7 +260,10 @@ impl<'a> Parser<'a> {
             TokenKind::FUNCTION => self.parse_fn_expression(),
             TokenKind::LBRACKET => {
                 let (elements, span) = self.parse_expression_list(&TokenKind::RBRACKET)?;
-                return Ok(Expression::LITERAL(Literal::Array(Array { elements, span })));
+                return Ok(Expression::LITERAL(Literal::Array(Array {
+                    elements,
+                    span,
+                })));
             }
             TokenKind::LBRACE => self.parse_hash_expression(),
             _ => Err(format!("no prefix function for token: {}", self.current_token)),
@@ -260,7 +293,10 @@ impl<'a> Parser<'a> {
                     op: infix_op,
                     left: Box::new(left.clone()),
                     right: Box::new(right),
-                    span: Span { start: left_start, end: span.end },
+                    span: Span {
+                        start: left_start,
+                        end: span.end,
+                    },
                 })));
             }
             TokenKind::LPAREN => {
@@ -300,7 +336,10 @@ impl<'a> Parser<'a> {
             condition: Box::new(condition),
             consequent,
             alternate,
-            span: Span { start, end },
+            span: Span {
+                start,
+                end,
+            },
         }));
     }
 
@@ -320,7 +359,13 @@ impl<'a> Parser<'a> {
 
         let end = self.current_token.span.end;
 
-        Ok(BlockStatement { body: block_statement, span: Span { start, end } })
+        Ok(BlockStatement {
+            body: block_statement,
+            span: Span {
+                start,
+                end,
+            },
+        })
     }
 
     fn parse_fn_expression(&mut self) -> Result<Expression, ParseError> {
@@ -338,7 +383,10 @@ impl<'a> Parser<'a> {
         Ok(Expression::FUNCTION(FunctionDeclaration {
             params,
             body: function_body,
-            span: Span { start, end },
+            span: Span {
+                start,
+                end,
+            },
             name: "".to_string(),
         }))
     }
@@ -353,8 +401,12 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         match &self.current_token.kind {
-            TokenKind::IDENTIFIER { name } => params
-                .push(IDENTIFIER { name: name.clone(), span: self.current_token.span.clone() }),
+            TokenKind::IDENTIFIER {
+                name,
+            } => params.push(IDENTIFIER {
+                name: name.clone(),
+                span: self.current_token.span.clone(),
+            }),
             token => {
                 return Err(format!("expected function params  to be an identifier, got {}", token))
             }
@@ -364,8 +416,12 @@ impl<'a> Parser<'a> {
             self.next_token();
             self.next_token();
             match &self.current_token.kind {
-                TokenKind::IDENTIFIER { name } => params
-                    .push(IDENTIFIER { name: name.clone(), span: self.current_token.span.clone() }),
+                TokenKind::IDENTIFIER {
+                    name,
+                } => params.push(IDENTIFIER {
+                    name: name.clone(),
+                    span: self.current_token.span.clone(),
+                }),
                 token => {
                     return Err(format!(
                         "expected function params  to be an identifier, got {}",
@@ -393,7 +449,14 @@ impl<'a> Parser<'a> {
         }
         let callee = Box::new(expr);
 
-        Ok(Expression::FunctionCall(FunctionCall { callee, arguments, span: Span { start, end } }))
+        Ok(Expression::FunctionCall(FunctionCall {
+            callee,
+            arguments,
+            span: Span {
+                start,
+                end,
+            },
+        }))
     }
 
     fn parse_expression_list(
@@ -405,7 +468,13 @@ impl<'a> Parser<'a> {
         if self.peek_token_is(end) {
             self.next_token();
             let end = self.current_token.span.end;
-            return Ok((expr_list, Span { start, end }));
+            return Ok((
+                expr_list,
+                Span {
+                    start,
+                    end,
+                },
+            ));
         }
 
         self.next_token();
@@ -421,7 +490,13 @@ impl<'a> Parser<'a> {
         self.expect_peek(end)?;
         let end = self.current_token.span.end;
 
-        return Ok((expr_list, Span { start, end }));
+        return Ok((
+            expr_list,
+            Span {
+                start,
+                end,
+            },
+        ));
     }
 
     fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
@@ -436,7 +511,10 @@ impl<'a> Parser<'a> {
         return Ok(Expression::Index(Index {
             object: Box::new(left),
             index: Box::new(index),
-            span: Span { start, end },
+            span: Span {
+                start,
+                end,
+            },
         }));
     }
 
@@ -463,7 +541,13 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::RBRACE)?;
         let end = self.current_token.span.end;
 
-        Ok(Expression::LITERAL(Literal::Hash(Hash { elements: map, span: Span { start, end } })))
+        Ok(Expression::LITERAL(Literal::Hash(Hash {
+            elements: map,
+            span: Span {
+                start,
+                end,
+            },
+        })))
     }
 }
 

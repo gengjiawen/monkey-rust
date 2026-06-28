@@ -31,7 +31,13 @@ pub struct Program {
 
 impl Program {
     pub fn new() -> Self {
-        Program { body: vec![], span: Span { start: 0, end: 0 } }
+        Program {
+            body: vec![],
+            span: Span {
+                start: 0,
+                end: 0,
+            },
+        }
     }
 }
 
@@ -67,13 +73,23 @@ pub struct ReturnStatement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Statement::Let(Let { identifier: id, expr, .. }) => {
-                if let TokenKind::IDENTIFIER { name } = &id.kind {
+            Statement::Let(Let {
+                identifier: id,
+                expr,
+                ..
+            }) => {
+                if let TokenKind::IDENTIFIER {
+                    name,
+                } = &id.kind
+                {
                     return write!(f, "let {} = {};", name, expr);
                 }
                 panic!("unreachable")
             }
-            Statement::Return(ReturnStatement { argument, .. }) => {
+            Statement::Return(ReturnStatement {
+                argument,
+                ..
+            }) => {
                 write!(f, "return {};", argument)
             }
             Statement::Expr(expr) => write!(f, "{}", expr),
@@ -175,22 +191,44 @@ pub struct Index {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => write!(f, "{}", id),
+            Expression::IDENTIFIER(IDENTIFIER {
+                name: id,
+                ..
+            }) => write!(f, "{}", id),
             Expression::LITERAL(l) => write!(f, "{}", l),
-            Expression::PREFIX(UnaryExpression { op, operand: expr, .. }) => {
+            Expression::PREFIX(UnaryExpression {
+                op,
+                operand: expr,
+                ..
+            }) => {
                 write!(f, "({}{})", op.kind, expr)
             }
-            Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
+            Expression::INFIX(BinaryExpression {
+                op,
+                left,
+                right,
+                ..
+            }) => {
                 write!(f, "({} {} {})", left, op.kind, right)
             }
-            Expression::IF(IF { condition, consequent, alternate, .. }) => {
+            Expression::IF(IF {
+                condition,
+                consequent,
+                alternate,
+                ..
+            }) => {
                 if let Some(else_block) = alternate {
                     write!(f, "if {} {{ {} }} else {{ {} }}", condition, consequent, else_block,)
                 } else {
                     write!(f, "if {} {{ {} }}", condition, consequent,)
                 }
             }
-            Expression::FUNCTION(FunctionDeclaration { name, params, body, .. }) => {
+            Expression::FUNCTION(FunctionDeclaration {
+                name,
+                params,
+                body,
+                ..
+            }) => {
                 let func_params = params
                     .iter()
                     .map(|stmt| stmt.to_string())
@@ -198,10 +236,18 @@ impl fmt::Display for Expression {
                     .join(", ");
                 write!(f, "fn {}({}) {{ {} }}", name, func_params, body)
             }
-            Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
+            Expression::FunctionCall(FunctionCall {
+                callee,
+                arguments,
+                ..
+            }) => {
                 write!(f, "{}({})", callee, format_expressions(arguments))
             }
-            Expression::Index(Index { object, index, .. }) => {
+            Expression::Index(Index {
+                object,
+                index,
+                ..
+            }) => {
                 write!(f, "({}[{}])", object, index)
             }
         }
@@ -251,11 +297,26 @@ pub struct Hash {
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Literal::Integer(Integer { raw: i, .. }) => write!(f, "{}", i),
-            Literal::Boolean(Boolean { raw: b, .. }) => write!(f, "{}", b),
-            Literal::String(StringType { raw: s, .. }) => write!(f, "\"{}\"", s),
-            Literal::Array(Array { elements: e, .. }) => write!(f, "[{}]", format_expressions(e)),
-            Literal::Hash(Hash { elements: map, .. }) => {
+            Literal::Integer(Integer {
+                raw: i,
+                ..
+            }) => write!(f, "{}", i),
+            Literal::Boolean(Boolean {
+                raw: b,
+                ..
+            }) => write!(f, "{}", b),
+            Literal::String(StringType {
+                raw: s,
+                ..
+            }) => write!(f, "\"{}\"", s),
+            Literal::Array(Array {
+                elements: e,
+                ..
+            }) => write!(f, "[{}]", format_expressions(e)),
+            Literal::Hash(Hash {
+                elements: map,
+                ..
+            }) => {
                 let to_string = map
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k, v))

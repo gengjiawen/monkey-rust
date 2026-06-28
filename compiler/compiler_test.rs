@@ -156,12 +156,36 @@ mod tests {
         assert_eq!(
             bytecode.debug_info.pc_spans,
             vec![
-                crate::compiler::PcSpan { pc: 0, span: Span { start: 0, end: 1 } },
-                crate::compiler::PcSpan { pc: 4, span: Span { start: 3, end: 5 } },
+                crate::compiler::PcSpan {
+                    pc: 0,
+                    span: Span {
+                        start: 0,
+                        end: 1
+                    }
+                },
+                crate::compiler::PcSpan {
+                    pc: 4,
+                    span: Span {
+                        start: 3,
+                        end: 5
+                    }
+                },
             ]
         );
-        assert_eq!(bytecode.debug_info.span_for_pc(3), Some(&Span { start: 0, end: 1 }));
-        assert_eq!(bytecode.debug_info.span_for_pc(7), Some(&Span { start: 3, end: 5 }));
+        assert_eq!(
+            bytecode.debug_info.span_for_pc(3),
+            Some(&Span {
+                start: 0,
+                end: 1
+            })
+        );
+        assert_eq!(
+            bytecode.debug_info.span_for_pc(7),
+            Some(&Span {
+                start: 3,
+                end: 5
+            })
+        );
     }
 
     #[test]
@@ -176,7 +200,10 @@ mod tests {
 
         assert_eq!(
             function_debug_info.span_for_pc(4),
-            Some(&Span { start: expression_start, end: expression_start + "a + b".len() })
+            Some(&Span {
+                start: expression_start,
+                end: expression_start + "a + b".len()
+            })
         );
     }
 
@@ -230,7 +257,9 @@ mod tests {
             .find(|line| {
                 matches!(
                     line.scope,
-                    crate::compiler::InstructionScope::Function { constant_index: 0 }
+                    crate::compiler::InstructionScope::Function {
+                        constant_index: 0
+                    }
                 ) && line.pc == 4
             })
             .expect("OpAdd instruction line");

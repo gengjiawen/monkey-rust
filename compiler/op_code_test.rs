@@ -19,7 +19,11 @@ mod tests {
                 operands: vec![65534],
                 expected: vec![OpConst as u8, 255, 254],
             },
-            Test { op: Opcode::OpAdd, operands: vec![], expected: vec![OpAdd as u8] },
+            Test {
+                op: Opcode::OpAdd,
+                operands: vec![],
+                expected: vec![OpAdd as u8],
+            },
             Test {
                 op: Opcode::OpGetLocal,
                 operands: vec![255],
@@ -42,8 +46,16 @@ mod tests {
         }
 
         let tests = vec![
-            Test { op: Opcode::OpConst, operands: vec![65534], bytes_read: 2 },
-            Test { op: Opcode::OpConst, operands: vec![255], bytes_read: 2 },
+            Test {
+                op: Opcode::OpConst,
+                operands: vec![65534],
+                bytes_read: 2,
+            },
+            Test {
+                op: Opcode::OpConst,
+                operands: vec![255],
+                bytes_read: 2,
+            },
         ];
 
         for t in tests {
@@ -73,7 +85,7 @@ mod tests {
             make_instructions(OpGetLocal, &vec![1]),
             make_instructions(OpConst, &vec![2]),
             make_instructions(OpConst, &vec![65535]),
-            make_instructions(OpClosure, &vec![65535, 255])
+            make_instructions(OpClosure, &vec![65535, 255]),
         ];
 
         let expected = "0000 OpAdd\n\
@@ -87,7 +99,10 @@ mod tests {
             .iter()
             .fold(vec![], |sum, i| [sum.as_slice(), i.data.as_slice()].concat());
 
-        let concatted = Instructions { data: merged_ins }.string();
+        let concatted = Instructions {
+            data: merged_ins,
+        }
+        .string();
 
         assert_eq!(concatted, expected);
     }

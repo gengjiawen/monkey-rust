@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
     use crate::compiler_test::{run_compiler_test, CompilerTestCase};
     use crate::op_code::Opcode::*;
     use crate::op_code::{concat_instructions, make_instructions};
     use object::Object;
+    use std::rc::Rc;
 
     #[test]
     fn test_functions() {
@@ -21,7 +21,7 @@ mod tests {
                             make_instructions(OpAdd, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 0,
                         num_parameters: 0,
                     })),
@@ -43,7 +43,7 @@ mod tests {
                             make_instructions(OpAdd, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 0,
                         num_parameters: 0,
                     })),
@@ -65,7 +65,7 @@ mod tests {
                             make_instructions(OpConst, &vec![1]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 0,
                         num_parameters: 0,
                     })),
@@ -83,12 +83,14 @@ mod tests {
     fn test_function_without_return_value() {
         let tests = vec![CompilerTestCase {
             input: "fn() { }",
-            expected_constants: vec![Object::CompiledFunction(Rc::from(object::CompiledFunction {
-                instructions: concat_instructions(&vec![make_instructions(OpReturn, &vec![0])])
-                    .data,
-                num_locals: 0,
-                num_parameters: 0,
-            }))],
+            expected_constants: vec![Object::CompiledFunction(Rc::from(
+                object::CompiledFunction {
+                    instructions: concat_instructions(&vec![make_instructions(OpReturn, &vec![0])])
+                        .data,
+                    num_locals: 0,
+                    num_parameters: 0,
+                },
+            ))],
             expected_instructions: vec![
                 make_instructions(OpClosure, &vec![0, 0]),
                 make_instructions(OpPop, &vec![0]),
@@ -109,7 +111,7 @@ mod tests {
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 0,
                         num_parameters: 0,
                     })),
@@ -129,7 +131,7 @@ mod tests {
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 0,
                         num_parameters: 0,
                     })),
@@ -150,7 +152,7 @@ mod tests {
                             make_instructions(OpGetLocal, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 1,
                         num_parameters: 1,
                     })),
@@ -177,7 +179,7 @@ mod tests {
                             make_instructions(OpGetLocal, &vec![2]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 3,
                         num_parameters: 3,
                     })),
@@ -213,7 +215,7 @@ mod tests {
                             make_instructions(OpGetGlobal, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 0,
                         num_parameters: 0,
                     })),
@@ -236,7 +238,7 @@ mod tests {
                             make_instructions(OpGetLocal, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 1,
                         num_parameters: 0,
                     })),
@@ -262,7 +264,7 @@ mod tests {
                             make_instructions(OpAdd, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
                         ])
-                            .data,
+                        .data,
                         num_locals: 2,
                         num_parameters: 0,
                     })),
@@ -296,17 +298,19 @@ mod tests {
             },
             CompilerTestCase {
                 input: "fn() { len([]) }",
-                expected_constants: vec![Object::CompiledFunction(Rc::from(object::CompiledFunction {
-                    instructions: concat_instructions(&vec![
-                        make_instructions(OpGetBuiltin, &vec![0]),
-                        make_instructions(OpArray, &vec![0]),
-                        make_instructions(OpCall, &vec![1]),
-                        make_instructions(OpReturnValue, &vec![0]),
-                    ])
+                expected_constants: vec![Object::CompiledFunction(Rc::from(
+                    object::CompiledFunction {
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpGetBuiltin, &vec![0]),
+                            make_instructions(OpArray, &vec![0]),
+                            make_instructions(OpCall, &vec![1]),
+                            make_instructions(OpReturnValue, &vec![0]),
+                        ])
                         .data,
-                    num_locals: 0,
-                    num_parameters: 0,
-                }))],
+                        num_locals: 0,
+                        num_parameters: 0,
+                    },
+                ))],
                 expected_instructions: vec![
                     make_instructions(OpClosure, &vec![0, 0]),
                     make_instructions(OpPop, &vec![0]),

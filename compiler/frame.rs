@@ -1,5 +1,5 @@
 use crate::op_code::Instructions;
-use object::{Closure};
+use object::Closure;
 
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -10,10 +10,16 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(func: Closure, base_pointer: usize) -> Self {
-        Frame { cl: func, ip: -1, base_pointer }
+        Frame {
+            cl: func,
+            ip: -1,
+            base_pointer,
+        }
     }
 
     pub fn instructions(&self) -> Instructions {
-        return Instructions { data: self.cl.func.instructions.clone() };
+        return Instructions {
+            data: self.cl.func.instructions.clone(),
+        };
     }
 }

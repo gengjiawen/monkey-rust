@@ -12,7 +12,12 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        let mut l = Lexer { input, position: 0, read_position: 0, ch: '\0' };
+        let mut l = Lexer {
+            input,
+            position: 0,
+            read_position: 0,
+            ch: '\0',
+        };
 
         l.read_char();
         return l;
@@ -44,7 +49,13 @@ impl<'a> Lexer<'a> {
         let start = self.position;
         if self.ch == '\0' {
             self.read_char();
-            return Token { span: Span { start, end: start + 1 }, kind: TokenKind::EOF };
+            return Token {
+                span: Span {
+                    start,
+                    end: start + 1,
+                },
+                kind: TokenKind::EOF,
+            };
         }
 
         let t = match self.ch {
@@ -81,18 +92,33 @@ impl<'a> Lexer<'a> {
             ']' => TokenKind::RBRACKET,
             '"' => {
                 let (start, end, string) = self.read_string();
-                return Token { span: Span { start, end }, kind: TokenKind::STRING(string) };
+                return Token {
+                    span: Span {
+                        start,
+                        end,
+                    },
+                    kind: TokenKind::STRING(string),
+                };
             }
             _ => {
                 if is_letter(self.ch) {
                     let (start, end, identifier) = self.read_identifier();
                     return Token {
-                        span: Span { start, end },
+                        span: Span {
+                            start,
+                            end,
+                        },
                         kind: lookup_identifier(&identifier),
                     };
                 } else if is_digit(self.ch) {
                     let (start, end, num) = self.read_number();
-                    return Token { span: Span { start, end }, kind: TokenKind::INT(num) };
+                    return Token {
+                        span: Span {
+                            start,
+                            end,
+                        },
+                        kind: TokenKind::INT(num),
+                    };
                 } else {
                     TokenKind::ILLEGAL
                 }
@@ -100,7 +126,13 @@ impl<'a> Lexer<'a> {
         };
 
         self.read_char();
-        return Token { span: Span { start, end: self.position }, kind: t };
+        return Token {
+            span: Span {
+                start,
+                end: self.position,
+            },
+            kind: t,
+        };
     }
 
     fn skip_whitespace(&mut self) {

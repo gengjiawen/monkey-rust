@@ -86,9 +86,8 @@ impl Bytecode {
 
         builder.write_line("Instructions:");
         for line in self.instructions.string().lines() {
-            builder.write_instruction_line(line, InstructionScope::Main, |line| {
-                format!("{line}\n")
-            });
+            builder
+                .write_instruction_line(line, InstructionScope::Main, |line| format!("{line}\n"));
         }
 
         builder.write_line("");
@@ -106,10 +105,12 @@ impl Bytecode {
                         ));
                         builder.write_line("     Instructions:");
 
-                        let instructions =
-                            Instructions { data: function.instructions.clone() };
-                        let scope =
-                            InstructionScope::Function { constant_index: index };
+                        let instructions = Instructions {
+                            data: function.instructions.clone(),
+                        };
+                        let scope = InstructionScope::Function {
+                            constant_index: index,
+                        };
                         for line in instructions.string().lines() {
                             builder.write_instruction_line(line, scope.clone(), |line| {
                                 format!("       {line}\n")
@@ -138,7 +139,11 @@ struct BytecodeDisplayBuilder {
 
 impl BytecodeDisplayBuilder {
     fn new() -> Self {
-        Self { output: String::new(), line: 0, instruction_lines: vec![] }
+        Self {
+            output: String::new(),
+            line: 0,
+            instruction_lines: vec![],
+        }
     }
 
     fn write_line(&mut self, line: &str) {
@@ -191,7 +196,10 @@ impl DebugInfo {
             return;
         }
 
-        self.pc_spans.push(PcSpan { pc, span: span.clone() });
+        self.pc_spans.push(PcSpan {
+            pc,
+            span: span.clone(),
+        });
     }
 
     pub fn span_for_pc(&self, pc: usize) -> Option<&Span> {
@@ -218,9 +226,17 @@ type CompileError = String;
 impl Compiler {
     pub fn new() -> Compiler {
         let main_scope = CompilationScope {
-            instructions: Instructions { data: vec![] },
-            last_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
-            previous_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
+            instructions: Instructions {
+                data: vec![],
+            },
+            last_instruction: EmittedInstruction {
+                opcode: OpNull,
+                position: 0,
+            },
+            previous_instruction: EmittedInstruction {
+                opcode: OpNull,
+                position: 0,
+            },
             debug_info: DebugInfo::default(),
         };
 
@@ -537,7 +553,10 @@ impl Compiler {
 
     fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
         let previous_instruction = self.scopes[self.scope_index].last_instruction.clone();
-        let last_instruction = EmittedInstruction { opcode: op, position: pos };
+        let last_instruction = EmittedInstruction {
+            opcode: op,
+            position: pos,
+        };
         self.scopes[self.scope_index].last_instruction = last_instruction;
         self.scopes[self.scope_index].previous_instruction = previous_instruction;
     }
@@ -602,9 +621,17 @@ impl Compiler {
 
     fn enter_scope(&mut self) {
         let scope = CompilationScope {
-            instructions: Instructions { data: vec![] },
-            last_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
-            previous_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
+            instructions: Instructions {
+                data: vec![],
+            },
+            last_instruction: EmittedInstruction {
+                opcode: OpNull,
+                position: 0,
+            },
+            previous_instruction: EmittedInstruction {
+                opcode: OpNull,
+                position: 0,
+            },
             debug_info: DebugInfo::default(),
         };
         self.scopes.push(scope);
@@ -619,7 +646,10 @@ impl Compiler {
         self.scope_index -= 1;
         let s = self.symbol_table.outer.as_ref().unwrap().as_ref().clone();
         self.symbol_table = s;
-        return ScopedInstructions { instructions, debug_info };
+        return ScopedInstructions {
+            instructions,
+            debug_info,
+        };
     }
 }
 

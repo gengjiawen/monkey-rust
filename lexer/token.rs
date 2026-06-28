@@ -76,14 +76,18 @@ pub fn lookup_identifier(identifier: &str) -> TokenKind {
         "if" => TokenKind::IF,
         "else" => TokenKind::ELSE,
         "return" => TokenKind::RETURN,
-        _ => TokenKind::IDENTIFIER { name: identifier.to_string() },
+        _ => TokenKind::IDENTIFIER {
+            name: identifier.to_string(),
+        },
     }
 }
 
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TokenKind::IDENTIFIER { name } => write!(f, "{}", name),
+            TokenKind::IDENTIFIER {
+                name,
+            } => write!(f, "{}", name),
             TokenKind::INT(i) => write!(f, "{}", i),
             TokenKind::STRING(s) => write!(f, "{}", s),
             TokenKind::ASSIGN => write!(f, "="),

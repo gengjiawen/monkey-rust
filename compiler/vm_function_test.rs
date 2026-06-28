@@ -147,9 +147,18 @@ mod tests {
     #[test]
     fn test_builtins() {
         let tests = vec![
-            VmTestCase { input: "len(\"\");", expected: Object::Integer(0) },
-            VmTestCase { input: "len(\"four\");", expected: Object::Integer(4) },
-            VmTestCase { input: "len(\"hello world\");", expected: Object::Integer(11) },
+            VmTestCase {
+                input: "len(\"\");",
+                expected: Object::Integer(0),
+            },
+            VmTestCase {
+                input: "len(\"four\");",
+                expected: Object::Integer(4),
+            },
+            VmTestCase {
+                input: "len(\"hello world\");",
+                expected: Object::Integer(11),
+            },
             // VmTestCase {
             //     input: "len(1);",
             //     expected: Object::Error("argument to `len` not supported, got INTEGER".to_string()),
@@ -158,16 +167,34 @@ mod tests {
                 input: "len(\"one\", \"two\");",
                 expected: Object::Error("builtin len expected 1 argument, got 2".to_string()),
             },
-            VmTestCase { input: "len([1, 2, 3]);", expected: Object::Integer(3) },
-            VmTestCase { input: "len([]);", expected: Object::Integer(0) },
-            VmTestCase { input: "first([1, 2, 3]);", expected: Object::Integer(1) },
-            VmTestCase { input: "first([]);", expected: Object::Null },
+            VmTestCase {
+                input: "len([1, 2, 3]);",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "len([]);",
+                expected: Object::Integer(0),
+            },
+            VmTestCase {
+                input: "first([1, 2, 3]);",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "first([]);",
+                expected: Object::Null,
+            },
             // VmTestCase {
             //     input: "first(1);",
             //     expected: Object::Error("argument to `first` must be ARRAY, got INTEGER".to_string()),
             // },
-            VmTestCase { input: "last([1, 2, 3]);", expected: Object::Integer(3) },
-            VmTestCase { input: "last([]);", expected: Object::Null },
+            VmTestCase {
+                input: "last([1, 2, 3]);",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "last([]);",
+                expected: Object::Null,
+            },
             VmTestCase {
                 input: "rest([1, 2, 3]);",
                 expected: Object::Array(vec![
@@ -175,7 +202,10 @@ mod tests {
                     Rc::from(Object::Integer(3)),
                 ]),
             },
-            VmTestCase { input: "rest([]);", expected: Object::Null },
+            VmTestCase {
+                input: "rest([]);",
+                expected: Object::Null,
+            },
             VmTestCase {
                 input: "push([], 1);",
                 expected: Object::Array(vec![Rc::from(Object::Integer(1))]),

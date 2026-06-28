@@ -5,8 +5,8 @@ use std::rc::Rc;
 use byteorder::{BigEndian, ByteOrder};
 use object::builtins::BuiltIns;
 
-use object::{BuiltinFunc, Closure, CompiledFunction, Object};
 use object::Object::ClosureObj;
+use object::{BuiltinFunc, Closure, CompiledFunction, Object};
 
 use crate::compiler::Bytecode;
 use crate::frame::Frame;
@@ -33,8 +33,12 @@ impl VM {
         // it's rust, it's verbose. You can't just grow your vector size.
         let empty_frame = Frame::new(
             Closure {
-                func: Rc::from(object::CompiledFunction { instructions: vec![], num_locals: 0, num_parameters: 0 }),
-                free: vec![]
+                func: Rc::from(object::CompiledFunction {
+                    instructions: vec![],
+                    num_locals: 0,
+                    num_parameters: 0,
+                }),
+                free: vec![],
             },
             0,
         );
@@ -44,7 +48,10 @@ impl VM {
             num_locals: 0,
             num_parameters: 0,
         });
-        let main_closure = Closure {func: main_fn, free: vec![] };
+        let main_closure = Closure {
+            func: main_fn,
+            free: vec![],
+        };
         let main_frame = Frame::new(main_closure, 0);
         let mut frames = vec![empty_frame; MAX_FRAMES];
         frames[0] = main_frame;
@@ -414,7 +421,7 @@ impl VM {
                     free.push(f);
                 }
                 self.sp = self.sp - num_free;
-                let closure = ClosureObj (Closure {
+                let closure = ClosureObj(Closure {
                     func: f.clone(),
                     free,
                 });
@@ -424,6 +431,5 @@ impl VM {
                 panic!("not a function {}", o);
             }
         }
-
     }
 }

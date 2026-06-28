@@ -36,14 +36,24 @@ fn eval_block_statements(statements: &Vec<Statement>, env: &Env) -> Result<Rc<Ob
 fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalError> {
     match statement {
         Statement::Expr(expr) => eval_expression(expr, env),
-        Statement::Return(ReturnStatement { argument, .. }) => {
+        Statement::Return(ReturnStatement {
+            argument,
+            ..
+        }) => {
             let val = eval_expression(argument, env)?;
             return Ok(Rc::new(Object::ReturnValue(val)));
         }
-        Statement::Let(Let { identifier: id, expr, .. }) => {
+        Statement::Let(Let {
+            identifier: id,
+            expr,
+            ..
+        }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
-            if let TokenKind::IDENTIFIER { name } = &id.kind {
+            if let TokenKind::IDENTIFIER {
+                name,
+            } = &id.kind
+            {
                 env.borrow_mut().set(name.clone(), obj);
             }
             return Ok(Rc::new(Object::Null));
@@ -62,16 +72,30 @@ fn is_truthy(obj: &Object) -> bool {
 fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, EvalError> {
     match expression {
         Expression::LITERAL(literal) => eval_literal(literal, env),
-        Expression::PREFIX(UnaryExpression { op, operand: expr, .. }) => {
+        Expression::PREFIX(UnaryExpression {
+            op,
+            operand: expr,
+            ..
+        }) => {
             let right = eval_expression(expr, &Rc::clone(env))?;
             return eval_prefix(op, &right);
         }
-        Expression::INFIX(BinaryExpression { op, left, right, .. }) => {
+        Expression::INFIX(BinaryExpression {
+            op,
+            left,
+            right,
+            ..
+        }) => {
             let left = eval_expression(left, &Rc::clone(env))?;
             let right = eval_expression(right, &Rc::clone(env))?;
             return eval_infix(op, &left, &right);
         }
-        Expression::IF(IF { condition, consequent, alternate, .. }) => {
+        Expression::IF(IF {
+            condition,
+            consequent,
+            alternate,
+            ..
+        }) => {
             let condition = eval_expression(condition, &Rc::clone(env))?;
             if is_truthy(&condition) {
                 eval_block_statements(&(consequent.body), env)
@@ -82,16 +106,31 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
                 }
             }
         }
-        Expression::IDENTIFIER(IDENTIFIER { name: id, .. }) => eval_identifier(&id, env),
-        Expression::FUNCTION(FunctionDeclaration { params, body, .. }) => {
+        Expression::IDENTIFIER(IDENTIFIER {
+            name: id,
+            ..
+        }) => eval_identifier(&id, env),
+        Expression::FUNCTION(FunctionDeclaration {
+            params,
+            body,
+            ..
+        }) => {
             return Ok(Rc::new(Object::Function(params.clone(), body.clone(), Rc::clone(env))));
         }
-        Expression::FunctionCall(FunctionCall { callee, arguments, .. }) => {
+        Expression::FunctionCall(FunctionCall {
+            callee,
+            arguments,
+            ..
+        }) => {
             let func = eval_expression(callee, &Rc::clone(env))?;
             let args = eval_expressions(arguments, env)?;
             apply_function(&func, &args)
         }
-        Expression::Index(Index { object: left, index, .. }) => {
+        Expression::Index(Index {
+            object: left,
+            index,
+            ..
+        }) => {
             let literal = eval_expression(left, &Rc::clone(env))?;
             let index = eval_expression(index, env)?;
             eval_index_expression(&literal, &index)
@@ -241,14 +280,29 @@ fn eval_string_infix(op: &Token, left: String, right: String) -> Result<Rc<Objec
 
 fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
     match literal {
-        Literal::Integer(Integer { raw: i, .. }) => Ok(Rc::from(Object::Integer(*i))),
-        Literal::Boolean(Boolean { raw: b, .. }) => Ok(Rc::from(Object::Boolean(*b))),
-        Literal::String(StringType { raw: s, .. }) => Ok(Rc::from(Object::String(s.clone()))),
-        Literal::Array(Array { elements, .. }) => {
+        Literal::Integer(Integer {
+            raw: i,
+            ..
+        }) => Ok(Rc::from(Object::Integer(*i))),
+        Literal::Boolean(Boolean {
+            raw: b,
+            ..
+        }) => Ok(Rc::from(Object::Boolean(*b))),
+        Literal::String(StringType {
+            raw: s,
+            ..
+        }) => Ok(Rc::from(Object::String(s.clone()))),
+        Literal::Array(Array {
+            elements,
+            ..
+        }) => {
             let list = eval_expressions(elements, env)?;
             return Ok(Rc::from(Object::Array(list)));
         }
-        Literal::Hash(Hash { elements: map, .. }) => {
+        Literal::Hash(Hash {
+            elements: map,
+            ..
+        }) => {
             let mut hash_map = HashMap::new();
 
             for (k, v) in map {

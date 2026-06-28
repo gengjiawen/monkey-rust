@@ -1,2 +1,6 @@
-struct_lit_width=100
-fn_call_width=100
+max_width = 100 # Maximum line width before rustfmt wraps.
+use_small_heuristics = "Max" # Scale granular width settings to max_width; explicit widths below override.
+struct_lit_width = 0 # Force every struct field onto its own line.
+fn_call_width = 100 # Keep function call arguments on one line up to this width.
+chain_width = 60 # Break method chains onto multiple lines when wider than this.
+array_width = 60 # Break array literals onto multiple lines when wider than this.
