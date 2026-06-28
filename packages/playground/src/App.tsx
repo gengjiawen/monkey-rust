@@ -1,7 +1,7 @@
 'use client'
 
 import { Box, Button, Flex, SegmentedControl, Select } from '@radix-ui/themes'
-import { compile_detail, parse } from '@gengjiawen/monkey-wasm'
+import { compile_with_debug, parse } from '@gengjiawen/monkey-wasm'
 import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import debounce from 'lodash.debounce'
@@ -9,6 +9,10 @@ import type { Plugin } from 'prettier'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AstTreeView } from './AstTreeView'
+import {
+  type BytecodeDebugView,
+  spanForBytecodeCursor,
+} from './bytecodeDebug'
 import { Editor, type EditorHandle } from './Editor'
 
 interface Snippet {
@@ -86,6 +90,8 @@ function App() {
     to: number
   } | null>(null)
   const [compilerOutput, setCompilerOutput] = useState('')
+  const [bytecodeDebugView, setBytecodeDebugView] =
+    useState<BytecodeDebugView | null>(null)
   const [vimMode, setVimMode] = useState(true)
   const [isFormatting, setIsFormatting] = useState(false)
   const editorRef = useRef<EditorHandle>(null)
@@ -103,8 +109,12 @@ function App() {
     }
 
     try {
-      setCompilerOutput(compile_detail(source))
+      const debugJson = compile_with_debug(source)
+      const view = JSON.parse(debugJson) as BytecodeDebugView
+      setBytecodeDebugView(view)
+      setCompilerOutput(view.detail)
     } catch (error) {
+      setBytecodeDebugView(null)
       setCompilerOutput(getErrorMessage(error))
     }
   }, [])
@@ -163,6 +173,30 @@ function App() {
   const handleNodeSelect = useCallback((start: number, end: number) => {
     editorRef.current?.highlightRange(start, end)
   }, [])
+
+  const handleBytecodeSelection = useCallback(
+    (selection: { from: number; to: number }) => {
+      if (bytecodeDebugView == null) {
+        editorRef.current?.clearHighlight()
+        return
+      }
+
+      const span = spanForBytecodeCursor(bytecodeDebugView, selection.from)
+      if (span == null) {
+        editorRef.current?.clearHighlight()
+        return
+      }
+
+      editorRef.current?.highlightRange(span.start, span.end)
+    },
+    [bytecodeDebugView],
+  )
+
+  useEffect(() => {
+    if (outputView !== 'bytecode') {
+      editorRef.current?.clearHighlight()
+    }
+  }, [outputView])
 
   return (
     <Flex className="playground-shell">
@@ -242,6 +276,9 @@ function App() {
             <Editor
               code={outputView === 'ast' ? astOutput : compilerOutput}
               extra={{ readOnly: true, editable: false }}
+              onSelectionChange={
+                outputView === 'bytecode' ? handleBytecodeSelection : undefined
+              }
               vimMode={false}
               fill
             />

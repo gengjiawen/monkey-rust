@@ -51,3 +51,21 @@ pub fn compile_detail(input: &str) -> String {
         Err(e) => throw_str(format!("compile error: {}", e).as_str()),
     }
 }
+
+#[wasm_bindgen]
+pub fn compile_with_debug(input: &str) -> String {
+    set_panic_hook();
+
+    let program = match parser_pase(input) {
+        Ok(ast) => ast,
+        Err(e) => throw_str(format!("parse error: {}", e[0]).as_str()),
+    };
+    let mut compiler = Compiler::new();
+    match compiler.compile(&program) {
+        Ok(bytecode) => match serde_json::to_string(&bytecode.debug_view()) {
+            Ok(json) => json,
+            Err(e) => throw_str(format!("json error: {}", e).as_str()),
+        },
+        Err(e) => throw_str(format!("compile error: {}", e).as_str()),
+    }
+}
