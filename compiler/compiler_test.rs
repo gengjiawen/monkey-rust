@@ -52,6 +52,7 @@ mod tests {
     use super::*;
     use crate::op_code::make_instructions;
     use crate::op_code::Opcode::*;
+    use parser::lexer::token::Span;
 
     #[test]
     fn integer_arithmetic() {
@@ -144,6 +145,107 @@ mod tests {
         assert!(output.contains("       0002 OpGetLocal 1\n"));
         assert!(output.contains("       0004 OpAdd\n"));
         assert!(output.contains("       0005 OpReturnValue\n"));
+    }
+
+    #[test]
+    fn bytecode_tracks_pc_to_source_spans() {
+        let program = parse("1;\n22").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        assert_eq!(
+            bytecode.debug_info.pc_spans,
+            vec![
+                crate::compiler::PcSpan { pc: 0, span: Span { start: 0, end: 1 } },
+                crate::compiler::PcSpan { pc: 4, span: Span { start: 3, end: 5 } },
+            ]
+        );
+        assert_eq!(bytecode.debug_info.span_for_pc(3), Some(&Span { start: 0, end: 1 }));
+        assert_eq!(bytecode.debug_info.span_for_pc(7), Some(&Span { start: 3, end: 5 }));
+    }
+
+    #[test]
+    fn bytecode_tracks_function_constant_pc_to_source_spans() {
+        let input = "let add = fn(a, b) { a + b; };";
+        let program = parse(input).unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        let expression_start = input.find("a + b").unwrap();
+        let function_debug_info = bytecode.function_debug_info.get(&0).unwrap();
+
+        assert_eq!(
+            function_debug_info.span_for_pc(4),
+            Some(&Span { start: expression_start, end: expression_start + "a + b".len() })
+        );
+    }
+
+    #[test]
+    fn bytecode_debug_view_maps_instruction_lines_to_pc() {
+        let input = "1;\n22";
+        let program = parse(input).unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+        let view = bytecode.debug_view();
+
+        assert_eq!(view.detail, bytecode.string());
+        assert_eq!(
+            view.instruction_lines,
+            vec![
+                crate::compiler::InstructionLineMapping {
+                    line: 1,
+                    pc: 0,
+                    scope: crate::compiler::InstructionScope::Main,
+                },
+                crate::compiler::InstructionLineMapping {
+                    line: 2,
+                    pc: 3,
+                    scope: crate::compiler::InstructionScope::Main,
+                },
+                crate::compiler::InstructionLineMapping {
+                    line: 3,
+                    pc: 4,
+                    scope: crate::compiler::InstructionScope::Main,
+                },
+                crate::compiler::InstructionLineMapping {
+                    line: 4,
+                    pc: 7,
+                    scope: crate::compiler::InstructionScope::Main,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn bytecode_debug_view_maps_function_instruction_lines() {
+        let input = "let add = fn(a, b) { a + b; };";
+        let program = parse(input).unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+        let view = bytecode.debug_view();
+
+        let add_line = view
+            .instruction_lines
+            .iter()
+            .find(|line| {
+                matches!(
+                    line.scope,
+                    crate::compiler::InstructionScope::Function { constant_index: 0 }
+                ) && line.pc == 4
+            })
+            .expect("OpAdd instruction line");
+
+        let expression_start = input.find("a + b").unwrap();
+        let function_debug_info = view.function_debug_info.get(&0).unwrap();
+
+        assert_eq!(add_line.line > 0, true);
+        assert_eq!(
+            function_debug_info.span_for_pc(add_line.pc),
+            Some(&Span {
+                start: expression_start,
+                end: expression_start + "a + b".len(),
+            })
+        );
     }
 
     #[test]

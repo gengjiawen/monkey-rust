@@ -1,8 +1,11 @@
 use object::builtins::BuiltIns;
+use serde::Serialize;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use object::Object;
 use parser::ast::{BlockStatement, Expression, Literal, Node, Statement};
+use parser::lexer::token::Span;
 use parser::lexer::token::TokenKind;
 
 use crate::op_code::Opcode::*;
@@ -13,11 +16,13 @@ struct CompilationScope {
     instructions: Instructions,
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
+    debug_info: DebugInfo,
 }
 
 pub struct Compiler {
     pub constants: Vec<Rc<Object>>,
     pub symbol_table: SymbolTable,
+    function_debug_info: HashMap<usize, DebugInfo>,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
 }
@@ -25,40 +30,180 @@ pub struct Compiler {
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Rc<Object>>,
+    pub debug_info: DebugInfo,
+    pub function_debug_info: HashMap<usize, DebugInfo>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PcSpan {
+    pub pc: usize,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugInfo {
+    pub pc_spans: Vec<PcSpan>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum InstructionScope {
+    Main,
+    Function { constant_index: usize },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstructionLineMapping {
+    pub line: usize,
+    pub pc: usize,
+    pub scope: InstructionScope,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BytecodeDebugView {
+    pub detail: String,
+    pub main_debug_info: DebugInfo,
+    pub function_debug_info: HashMap<usize, DebugInfo>,
+    pub instruction_lines: Vec<InstructionLineMapping>,
+}
+
+struct ScopedInstructions {
+    instructions: Instructions,
+    debug_info: DebugInfo,
 }
 
 impl Bytecode {
     pub fn string(&self) -> String {
-        let mut output = String::new();
+        self.debug_view().detail
+    }
 
-        output.push_str("Instructions:\n");
-        output.push_str(&self.instructions.string());
-        output.push_str("\nConstants:\n");
+    pub fn debug_view(&self) -> BytecodeDebugView {
+        let mut builder = BytecodeDisplayBuilder::new();
 
-        if self.constants.is_empty() {
-            output.push_str("(none)\n");
-            return output;
+        builder.write_line("Instructions:");
+        for line in self.instructions.string().lines() {
+            builder.write_instruction_line(line, InstructionScope::Main, |line| {
+                format!("{line}\n")
+            });
         }
 
-        for (index, constant) in self.constants.iter().enumerate() {
-            match constant.as_ref() {
-                Object::CompiledFunction(function) => {
-                    output.push_str(&format!(
-                        "{:04} CompiledFunction(num_locals={}, num_parameters={})\n",
-                        index, function.num_locals, function.num_parameters
-                    ));
-                    output.push_str("     Instructions:\n");
+        builder.write_line("");
+        builder.write_line("Constants:");
 
-                    let instructions = Instructions { data: function.instructions.clone() };
-                    for line in instructions.string().lines() {
-                        output.push_str(&format!("       {}\n", line));
+        if self.constants.is_empty() {
+            builder.write_line("(none)");
+        } else {
+            for (index, constant) in self.constants.iter().enumerate() {
+                match constant.as_ref() {
+                    Object::CompiledFunction(function) => {
+                        builder.write_line(&format!(
+                            "{index:04} CompiledFunction(num_locals={}, num_parameters={})",
+                            function.num_locals, function.num_parameters
+                        ));
+                        builder.write_line("     Instructions:");
+
+                        let instructions =
+                            Instructions { data: function.instructions.clone() };
+                        let scope =
+                            InstructionScope::Function { constant_index: index };
+                        for line in instructions.string().lines() {
+                            builder.write_instruction_line(line, scope.clone(), |line| {
+                                format!("       {line}\n")
+                            });
+                        }
                     }
+                    value => builder.write_line(&format!("{index:04} {value}")),
                 }
-                value => output.push_str(&format!("{:04} {}\n", index, value)),
             }
         }
 
-        output
+        BytecodeDebugView {
+            detail: builder.output,
+            main_debug_info: self.debug_info.clone(),
+            function_debug_info: self.function_debug_info.clone(),
+            instruction_lines: builder.instruction_lines,
+        }
+    }
+}
+
+struct BytecodeDisplayBuilder {
+    output: String,
+    line: usize,
+    instruction_lines: Vec<InstructionLineMapping>,
+}
+
+impl BytecodeDisplayBuilder {
+    fn new() -> Self {
+        Self { output: String::new(), line: 0, instruction_lines: vec![] }
+    }
+
+    fn write_line(&mut self, line: &str) {
+        self.output.push_str(line);
+        self.output.push('\n');
+        self.line += 1;
+    }
+
+    fn write_instruction_line(
+        &mut self,
+        raw_line: &str,
+        scope: InstructionScope,
+        format_line: impl FnOnce(&str) -> String,
+    ) {
+        if let Some(pc) = parse_instruction_pc(raw_line) {
+            self.instruction_lines.push(InstructionLineMapping {
+                line: self.line,
+                pc,
+                scope,
+            });
+        }
+
+        self.output.push_str(&format_line(raw_line));
+        self.line += 1;
+    }
+}
+
+fn parse_instruction_pc(line: &str) -> Option<usize> {
+    let trimmed = line.trim_start();
+    if trimmed.len() < 4 {
+        return None;
+    }
+
+    let pc_part = &trimmed[..4];
+    if !pc_part.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+
+    pc_part.parse().ok()
+}
+
+impl DebugInfo {
+    pub fn add_pc_span(&mut self, pc: usize, span: &Span) {
+        if self
+            .pc_spans
+            .last()
+            .map(|last| last.span == *span)
+            .unwrap_or(false)
+        {
+            return;
+        }
+
+        self.pc_spans.push(PcSpan { pc, span: span.clone() });
+    }
+
+    pub fn span_for_pc(&self, pc: usize) -> Option<&Span> {
+        self.pc_spans
+            .iter()
+            .rev()
+            .find(|pc_span| pc_span.pc <= pc)
+            .map(|pc_span| &pc_span.span)
+    }
+
+    fn truncate_from_pc(&mut self, pc: usize) {
+        self.pc_spans.retain(|pc_span| pc_span.pc < pc);
     }
 }
 
@@ -76,6 +221,7 @@ impl Compiler {
             instructions: Instructions { data: vec![] },
             last_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
             previous_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
+            debug_info: DebugInfo::default(),
         };
 
         let mut symbol_table = SymbolTable::new();
@@ -86,6 +232,7 @@ impl Compiler {
         return Compiler {
             constants: vec![],
             symbol_table,
+            function_debug_info: HashMap::new(),
             scopes: vec![main_scope],
             scope_index: 0,
         };
@@ -124,20 +271,28 @@ impl Compiler {
                     .define(let_statement.identifier.kind.to_string());
                 self.compile_expr(&let_statement.expr)?;
                 if symbol.scope == SymbolScope::Global {
-                    self.emit(Opcode::OpSetGlobal, &vec![symbol.index]);
+                    self.emit_with_span(
+                        Opcode::OpSetGlobal,
+                        &vec![symbol.index],
+                        &let_statement.span,
+                    );
                 } else {
-                    self.emit(Opcode::OpSetLocal, &vec![symbol.index]);
+                    self.emit_with_span(
+                        Opcode::OpSetLocal,
+                        &vec![symbol.index],
+                        &let_statement.span,
+                    );
                 }
                 return Ok(());
             }
             Statement::Return(r) => {
                 self.compile_expr(&r.argument)?;
-                self.emit(Opcode::OpReturnValue, &vec![]);
+                self.emit_with_span(Opcode::OpReturnValue, &vec![], &r.span);
                 return Ok(());
             }
             Statement::Expr(e) => {
                 self.compile_expr(e)?;
-                self.emit(OpPop, &vec![]);
+                self.emit_with_span(OpPop, &vec![], expression_span(e));
                 return Ok(());
             }
         }
@@ -149,7 +304,7 @@ impl Compiler {
                 let symbol = self.symbol_table.resolve(identifier.name.clone());
                 match symbol {
                     Some(symbol) => {
-                        self.load_symbol(&symbol);
+                        self.load_symbol(&symbol, &identifier.span);
                     }
                     None => {
                         return Err(format!("Undefined variable '{}'", identifier.name));
@@ -160,42 +315,42 @@ impl Compiler {
                 Literal::Integer(i) => {
                     let int = Object::Integer(i.raw);
                     let operands = vec![self.add_constant(int)];
-                    self.emit(OpConst, &operands);
+                    self.emit_with_span(OpConst, &operands, &i.span);
                 }
                 Literal::Boolean(i) => {
                     if i.raw {
-                        self.emit(OpTrue, &vec![]);
+                        self.emit_with_span(OpTrue, &vec![], &i.span);
                     } else {
-                        self.emit(OpFalse, &vec![]);
+                        self.emit_with_span(OpFalse, &vec![], &i.span);
                     }
                 }
                 Literal::String(s) => {
                     let string_object = Object::String(s.raw.clone());
                     let operands = vec![self.add_constant(string_object)];
-                    self.emit(OpConst, &operands);
+                    self.emit_with_span(OpConst, &operands, &s.span);
                 }
                 Literal::Array(array) => {
                     for element in array.elements.iter() {
                         self.compile_expr(element)?;
                     }
-                    self.emit(OpArray, &vec![array.elements.len()]);
+                    self.emit_with_span(OpArray, &vec![array.elements.len()], &array.span);
                 }
                 Literal::Hash(hash) => {
                     for (key, value) in hash.elements.iter() {
                         self.compile_expr(&key)?;
                         self.compile_expr(&value)?;
                     }
-                    self.emit(OpHash, &vec![hash.elements.len() * 2]);
+                    self.emit_with_span(OpHash, &vec![hash.elements.len() * 2], &hash.span);
                 }
             },
             Expression::PREFIX(prefix) => {
                 self.compile_expr(&prefix.operand).unwrap();
                 match prefix.op.kind {
                     TokenKind::MINUS => {
-                        self.emit(OpMinus, &vec![]);
+                        self.emit_with_span(OpMinus, &vec![], &prefix.span);
                     }
                     TokenKind::BANG => {
-                        self.emit(OpBang, &vec![]);
+                        self.emit_with_span(OpBang, &vec![], &prefix.span);
                     }
                     _ => {
                         return Err(format!("unexpected prefix op: {}", prefix.op));
@@ -206,32 +361,32 @@ impl Compiler {
                 if infix.op.kind == TokenKind::LT {
                     self.compile_expr(&infix.right).unwrap();
                     self.compile_expr(&infix.left).unwrap();
-                    self.emit(Opcode::OpGreaterThan, &vec![]);
+                    self.emit_with_span(Opcode::OpGreaterThan, &vec![], &infix.span);
                     return Ok(());
                 }
                 self.compile_expr(&infix.left).unwrap();
                 self.compile_expr(&infix.right).unwrap();
                 match infix.op.kind {
                     TokenKind::PLUS => {
-                        self.emit(OpAdd, &vec![]);
+                        self.emit_with_span(OpAdd, &vec![], &infix.span);
                     }
                     TokenKind::MINUS => {
-                        self.emit(OpSub, &vec![]);
+                        self.emit_with_span(OpSub, &vec![], &infix.span);
                     }
                     TokenKind::ASTERISK => {
-                        self.emit(OpMul, &vec![]);
+                        self.emit_with_span(OpMul, &vec![], &infix.span);
                     }
                     TokenKind::SLASH => {
-                        self.emit(OpDiv, &vec![]);
+                        self.emit_with_span(OpDiv, &vec![], &infix.span);
                     }
                     TokenKind::GT => {
-                        self.emit(Opcode::OpGreaterThan, &vec![]);
+                        self.emit_with_span(Opcode::OpGreaterThan, &vec![], &infix.span);
                     }
                     TokenKind::EQ => {
-                        self.emit(Opcode::OpEqual, &vec![]);
+                        self.emit_with_span(Opcode::OpEqual, &vec![], &infix.span);
                     }
                     TokenKind::NotEq => {
-                        self.emit(Opcode::OpNotEqual, &vec![]);
+                        self.emit_with_span(Opcode::OpNotEqual, &vec![], &infix.span);
                     }
                     _ => {
                         return Err(format!("unexpected infix op: {}", infix.op));
@@ -240,19 +395,20 @@ impl Compiler {
             }
             Expression::IF(if_node) => {
                 self.compile_expr(&if_node.condition)?;
-                let jump_not_truthy = self.emit(OpJumpNotTruthy, &vec![9527]);
+                let jump_not_truthy =
+                    self.emit_with_span(OpJumpNotTruthy, &vec![9527], &if_node.span);
                 self.compile_block_statement(&if_node.consequent)?;
                 if self.last_instruction_is(OpPop) {
                     self.remove_last_pop();
                 }
 
-                let jump_pos = self.emit(OpJump, &vec![9527]);
+                let jump_pos = self.emit_with_span(OpJump, &vec![9527], &if_node.span);
 
                 let after_consequence_location = self.current_instruction().data.len();
                 self.change_operand(jump_not_truthy, after_consequence_location);
 
                 if if_node.alternate.is_none() {
-                    self.emit(OpNull, &vec![]);
+                    self.emit_with_span(OpNull, &vec![], &if_node.span);
                 } else {
                     self.compile_block_statement(&if_node.clone().alternate.unwrap())?;
                     if self.last_instruction_is(OpPop) {
@@ -265,9 +421,10 @@ impl Compiler {
             Expression::Index(index) => {
                 self.compile_expr(&index.object)?;
                 self.compile_expr(&index.index)?;
-                self.emit(OpIndex, &vec![]);
+                self.emit_with_span(OpIndex, &vec![], &index.span);
             }
             Expression::FUNCTION(f) => {
+                let function_span = f.span.clone();
                 self.enter_scope();
                 // f.name
                 for param in f.params.iter() {
@@ -278,55 +435,55 @@ impl Compiler {
                     self.replace_last_pop_with_return();
                 }
                 if !(self.last_instruction_is(OpReturnValue)) {
-                    self.emit(OpReturn, &vec![]);
+                    self.emit_with_span(OpReturn, &vec![], &function_span);
                 }
                 let num_locals = self.symbol_table.num_definitions;
                 let free_symbols = self.symbol_table.free_symbols.clone();
-                let instructions = self.leave_scope();
+                let scoped_instructions = self.leave_scope();
                 for x in free_symbols.clone() {
-                    self.load_symbol(&x);
+                    self.load_symbol(&x, &function_span);
                 }
 
                 let compiled_function = Rc::from(object::CompiledFunction {
-                    instructions: instructions.data,
+                    instructions: scoped_instructions.instructions.data,
                     num_locals,
                     num_parameters: f.params.len(),
                 });
 
-                let operands = vec![
-                    self.add_constant(Object::CompiledFunction(compiled_function)),
-                    free_symbols.len(),
-                ];
-                self.emit(OpClosure, &operands);
+                let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
+                self.function_debug_info_mut()
+                    .insert(constant_index, scoped_instructions.debug_info);
+                let operands = vec![constant_index, free_symbols.len()];
+                self.emit_with_span(OpClosure, &operands, &function_span);
             }
             Expression::FunctionCall(fc) => {
                 self.compile_expr(&fc.callee)?;
                 for arg in fc.arguments.iter() {
                     self.compile_expr(arg)?;
                 }
-                self.emit(OpCall, &vec![fc.arguments.len()]);
+                self.emit_with_span(OpCall, &vec![fc.arguments.len()], &fc.span);
             }
         }
 
         return Ok(());
     }
 
-    fn load_symbol(&mut self, symbol: &Rc<Symbol>) {
+    fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) {
         match symbol.scope {
             SymbolScope::Global => {
-                self.emit(OpGetGlobal, &vec![symbol.index]);
+                self.emit_with_span(OpGetGlobal, &vec![symbol.index], span);
             }
             SymbolScope::LOCAL => {
-                self.emit(OpGetLocal, &vec![symbol.index]);
+                self.emit_with_span(OpGetLocal, &vec![symbol.index], span);
             }
             SymbolScope::Builtin => {
-                self.emit(OpGetBuiltin, &vec![symbol.index]);
+                self.emit_with_span(OpGetBuiltin, &vec![symbol.index], span);
             }
             SymbolScope::Free => {
-                self.emit(OpGetFree, &vec![symbol.index]);
+                self.emit_with_span(OpGetFree, &vec![symbol.index], span);
             }
             SymbolScope::Function => {
-                self.emit(OpCurrentClosure, &vec![]);
+                self.emit_with_span(OpCurrentClosure, &vec![], span);
             }
         }
     }
@@ -335,6 +492,8 @@ impl Compiler {
         return Bytecode {
             instructions: self.current_instruction().clone(),
             constants: self.constants.clone(),
+            debug_info: self.current_debug_info().clone(),
+            function_debug_info: self.function_debug_info.clone(),
         };
     }
 
@@ -349,6 +508,12 @@ impl Compiler {
         self.set_last_instruction(op, pos);
 
         return pos;
+    }
+
+    pub fn emit_with_span(&mut self, op: Opcode, operands: &Vec<usize>, span: &Span) -> usize {
+        let pos = self.emit(op, operands);
+        self.add_pc_span(pos, span);
+        pos
     }
 
     fn compile_block_statement(
@@ -392,6 +557,9 @@ impl Compiler {
         let new = old[..last.position].to_vec();
 
         self.scopes[self.scope_index].instructions.data = new;
+        self.scopes[self.scope_index]
+            .debug_info
+            .truncate_from_pc(last.position);
         self.scopes[self.scope_index].last_instruction = previous;
     }
 
@@ -418,23 +586,62 @@ impl Compiler {
         return &self.scopes[self.scope_index].instructions;
     }
 
+    fn current_debug_info(&self) -> &DebugInfo {
+        return &self.scopes[self.scope_index].debug_info;
+    }
+
+    fn function_debug_info_mut(&mut self) -> &mut HashMap<usize, DebugInfo> {
+        return &mut self.function_debug_info;
+    }
+
+    fn add_pc_span(&mut self, pc: usize, span: &Span) {
+        self.scopes[self.scope_index]
+            .debug_info
+            .add_pc_span(pc, span);
+    }
+
     fn enter_scope(&mut self) {
         let scope = CompilationScope {
             instructions: Instructions { data: vec![] },
             last_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
             previous_instruction: EmittedInstruction { opcode: OpNull, position: 0 },
+            debug_info: DebugInfo::default(),
         };
         self.scopes.push(scope);
         self.scope_index += 1;
         self.symbol_table = SymbolTable::new_enclosed_symbol_table(self.symbol_table.clone());
     }
 
-    fn leave_scope(&mut self) -> Instructions {
+    fn leave_scope(&mut self) -> ScopedInstructions {
         let instructions = self.current_instruction().clone();
+        let debug_info = self.current_debug_info().clone();
         self.scopes.pop();
         self.scope_index -= 1;
         let s = self.symbol_table.outer.as_ref().unwrap().as_ref().clone();
         self.symbol_table = s;
-        return instructions;
+        return ScopedInstructions { instructions, debug_info };
+    }
+}
+
+fn expression_span(expression: &Expression) -> &Span {
+    match expression {
+        Expression::IDENTIFIER(identifier) => &identifier.span,
+        Expression::LITERAL(literal) => literal_span(literal),
+        Expression::PREFIX(prefix) => &prefix.span,
+        Expression::INFIX(infix) => &infix.span,
+        Expression::IF(if_expression) => &if_expression.span,
+        Expression::FUNCTION(function) => &function.span,
+        Expression::FunctionCall(function_call) => &function_call.span,
+        Expression::Index(index) => &index.span,
+    }
+}
+
+fn literal_span(literal: &Literal) -> &Span {
+    match literal {
+        Literal::Integer(integer) => &integer.span,
+        Literal::Boolean(boolean) => &boolean.span,
+        Literal::String(string) => &string.span,
+        Literal::Array(array) => &array.span,
+        Literal::Hash(hash) => &hash.span,
     }
 }
