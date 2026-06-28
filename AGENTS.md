@@ -12,6 +12,7 @@
 - Rust (workspace): `cargo build` and `cargo test` — builds/tests all crates.
 - Single crate: `cargo build -p monkey-parser` or `cargo test -p monkey-compiler`.
 - Wasm package: `cd wasm && wasm-pack build --release --scope=gengjiawen`.
+- Note: the playground consumes `wasm/pkg/` (the wasm-pack output), not the Rust sources directly. After changes to lexer/parser/compiler, rebuild the wasm package first, otherwise the playground runs stale bytecode. `cargo test` passing does not imply the wasm is up to date.
 - JS workspace: `pnpm i` then
   - Playground: `pnpm -C packages/playground dev` (local server) or `pnpm build`.
   - Prettier plugin: `pnpm -C packages/prettier-plugin-monkey test` and `pnpm -C packages/prettier-plugin-monkey build`.
