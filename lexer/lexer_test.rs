@@ -51,6 +51,16 @@ mod tests {
     }
 
     #[test]
+    fn test_lexer_unicode_string() {
+        let mut l = Lexer::new(r#""你好""#);
+        let token = l.next_token();
+
+        assert_eq!(token.kind, TokenKind::STRING("你好".to_string()));
+        assert_eq!(token.span.start, 0);
+        assert_eq!(token.span.end, r#""你好""#.len());
+    }
+
+    #[test]
     fn test_lexer_array() {
         test_lexer_common("array", "[3]");
     }
@@ -64,15 +74,23 @@ mod tests {
     fn test_lexer_bool() {
         test_lexer_common("bool", "let y=true");
     }
-    
+
+    #[test]
+    fn test_lexer_large_input() {
+        let input = "let x = 1;".repeat(10_000);
+        let mut l = Lexer::new(&input);
+        let tokens = test_token_set(&mut l);
+
+        assert_eq!(tokens.len(), 50_001);
+        assert_eq!(tokens.last().unwrap().kind, TokenKind::EOF);
+    }
+
     #[test]
     fn test_comments_then_blank_line() {
         // Ensure comments followed by a blank line are skipped correctly
         // and do not yield ILLEGAL tokens.
         test_lexer_common("comments_then_blank_line", "// comment\n\nlet x = 5");
     }
-
-
 
     #[test]
     fn test_lexer_complex() {

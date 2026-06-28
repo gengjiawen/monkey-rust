@@ -12,36 +12,28 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        let mut l = Lexer { input, position: 0, read_position: 0, ch: 0 as char };
+        let mut l = Lexer { input, position: 0, read_position: 0, ch: '\0' };
 
         l.read_char();
         return l;
     }
 
     fn read_char(&mut self) {
-        if self.read_position >= self.input.len() {
-            self.ch = 0 as char
-        } else {
-            if let Some(ch) = self.input.chars().nth(self.read_position) {
-                self.ch = ch;
-            } else {
-                panic!("read out of range")
-            }
-        }
-
         self.position = self.read_position;
-        self.read_position += 1;
+
+        if self.position >= self.input.len() {
+            self.ch = '\0'
+        } else {
+            self.ch = self.input[self.position..].chars().next().unwrap();
+            self.read_position = self.position + self.ch.len_utf8();
+        }
     }
 
     fn peek_char(&self) -> char {
         if self.read_position >= self.input.len() {
-            0 as char
+            '\0'
         } else {
-            if let Some(ch) = self.input.chars().nth(self.read_position) {
-                ch
-            } else {
-                panic!("read out of range")
-            }
+            self.input[self.read_position..].chars().next().unwrap()
         }
     }
 
@@ -49,6 +41,12 @@ impl<'a> Lexer<'a> {
         // println!("self ch {}, position {} read_position {}", self.ch, self.position, self.read_position);
         // Skip any whitespace and successive line comments before producing a token.
         self.skip_ignorable();
+        let start = self.position;
+        if self.ch == '\0' {
+            self.read_char();
+            return Token { span: Span { start, end: start + 1 }, kind: TokenKind::EOF };
+        }
+
         let t = match self.ch {
             '=' => {
                 if self.peek_char() == '=' {
@@ -81,7 +79,6 @@ impl<'a> Lexer<'a> {
             '[' => TokenKind::LBRACKET,
             ':' => TokenKind::COLON,
             ']' => TokenKind::RBRACKET,
-            '\u{0}' => TokenKind::EOF,
             '"' => {
                 let (start, end, string) = self.read_string();
                 return Token { span: Span { start, end }, kind: TokenKind::STRING(string) };
@@ -103,10 +100,7 @@ impl<'a> Lexer<'a> {
         };
 
         self.read_char();
-        return Token {
-            span: Span { start: self.position - 1, end: self.read_position - 1 },
-            kind: t,
-        };
+        return Token { span: Span { start, end: self.position }, kind: t };
     }
 
     fn skip_whitespace(&mut self) {
