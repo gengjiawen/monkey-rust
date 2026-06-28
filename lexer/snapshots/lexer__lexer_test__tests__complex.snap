@@ -644,7 +644,7 @@ expression: "\n// welcome to monkeylang\nlet five = 5;\nlet ten = 10;\n\nlet add
       "type": "EQ"
     },
     "span": {
-      "start": 197,
+      "start": 196,
       "end": 198
     }
   },
@@ -682,7 +682,7 @@ expression: "\n// welcome to monkeylang\nlet five = 5;\nlet ten = 10;\n\nlet add
       "type": "NotEq"
     },
     "span": {
-      "start": 207,
+      "start": 206,
       "end": 208
     }
   },
