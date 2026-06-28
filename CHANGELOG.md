@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.15.0](https://github.com/gengjiawen/monkey-rust/compare/v0.14.0...v0.15.0) (2026-06-28)
+
+
+### Features
+
+* **compiler:** add debug info and playground bytecode-to-source linking ([#260](https://github.com/gengjiawen/monkey-rust/issues/260)) ([d8d16cd](https://github.com/gengjiawen/monkey-rust/commit/d8d16cd6d0614d11b33508591d418559b39056d3))
+* **playground:** add AST cascade highlighting ([817bac2](https://github.com/gengjiawen/monkey-rust/commit/817bac2ca08ec2433b8d65560d6db3313f1675b8))
+* **playground:** add dark mode support ([#255](https://github.com/gengjiawen/monkey-rust/issues/255)) ([afa8b73](https://github.com/gengjiawen/monkey-rust/commit/afa8b73c2aee34f16d6d77bca181065b093246e0))
+* **playground:** add favicon for Next.js app ([#254](https://github.com/gengjiawen/monkey-rust/issues/254)) ([c86dc6b](https://github.com/gengjiawen/monkey-rust/commit/c86dc6bb88ef27693b339133012c12038a494976))
+* **playground:** add header with logo and GitHub link ([37246cb](https://github.com/gengjiawen/monkey-rust/commit/37246cb6e6b063803993b41e72e5a5ad045dbf59))
+* **playground:** add loading state to format button ([58535ca](https://github.com/gengjiawen/monkey-rust/commit/58535ca68f733f91163a01a4779f42d873c6e9d8))
+
+
+### Bug Fixes
+
+* **lexer:** make character reads linear ([#259](https://github.com/gengjiawen/monkey-rust/issues/259)) ([54c32e8](https://github.com/gengjiawen/monkey-rust/commit/54c32e8a8d2ecf20304e4310133f6ac1d28cbc53))
+* **playground:** prevent code panel growth on mobile bytecode switch ([#256](https://github.com/gengjiawen/monkey-rust/issues/256)) ([dbd0941](https://github.com/gengjiawen/monkey-rust/commit/dbd094187ad2b46bccc2eb44a1fdb2f0dbb97516))
+
 ## [0.14.0](https://github.com/gengjiawen/monkey-rust/compare/v0.13.0...v0.14.0) (2026-06-13)
 
 
