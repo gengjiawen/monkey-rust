@@ -52,6 +52,8 @@ impl GcVM {
             }),
         );
         let main_instructions = compiled_instructions(&heap, main_fn);
+        // Frames keep borrowed GcRefs. The initial main_fn allocation is the VM
+        // root for these handles; placeholder frames do not take extra refs.
         let main_frame = Frame::new(
             GcClosure {
                 func: main_fn,
@@ -140,7 +142,7 @@ impl GcVM {
                 Opcode::OpJumpNotTruthy => {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let condition = self.pop();
+                    let condition = self.pop_owned();
                     if !is_truthy(&self.heap, condition) {
                         self.current_frame().ip = pos as i32 - 1;
                     }
@@ -157,7 +159,7 @@ impl GcVM {
                 Opcode::OpSetGlobal => {
                     let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let value = self.pop();
+                    let value = self.pop_owned();
                     self.heap.free(self.globals[global_index]);
                     self.globals[global_index] = value;
                 }
@@ -182,14 +184,14 @@ impl GcVM {
                     self.push_raw(hash);
                 }
                 Opcode::OpIndex => {
-                    let index = self.pop();
-                    let left = self.pop();
+                    let index = self.pop_owned();
+                    let left = self.pop_owned();
                     self.execute_index_operation(left, index);
                     self.heap.free(index);
                     self.heap.free(left);
                 }
                 Opcode::OpReturnValue => {
-                    let return_value = self.pop();
+                    let return_value = self.pop_owned();
                     let frame = self.pop_frame();
                     let new_sp = frame.base_pointer - 1;
                     self.clear_stack_range(new_sp, self.sp);
@@ -212,7 +214,7 @@ impl GcVM {
                     let local_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let base = self.current_frame().base_pointer;
-                    let value = self.pop();
+                    let value = self.pop_owned();
                     self.heap.free(self.stack[base + local_index]);
                     self.stack[base + local_index] = value;
                 }
@@ -277,7 +279,11 @@ impl GcVM {
         self.sp += 1;
     }
 
-    fn pop(&mut self) -> GcRef {
+    /// Move the top stack slot's owned reference to the caller.
+    ///
+    /// The caller must either free the returned ref or store it in another
+    /// owning location. The vacated stack slot is reset to a null ref.
+    fn pop_owned(&mut self) -> GcRef {
         self.sp -= 1;
         let value = self.stack[self.sp];
         self.stack[self.sp] = self.heap.dup(self.null);
@@ -285,7 +291,7 @@ impl GcVM {
     }
 
     fn pop_discard(&mut self) {
-        let value = self.pop();
+        let value = self.pop_owned();
         self.heap.free(self.last_popped);
         self.last_popped = value;
     }
@@ -299,8 +305,8 @@ impl GcVM {
     }
 
     fn execute_binary_operation(&mut self, opcode: Opcode) {
-        let right = self.pop();
-        let left = self.pop();
+        let right = self.pop_owned();
+        let left = self.pop_owned();
         match (get_value(&self.heap, left), get_value(&self.heap, right)) {
             (Value::Integer(l), Value::Integer(r)) => {
                 let result = match opcode {
@@ -326,8 +332,8 @@ impl GcVM {
     }
 
     fn execute_comparison(&mut self, opcode: Opcode) {
-        let right = self.pop();
-        let left = self.pop();
+        let right = self.pop_owned();
+        let left = self.pop_owned();
         let result = match (get_value(&self.heap, left), get_value(&self.heap, right)) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
                 Opcode::OpEqual => l == r,
@@ -348,7 +354,7 @@ impl GcVM {
     }
 
     fn execute_minus_operation(&mut self) {
-        let operand = self.pop();
+        let operand = self.pop_owned();
         let negated = match get_value(&self.heap, operand) {
             Value::Integer(l) => -l,
             _ => panic!("unsupported types for negation"),
@@ -358,7 +364,7 @@ impl GcVM {
     }
 
     fn execute_bang_operation(&mut self) {
-        let operand = self.pop();
+        let operand = self.pop_owned();
         let result = match get_value(&self.heap, operand) {
             Value::Boolean(l) => !l,
             _ => false,

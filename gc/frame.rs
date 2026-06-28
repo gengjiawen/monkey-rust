@@ -3,6 +3,8 @@ use compiler::op_code::Instructions;
 
 #[derive(Debug, Clone)]
 pub struct Frame {
+    /// Borrowed closure refs. Frames do not own or free these handles; the
+    /// callee stack slot, main function root, or closure object keeps them live.
     pub cl: GcClosure,
     pub ip: i32,
     pub base_pointer: usize,
