@@ -69,12 +69,10 @@ impl Value {
 
     pub fn with_owned_edges(self, heap: &mut GcHeap) -> Self {
         match self {
-            Value::Array(items) => {
-                Value::Array(items.into_iter().map(|r| heap.dup(r)).collect())
+            Value::Array(items) => Value::Array(items.into_iter().map(|r| heap.dup(r)).collect()),
+            Value::Hash(map) => {
+                Value::Hash(map.into_iter().map(|(k, v)| (k, heap.dup(v))).collect())
             }
-            Value::Hash(map) => Value::Hash(
-                map.into_iter().map(|(k, v)| (k, heap.dup(v))).collect(),
-            ),
             Value::Closure(mut closure) => {
                 closure.func = heap.dup(closure.func);
                 closure.free = closure.free.into_iter().map(|r| heap.dup(r)).collect();
@@ -82,6 +80,12 @@ impl Value {
             }
             other => other,
         }
+    }
+
+    pub fn edge_refs(&self) -> Vec<GcRef> {
+        let mut refs = Vec::new();
+        self.trace(&mut |reference| refs.push(reference));
+        refs
     }
 }
 
@@ -115,7 +119,12 @@ impl HashKey {
 
 pub fn alloc_value(heap: &mut GcHeap, value: Value) -> GcRef {
     let value = value.with_owned_edges(heap);
-    heap.alloc(ValueCell { value }, GcObjectType::JsObject)
+    heap.alloc(
+        ValueCell {
+            value,
+        },
+        GcObjectType::JsObject,
+    )
 }
 
 pub fn get_value<'a>(heap: &'a GcHeap, reference: GcRef) -> &'a Value {
@@ -206,7 +215,12 @@ pub fn import_object(heap: &mut GcHeap, object: &Object) -> GcRef {
             panic!("interpreter functions cannot be imported into the GC VM")
         }
     };
-    alloc_value(heap, value)
+    let edge_refs = value.edge_refs();
+    let reference = alloc_value(heap, value);
+    for edge in edge_refs {
+        heap.free(edge);
+    }
+    reference
 }
 
 pub fn export_object(heap: &GcHeap, reference: GcRef) -> Object {
@@ -224,12 +238,7 @@ pub fn export_object(heap: &GcHeap, reference: GcRef) -> Object {
         ),
         Value::Hash(map) => Object::Hash(
             map.iter()
-                .map(|(k, v)| {
-                    (
-                        Rc::new(k.to_object()),
-                        Rc::new(export_object(heap, *v)),
-                    )
-                })
+                .map(|(k, v)| (Rc::new(k.to_object()), Rc::new(export_object(heap, *v))))
                 .collect(),
         ),
         Value::CompiledFunction(f) => Object::CompiledFunction(Rc::new(f.clone())),

@@ -1,13 +1,6 @@
-use crate::header::{
-    GcId,
-    GcObjectHeader,
-    GcObjectType,
-    GcPhase,
-    RefCountHeader,
-    RefCountId,
-};
+use crate::header::{GcId, GcObjectHeader, GcObjectType, GcPhase, RefCountHeader, RefCountId};
 use crate::list::{GcList, GcListIter};
-use crate::malloc::{DEFAULT_GC_THRESHOLD, MallocState};
+use crate::malloc::{MallocState, DEFAULT_GC_THRESHOLD};
 use std::any::Any;
 
 /// Child-mark callback mode used during the three GC phases.
@@ -35,7 +28,7 @@ pub trait GcObject: Any {
 
 struct GcObjectEntry {
     header: GcObjectHeader,
-    object: Box<dyn GcObject>,
+    object: Option<Box<dyn GcObject>>,
 }
 
 struct RefCountEntry {
@@ -220,14 +213,10 @@ impl GcRuntime {
 
     /// Register a new GC object with `ref_count = 1` on `gc_obj_list`.
     /// Matches QuickJS `add_gc_object`.
-    pub fn add_gc_object(
-        &mut self,
-        object: Box<dyn GcObject>,
-        gc_obj_type: GcObjectType,
-    ) -> GcId {
+    pub fn add_gc_object(&mut self, object: Box<dyn GcObject>, gc_obj_type: GcObjectType) -> GcId {
         let id = self.alloc_slot(GcObjectEntry {
             header: GcObjectHeader::new(gc_obj_type, 1),
-            object,
+            object: Some(object),
         });
         self.list_push_back(GcListKind::GcObj, id);
         id
@@ -287,7 +276,11 @@ impl GcRuntime {
     }
 
     pub fn dup_ref_counted(&mut self, id: RefCountId) -> RefCountId {
-        self.ref_counts[id].as_mut().expect("invalid RefCountId").header.ref_count += 1;
+        self.ref_counts[id]
+            .as_mut()
+            .expect("invalid RefCountId")
+            .header
+            .ref_count += 1;
         id
     }
 
@@ -320,7 +313,12 @@ impl GcRuntime {
     pub fn mark_children(&mut self, id: GcId, mark_func: MarkFunc) {
         let mut child_ids = Vec::new();
         {
-            let object = &self.objects[id].as_ref().expect("invalid GcId").object;
+            let object = self.objects[id]
+                .as_ref()
+                .expect("invalid GcId")
+                .object
+                .as_ref()
+                .expect("object already finalized");
             object.trace(&mut |child| child_ids.push(child));
         }
         for child in child_ids {
@@ -334,8 +332,8 @@ impl GcRuntime {
             self.malloc_state.malloc_size.saturating_add(alloc_size) > self.malloc_gc_threshold;
         if force_gc {
             self.run_gc();
-            self.malloc_gc_threshold = self.malloc_state.malloc_size
-                + (self.malloc_state.malloc_size >> 1);
+            self.malloc_gc_threshold =
+                self.malloc_state.malloc_size + (self.malloc_state.malloc_size >> 1);
         }
     }
 
@@ -365,12 +363,12 @@ impl GcRuntime {
 
     pub fn object_downcast<T: GcObject>(&self, id: GcId) -> Option<&T> {
         let entry = self.objects.get(id)?.as_ref()?;
-        (entry.object.as_ref() as &dyn Any).downcast_ref()
+        (entry.object.as_ref()?.as_ref() as &dyn Any).downcast_ref()
     }
 
     pub fn object_downcast_mut<T: GcObject>(&mut self, id: GcId) -> Option<&mut T> {
         let entry = self.objects.get_mut(id)?.as_mut()?;
-        (entry.object.as_mut() as &mut dyn Any).downcast_mut()
+        (entry.object.as_mut()?.as_mut() as &mut dyn Any).downcast_mut()
     }
 
     #[cfg(test)]
@@ -424,11 +422,12 @@ impl GcRuntime {
     }
 
     fn gc_scan(&mut self) {
-        let live_ids = self.list_to_vec(GcListKind::GcObj);
-        for id in live_ids {
+        let mut current = self.gc_obj_list.head;
+        while let Some(id) = current {
             assert!(self.header(id).ref_count > 0);
             self.header_mut(id).mark = 0;
             self.mark_children(id, MarkFunc::ScanIncref);
+            current = self.header(id).list_next;
         }
 
         let tmp_ids = self.list_to_vec(GcListKind::Tmp);
@@ -473,9 +472,6 @@ impl GcRuntime {
             self.list_remove(GcListKind::GcObj, id);
             self.list_remove(GcListKind::Tmp, id);
             self.list_remove(GcListKind::ZeroRef, id);
-            let mut entry = self.objects[id].take().expect("deferred object missing");
-            entry.object.on_free(self);
-            drop(entry.object);
             self.free_slot(id);
         }
         self.gc_zero_ref_count_list.clear();
@@ -512,27 +508,37 @@ impl GcRuntime {
         self.header_mut(id).free_mark = true;
 
         let child_ids = {
-            let object = &self.objects[id].as_ref().expect("invalid GcId").object;
+            let object = self.objects[id]
+                .as_ref()
+                .expect("invalid GcId")
+                .object
+                .as_ref()
+                .expect("object already finalized");
             let mut child_ids = Vec::new();
             object.trace(&mut |child| child_ids.push(child));
             child_ids
         };
 
+        for child in child_ids {
+            self.free_gc(child);
+        }
+
+        let mut object = self.objects[id]
+            .as_mut()
+            .expect("object already freed")
+            .object
+            .take()
+            .expect("object already finalized");
+        object.on_free(self);
+        drop(object);
+
         self.list_remove_from_any(id);
 
-        let defer_free =
-            self.gc_phase == GcPhase::RemoveCycles && self.header(id).ref_count != 0;
+        let defer_free = self.gc_phase == GcPhase::RemoveCycles && self.header(id).ref_count != 0;
         if !defer_free {
-            let mut entry = self.objects[id].take().expect("object already freed");
-            entry.object.on_free(self);
-            drop(entry.object);
             self.free_slot(id);
         } else {
             self.list_push_back(GcListKind::ZeroRef, id);
-        }
-
-        for child in child_ids {
-            self.free_gc(child);
         }
     }
 }

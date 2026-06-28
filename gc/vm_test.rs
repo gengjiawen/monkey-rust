@@ -13,9 +13,8 @@ pub struct VmTestCase<'a> {
 
 pub fn run_gc_vm_tests(tests: Vec<VmTestCase>) {
     for test in tests {
-        let program = parse(test.input).unwrap_or_else(|errors| {
-            panic!("parse error for {:?}: {}", test.input, errors[0])
-        });
+        let program = parse(test.input)
+            .unwrap_or_else(|errors| panic!("parse error for {:?}: {}", test.input, errors[0]));
         let mut compiler = Compiler::new();
         let bytecode = compiler
             .compile(&program)
@@ -323,7 +322,8 @@ mod tests {
                 expected: Object::Integer(3),
             },
             VmTestCase {
-                input: "let a = fn() { 1 }; let b = fn() { a() + 1 }; let c = fn() { b() + 1 }; c();",
+                input:
+                    "let a = fn() { 1 }; let b = fn() { a() + 1 }; let c = fn() { b() + 1 }; c();",
                 expected: Object::Integer(3),
             },
         ]);
@@ -388,6 +388,20 @@ mod tests {
     }
 
     #[test]
+    fn test_closures() {
+        run_gc_vm_tests(vec![
+            VmTestCase {
+                input: "let newAdder = fn(a, b) { fn(c) { a + b + c } }; let adder = newAdder(1, 2); adder(8);",
+                expected: Object::Integer(11),
+            },
+            VmTestCase {
+                input: "let global = 10; let outer = fn(a) { let inner = fn(b) { a + b + global }; inner }; let adder = outer(2); adder(3);",
+                expected: Object::Integer(15),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_builtins() {
         run_gc_vm_tests(vec![
             VmTestCase {
@@ -443,6 +457,20 @@ mod tests {
                 expected: int_array(&[1]),
             },
         ]);
+    }
+
+    #[test]
+    fn builtin_call_releases_callee_args_and_stack_temporaries() {
+        let program = parse("len([1, 2, 3]);").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+        let mut vm = GcVM::new(bytecode);
+
+        vm.run();
+        assert_eq!(vm.export_last_result(), Some(Object::Integer(3)));
+
+        vm.heap_mut().run_gc();
+        assert_eq!(vm.heap().runtime().gc_object_count(), 6);
     }
 
     #[test]

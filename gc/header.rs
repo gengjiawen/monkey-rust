@@ -57,6 +57,8 @@ impl GcObjectHeader {
 
 impl RefCountHeader {
     pub fn new(ref_count: i32) -> Self {
-        RefCountHeader { ref_count }
+        RefCountHeader {
+            ref_count,
+        }
     }
 }

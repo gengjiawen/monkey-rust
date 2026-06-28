@@ -45,6 +45,8 @@ impl MallocState {
 
     pub fn record_free(&mut self, usable_size: usize) {
         self.malloc_count = self.malloc_count.saturating_sub(1);
-        self.malloc_size = self.malloc_size.saturating_sub(usable_size + MALLOC_OVERHEAD);
+        self.malloc_size = self
+            .malloc_size
+            .saturating_sub(usable_size + MALLOC_OVERHEAD);
     }
 }

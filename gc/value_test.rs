@@ -95,6 +95,38 @@ mod tests {
     }
 
     #[test]
+    fn import_object_releases_temporary_child_refs() {
+        let mut heap = GcHeap::new();
+        let original = Object::Array(vec![Rc::new(Object::Array(vec![
+            Rc::new(Object::Integer(1)),
+            Rc::new(Object::Integer(2)),
+        ]))]);
+
+        let root = import_object(&mut heap, &original);
+        let nested = match get_value(&heap, root) {
+            Value::Array(items) => items[0],
+            other => panic!("expected root array, got {:?}", other),
+        };
+        let leaves = match get_value(&heap, nested) {
+            Value::Array(items) => items.clone(),
+            other => panic!("expected nested array, got {:?}", other),
+        };
+
+        assert_eq!(heap.ref_count(root), 1);
+        assert_eq!(heap.ref_count(nested), 1);
+        for leaf in &leaves {
+            assert_eq!(heap.ref_count(*leaf), 1);
+        }
+
+        heap.free(root);
+        assert!(!heap.exists(root));
+        assert!(!heap.exists(nested));
+        for leaf in leaves {
+            assert!(!heap.exists(leaf));
+        }
+    }
+
+    #[test]
     fn value_cycle_collected_by_gc() {
         let mut heap = GcHeap::new();
         let node_b = alloc_value(&mut heap, Value::Null);

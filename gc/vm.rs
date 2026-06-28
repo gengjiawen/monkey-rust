@@ -8,14 +8,7 @@ use object::Object;
 
 use crate::frame::Frame;
 use crate::value::{
-    alloc_value,
-    call_builtin,
-    export_object,
-    get_value,
-    import_object,
-    GcClosure,
-    HashKey,
-    Value,
+    alloc_value, call_builtin, export_object, get_value, import_object, GcClosure, HashKey, Value,
 };
 use crate::{GcHeap, GcRef};
 
@@ -37,6 +30,7 @@ pub struct GcVM {
     frames: Vec<Frame>,
     frame_index: usize,
     null: GcRef,
+    last_popped: GcRef,
 }
 
 impl GcVM {
@@ -81,6 +75,7 @@ impl GcVM {
 
         let stack = (0..STACK_SIZE).map(|_| heap.dup(null)).collect();
         let globals = (0..GLOBAL_SIZE).map(|_| heap.dup(null)).collect();
+        let last_popped = heap.dup(null);
 
         GcVM {
             heap,
@@ -91,6 +86,7 @@ impl GcVM {
             frames,
             frame_index: 1,
             null,
+            last_popped,
         }
     }
 
@@ -103,9 +99,7 @@ impl GcVM {
     }
 
     pub fn run(&mut self) {
-        while self.current_frame().ip
-            < self.current_frame().instructions.len() as i32 - 1
-        {
+        while self.current_frame().ip < self.current_frame().instructions.len() as i32 - 1 {
             self.current_frame().ip += 1;
             let ip = self.current_frame().ip as usize;
             let ins = self.current_frame().instructions.clone();
@@ -170,16 +164,22 @@ impl GcVM {
                 Opcode::OpArray => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let elements = self.build_array(self.sp - count, self.sp);
-                    self.sp -= count;
-                    self.alloc_and_push(Value::Array(elements));
+                    let start = self.sp - count;
+                    let elements = self.build_array(start, self.sp);
+                    let array = alloc_value(&mut self.heap, Value::Array(elements));
+                    self.clear_stack_range(start, self.sp);
+                    self.sp = start;
+                    self.push_raw(array);
                 }
                 Opcode::OpHash => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let elements = self.build_hash(self.sp - count, self.sp);
-                    self.sp -= count;
-                    self.alloc_and_push(Value::Hash(elements));
+                    let start = self.sp - count;
+                    let elements = self.build_hash(start, self.sp);
+                    let hash = alloc_value(&mut self.heap, Value::Hash(elements));
+                    self.clear_stack_range(start, self.sp);
+                    self.sp = start;
+                    self.push_raw(hash);
                 }
                 Opcode::OpIndex => {
                     let index = self.pop();
@@ -191,12 +191,16 @@ impl GcVM {
                 Opcode::OpReturnValue => {
                     let return_value = self.pop();
                     let frame = self.pop_frame();
-                    self.sp = frame.base_pointer - 1;
+                    let new_sp = frame.base_pointer - 1;
+                    self.clear_stack_range(new_sp, self.sp);
+                    self.sp = new_sp;
                     self.push_raw(return_value);
                 }
                 Opcode::OpReturn => {
                     let frame = self.pop_frame();
-                    self.sp = frame.base_pointer - 1;
+                    let new_sp = frame.base_pointer - 1;
+                    self.clear_stack_range(new_sp, self.sp);
+                    self.sp = new_sp;
                     self.dup_and_push(self.null);
                 }
                 Opcode::OpCall => {
@@ -245,7 +249,7 @@ impl GcVM {
     }
 
     pub fn last_popped_stack_elm(&self) -> Option<GcRef> {
-        self.stack.get(self.sp).copied()
+        Some(self.last_popped)
     }
 
     pub fn export_last_result(&self) -> Option<Object> {
@@ -267,18 +271,31 @@ impl GcVM {
         if self.sp >= STACK_SIZE {
             panic!("Stack overflow");
         }
+        let old = self.stack[self.sp];
         self.stack[self.sp] = value;
+        self.heap.free(old);
         self.sp += 1;
     }
 
     fn pop(&mut self) -> GcRef {
-        let value = self.heap.dup(self.stack[self.sp - 1]);
         self.sp -= 1;
+        let value = self.stack[self.sp];
+        self.stack[self.sp] = self.heap.dup(self.null);
         value
     }
 
     fn pop_discard(&mut self) {
-        self.sp -= 1;
+        let value = self.pop();
+        self.heap.free(self.last_popped);
+        self.last_popped = value;
+    }
+
+    fn clear_stack_range(&mut self, start: usize, end: usize) {
+        for index in start..end {
+            let old = self.stack[index];
+            self.stack[index] = self.heap.dup(self.null);
+            self.heap.free(old);
+        }
     }
 
     fn execute_binary_operation(&mut self, opcode: Opcode) {
@@ -353,7 +370,7 @@ impl GcVM {
     fn build_array(&mut self, start: usize, end: usize) -> Vec<GcRef> {
         let mut elements = Vec::with_capacity(end - start);
         for i in start..end {
-            elements.push(self.heap.dup(self.stack[i]));
+            elements.push(self.stack[i]);
         }
         elements
     }
@@ -364,7 +381,7 @@ impl GcVM {
             let key_ref = self.stack[i];
             let key = HashKey::from_value(get_value(&self.heap, key_ref))
                 .expect("hash key must be hashable");
-            elements.insert(key, self.heap.dup(self.stack[i + 1]));
+            elements.insert(key, self.stack[i + 1]);
         }
         elements
     }
@@ -427,10 +444,7 @@ impl GcVM {
             _ => panic!("closure without compiled function"),
         };
         if compiled.num_parameters != num_args {
-            panic!(
-                "wrong number of arguments: want={}, got={}",
-                compiled.num_parameters, num_args
-            );
+            panic!("wrong number of arguments: want={}, got={}", compiled.num_parameters, num_args);
         }
 
         let frame = Frame::new(closure, compiled.instructions, self.sp - num_args);
@@ -439,25 +453,33 @@ impl GcVM {
     }
 
     fn call_builtin(&mut self, builtin: object::BuiltinFunc, num_args: usize) {
-        let mut args = Vec::with_capacity(num_args);
-        for reference in &self.stack[self.sp - num_args..self.sp] {
-            args.push(self.heap.dup(*reference));
-        }
+        let base = self.sp - num_args - 1;
+        let args = self.stack[self.sp - num_args..self.sp].to_vec();
         let result = call_builtin(&mut self.heap, builtin, args);
-        self.sp = self.sp - num_args - 1;
+        self.clear_stack_range(base, self.sp);
+        self.sp = base;
         self.push_raw(result);
     }
 
     fn push_closure(&mut self, const_index: usize, num_free: usize) {
         match get_value(&self.heap, self.constants[const_index]).clone() {
             Value::CompiledFunction(_) => {
+                let start = self.sp - num_free;
                 let mut free = Vec::with_capacity(num_free);
                 for i in 0..num_free {
-                    free.push(self.heap.dup(self.stack[self.sp - num_free + i]));
+                    free.push(self.stack[start + i]);
                 }
-                self.sp -= num_free;
-                let func = self.heap.dup(self.constants[const_index]);
-                self.alloc_and_push(Value::Closure(GcClosure { func, free }));
+                let func = self.constants[const_index];
+                let closure = alloc_value(
+                    &mut self.heap,
+                    Value::Closure(GcClosure {
+                        func,
+                        free,
+                    }),
+                );
+                self.clear_stack_range(start, self.sp);
+                self.sp = start;
+                self.push_raw(closure);
             }
             other => panic!("not a function {:?}", other),
         }

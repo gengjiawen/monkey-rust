@@ -183,13 +183,15 @@ Phase 3: gc_free_cycles  释放 tmp 列表中真正不可达的环
 **Phase 2 — `gc_scan`**
 
 - 对 `gc_obj_list` 中仍存活（`ref_count > 0`）的对象：`mark_children(ScanIncref)`，恢复被误减的引用。
+- `gc_obj_list` 按链表动态遍历；`ScanIncref` 从 `tmp_obj_list` 迁回来的对象会追加到 `gc_obj_list` 尾部，并在同一轮 scan 中继续扫描。这一点与 QuickJS `list_for_each(el, &rt->gc_obj_list)` 保持一致，确保外部根间接保活的整段环都被恢复。
 - 对 `tmp_obj_list` 中的对象：`mark_children(ScanIncref2)`，仅增引用不计入链表迁移。
 
 **Phase 3 — `gc_free_cycles`**
 
 - 设置 `gc_phase = RemoveCycles`。
 - 逐个释放 `tmp_obj_list` 中的对象（真正不可达的环）。
-- 若释放时 `ref_count != 0`（被外部引用恢复），**延迟**到 `gc_zero_ref_count_list`，待 phase 结束后再释放。
+- `free_js_object` 先释放 `trace` 出来的子边，再运行 `on_free`，最后移出 GC 链表。
+- 若释放子边和 finalizer 后 `ref_count != 0`，只把物理释放 **延迟** 到 `gc_zero_ref_count_list`；`on_free` 不会在延迟释放阶段重复执行。
 
 ### 5.5 即时释放路径
 
@@ -251,10 +253,12 @@ pub enum Value {
 
 | 操作 | 行为 |
 |------|------|
-| `alloc_value` | `with_owned_edges` 对所有子 `GcRef` 执行 `dup`，再分配 |
-| VM `push` | `dup` 后写入栈（栈槽持有一份引用） |
-| VM `pop` | `dup` 返回值，栈槽引用仍保留直到被覆盖 |
+| `alloc_value` | `with_owned_edges` 对所有子 `GcRef` 执行 `dup`，再分配；调用方仍负责释放传入的临时边 |
+| `import_object` | 递归 import 子对象，父对象分配完成后释放这些临时子引用，只保留父对象持有的边 |
+| VM `push` | 对已有引用执行 `dup` 后入栈；`push_raw` 表示转移一份已拥有的引用 |
+| VM `pop` | 将栈槽持有的引用转移给调用方，并把槽位重置为 `null` 引用 |
 | VM 覆盖栈槽/全局变量 | 先 `free` 旧值，再写入新 `GcRef` |
+| VM 构造数组/哈希/闭包 | 用栈上的临时引用分配父对象，随后清空对应栈区间，避免临时引用泄漏 |
 | 运算消费操作数 | `free(left)` + `free(right)` |
 
 ### 6.3 import / export 桥接
@@ -286,6 +290,7 @@ pub struct GcVM {
     frames: Vec<Frame>,         // 最多 1024 帧
     frame_index: usize,
     null: GcRef,                 // 共享 null 单例
+    last_popped: GcRef,          // 最近一次 OpPop 的结果
 }
 ```
 
@@ -355,7 +360,8 @@ let result = vm.export_last_result();  // Option<Object>
 
 | 限制 | 说明 |
 |------|------|
-| 间接外部引用不保全环 | 若外部仅引用环中某一节点，环内其他节点可能在 GC 后被回收，但入口节点仍存活 |
+| QuickJS 对象模型未完整移植 | 当前只实现 Monkey `ValueCell` 所需的 `JsObject`/`FunctionBytecode` 风格路径，没有 shape、realm、var ref、async function 等完整对象系统 |
+| finalizer 能力较小 | `on_free` 对应 QuickJS finalizer；调用前 trace 边已经释放，但 Rust 对象字段不会像 QuickJS C 结构那样逐字段置空，因此 `on_free` 不应再次释放 trace 边 |
 | 陈旧边防护 | `free_gc` 对已释放子节点做 `object_exists` 检查，避免沿已拆除的环边 panic |
 | 字符串未拆堆 | `Value::String` 内联在 `ValueCell` 中，未使用 `RefCountHeader` 路径 |
 | `GcObjectType` 预留 | `Shape`, `VarRef`, `AsyncFunction`, `JsContext` 等 tag 已定义但未使用 |
@@ -366,13 +372,13 @@ let result = vm.export_last_result();  // Option<Object>
 
 ## 10. 测试策略
 
-当前 **38 个测试**，分三层：
+当前 **42 个测试**，分三层：
 
 | 层 | 文件 | 覆盖 |
 |----|------|------|
-| GC 算法 | `gc_test.rs` (16) | refcount、dup、2/3/4 节点环、自环、外部根保活、无环图、on_free、GC 阈值、mark 函数、幂等性 |
-| 值桥接 | `value_test.rs` (8) | import/export 往返、HashKey、子 refcount、Value 层环回收 |
-| 端到端 VM | `vm_test.rs` (14) | 算术、布尔、条件、let、字符串、数组、哈希、索引、函数、闭包、builtins |
+| GC 算法 | `gc_test.rs` (17) | refcount、dup、2/3/4 节点环、自环、外部根间接保活整个环、无环图、on_free 顺序、GC 阈值、mark 函数、幂等性 |
+| 值桥接 | `value_test.rs` (9) | import/export 往返、HashKey、子 refcount、import 临时引用释放、Value 层环回收 |
+| 端到端 VM | `vm_test.rs` (16) | 算术、布尔、条件、let、字符串、数组、哈希、索引、函数、闭包、builtins、调用后临时引用清理 |
 
 运行：
 
@@ -386,7 +392,7 @@ cargo test -p monkey-gc
 
 1. **wasm 集成** — 在 wasm crate 增加 `GcVM` 导出，供 playground 切换。
 2. **字符串拆堆** — 大字符串走 `RefCountHeader`，减 `ValueCell` 体积。
-3. **闭包递归 / 高阶函数** — 补充 VM 测试，验证环场景下的生产行为。
+3. **递归 / 复杂环场景** — 继续补充真实程序级回归，验证闭包与容器组合后的生产行为。
 4. **GC 统计 API** — 暴露 `gc_object_count`、`malloc_state` 供 playground 调试面板。
 5. **性能对比** — 与 `Rc` VM 建立 benchmark（分配速率、GC 暂停）。
 

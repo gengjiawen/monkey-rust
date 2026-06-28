@@ -1,10 +1,4 @@
-use crate::{
-    GcHeap,
-    GcObject,
-    GcObjectType,
-    GcRef,
-    MarkFunc,
-};
+use crate::{GcHeap, GcObject, GcObjectType, GcRef, MarkFunc};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -15,14 +9,21 @@ struct TestNode {
     id: usize,
     edges: EdgeMap,
     freed: Rc<Cell<bool>>,
+    freed_ref_counts: Rc<RefCell<HashMap<usize, i32>>>,
 }
 
 impl TestNode {
-    fn new(id: usize, edges: EdgeMap, freed: Rc<Cell<bool>>) -> Self {
+    fn new(
+        id: usize,
+        edges: EdgeMap,
+        freed: Rc<Cell<bool>>,
+        freed_ref_counts: Rc<RefCell<HashMap<usize, i32>>>,
+    ) -> Self {
         TestNode {
             id,
             edges,
             freed,
+            freed_ref_counts,
         }
     }
 }
@@ -37,7 +38,10 @@ impl GcObject for TestNode {
         }
     }
 
-    fn on_free(&mut self, _rt: &mut crate::GcRuntime) {
+    fn on_free(&mut self, rt: &mut crate::GcRuntime) {
+        self.freed_ref_counts
+            .borrow_mut()
+            .insert(self.id, rt.ref_count(self.id));
         self.freed.set(true);
     }
 }
@@ -46,6 +50,7 @@ struct TestHeap {
     gc: GcHeap,
     edges: EdgeMap,
     freed: Rc<Cell<bool>>,
+    freed_ref_counts: Rc<RefCell<HashMap<usize, i32>>>,
 }
 
 impl TestHeap {
@@ -54,6 +59,7 @@ impl TestHeap {
             gc: GcHeap::new(),
             edges: Rc::new(RefCell::new(HashMap::new())),
             freed: Rc::new(Cell::new(false)),
+            freed_ref_counts: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -64,7 +70,12 @@ impl TestHeap {
             self.gc.runtime().object_len_for_test()
         };
         let reference = self.gc.alloc(
-            TestNode::new(id, self.edges.clone(), self.freed.clone()),
+            TestNode::new(
+                id,
+                self.edges.clone(),
+                self.freed.clone(),
+                self.freed_ref_counts.clone(),
+            ),
             GcObjectType::JsObject,
         );
         assert_eq!(reference.0, id);
@@ -258,11 +269,26 @@ fn external_ref_to_cycle_entry_survives_gc() {
 
     // Holder keeps the cycle entry alive through GC.
     assert!(heap.gc.exists(nodes[0]));
+    assert!(heap.gc.exists(nodes[1]));
     assert!(heap.gc.exists(holder));
 
     heap.gc.free(holder);
     heap.gc.run_gc();
     assert!(!heap.gc.exists(nodes[0]));
+    assert!(!heap.gc.exists(nodes[1]));
+}
+
+#[test]
+fn self_cycle_finalizer_runs_after_edges_are_released() {
+    let mut heap = TestHeap::new();
+    let a = heap.alloc();
+    heap.link(a, a);
+    heap.gc.free(a);
+
+    heap.gc.run_gc();
+
+    assert_eq!(heap.freed_ref_counts.borrow().get(&a.0).copied(), Some(0));
+    assert!(!heap.gc.exists(a));
 }
 
 #[test]
