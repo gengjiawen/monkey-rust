@@ -6,7 +6,7 @@ use std::rc::Rc;
 type EdgeMap = Rc<RefCell<HashMap<usize, Vec<GcRef>>>>;
 
 struct TestNode {
-    id: usize,
+    id: Rc<Cell<Option<usize>>>,
     edges: EdgeMap,
     freed: Rc<Cell<bool>>,
     freed_ref_counts: Rc<RefCell<HashMap<usize, i32>>>,
@@ -14,7 +14,7 @@ struct TestNode {
 
 impl TestNode {
     fn new(
-        id: usize,
+        id: Rc<Cell<Option<usize>>>,
         edges: EdgeMap,
         freed: Rc<Cell<bool>>,
         freed_ref_counts: Rc<RefCell<HashMap<usize, i32>>>,
@@ -30,8 +30,11 @@ impl TestNode {
 
 impl GcObject for TestNode {
     fn trace(&self, visit: &mut dyn FnMut(crate::GcId)) {
+        let Some(id) = self.id.get() else {
+            return;
+        };
         let edges = self.edges.borrow();
-        if let Some(children) = edges.get(&self.id) {
+        if let Some(children) = edges.get(&id) {
             for child in children {
                 visit(child.0);
             }
@@ -39,9 +42,12 @@ impl GcObject for TestNode {
     }
 
     fn on_free(&mut self, rt: &mut crate::GcRuntime) {
+        let Some(id) = self.id.get() else {
+            return;
+        };
         self.freed_ref_counts
             .borrow_mut()
-            .insert(self.id, rt.ref_count(self.id));
+            .insert(id, rt.ref_count(id));
         self.freed.set(true);
     }
 }
@@ -64,22 +70,18 @@ impl TestHeap {
     }
 
     fn alloc(&mut self) -> GcRef {
-        let id = if let Some(&id) = self.gc.runtime().free_slots_for_test().first() {
-            id
-        } else {
-            self.gc.runtime().object_len_for_test()
-        };
+        let id = Rc::new(Cell::new(None));
         let reference = self.gc.alloc(
             TestNode::new(
-                id,
+                id.clone(),
                 self.edges.clone(),
                 self.freed.clone(),
                 self.freed_ref_counts.clone(),
             ),
             GcObjectType::MonkeyObject,
         );
-        assert_eq!(reference.0, id);
-        self.edges.borrow_mut().insert(id, Vec::new());
+        id.set(Some(reference.0));
+        self.edges.borrow_mut().insert(reference.0, Vec::new());
         reference
     }
 

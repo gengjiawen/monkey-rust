@@ -371,16 +371,6 @@ impl GcRuntime {
         (entry.object.as_mut()?.as_mut() as &mut dyn Any).downcast_mut()
     }
 
-    #[cfg(test)]
-    pub(crate) fn object_len_for_test(&self) -> GcId {
-        self.objects.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn free_slots_for_test(&self) -> &[GcId] {
-        &self.free_slots
-    }
-
     // --- Phase 1: trial deletion ---
 
     fn gc_decref_child(&mut self, id: GcId) {
