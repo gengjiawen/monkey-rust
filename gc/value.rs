@@ -123,7 +123,7 @@ pub fn alloc_value(heap: &mut GcHeap, value: Value) -> GcRef {
         ValueCell {
             value,
         },
-        GcObjectType::JsObject,
+        GcObjectType::MonkeyObject,
     )
 }
 

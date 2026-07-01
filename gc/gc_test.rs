@@ -76,7 +76,7 @@ impl TestHeap {
                 self.freed.clone(),
                 self.freed_ref_counts.clone(),
             ),
-            GcObjectType::JsObject,
+            GcObjectType::MonkeyObject,
         );
         assert_eq!(reference.0, id);
         self.edges.borrow_mut().insert(id, Vec::new());

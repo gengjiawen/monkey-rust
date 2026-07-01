@@ -190,7 +190,7 @@ Phase 3: gc_free_cycles  释放 tmp 列表中真正不可达的环
 
 - 设置 `gc_phase = RemoveCycles`。
 - 逐个释放 `tmp_obj_list` 中的对象（真正不可达的环）。
-- `free_js_object` 先释放 `trace` 出来的子边，再运行 `on_free`，最后移出 GC 链表。
+- `free_heap_object` 先释放 `trace` 出来的子边，再运行 `on_free`，最后移出 GC 链表。
 - 若释放子边和 finalizer 后 `ref_count != 0`，只把物理释放 **延迟** 到 `gc_zero_ref_count_list`；`on_free` 不会在延迟释放阶段重复执行。
 
 ### 5.5 即时释放路径
@@ -198,10 +198,10 @@ Phase 3: gc_free_cycles  释放 tmp 列表中真正不可达的环
 `ref_count` 减到 0 且不在 `RemoveCycles` 阶段时：
 
 ```
-free_gc → gc_zero_ref_count_list → free_zero_refcount → free_js_object
+free_gc → gc_zero_ref_count_list → free_zero_refcount → free_heap_object
 ```
 
-`free_js_object` 会 `trace` 子节点并递归 `free_gc`，形成级联释放。对已释放的子节点，`free_gc` 通过 `object_exists` 检查避免沿陈旧边 panic。
+`free_heap_object` 会 `trace` 子节点并递归 `free_gc`，形成级联释放。对已释放的子节点，`free_gc` 通过 `object_exists` 检查避免沿陈旧边 panic。
 
 ### 5.6 GC 触发策略
 
@@ -360,11 +360,11 @@ let result = vm.export_last_result();  // Option<Object>
 
 | 限制 | 说明 |
 |------|------|
-| QuickJS 对象模型未完整移植 | 当前只实现 Monkey `ValueCell` 所需的 `JsObject`/`FunctionBytecode` 风格路径，没有 shape、realm、var ref、async function 等完整对象系统 |
+| QuickJS 对象模型未完整移植 | 当前只实现 Monkey `ValueCell` 所需的 `MonkeyObject`/`FunctionBytecode` 风格路径，没有 shape、realm、var ref、async function 等完整对象系统 |
 | finalizer 能力较小 | `on_free` 对应 QuickJS finalizer；调用前 trace 边已经释放，但 Rust 对象字段不会像 QuickJS C 结构那样逐字段置空，因此 `on_free` 不应再次释放 trace 边 |
 | 陈旧边防护 | `free_gc` 对已释放子节点做 `object_exists` 检查，避免沿已拆除的环边 panic |
 | 字符串未拆堆 | `Value::String` 内联在 `ValueCell` 中，未使用 `RefCountHeader` 路径 |
-| `GcObjectType` 预留 | `Shape`, `VarRef`, `AsyncFunction`, `JsContext` 等 tag 已定义但未使用 |
+| `GcObjectType` 预留 | `FunctionBytecode`, `Shape`, `VarRef`, `AsyncFunction`, `JsContext` 等 tag 已定义但未使用 |
 | 无写屏障 | 与 QuickJS 一致，依赖显式 `dup`/`free` 维护 refcount |
 | 单线程 | 无 `Send`/`Sync` 保证，设计为单线程 VM |
 

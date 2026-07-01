@@ -1,7 +1,7 @@
-/// GC object type tags, matching QuickJS `JSGCObjectTypeEnum`.
+/// GC object type tags, adapted from QuickJS `JSGCObjectTypeEnum`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GcObjectType {
-    JsObject,
+    MonkeyObject,
     FunctionBytecode,
     Shape,
     VarRef,
@@ -26,7 +26,7 @@ pub struct GcObjectHeader {
     pub gc_obj_type: GcObjectType,
     /// GC-phase flag (not a permanent mark bit). Set to 1 after `gc_decref` processes the object.
     pub mark: u8,
-    /// Zombie detection during cycle free, like QuickJS `JSObject.free_mark`.
+    /// Zombie detection during cycle free, inspired by QuickJS `free_mark`.
     pub free_mark: bool,
     pub list_prev: Option<GcId>,
     pub list_next: Option<GcId>,

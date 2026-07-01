@@ -449,7 +449,7 @@ impl GcRuntime {
             let id = id.unwrap();
             let gc_obj_type = self.header(id).gc_obj_type;
             match gc_obj_type {
-                GcObjectType::JsObject | GcObjectType::FunctionBytecode => {
+                GcObjectType::MonkeyObject | GcObjectType::FunctionBytecode => {
                     self.free_gc_object(id);
                 }
                 _ => {
@@ -465,7 +465,7 @@ impl GcRuntime {
         for id in deferred {
             let ty = self.header(id).gc_obj_type;
             assert!(
-                ty == GcObjectType::JsObject || ty == GcObjectType::FunctionBytecode,
+                ty == GcObjectType::MonkeyObject || ty == GcObjectType::FunctionBytecode,
                 "unexpected deferred type: {:?}",
                 ty
             );
@@ -493,7 +493,9 @@ impl GcRuntime {
 
     fn free_gc_object(&mut self, id: GcId) {
         match self.header(id).gc_obj_type {
-            GcObjectType::JsObject | GcObjectType::FunctionBytecode => self.free_js_object(id),
+            GcObjectType::MonkeyObject | GcObjectType::FunctionBytecode => {
+                self.free_heap_object(id)
+            }
             other => panic!("free_gc_object: unsupported type {:?}", other),
         }
     }
@@ -504,7 +506,7 @@ impl GcRuntime {
         self.list_remove(GcListKind::ZeroRef, id);
     }
 
-    fn free_js_object(&mut self, id: GcId) {
+    fn free_heap_object(&mut self, id: GcId) {
         self.header_mut(id).free_mark = true;
 
         let child_ids = {
