@@ -1,0 +1,22 @@
+[package]
+name = "monkey-gc"
+version = "0.14.0"
+description = "QuickJS-style GC runtime for Monkey (bytecode VM with cycle collector)"
+homepage = "https://github.com/gengjiawen/monkey-rust"
+repository = "https://github.com/gengjiawen/monkey-rust"
+authors = ["gengjiawen <technicalcute@gmail.com>"]
+edition = "2018"
+license = "MIT"
+
+[lib]
+name = "gc"
+path = "lib.rs"
+
+[dependencies]
+byteorder = "1.5.0"
+monkey-compiler = { path = "../compiler", version = "0.14.0" }
+monkey-object = { path = "../object", version = "0.14.0" }
+monkey-parser = { path = "../parser", version = "0.14.0" }
+
+[dev-dependencies]
+insta = "1.42.2"
