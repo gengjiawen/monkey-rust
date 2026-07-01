@@ -6,7 +6,7 @@ pub enum GcObjectType {
     Shape,
     VarRef,
     AsyncFunction,
-    JsContext,
+    MonkeyContext,
 }
 
 /// Reentrancy guard during cascade free and cycle removal.

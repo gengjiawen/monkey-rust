@@ -364,7 +364,7 @@ let result = vm.export_last_result();  // Option<Object>
 | finalizer 能力较小 | `on_free` 对应 QuickJS finalizer；调用前 trace 边已经释放，但 Rust 对象字段不会像 QuickJS C 结构那样逐字段置空，因此 `on_free` 不应再次释放 trace 边 |
 | 陈旧边防护 | `free_gc` 对已释放子节点做 `object_exists` 检查，避免沿已拆除的环边 panic |
 | 字符串未拆堆 | `Value::String` 内联在 `ValueCell` 中，未使用 `RefCountHeader` 路径 |
-| `GcObjectType` 预留 | `FunctionBytecode`, `Shape`, `VarRef`, `AsyncFunction`, `JsContext` 等 tag 已定义但未使用 |
+| `GcObjectType` 预留 | `FunctionBytecode`, `Shape`, `VarRef`, `AsyncFunction`, `MonkeyContext` 等 tag 已定义但未使用 |
 | 无写屏障 | 与 QuickJS 一致，依赖显式 `dup`/`free` 维护 refcount |
 | 单线程 | 无 `Send`/`Sync` 保证，设计为单线程 VM |
 
