@@ -1,4 +1,5 @@
 use crate::{GcHeap, GcObject, GcObjectType, GcRef, MarkFunc};
+use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -49,6 +50,14 @@ impl GcObject for TestNode {
             .borrow_mut()
             .insert(id, rt.ref_count(id));
         self.freed.set(true);
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

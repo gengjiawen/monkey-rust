@@ -18,6 +18,8 @@ pub enum MarkFunc {
 pub trait GcObject: Any {
     fn trace(&self, visit: &mut dyn FnMut(GcId));
     fn on_free(&mut self, _rt: &mut GcRuntime) {}
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 struct GcObjectEntry {
@@ -358,12 +360,12 @@ impl GcRuntime {
 
     pub fn object_downcast<T: GcObject>(&self, id: GcId) -> Option<&T> {
         let entry = self.objects.get(id)?.as_ref()?;
-        (entry.object.as_ref()?.as_ref() as &dyn Any).downcast_ref()
+        entry.object.as_ref()?.as_ref().as_any().downcast_ref()
     }
 
     pub fn object_downcast_mut<T: GcObject>(&mut self, id: GcId) -> Option<&mut T> {
         let entry = self.objects.get_mut(id)?.as_mut()?;
-        (entry.object.as_mut()?.as_mut() as &mut dyn Any).downcast_mut()
+        entry.object.as_mut()?.as_mut().as_any_mut().downcast_mut()
     }
 
     // --- Phase 1: trial deletion ---

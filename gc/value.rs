@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
@@ -41,6 +42,14 @@ pub struct ValueCell {
 impl GcObject for ValueCell {
     fn trace(&self, visit: &mut dyn FnMut(crate::GcId)) {
         self.value.trace(&mut |reference| visit(reference.0));
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
