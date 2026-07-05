@@ -48,7 +48,7 @@ importers:
         specifier: ^6.43.1
         version: 6.43.1
       '@gengjiawen/monkey-wasm':
-        specifier: workspace:^0.14.0
+        specifier: workspace:^0.15.0
         version: link:../../wasm/pkg
       '@radix-ui/themes':
         specifier: ^3.3.0
@@ -103,7 +103,7 @@ importers:
   packages/prettier-plugin-monkey:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^0.14.0
+        specifier: ^0.15.0
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
