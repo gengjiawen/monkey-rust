@@ -1,0 +1,20 @@
+name: Packages
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  vscode-extension:
+    runs-on: ubuntu-latest
+    container:
+      image: gengjiawen/node-build
+    steps:
+      - uses: actions/checkout@v6
+      - run: npx envinfo
+      - name: Build wasm package
+        run: cd wasm && wasm-pack build --release --scope=gengjiawen
+      - name: Build VS Code extension
+        run: |
+          pnpm install --filter monkey-extension... --frozen-lockfile
+          pnpm --filter monkey-extension run build
