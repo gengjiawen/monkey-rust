@@ -81,11 +81,7 @@ cargo test -p monkey-gc -- value_test
 cargo test -p monkey-gc -- vm_test
 ```
 
-3. 每章末尾有 **本章测试** 列表，可以按名过滤，例如：
-
-```bash
-cargo test -p monkey-gc collects_simple_cycle
-```
+3. 读到某个测试时，可以按名单独跑，例如 `cargo test -p monkey-gc collects_simple_cycle`。
 
 ### 0.5 每章固定四拍
 
@@ -415,8 +411,6 @@ pub fn free_gc(&mut self, id: GcId) {
 | 1 | `alloc()` | 1（测试代码持有） | true |
 | 2 | `free(a)` | 0 → 释放 | false |
 
-**本章测试**（`gc/gc_test.rs`）：`refcount_frees_immediately_without_gc`，`on_free_called_when_collected`，`malloc_state_tracks_allocations`
-
 ---
 
 ## 3. 第二个持有者：dup 与所有权纪律
@@ -504,8 +498,6 @@ pub fn dup_gc(&mut self, id: GcId) -> GcId {
 | holder | 1 | ① 测试变量 `holder` |
 
 `free(child)` 后 child.rc = 1，只剩 holder 边——与第 4 章测试衔接。
-
-**本章测试**（`gc/gc_test.rs`）：`dup_extends_lifetime`
 
 ---
 
@@ -661,8 +653,6 @@ fn free_zero_refcount(&mut self) {
 | 4 | `free(child)` | 1 | 1 | 测试放手，holder 还在 |
 | 5 | `free(holder)` | 0 | 0 | holder 死 → trace → free child → 子死 |
 
-**本章测试**（`gc/gc_test.rs`）：`acyclic_holder_extends_child_lifetime`，`acyclic_graph_freed_without_gc`
-
 ---
 
 ## 5. 红灯：循环引用
@@ -721,8 +711,6 @@ flowchart LR
 | 4 | 尝试 `free` | 不变 | 不变 | rc > 0，无法释放 |
 
 **泄漏确认**：两个对象永远挂在 `gc_obj_list` 里。这就是 `Rc` 的洞，现在在我们自己的堆里重现了。
-
-**本章测试**（`gc/gc_test.rs`）：`collects_simple_cycle`（第 6 章实现后变绿）
 
 ---
 
@@ -1081,8 +1069,6 @@ stateDiagram-v2
     TmpList --> ZeroRef: 拆环僵尸延迟
 ```
 
-**本章测试**（`gc/gc_test.rs`）：`mark_func_decref_zeros_isolated_cycle`，`collects_simple_cycle`，`self_cycle_collected`，`three_node_cycle_collected`，`four_node_cycle_collected`，`repeated_gc_is_idempotent`，`self_cycle_finalizer_runs_after_edges_are_released`
-
 ---
 
 ## 7. 活着的环：循环 ≠ 垃圾
@@ -1172,8 +1158,6 @@ fn external_ref_to_cycle_entry_survives_gc() {
 
 阶段 1 后 `holder.rc = 1`（测试代码持有），`node0` / `node1` 会进入 tmp；阶段 2 从 holder 出发先平反 node0，再动态扫到 node0 平反 node1，整环回到 `gc_obj_list`。`free(holder)` 后再 GC，环变不可达，收掉。
 
-**本章测试**（`gc/gc_test.rs`）：`cycle_with_external_root_survives`，`external_ref_to_cycle_entry_survives_gc`
-
 ---
 
 ## 8. 什么时候跑 GC
@@ -1245,8 +1229,6 @@ pub fn trigger_gc(&mut self, alloc_size: usize) {
     }
 }
 ```
-
-**本章测试**（`gc/gc_test.rs`）：`trigger_gc_on_threshold`，`ref_counted_freed_without_gc`，`malloc_state_tracks_allocations`（亦见第 2 章）
 
 ---
 
@@ -1423,8 +1405,6 @@ flowchart LR
     Builtin -->|import 结果| Heap
 ```
 
-**本章测试**（`gc/value_test.rs`）：`alloc_value_increments_child_refcounts`，`import_object_releases_temporary_child_refs`，`value_cycle_collected_by_gc`，以及 `import_export_*`、`hash_key_from_value_matches_object`
-
 ---
 
 ## 10. VM：每条指令说清楚谁持有谁
@@ -1600,8 +1580,6 @@ pub struct GcVM {
     last_popped: GcRef,
 }
 ```
-
-**本章测试**（`gc/vm_test.rs`）：`test_integer_arithmetic`，`test_boolean_expressions`，`test_conditionals`，`test_global_let_statements`，`test_strings`，`test_arrays`，`test_hash`，`test_index`，`test_functions_without_arguments`，`test_functions_without_return_value`，`test_calling_functions_with_bindings`，`test_calling_functions_with_arguments_and_bindings`，`test_closures`，`test_builtins`，`builtin_call_releases_callee_args_and_stack_temporaries`，`test_eval_source_helper`
 
 ---
 
