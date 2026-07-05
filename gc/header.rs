@@ -18,6 +18,14 @@ pub enum GcPhase {
     RemoveCycles,
 }
 
+/// Which intrusive GC list currently owns an object. Each object is on at most one list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GcListKind {
+    GcObj,
+    Tmp,
+    ZeroRef,
+}
+
 /// Header shared by all cycle-GC'd objects.
 /// Matches QuickJS `JSGCObjectHeader`.
 #[derive(Debug, Clone)]
@@ -28,6 +36,7 @@ pub struct GcObjectHeader {
     pub mark: u8,
     /// Zombie detection during cycle free, inspired by QuickJS `free_mark`.
     pub free_mark: bool,
+    pub list_kind: Option<GcListKind>,
     pub list_prev: Option<GcId>,
     pub list_next: Option<GcId>,
 }
@@ -49,6 +58,7 @@ impl GcObjectHeader {
             gc_obj_type,
             mark: 0,
             free_mark: false,
+            list_kind: None,
             list_prev: None,
             list_next: None,
         }

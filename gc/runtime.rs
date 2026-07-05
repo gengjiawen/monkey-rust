@@ -1,4 +1,6 @@
-use crate::header::{GcId, GcObjectHeader, GcObjectType, GcPhase, RefCountHeader, RefCountId};
+use crate::header::{
+    GcId, GcListKind, GcObjectHeader, GcObjectType, GcPhase, RefCountHeader, RefCountId,
+};
 use crate::list::{GcList, GcListIter};
 use crate::malloc::{MallocState, DEFAULT_GC_THRESHOLD};
 use std::any::Any;
@@ -10,14 +12,6 @@ pub enum MarkFunc {
     Decref,
     ScanIncref,
     ScanIncref2,
-}
-
-/// Which intrusive list a GC object belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GcListKind {
-    GcObj,
-    Tmp,
-    ZeroRef,
 }
 
 /// Trait for objects stored in the GC heap. Implementors expose graph edges via `trace`.
@@ -118,6 +112,12 @@ impl GcRuntime {
 
         {
             let header = self.header_mut(id);
+            assert!(
+                header.list_kind.is_none(),
+                "object already belongs to a GC list: {:?}",
+                header.list_kind
+            );
+            header.list_kind = Some(kind);
             header.list_prev = tail;
             header.list_next = None;
         }
@@ -135,11 +135,9 @@ impl GcRuntime {
     }
 
     fn list_remove(&mut self, kind: GcListKind, id: GcId) {
-        let list_ptr = self.list_ptr(kind);
-        if !self.list_contains(kind, id) {
-            return;
-        }
+        assert_eq!(self.header(id).list_kind, Some(kind), "object is not on the expected GC list");
 
+        let list_ptr = self.list_ptr(kind);
         let (prev, next) = {
             let header = self.header(id);
             (header.list_prev, header.list_next)
@@ -160,34 +158,30 @@ impl GcRuntime {
         }
 
         let header = self.header_mut(id);
+        header.list_kind = None;
         header.list_prev = None;
         header.list_next = None;
     }
 
-    fn list_contains(&self, kind: GcListKind, id: GcId) -> bool {
-        let head = match kind {
-            GcListKind::GcObj => self.gc_obj_list.head,
-            GcListKind::Tmp => self.tmp_obj_list.head,
-            GcListKind::ZeroRef => self.gc_zero_ref_count_list.head,
-        };
-        GcListIter {
-            rt: self,
-            current: head,
-        }
-        .any(|x| x == id)
+    fn list_remove_current(&mut self, id: GcId) {
+        let kind = self
+            .header(id)
+            .list_kind
+            .expect("object is not on a GC list");
+        self.list_remove(kind, id);
     }
 
-    fn list_to_vec(&self, kind: GcListKind) -> Vec<GcId> {
-        let head = match kind {
-            GcListKind::GcObj => self.gc_obj_list.head,
-            GcListKind::Tmp => self.tmp_obj_list.head,
-            GcListKind::ZeroRef => self.gc_zero_ref_count_list.head,
-        };
-        GcListIter {
-            rt: self,
-            current: head,
-        }
-        .collect()
+    fn list_move(&mut self, from: GcListKind, to: GcListKind, id: GcId) {
+        self.list_remove(from, id);
+        self.list_push_back(to, id);
+    }
+
+    fn list_move_current_to(&mut self, to: GcListKind, id: GcId) {
+        let from = self
+            .header(id)
+            .list_kind
+            .expect("object is not on a GC list");
+        self.list_move(from, to, id);
     }
 
     fn alloc_slot(&mut self, entry: GcObjectEntry) -> GcId {
@@ -245,8 +239,7 @@ impl GcRuntime {
         }
 
         if self.gc_phase != GcPhase::RemoveCycles {
-            self.list_remove(GcListKind::GcObj, id);
-            self.list_push_back(GcListKind::ZeroRef, id);
+            self.list_move(GcListKind::GcObj, GcListKind::ZeroRef, id);
             if self.gc_phase == GcPhase::None {
                 self.free_zero_refcount();
             }
@@ -311,19 +304,21 @@ impl GcRuntime {
 
     /// Traverse children of a GC object. Matches QuickJS `mark_children`.
     pub fn mark_children(&mut self, id: GcId, mark_func: MarkFunc) {
-        let mut child_ids = Vec::new();
-        {
-            let object = self.objects[id]
-                .as_ref()
-                .expect("invalid GcId")
-                .object
-                .as_ref()
-                .expect("object already finalized");
-            object.trace(&mut |child| child_ids.push(child));
-        }
-        for child in child_ids {
+        // Move the box out temporarily so `trace` can call back into the runtime without
+        // materializing a child-id buffer.
+        let object = self.objects[id]
+            .as_mut()
+            .expect("invalid GcId")
+            .object
+            .take()
+            .expect("object already finalized");
+        object.trace(&mut |child| {
             self.mark_gc_header(child, mark_func);
-        }
+        });
+        self.objects[id]
+            .as_mut()
+            .expect("object freed while tracing")
+            .object = Some(object);
     }
 
     /// Maybe run GC when tracked malloc exceeds threshold. Matches `js_trigger_gc`.
@@ -377,22 +372,25 @@ impl GcRuntime {
         assert!(self.header(id).ref_count > 0);
         self.header_mut(id).ref_count -= 1;
         if self.header(id).ref_count == 0 && self.header(id).mark == 1 {
-            self.list_remove(GcListKind::GcObj, id);
-            self.list_push_back(GcListKind::Tmp, id);
+            self.list_move(GcListKind::GcObj, GcListKind::Tmp, id);
         }
     }
 
     fn gc_decref(&mut self) {
-        self.tmp_obj_list.clear();
-        let ids = self.list_to_vec(GcListKind::GcObj);
-        for id in ids {
+        assert!(
+            self.tmp_obj_list.is_empty(),
+            "temporary GC list must be empty before trial deletion"
+        );
+        let mut current = self.gc_obj_list.head;
+        while let Some(id) = current {
+            let next = self.header(id).list_next;
             assert_eq!(self.header(id).mark, 0);
             self.mark_children(id, MarkFunc::Decref);
             self.header_mut(id).mark = 1;
             if self.header(id).ref_count == 0 {
-                self.list_remove(GcListKind::GcObj, id);
-                self.list_push_back(GcListKind::Tmp, id);
+                self.list_move(GcListKind::GcObj, GcListKind::Tmp, id);
             }
+            current = next;
         }
     }
 
@@ -401,8 +399,7 @@ impl GcRuntime {
     fn gc_scan_incref_child(&mut self, id: GcId) {
         self.header_mut(id).ref_count += 1;
         if self.header(id).ref_count == 1 {
-            self.list_remove(GcListKind::Tmp, id);
-            self.list_push_back(GcListKind::GcObj, id);
+            self.list_move(GcListKind::Tmp, GcListKind::GcObj, id);
             self.header_mut(id).mark = 0;
         }
     }
@@ -420,9 +417,11 @@ impl GcRuntime {
             current = self.header(id).list_next;
         }
 
-        let tmp_ids = self.list_to_vec(GcListKind::Tmp);
-        for id in tmp_ids {
+        let mut current = self.tmp_obj_list.head;
+        while let Some(id) = current {
+            let next = self.header(id).list_next;
             self.mark_children(id, MarkFunc::ScanIncref2);
+            current = next;
         }
     }
 
@@ -443,28 +442,23 @@ impl GcRuntime {
                     self.free_gc_object(id);
                 }
                 _ => {
-                    self.list_remove(GcListKind::Tmp, id);
-                    self.list_push_back(GcListKind::ZeroRef, id);
+                    self.list_move(GcListKind::Tmp, GcListKind::ZeroRef, id);
                 }
             }
         }
 
         self.gc_phase = GcPhase::None;
 
-        let deferred = self.list_to_vec(GcListKind::ZeroRef);
-        for id in deferred {
+        while let Some(id) = self.gc_zero_ref_count_list.head {
             let ty = self.header(id).gc_obj_type;
             assert!(
                 ty == GcObjectType::MonkeyObject || ty == GcObjectType::FunctionBytecode,
                 "unexpected deferred type: {:?}",
                 ty
             );
-            self.list_remove(GcListKind::GcObj, id);
-            self.list_remove(GcListKind::Tmp, id);
-            self.list_remove(GcListKind::ZeroRef, id);
+            self.list_remove_current(id);
             self.free_slot(id);
         }
-        self.gc_zero_ref_count_list.clear();
     }
 
     fn free_zero_refcount(&mut self) {
@@ -490,47 +484,29 @@ impl GcRuntime {
         }
     }
 
-    fn list_remove_from_any(&mut self, id: GcId) {
-        self.list_remove(GcListKind::GcObj, id);
-        self.list_remove(GcListKind::Tmp, id);
-        self.list_remove(GcListKind::ZeroRef, id);
-    }
-
     fn free_heap_object(&mut self, id: GcId) {
         self.header_mut(id).free_mark = true;
 
-        let child_ids = {
-            let object = self.objects[id]
-                .as_ref()
-                .expect("invalid GcId")
-                .object
-                .as_ref()
-                .expect("object already finalized");
-            let mut child_ids = Vec::new();
-            object.trace(&mut |child| child_ids.push(child));
-            child_ids
-        };
-
-        for child in child_ids {
-            self.free_gc(child);
-        }
-
+        // Process outgoing edges as `trace` reports them; GC freeing should not allocate
+        // a child snapshot.
         let mut object = self.objects[id]
             .as_mut()
-            .expect("object already freed")
+            .expect("invalid GcId")
             .object
             .take()
             .expect("object already finalized");
+        object.trace(&mut |child| {
+            self.free_gc(child);
+        });
         object.on_free(self);
         drop(object);
 
-        self.list_remove_from_any(id);
-
         let defer_free = self.gc_phase == GcPhase::RemoveCycles && self.header(id).ref_count != 0;
         if !defer_free {
+            self.list_remove_current(id);
             self.free_slot(id);
         } else {
-            self.list_push_back(GcListKind::ZeroRef, id);
+            self.list_move_current_to(GcListKind::ZeroRef, id);
         }
     }
 }
