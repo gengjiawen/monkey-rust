@@ -17,3 +17,14 @@ jobs:
         run: cargo build
       - name: Run tests
         run: cargo test
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Build wasm package
+        run: cd wasm && wasm-pack build --release --scope=gengjiawen
+      - name: Build VS Code extension
+        run: |
+          corepack enable
+          pnpm install --filter monkey-extension... --frozen-lockfile
+          pnpm --filter monkey-extension run build
