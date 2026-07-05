@@ -30,6 +30,7 @@ Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **inf
 - **Prettier Plugin**: Format Monkey source code with [Prettier](https://prettier.io/) via `prettier-plugin-monkey`.
 - **VS Code Extension**: First-class editor support with syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
 - bytecode viewer from source
+- **GC** ([`monkey-gc`](gc/README.md)): alternate bytecode VM with QuickJS-style refcounting and three-phase cycle collection (`gc_decref` → `gc_scan` → `gc_free_cycles`) on a `GcHeap`, so cyclic object graphs can be reclaimed without changing `object` or the default `Rc` VM.
 
 ## Resources
 Official site is: https://monkeylang.org/. It's has various implementation languages :).
