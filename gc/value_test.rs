@@ -5,7 +5,9 @@ mod tests {
 
     use object::Object;
 
-    use crate::value::{alloc_value, export_object, get_value, import_object, HashKey, Value};
+    use crate::value::{
+        alloc_value, export_object, get_value, import_object, HashKey, Value, ValueCell,
+    };
     use crate::GcHeap;
 
     #[test]
@@ -129,10 +131,19 @@ mod tests {
     #[test]
     fn value_cycle_collected_by_gc() {
         let mut heap = GcHeap::new();
-        let node_b = alloc_value(&mut heap, Value::Null);
-        let node_a = alloc_value(&mut heap, Value::Array(vec![node_b]));
-        heap.free(node_b);
+        let node_a = alloc_value(&mut heap, Value::Array(vec![]));
         let node_b = alloc_value(&mut heap, Value::Array(vec![node_a]));
+
+        let node_b_edge = heap.dup(node_b);
+        match &mut heap
+            .runtime_mut()
+            .object_downcast_mut::<ValueCell>(node_a.0)
+            .expect("node_a should be a ValueCell")
+            .value
+        {
+            Value::Array(items) => items.push(node_b_edge),
+            other => panic!("expected node_a array, got {:?}", other),
+        }
 
         heap.free(node_a);
         heap.free(node_b);
