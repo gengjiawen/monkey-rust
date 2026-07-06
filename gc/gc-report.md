@@ -28,72 +28,6 @@
 - **没有 GC 背景**：不知道 mark-sweep、trial deletion 也没关系，第 1 章会把后文全部概念一次讲透。
 - 愿意跟着测试跑：边读边执行 `cargo test -p monkey-gc` 效果最好。
 
-### 0.3 全文地图
-
-报告分四层，从抽象概念一路接到可运行的 Monkey 程序：
-
-```mermaid
-flowchart TB
-    subgraph concept [概念层]
-        Ch1[第1章 概念地基]
-    end
-    subgraph heap [堆层]
-        Ch2[第2章 最小堆]
-        Ch3[第3章 dup]
-        Ch4[第4章 trace]
-        Ch5[第5章 循环红灯]
-        Ch6[第6章 三阶段回收]
-        Ch7[第7章 活着的环]
-        Ch8[第8章 触发策略]
-    end
-    subgraph value [值层]
-        Ch9[第9章 Monkey Value]
-    end
-    subgraph vm [VM层]
-        Ch10[第10章 GcVM]
-    end
-  Ch1 --> Ch2 --> Ch3 --> Ch4 --> Ch5 --> Ch6 --> Ch7 --> Ch8 --> Ch9 --> Ch10
-```
-
-| 层 | 章节 | 测试文件 | 测试数 |
-|----|------|----------|--------|
-| 堆 | 第 2–8 章 | `gc/gc_test.rs` | 17 |
-| 值 | 第 9 章 | `gc/value_test.rs` | 9 |
-| VM | 第 10 章 | `gc/vm_test.rs` | 16 |
-| **合计** | | | **42** |
-
-### 0.4 怎么跟读
-
-1. 克隆或打开本仓库，进入根目录。
-2. 每读完一章，跑对应测试：
-
-```bash
-# 全部
-cargo test -p monkey-gc
-
-# 只看堆层
-cargo test -p monkey-gc -- gc_test
-
-# 只看值层
-cargo test -p monkey-gc -- value_test
-
-# 只看 VM
-cargo test -p monkey-gc -- vm_test
-```
-
-3. 读到某个测试时，可以按名单独跑，例如 `cargo test -p monkey-gc collects_simple_cycle`。
-
-### 0.5 每章固定四拍
-
-后文每一章（第 2 章起）尽量按同一节奏写：
-
-| 节拍 | 内容 |
-|------|------|
-| **概念** | 这一章依赖什么、为什么需要它（配图，暂不讲代码） |
-| **测试即规格** | 贴真实测试，Given / When / Then 逐行解读 |
-| **实现** | 最小实现让测试变绿，只解释非显然的设计 |
-| **推演验证** | 手工走一遍 ref_count 或对象图，确认不是碰巧 |
-
 ---
 
 ## 1. 概念地基
@@ -123,7 +57,7 @@ flowchart LR
 
 **根**是对象图在堆**外面**的入口：程序还能直接摸到的引用，不经过其他堆对象。
 
-在 Monkey VM 里，根主要包括：
+在 Monkey VM 里，根主要包括（精确清单见第 10.1 节）：
 
 | 根来源 | 例子 |
 |--------|------|
@@ -138,15 +72,24 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph roots [根集合]
-        R1[测试里的 GcRef]
-        R2[VM 栈槽]
-        R3[全局变量]
+    subgraph roots [根集合：堆外入口]
+        R1[全局变量槽]
+        R2[操作数栈槽]
+        R3[常量表]
+        R4[临时持有]
     end
-    R1 --> O1
-    R2 --> O2
-    R3 --> O3
-    O1 --> O4
+    subgraph heap [堆]
+        A[数组对象]
+        B[数组元素]
+        C[闭包对象]
+        D[常量对象]
+        E[临时对象]
+    end
+    R1 --> A
+    A --> B
+    R2 --> C
+    R3 --> D
+    R4 --> E
 ```
 
 ### 1.3 可达性与垃圾
@@ -213,7 +156,8 @@ fn main() {
     let b = Rc::new(Node { next: RefCell::new(None) });
     *a.next.borrow_mut() = Some(b.clone());
     *b.next.borrow_mut() = Some(a.clone());
-    // 离开作用域时 a、b 的 rc 都是 2，永远不会归零
+    // 离开作用域前 a、b 的 strong count 都是 2；
+    // 局部变量 drop 后各剩 1，仍然不会归零
 }
 ```
 
@@ -228,11 +172,53 @@ fn main() {
 
 **Mark-sweep**：要维护完整的根集合，扫一遍栈、全局表、寄存器，再 DFS/BFS 标记。实现干净，但要么 STW，要么要写屏障配合增量标记。
 
-**QuickJS 路线**（我们选的）：平时仍是引用计数；环由**三阶段 trial deletion** 回收。核心观察是——
+**QuickJS 路线**（我们选的）：平时仍是引用计数；环由**三阶段 trial deletion** 回收。它建在一个能把整篇报告串起来的观察上。
 
-> 对象的 `ref_count` = 根持有它的次数 + 堆内其他对象指向它的边数
+#### 把 ref_count 拆成两半
 
-因此：**把所有堆内边从计数里减掉之后，剩下的计数恰好等于根持有它的次数**。不必枚举根，就能区分"被根拽着"和"只在环里互相撑着"。
+每个对象的 `ref_count` 可以按**来源**拆成两部分：
+
+```text
+ref_count = 外部持有数 + 内部持有数
+```
+
+- **外部持有数**：来自根的引用——栈槽、全局变量、测试代码手里的 `GcRef`。它不是完整的活性答案，而是**可达性传播的入口**：某个对象有外部持有，说明程序还能从堆外摸到它。
+- **内部持有数**：来自其他堆对象的边——数组的元素、闭包的捕获。它本身不能证明对象活着；但一旦源对象从外部入口可达，这条边就会把活性继续传给子对象。
+
+1.4 节的循环泄漏，本质就是 `ref_count` 把这两半混在一起算，噪声盖过了信号。
+
+#### 关键一击：不用数外部持有，把内部持有减掉就行
+
+GC 想知道的是外部持有数。直觉做法是枚举所有根、数每个对象被几个根指着——这正是 mark-sweep 的代价，要在 VM 里维护一个完整的根扫描器。
+
+trial deletion 走反方向：**不数外部持有，而是把内部持有从计数里减掉，剩下的自然就是外部持有数。** 能这样做而不枚举根，是因为内部持有有一个对称结构：
+
+> 每个对象的"内部持有数" = 指向它的堆内**入边**数。
+> 每条入边，一定是某个对象的**出边**。
+
+所以只要**遍历每个对象、沿它的出边把邻居的计数 −1**，就等价于把每个对象的入边都减了一遍：
+
+```text
+对每个对象 X，沿出边 decref 邻居
+   = 对每条堆内边 (X → Y)，做 Y.ref_count −= 1
+   = 把 Y 的"来自 X 的入边"从计数里减掉
+遍历完所有 X  ⟹  每个对象的全部入边都被减了一遍
+             ⟹  剩余 ref_count = 原本的外部持有数
+```
+
+注意这个转换里**出边**和**入边**的角色：算法操作的是出边（我们主动遍历每个对象的子节点），产生效果的是入边（每个子节点被减掉一条指向它的边）。后文反复出现"沿出边 decref"——记住它等价于"把对方的入边减掉"。
+
+#### 为什么叫"试探性"删除
+
+把所有堆内边减掉之后，计数归零的对象**只是嫌疑垃圾**，不是定罪。原因：有些对象虽然没有外部持有，但能从有外部持有的对象沿堆内边走到。阶段 1 会把这些堆内边也减掉，所以这类间接可达的活对象也可能暂时变成 0。
+
+> "trial"（试探）的关键就在这里：删除是**可逆**的。我们只是试探性地把内部边全摘掉，看谁剩 0；后面的步骤会把冤枉的计数加回去。
+
+这正是第 6 章三阶段的来历——
+
+- **阶段 1**：试探性减掉所有堆内边，剩余计数 = 外部持有数。归零的进"嫌疑人名单"。
+- **阶段 2**：从"明确活着"的对象（剩余计数 > 0）出发，沿边把计数加回去；被救的撤出名单。
+- **阶段 3**：名单上剩下的，没有任何活人能走到，才是真垃圾。
 
 我们选这条路的理由：
 
@@ -244,7 +230,7 @@ fn main() {
 
 | 概念 | 首次深入 | 测试锚点 |
 |------|----------|----------|
-| 句柄 vs 指针 | 第 2 章 | `refcount_frees_immediately_without_gc` |
+| `GcRef` 句柄 | 第 2 章 | `refcount_frees_immediately_without_gc` |
 | dup / free 纪律 | 第 3 章 | `dup_extends_lifetime` |
 | trace / 级联释放 | 第 4 章 | `acyclic_holder_extends_child_lifetime` |
 | 循环泄漏 | 第 5 章 | `collects_simple_cycle`（先红后绿） |
@@ -261,6 +247,7 @@ fn main() {
 | **根（root）** | 堆外可直接访问的引用：栈槽、全局变量、测试代码手里的 `GcRef` 等 |
 | **可达（reachable）** | 从某个根沿边能走到的对象 |
 | **引用计数（refcount）** | 每个对象的持有者数量；`dup` +1，`free` −1 |
+| **外部持有 / 内部持有** | ref_count 的两半：外部持有来自根，是可达性入口；内部持有来自堆内其他对象的边，负责从入口继续传播可达性，单独不能证明对象活着 |
 | **trace** | 对象报告自己引用的所有子对象（出边） |
 | **trial deletion** | 三阶段 GC 的第一阶段：试探性减掉所有堆内边 |
 | **mark（header 字段）** | 阶段内临时标记："我的出边已经减过了"，不是永久 mark bit |
@@ -275,28 +262,18 @@ fn main() {
 
 ## 2. 最小的堆：分配和释放
 
-### 2.1 概念：句柄 vs 指针
+### 2.1 概念：`GcRef` 是堆对象的句柄
 
-堆对象可能搬家、可能复用槽位。如果到处传裸指针，释放后容易**悬垂指针**——指着一块已经分配给别人的内存。
+`GcRef` 不是对象本体，也不是 `Rc<Object>`。它只是一个不透明的堆内 ID：
 
-常见做法是发**句柄**（不透明 ID）：调用者只拿"第 7 号槽位"这种凭据，通过运行时查表访问本体。完整的生产实现通常会给句柄带上 generation，槽位复用后旧句柄也能被识别出来。
-
-我们的 `GcRef(GcId)` 是最小版下标句柄。对象表是 `Vec<Option<GcObjectEntry>>`：释放 = 槽位置 `None` + 下标扔进 `free_slots` 复用。因此旧句柄只在槽位**尚未复用**时查到 `None`；一旦同一个下标被新对象复用，旧句柄可能误命中新对象。本项目不提供 use-after-free 硬防御，正确性靠 `dup` / `free` 所有权纪律：某个持有者 `free` 之后，不能再使用那份句柄。若要硬性防御，应把 `GcRef` 扩成 `(slot, generation)`。
-
-```mermaid
-flowchart LR
-    subgraph handles [句柄]
-        H0["GcRef(0)"]
-        H1["GcRef(1)"]
-    end
-    subgraph table [对象表 Vec]
-        S0["slot 0: Some(obj_A)"]
-        S1["slot 1: None 已释放（复用前）"]
-        S2["slot 2: Some(obj_C)"]
-    end
-    H0 --> S0
-    H1 -.->|复用前查不到；复用后可能命中新对象| S1
+```rust
+pub struct GcRef(pub GcId);
+pub type GcId = usize;
 ```
+
+运行时用这个 ID 去 `Vec<Option<GcObjectEntry>>` 里查对象。这样 VM、数组、闭包里保存的都是轻量句柄，真正的对象统一由 `GcRuntime` 管。
+
+这个实现是最小版句柄：没有 generation。对象释放后槽位会进入 `free_slots`，以后可能被新对象复用；因此已经 `free` 的那份 `GcRef` 不能再使用。正确性靠 `dup` / `free` 所有权纪律维护，而不是靠句柄本身防 use-after-free。
 
 ### 2.2 测试即规格
 
@@ -714,25 +691,53 @@ flowchart LR
 
 ---
 
-## 6. 三阶段回收：先破坏，再修复，再收尸
+## 6. 三阶段回收：先破坏，再修复，再释放
 
-### 6.0 概念：核心等式
+### 6.0 概念：两张名单与三个阶段
 
-对任意对象，在稳态下（没有正在进行的 dup/free/GC 中间态）：
+第 1.5 节已经把核心等式讲透了。这里先把它落成一套**在两张名单之间搬对象**的具体流程，再回头用等式验证。
 
-```text
-ref_count = 根引用数 + 堆内入边数
+#### 两张名单
+
+运行时维护两条侵入式链表（第 4 章介绍过 `list_prev` / `list_next`）：
+
+| 名单 | 含义 |
+|------|------|
+| `gc_obj_list` | **未受怀疑**的存活对象；GC 开始前所有对象都在这 |
+| `tmp_obj_list` | **嫌疑人**：阶段 1 减完边后计数归零、但尚未定罪 |
+
+整个 `run_gc` 就是对象在这两张名单（外加收尾用的 `gc_zero_ref_count_list`）之间的迁移：
+
+```mermaid
+flowchart LR
+    GCO["gc_obj_list<br/>未受怀疑"] -->|阶段1 减边后 rc==0| TMP["tmp_obj_list<br/>嫌疑人"]
+    TMP -->|阶段2 被活人救回| GCO
+    TMP -->|阶段3 真垃圾| FREE["释放"]
 ```
 
-其中**堆内入边**= 其他堆对象通过 `trace` 报出来的、指向它的边数。根引用 = 栈槽、全局变量、测试代码手里的 `GcRef` 等堆外持有。
+#### 三个阶段，一句话各一个为什么
 
-**trial deletion（阶段 1）** 遍历每个堆对象，对它的每条出边执行"子对象 rc −= 1"。等价于把**所有堆内入边**从计数里摘掉。减完之后：
+- **阶段 1 `gc_decref`** —— *试探性减边*：沿每个对象的出边把邻居计数 −1。减完后剩余计数 = 外部持有数（第 1.5 节等式）。归零的搬进 `tmp_obj_list` 当嫌疑人。
+- **阶段 2 `gc_scan`** —— *平反*：阶段 1 会**过度减扣**——只靠堆内边间接可达的活对象也会被减成 0。从"剩余计数 > 0"的明确活人出发，沿边把计数加回去；被救的（0→1）从 `tmp` 搬回 `gc_obj_list` 尾部。**没有这一步，嵌套结构的中层会被误杀。**
+- **阶段 3 `gc_free_cycles`** —— *收尾释放*：`tmp_obj_list` 上剩下的，没有任何活人能走到，是真垃圾，释放。
+
+> 三阶段的根本原因：阶段 1 只看"减完边后还有没有剩余"，看不到"能不能从活人走过去"。后者正是阶段 2 补的判据。两者合起来，才等价于第 1.3 节的可达性判据。
+
+#### 核心等式（回顾）
+
+稳态下（没有正在进行的 dup/free/GC 中间态）：
 
 ```text
-剩余 ref_count = 根引用数
+ref_count = 外部持有数 + 堆内入边数
 ```
 
-这是全文最重要的等式。下面用三个具体图各验证一遍。
+阶段 1 沿每个对象的**出边** decref 邻居，等价于把每个对象的**入边**全减一遍：
+
+```text
+剩余 ref_count = ref_count − 堆内入边数 = 外部持有数
+```
+
+下面用三个具体图各验证一遍"剩余 = 外部持有数"，并看阶段 2 怎么救回误伤。
 
 #### 验证 1：纯 2 环，无根
 
@@ -749,7 +754,7 @@ flowchart LR
 | node0 | 1 | 1 | 0 |
 | node1 | 1 | 1 | 0 |
 
-两人都是嫌疑人 → 阶段 2 没人救 → 阶段 3 收尸。
+两人都是嫌疑人 → 阶段 2 没人救 → 阶段 3 收尾释放。
 
 #### 验证 2：链式嵌套，只有根持头
 
@@ -794,15 +799,7 @@ pub fn run_gc(&mut self) {
 }
 ```
 
-```mermaid
-flowchart TB
-    start[run_gc] --> p1[gc_decref]
-    p1 --> p2[gc_scan]
-    p2 --> p3[gc_free_cycles]
-    p1 --> L1["对象在 gc_obj_list / tmp_obj_list 间迁移"]
-    p2 --> L2["误伤者回到 gc_obj_list 尾部"]
-    p3 --> L3["tmp 剩余者被 free_heap_object"]
-```
+> 这三个阶段的执行顺序就是 `run_gc` 的一行行调用；对象在名单间的迁移轨迹见本节开头的两张名单图。
 
 ### 6.1 阶段 1：gc_decref
 
@@ -851,16 +848,27 @@ fn gc_decref_child(&mut self, id: GcId) {
 }
 ```
 
-#### `mark` 字段：每条边恰好减一次
+#### `mark` 字段：守住"出边减完才进名单"这条不变量
 
-`mark = 1` 表示"这个对象的出边已经处理过"。子对象归零时，**只有它自己的出边也减完了**（`mark == 1`）才立刻进 `tmp_obj_list`；否则等主循环轮到它。
+阶段 1 的主循环只走 `gc_obj_list`：`current = head; while ... current = list_next`。一旦某个对象被搬进 `tmp_obj_list`，主循环就再也碰不到它——可它的出边可能还没 decref 过。
+
+所以有一条必须守的不变量：
+
+> **对象必须在"自己的出边全部减完"之后，才能进 `tmp_obj_list`。** 否则它的出边永远漏减，邻居计数偏高，环可能漏回收。
+
+`mark` 就是守这条不变量的标志位：
+
+- `mark = 0`：出边还没处理。
+- `mark = 1`：`mark_children` 跑过了，出边已全部 decref。
+
+看 `gc_decref` 的顺序：先 `mark_children(id, Decref)`（减掉 id 的所有出边），**再** `header.mark = 1`。再看 `gc_decref_child`：子对象归零时，**只有它 `mark == 1`（自己的出边也减完了）才立刻进 tmp**；否则留在 `gc_obj_list`，等主循环轮到它、把出边减完再判定。
 
 | 失败模式 | 原因 | 后果 |
 |----------|------|------|
 | 少减 | 某条堆内边没减掉 | 垃圾对象 rc 仍 > 0，漏回收 |
 | 多减 | 同一条边减了两次 | 活人 rc 变 0 进 tmp，可能被误杀 |
 
-**反例：若不做 mark 同步**
+**反例：不守不变量会怎样**
 
 两节点环，处理顺序若让 node1 先被邻居减量、自己出边尚未处理：
 
@@ -869,11 +877,13 @@ node1 被 node0 的边减量 → rc 0，但 mark 仍为 0
 若此时立刻进 tmp 且不再处理 node1 的出边 → node0 少减一条 → 泄漏
 ```
 
+`mark == 1` 这道闸拦住了这个时序：node1 的 mark 还是 0，就留在 `gc_obj_list`，等主循环轮到它把出边减完，再判定进不进 tmp。
+
 **反例：若边减两次**
 
-同一子节点被两个父节点各减一次本没问题；但若**同一条边**因重复 `mark_children` 减两次，活人 rc 会偏低甚至变 0。
+同一子节点被两个父节点各减一次本没问题（两条不同的入边）；但若**同一条边**因重复 `mark_children` 减两次，活人 rc 会偏低甚至变 0。所以每个对象在阶段 1 恰好被 `mark_children` 一次。
 
-进 `tmp_obj_list` **不是释放**，只是嫌疑人名单。
+进 `tmp_obj_list` **不是释放**，只是嫌疑人名单——再强调一遍：定罪要等阶段 2，行刑要等阶段 3。
 
 #### 推演：两节点孤立环
 
@@ -1173,7 +1183,7 @@ fn external_ref_to_cycle_entry_survives_gc() {
 | 稳定，只有无环分配/释放 | 几乎不触发 |
 | 猛涨（大量新对象、可能出现环） | 超过阈值才扫 |
 
-**1.5 倍系数**：触发后 `threshold = malloc_size + malloc_size/2`。堆从 100KB 涨到触发点，下次要涨到 150KB 才再触发——避免抖动。堆缩小后阈值也会跟着降。
+**1.5 倍系数**：触发后 `threshold = malloc_size + malloc_size/2`。堆从 100KB 涨到触发点，下次要涨到 150KB 才再触发——避免抖动。注意阈值只在 `trigger_gc()` 实际触发 GC 后重算；普通释放会降低 `malloc_size`，但不会立刻降低 `malloc_gc_threshold`。
 
 `MallocState` 在 `alloc_slot` / `free_slot` 记账；`trigger_gc(alloc_size)` 在**即将分配**前判断 `malloc_size + alloc_size > threshold`。
 
@@ -1454,7 +1464,7 @@ run_gc_vm_tests(vec![
                 let adder = newAdder(1, 2); adder(8);",
         expected: Object::Integer(11),
     },
-    // ... 共 15 组 VmTestCase + 1 组计数测试
+    // ... vm_test.rs 里共有 14 组 run_gc_vm_tests 语义测试
 ]);
 ```
 
@@ -1470,7 +1480,7 @@ run_gc_vm_tests(vec![
 | `test_builtins` | len、push 等 |
 | `test_eval_source_helper` | 顶层 `eval_source` API |
 
-16 组里 15 组验语义，1 组验计数。
+`vm_test.rs` 共有 16 个测试：14 个 `run_gc_vm_tests` 语义测试、1 个 `test_eval_source_helper` 顶层 API 测试、1 个计数测试。
 
 **`builtin_call_releases_callee_args_and_stack_temporaries`** 保证**计数对**：
 
@@ -1553,12 +1563,12 @@ self.push_raw(array);
 
 #### 闭包捕获：栈 → 闭包对象的净转移
 
-`newAdder(1, 2)` 返回内层闭包时，外层帧弹出，但内层仍要读 `a`、`b`。`OpClosure` 走模式三：`with_owned_edges` 对 `func` 和每个自由变量 `dup`，再清空栈上捕获槽。
+`newAdder(1, 2)` 返回内层闭包时，外层帧弹出，但内层仍要读 `a`、`b`。`OpClosure` 走模式三：`with_owned_edges` 对常量表里的 `func` 和每个栈上的自由变量 `dup`，再清空栈上捕获槽。
 
 ```text
-OpClosure 前:  stack[base..] 持 func、a、b
+OpClosure 前:  constants[const_index] 持 func；stack[start..sp) 持 a、b
 后:            闭包对象持 func、a、b（各 dup 一次）
-               栈槽 free，计数净不变
+               捕获槽 free；a、b 计数净不变，func 多出闭包持有的一份
 ```
 
 #### 帧不持引用
@@ -1612,7 +1622,7 @@ cargo test -p monkey-gc
 1. 下标句柄堆，`alloc` / `free`
 2. `dup` 与所有权纪律
 3. `trace` 与无环级联释放
-4. 三阶段环回收：trial deletion → 平反 → 拆环收尸
+4. 三阶段环回收：trial deletion → 平反 → 拆环释放
 5. 阈值触发，`Value` 与 `GcVM` 接线
 
 ### 12.2 核心直觉
@@ -1644,7 +1654,7 @@ cargo test -p monkey-gc
 | import 不泄漏 | 9 | `import_object_releases_temporary_child_refs` |
 | Value 层环 | 9 | `value_cycle_collected_by_gc` |
 | VM 计数 | 10 | `builtin_call_releases_callee_args_and_stack_temporaries` |
-| 端到端语义 | 10 | `test_closures` 等 15 组 |
+| 端到端语义 | 10 | `test_closures` 等 VM 测试 |
 
 ### 12.4 延伸阅读
 
