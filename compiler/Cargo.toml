@@ -1,6 +1,6 @@
 [package]
 name = "monkey-compiler"
-version = "0.15.0"
+version = "0.15.1"
 description = "a compiler for monkeylang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
