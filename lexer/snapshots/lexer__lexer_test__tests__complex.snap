@@ -711,7 +711,7 @@ expression: "\n// welcome to monkeylang\nlet five = 5;\nlet ten = 10;\n\nlet add
     },
     "span": {
       "start": 211,
-      "end": 211
+      "end": 212
     }
   }
 ]

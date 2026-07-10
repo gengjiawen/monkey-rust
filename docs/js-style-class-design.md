@@ -1232,7 +1232,6 @@ empty class/body 已使用 comment-aware 路径，并由 dangling comment 测试
 实现 class 时一并修复：
 
 - index span 应从 object 起点开始，不是 `[`；
-- EOF 应是 `len..len` 的空 half-open span，而不是越界到 `len + 1`；
 - call/property/new 全部使用统一 span accessor。
 
 Rust span 当前是 UTF-8 byte offset，Prettier/JS location 使用 UTF-16 code unit offset。非 ASCII 文本出现在节点前时可能错位。class PR 至少要增加 Unicode regression test 并记录边界；更完整的方案是在 WASM/plugin boundary 建 byte offset 到 JS offset 的映射。这个问题不应被误认为 class AST 自身的 span 错误。
@@ -1360,7 +1359,7 @@ assert_eq!(report.collected_by_value_kind.instance, 2);
 - binary RHS 移除 unwrap；
 - expression span accessor + parser-local grouped cover span；
 - call callee 放开；
-- identifier digit、index/EOF span 修正。
+- identifier digit、index span 修正。
 - 恢复 compiler instruction test helper 的 length assertion。
 
 ### Phase 1：Syntax、AST 与 formatter

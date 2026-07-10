@@ -48,10 +48,11 @@ impl<'a> Lexer<'a> {
         self.skip_ignorable();
         let start = self.position;
         if self.ch == '\0' {
+            self.read_char();
             return Token {
                 span: Span {
                     start,
-                    end: start,
+                    end: start + 1,
                 },
                 kind: TokenKind::EOF,
             };

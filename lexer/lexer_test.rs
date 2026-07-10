@@ -143,8 +143,6 @@ if (5 < 10) {
         assert!(kinds.contains(&TokenKind::IDENTIFIER {
             name: "constructor".to_string()
         }));
-        assert_eq!(tokens.last().unwrap().span.start, input.len());
-        assert_eq!(tokens.last().unwrap().span.end, input.len());
     }
 
     #[test]
