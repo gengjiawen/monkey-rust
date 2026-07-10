@@ -619,6 +619,23 @@ mod tests {
             .restored_objects
             .iter()
             .all(|object| { object.label.ends_with(&format!("#{}", object.id)) }));
+        let restored_labels = report
+            .phases
+            .scan
+            .restored_objects
+            .iter()
+            .map(|object| object.label.as_str())
+            .collect::<Vec<_>>();
+        assert!(
+            report
+                .phases
+                .scan
+                .restored_objects
+                .iter()
+                .any(|object| object.label == format!("Closure(Node.connect)#{}", object.id)),
+            "restored labels: {:?}",
+            restored_labels
+        );
         assert_eq!(report.phases.scan.garbage_candidate_objects.len(), 2);
         assert!(report
             .phases
@@ -633,6 +650,43 @@ mod tests {
 
         let second = vm.collect_garbage();
         assert_eq!(second.phases.free_cycles.freed, 0);
+    }
+
+    #[test]
+    fn scan_report_uses_compiled_function_names_for_closures() {
+        let mut vm = cycle_vm(
+            r#"
+                let makeHolders = fn() {
+                  let named = fn() { 1; };
+                  [named, fn() { 2; }];
+                };
+                let holders = makeHolders();
+            "#,
+        );
+
+        let report = vm.collect_garbage();
+        let closure_labels = report
+            .phases
+            .scan
+            .restored_objects
+            .iter()
+            .filter(|object| object.kind == ValueKind::Closure)
+            .map(|object| object.label.as_str())
+            .collect::<Vec<_>>();
+        assert!(
+            closure_labels
+                .iter()
+                .any(|label| label.starts_with("Closure(named)#")),
+            "closure labels: {:?}",
+            closure_labels
+        );
+        assert!(
+            closure_labels
+                .iter()
+                .any(|label| label.starts_with("Closure#")),
+            "closure labels: {:?}",
+            closure_labels
+        );
     }
 
     #[test]

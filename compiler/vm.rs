@@ -34,6 +34,7 @@ impl VM {
         let empty_frame = Frame::new(
             Closure {
                 func: Rc::from(object::CompiledFunction {
+                    name: String::new(),
                     instructions: vec![],
                     num_locals: 0,
                     num_parameters: 0,
@@ -44,6 +45,7 @@ impl VM {
         );
 
         let main_fn = Rc::from(object::CompiledFunction {
+            name: String::new(),
             instructions: bytecode.instructions.data,
             num_locals: 0,
             num_parameters: 0,

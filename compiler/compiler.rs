@@ -339,7 +339,7 @@ impl Compiler {
                 self.emit_with_span(OpClass, &vec![class_name], &class.span);
 
                 for method in &class.methods {
-                    self.compile_method(method)?;
+                    self.compile_method(&class.name.name, method)?;
                     let method_name = self.add_constant(Object::String(method.name.name.clone()));
                     let kind = match method.kind {
                         MethodKind::Method => 0,
@@ -494,7 +494,6 @@ impl Compiler {
                 let function_span = f.span.clone();
                 self.enter_scope();
                 self.callable_kinds.push(CallableKind::Function);
-                // f.name
                 for param in f.params.iter() {
                     self.symbol_table.define(param.name.clone());
                 }
@@ -514,6 +513,7 @@ impl Compiler {
                 }
 
                 let compiled_function = Rc::from(object::CompiledFunction {
+                    name: f.name.clone(),
                     instructions: scoped_instructions.instructions.data,
                     num_locals,
                     num_parameters: f.params.len(),
@@ -624,7 +624,11 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_method(&mut self, method: &MethodDefinition) -> Result<(), CompileError> {
+    fn compile_method(
+        &mut self,
+        class_name: &str,
+        method: &MethodDefinition,
+    ) -> Result<(), CompileError> {
         let method_span = method.span.clone();
         self.enter_scope();
         let callable_kind = match method.kind {
@@ -663,6 +667,7 @@ impl Compiler {
         }
 
         let compiled_function = Rc::new(object::CompiledFunction {
+            name: format!("{}.{}", class_name, method.name.name),
             instructions: scoped_instructions.instructions.data,
             num_locals,
             num_parameters: method.params.len() + 1,

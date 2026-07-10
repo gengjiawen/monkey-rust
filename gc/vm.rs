@@ -78,6 +78,7 @@ impl GcVM {
         let main_fn = alloc_value(
             &mut heap,
             Value::CompiledFunction(object::CompiledFunction {
+                name: String::new(),
                 instructions: instructions.data,
                 num_locals: 0,
                 num_parameters: 0,

@@ -1042,7 +1042,7 @@ impl GcVM {
 
 `GcId` slot 可能在后续 allocation 中复用，所以 kind 差集和 label 都必须在同一次同步 collection 内完成。对象摘要按 ID 排序；ID 只在本次 report 内用于区分对象。
 
-合成 label 不尝试恢复源码变量名：alias 会让“对象的变量名”没有唯一答案。class 和方法使用运行时名称，其余对象使用类型与 ID，例如 `Class(Node)#7`、`Instance(Node)#12`、`BoundMethod(Node.connect)#14`、`Array#15`。
+合成 label 不尝试恢复对象当前绑定的变量名：alias 会让“对象的变量名”没有唯一答案。closure 使用编译时保存在 `CompiledFunction` 上的原始函数名，class 和方法使用运行时名称，其余对象使用类型与 ID，例如 `Closure(makeCycle)#10`、`Class(Node)#7`、`Instance(Node)#12`、`BoundMethod(Node.connect)#14`、`Array#15`。匿名 closure 保持为 `Closure#18`。
 
 阶段 telemetry 至少包括：
 

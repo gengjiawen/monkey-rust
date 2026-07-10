@@ -15,6 +15,7 @@ mod tests {
                     Object::Integer(5),
                     Object::Integer(10),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpConst, &vec![1]),
@@ -37,6 +38,7 @@ mod tests {
                     Object::Integer(5),
                     Object::Integer(10),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpConst, &vec![1]),
@@ -59,6 +61,7 @@ mod tests {
                     Object::Integer(1),
                     Object::Integer(2),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpPop, &vec![0]),
@@ -85,6 +88,7 @@ mod tests {
             input: "fn() { }",
             expected_constants: vec![Object::CompiledFunction(Rc::from(
                 object::CompiledFunction {
+                    name: String::new(),
                     instructions: concat_instructions(&vec![make_instructions(OpReturn, &vec![0])])
                         .data,
                     num_locals: 0,
@@ -107,6 +111,7 @@ mod tests {
                 expected_constants: vec![
                     Object::Integer(24),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
@@ -127,6 +132,7 @@ mod tests {
                 expected_constants: vec![
                     Object::Integer(24),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: "noArg".to_string(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
@@ -148,6 +154,7 @@ mod tests {
                 input: "let oneArg = fn(a) { a; }; oneArg(24);",
                 expected_constants: vec![
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: "oneArg".to_string(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpGetLocal, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
@@ -171,6 +178,7 @@ mod tests {
                 input: "let manyArg = fn(a, b, c) { a; b; c; }; manyArg(24, 25, 26);",
                 expected_constants: vec![
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: "manyArg".to_string(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpGetLocal, &vec![0]),
                             make_instructions(OpPop, &vec![0]),
@@ -211,6 +219,7 @@ mod tests {
                 expected_constants: vec![
                     Object::Integer(55),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpGetGlobal, &vec![0]),
                             make_instructions(OpReturnValue, &vec![0]),
@@ -232,6 +241,7 @@ mod tests {
                 expected_constants: vec![
                     Object::Integer(55),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpSetLocal, &vec![0]),
@@ -254,6 +264,7 @@ mod tests {
                     Object::Integer(55),
                     Object::Integer(77),
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpConst, &vec![0]),
                             make_instructions(OpSetLocal, &vec![0]),
@@ -300,6 +311,7 @@ mod tests {
                 input: "fn() { len([]) }",
                 expected_constants: vec![Object::CompiledFunction(Rc::from(
                     object::CompiledFunction {
+                        name: String::new(),
                         instructions: concat_instructions(&vec![
                             make_instructions(OpGetBuiltin, &vec![0]),
                             make_instructions(OpArray, &vec![0]),

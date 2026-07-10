@@ -105,7 +105,9 @@ collector invariants.
 
 Scan labels identify runtime objects without pretending to recover source
 bindings: `Class(Node)#7`, `Instance(Node)#12`, and
-`BoundMethod(Node.connect)#14`. IDs are scoped to one synchronous report.
+`BoundMethod(Node.connect)#14`. Named closures retain their compile-time name,
+for example `Closure(makeCycle)#10`; anonymous closures remain `Closure#18`.
+IDs are scoped to one synchronous report.
 
 ## Modules
 

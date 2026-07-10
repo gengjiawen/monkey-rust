@@ -103,12 +103,13 @@ function successEnvelope({
         byValueKind: counts({ instance: after }),
       },
       phases: {
-        trialDeletion: { edgesVisited: 11, candidates: 4 },
+        trialDeletion: { edgesVisited: 11, candidates: 5 },
         scan: {
-          restored: 2,
+          restored: 3,
           garbageCandidates: 2,
           restoredObjects: [
             { id: 7, kind: 'class', label: 'Class(Node)#7' },
+            { id: 10, kind: 'closure', label: 'Closure(makeCycle)#10' },
             { id: 12, kind: 'instance', label: 'Instance(Node)#12' },
           ],
           garbageCandidateObjects: [
@@ -186,6 +187,7 @@ describe('GC playground', () => {
     expect(screen.getByText('Scan')).toBeInTheDocument()
     expect(screen.getByText('Free cycles')).toBeInTheDocument()
     expect(screen.getByText('Class(Node)#7')).toBeInTheDocument()
+    expect(screen.getByText('Closure(makeCycle)#10')).toBeInTheDocument()
     expect(screen.getByText('Instance(Node)#12')).toBeInTheDocument()
     expect(screen.getByText('Instance(Node)#13')).toBeInTheDocument()
     expect(screen.getByText('BoundMethod(Node.connect)#14')).toBeInTheDocument()

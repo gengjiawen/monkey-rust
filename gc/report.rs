@@ -111,7 +111,9 @@ fn summarize_gc_object(runtime: &GcRuntime, id: GcId) -> GcObjectSummary {
             instance_class_name(runtime, method.receiver),
             method.name
         ),
-        Value::Closure(_) => "Closure".to_string(),
+        Value::Closure(closure) => closure_name(runtime, closure.func)
+            .map(|name| format!("Closure({})", name))
+            .unwrap_or_else(|| "Closure".to_string()),
         Value::Array(_) => "Array".to_string(),
         Value::Hash(_) => "Hash".to_string(),
         Value::Integer(_) => "Integer".to_string(),
@@ -138,6 +140,17 @@ fn class_name(runtime: &GcRuntime, reference: GcRef) -> &str {
             _ => None,
         })
         .unwrap_or("<unknown>")
+}
+
+fn closure_name(runtime: &GcRuntime, reference: GcRef) -> Option<&str> {
+    runtime
+        .object_downcast::<ValueCell>(reference.0)
+        .and_then(|cell| match &cell.value {
+            Value::CompiledFunction(function) if !function.name.is_empty() => {
+                Some(function.name.as_str())
+            }
+            _ => None,
+        })
 }
 
 fn instance_class_name(runtime: &GcRuntime, reference: GcRef) -> &str {

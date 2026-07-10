@@ -646,6 +646,7 @@ mod tests {
     #[test]
     fn compiles_class_constructor_properties_and_new_exactly() {
         let constructor = Object::CompiledFunction(Rc::new(object::CompiledFunction {
+            name: "Point.constructor".to_string(),
             instructions: concat_instructions(&vec![
                 make_instructions(OpGetLocal, &vec![0]),
                 make_instructions(OpGetLocal, &vec![1]),
@@ -660,6 +661,7 @@ mod tests {
             num_parameters: 2,
         }));
         let value_method = Object::CompiledFunction(Rc::new(object::CompiledFunction {
+            name: "Point.value".to_string(),
             instructions: concat_instructions(&vec![
                 make_instructions(OpGetLocal, &vec![0]),
                 make_instructions(OpGetProperty, &vec![4]),

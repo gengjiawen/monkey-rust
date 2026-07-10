@@ -328,6 +328,7 @@ pub fn import_object(heap: &mut GcHeap, object: &Object) -> GcRef {
                 .collect(),
         ),
         Object::CompiledFunction(f) => Value::CompiledFunction(CompiledFunction {
+            name: f.name.clone(),
             instructions: f.instructions.clone(),
             num_locals: f.num_locals,
             num_parameters: f.num_parameters,

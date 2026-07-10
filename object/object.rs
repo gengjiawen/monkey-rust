@@ -194,6 +194,7 @@ impl Hash for Object {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CompiledFunction {
+    pub name: String,
     pub instructions: Vec<u8>,
     pub num_locals: usize,
     pub num_parameters: usize,
