@@ -49,7 +49,7 @@ expression: let x=5
     },
     "span": {
       "start": 7,
-      "end": 8
+      "end": 7
     }
   }
 ]

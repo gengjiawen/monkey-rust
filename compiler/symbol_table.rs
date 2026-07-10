@@ -61,39 +61,36 @@ impl SymbolTable {
         return symbol;
     }
 
+    pub fn visible_names(&self) -> Vec<String> {
+        let mut names = self
+            .outer
+            .as_ref()
+            .map(|outer| outer.visible_names())
+            .unwrap_or_default();
+        names.extend(self.symbols.keys().cloned());
+        names
+    }
+
     // Resolve a name in the current scope, capturing free variables from outers when needed.
     pub fn resolve(&mut self, name: String) -> Option<Rc<Symbol>> {
         if let Some(sym) = self.symbols.get(&name) {
             return Some(sym.clone());
         }
 
-        // If not found locally, try outer scopes.
-        if let Some(outer) = &self.outer {
-            // We can't mutate outer here, so use a read-only helper to locate the original symbol.
-            if let Some(original) = outer.resolve_readonly(&name) {
-                return match original.scope {
-                    // Globals and builtins are accessed directly.
-                    SymbolScope::Global | SymbolScope::Builtin => Some(original),
-                    // Locals (from outer scope) or already-free symbols should be captured as a new free symbol here.
-                    SymbolScope::LOCAL | SymbolScope::Free | SymbolScope::Function => {
-                        Some(self.define_free(original))
-                    }
-                };
+        // Resolve through every intermediate function scope. Each scope must
+        // create its own free symbol so closures capture from the immediately
+        // enclosing frame rather than reading a grandparent's local slot.
+        let outer = self.outer.take()?;
+        let mut outer_table = outer.as_ref().clone();
+        let original = outer_table.resolve(name);
+        self.outer = Some(Rc::new(outer_table));
+        let original = original?;
+        match original.scope {
+            SymbolScope::Global | SymbolScope::Builtin => Some(original),
+            SymbolScope::LOCAL | SymbolScope::Free | SymbolScope::Function => {
+                Some(self.define_free(original))
             }
         }
-
-        None
-    }
-
-    // Read-only resolver used internally to search outer scopes without mutating them.
-    fn resolve_readonly(&self, name: &str) -> Option<Rc<Symbol>> {
-        if let Some(sym) = self.symbols.get(name) {
-            return Some(sym.clone());
-        }
-        if let Some(outer) = &self.outer {
-            return outer.resolve_readonly(name);
-        }
-        None
     }
 
     pub fn define_builtin(&mut self, index: usize, name: String) -> Rc<Symbol> {

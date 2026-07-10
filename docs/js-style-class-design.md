@@ -1,12 +1,12 @@
 # Monkey JS 风格 Class 设计提案
 
-> 状态：Draft，供实现前评审。
+> 状态：Implemented。基础 class、三个执行后端、WASM GC report、Playground、Prettier 和 VS Code grammar 已按本文落地。
 >
 > 核心结论：Monkey 的基础类使用 `class`、`constructor`、`this` 和 `new`。第一版采用 JS 风格的表面语法，但不实现原型链；运行时使用 class / instance / bound method 三种明确的对象。
 >
 > 关联设计：[monkey-gc 设计文档](./gc.md)。
 >
-> `docs/gc.md`、`gc/gc-report.md` 和 `gc/README.md` 描述的是当前 `origin/main` 已实现的能力；本文描述尚未实现的目标状态。class / GC playground 落地后，本文第 11 至 13 节取代这些文档中“语言无法构造环”“builtin 依赖 Object bridge”“WASM 尚未接入 GC”的限制说明，并要求在同一实施阶段同步旧文档。
+> 本文保留完整设计取舍，同时作为实现记录。当前 GC 能力以本文第 11 至 13 节、`docs/gc.md`、`gc/gc-report.md` 和 `gc/README.md` 的同步说明为准。
 
 ## 目录
 
@@ -35,7 +35,7 @@
 
 ## 1. 背景与结论
 
-Monkey 当前已有 lexer、parser、AST interpreter、bytecode compiler、默认 `Rc<Object>` VM 和支持环回收的 `GcVM`。但是语言值目前基本不可变：array/hash 构造完成后不能写回，也没有带可变字段的对象。因此，Monkey 源码无法稳定构造下面这种对象图：
+实现前，Monkey 已有 lexer、parser、AST interpreter、bytecode compiler、默认 `Rc<Object>` VM 和支持环回收的 `GcVM`，但语言值基本不可变：array/hash 构造完成后不能写回，也没有带可变字段的对象。因此，Monkey 源码当时无法稳定构造下面这种对象图：
 
 ```text
 a.next ──► b
@@ -43,9 +43,9 @@ a.next ──► b
   └────────┘ b.next
 ```
 
-这使得 playground 即使接入 `GcVM`，也很难用纯 Monkey 源码解释 `gc_decref`、`gc_scan` 和 `gc_free_cycles` 为什么存在。
+基础 class 和可变实例字段补上了这条缺口，Playground 现在可以用纯 Monkey 源码解释 `gc_decref`、`gc_scan` 和 `gc_free_cycles` 为什么存在。
 
-基础 class 应先于 GC playground 的源码级环演示实现。建议的最小用户体验是：
+实现采用的最小用户体验是：
 
 ```monkey
 class Node {
@@ -907,21 +907,21 @@ Property get：
 
 GcVM stack slot / globals / constants 继续是显式引用 owner，Frame 只借用 callable metadata。bound/new 改写 callee slot 前，必须先取得 owned closure / receiver 引用；改写后由 closure slot 和 local 0 分别保活它们。Frame 不额外 `dup` this/class，避免清理时双账。
 
-### 11.5 Builtin 必须先改成 Gc-native
+### 11.5 Builtin 已改成 Gc-native
 
-当前 GcVM builtin 路径会执行：
+实现前的 GcVM builtin 路径会执行：
 
 ```text
 GcRef -> object::Object -> BuiltinFunc -> object::Object -> GcRef
 ```
 
-class 上线后这条桥有三个不可接受的问题：
+class 上线后，这条旧桥会产生三个不可接受的问题：
 
 - `first` / `last` 返回深拷贝，破坏 instance identity；
 - alias 关系丢失；
 - cyclic instance graph 在 export 时无限递归。
 
-因此，在 GcVM class 之前必须在 `object::builtins` 引入稳定的 `BuiltinId`，例如 `Len / Puts / First / Last / Rest / Push`。builtin registry 同时暴露 name、ID 和默认后端的 `BuiltinFunc`；compiler 仍编码 registry index，默认 VM 取 function，GcVM 把同一项转成 ID。`Value::Builtin(BuiltinId)` 随后原生操作 `GcRef`：
+实现已经在 `object::builtins` 引入稳定的 `BuiltinId`，包括 `Len / Puts / First / Last / Rest / Push`。builtin registry 同时暴露 name、ID 和默认后端的 `BuiltinFunc`；compiler 仍编码 registry index，默认 VM 取 function，GcVM 把同一项转成 ID。`Value::Builtin(BuiltinId)` 原生操作 `GcRef`：
 
 - `first` / `last` 返回 child 的 `dup`；
 - `rest` / `push` 用原 GcRef 建新 array，由 `alloc_value` 持边；
@@ -1066,7 +1066,7 @@ GC demo 执行流程：
 
 ### 12.5 Playground UI
 
-当前 playground 只有 AST / Bytecode。建议增加独立 `GC` tab 和显式 `Run GC` 按钮：
+Playground 已增加独立 `GC` tab 和显式 `Run GC` 按钮：
 
 - 编辑时仍 debounce parse/compile；
 - 不在每次按键后自动执行用户程序，避免递归或重程序卡住 UI；
@@ -1079,7 +1079,7 @@ GC demo 执行流程：
 
 ## 13. WASM API
 
-`wasm` crate 当前只依赖 parser/compiler。GC panel 需要增加 `monkey-gc` 依赖，并新增一个结构化执行入口，例如：
+`wasm` crate 已增加 `monkey-gc` 依赖，并导出结构化执行入口：
 
 ```rust
 #[wasm_bindgen]
@@ -1192,7 +1192,7 @@ postfix chain 自身不加括号，低优先级 child 作为 postfix object/call
 - methods 之间 comment；
 - empty class 内 dangling comment。
 
-当前 empty block 直接打印 `{}`，如果 dangling comment 测试失败，需要为 empty class/body 增加 comment-aware 路径，不能丢注释。
+empty class/body 已使用 comment-aware 路径，并由 dangling comment 测试保证注释不会丢失。
 
 ## 15. 错误语义
 
@@ -1352,7 +1352,7 @@ assert_eq!(report.collected_by_value_kind.instance, 2);
 
 ## 18. 实施顺序
 
-建议拆成可独立评审的阶段，不在一个 PR 同时修改整条管线。
+实现按下面的阶段完成；列表保留为变更审阅索引。
 
 ### Phase 0：Parser 基础加固
 
@@ -1411,7 +1411,7 @@ assert_eq!(report.collected_by_value_kind.instance, 2);
 
 ## 19. 文件改动索引
 
-预计影响：
+实际影响：
 
 | 层            | 主要文件                                                                                                       |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |

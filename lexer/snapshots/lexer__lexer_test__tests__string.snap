@@ -19,7 +19,7 @@ expression: "\"a\""
     },
     "span": {
       "start": 3,
-      "end": 4
+      "end": 3
     }
   }
 ]

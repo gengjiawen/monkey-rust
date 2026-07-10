@@ -5,6 +5,9 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#numbers" },
+    { "include": "#class-declarations" },
+    { "include": "#method-declarations" },
+    { "include": "#properties" },
     { "include": "#keywords" },
     { "include": "#operators" },
     {
@@ -39,11 +42,51 @@
         }
       ]
     },
+    "class-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(class)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.class.monkey" },
+            "2": { "name": "entity.name.type.class.monkey" }
+          }
+        }
+      ]
+    },
+    "method-declarations": {
+      "patterns": [
+        {
+          "match": "\\b((?!if\\b|fn\\b)[a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\([^)]*\\)\\s*\\{)",
+          "captures": {
+            "1": { "name": "entity.name.function.member.monkey" }
+          }
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {
+          "match": "(\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.monkey" },
+            "2": { "name": "variable.other.property.monkey" }
+          }
+        }
+      ]
+    },
     "keywords": {
       "patterns": [
         {
           "name": "keyword.control.monkey",
           "match": "\\b(fn|let|if|else|return|true|false)\\b"
+        },
+        {
+          "name": "keyword.operator.new.monkey",
+          "match": "\\bnew\\b"
+        },
+        {
+          "name": "variable.language.this.monkey",
+          "match": "\\bthis\\b"
         }
       ]
     },

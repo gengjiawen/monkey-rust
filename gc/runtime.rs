@@ -3,6 +3,7 @@ use crate::header::{
 };
 use crate::list::{GcList, GcListIter};
 use crate::malloc::{MallocState, DEFAULT_GC_THRESHOLD};
+use crate::report::{FreeCycleStats, GcPhaseStats, ScanStats, TrialDeletionStats};
 use std::any::Any;
 
 /// Child-mark callback mode used during the three GC phases.
@@ -88,6 +89,14 @@ impl GcRuntime {
             current: self.gc_obj_list.head,
         }
         .count()
+    }
+
+    pub fn object_ids(&self) -> Vec<GcId> {
+        self.objects
+            .iter()
+            .enumerate()
+            .filter_map(|(id, entry)| entry.as_ref().map(|_| id))
+            .collect()
     }
 
     pub(crate) fn header(&self, id: GcId) -> &GcObjectHeader {
@@ -334,9 +343,61 @@ impl GcRuntime {
 
     /// Run the three-phase cycle collector. Matches `JS_RunGC`.
     pub fn run_gc(&mut self) {
+        self.run_gc_with_stats();
+    }
+
+    /// Run all collector phases atomically and return read-only telemetry.
+    pub fn run_gc_with_stats(&mut self) -> GcPhaseStats {
+        let edges_visited = self.gc_edge_count();
         self.gc_decref();
+        let candidates = self.list_count(GcListKind::Tmp);
         self.gc_scan();
+        let garbage_candidates = self.list_count(GcListKind::Tmp);
+        let before_free = self.object_ids().len();
         self.gc_free_cycles();
+        let freed = before_free.saturating_sub(self.object_ids().len());
+
+        GcPhaseStats {
+            trial_deletion: TrialDeletionStats {
+                edges_visited,
+                candidates,
+            },
+            scan: ScanStats {
+                restored: candidates.saturating_sub(garbage_candidates),
+                garbage_candidates,
+            },
+            free_cycles: FreeCycleStats {
+                freed,
+            },
+        }
+    }
+
+    fn list_count(&self, kind: GcListKind) -> usize {
+        let current = match kind {
+            GcListKind::GcObj => self.gc_obj_list.head,
+            GcListKind::Tmp => self.tmp_obj_list.head,
+            GcListKind::ZeroRef => self.gc_zero_ref_count_list.head,
+        };
+        GcListIter {
+            rt: self,
+            current,
+        }
+        .count()
+    }
+
+    fn gc_edge_count(&self) -> usize {
+        let mut count = 0;
+        for id in (GcListIter {
+            rt: self,
+            current: self.gc_obj_list.head,
+        }) {
+            let object = self.objects[id]
+                .as_ref()
+                .and_then(|entry| entry.object.as_ref())
+                .expect("live GC object must have a payload");
+            object.trace(&mut |_| count += 1);
+        }
+        count
     }
 
     /// Return false if the object has been freed during cycle collection.

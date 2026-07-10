@@ -48,7 +48,7 @@ expression: let y=true
     },
     "span": {
       "start": 10,
-      "end": 11
+      "end": 10
     }
   }
 ]

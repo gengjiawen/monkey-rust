@@ -119,4 +119,44 @@ if (5 < 10) {
 10 != 9;",
         );
     }
+
+    #[test]
+    fn lexes_class_tokens_and_identifier_digits() {
+        let input = "class Node2 { constructor(value1) { this.value1 = new Node2().next; } }";
+        let mut lexer = Lexer::new(input);
+        let tokens = test_token_set(&mut lexer);
+        let kinds = tokens
+            .iter()
+            .map(|token| token.kind.clone())
+            .collect::<Vec<_>>();
+
+        assert_eq!(kinds[0], TokenKind::CLASS);
+        assert_eq!(
+            kinds[1],
+            TokenKind::IDENTIFIER {
+                name: "Node2".to_string()
+            }
+        );
+        assert!(kinds.contains(&TokenKind::THIS));
+        assert!(kinds.contains(&TokenKind::NEW));
+        assert!(kinds.contains(&TokenKind::DOT));
+        assert!(kinds.contains(&TokenKind::IDENTIFIER {
+            name: "constructor".to_string()
+        }));
+        assert_eq!(tokens.last().unwrap().span.start, input.len());
+        assert_eq!(tokens.last().unwrap().span.end, input.len());
+    }
+
+    #[test]
+    fn class_keyword_boundaries_remain_identifiers() {
+        let mut lexer = Lexer::new("className newNode thisValue");
+        for expected in ["className", "newNode", "thisValue"] {
+            assert_eq!(
+                lexer.next_token().kind,
+                TokenKind::IDENTIFIER {
+                    name: expected.to_string(),
+                }
+            );
+        }
+    }
 }

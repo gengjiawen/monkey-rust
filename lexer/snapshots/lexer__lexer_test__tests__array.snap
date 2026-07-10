@@ -37,7 +37,7 @@ expression: "[3]"
     },
     "span": {
       "start": 3,
-      "end": 4
+      "end": 3
     }
   }
 ]

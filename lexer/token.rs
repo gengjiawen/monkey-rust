@@ -49,6 +49,7 @@ pub enum TokenKind {
     COMMA,
     SEMICOLON,
     COLON,
+    DOT,
 
     LPAREN,
     RPAREN,
@@ -65,6 +66,9 @@ pub enum TokenKind {
     IF,
     ELSE,
     RETURN,
+    CLASS,
+    THIS,
+    NEW,
 }
 
 pub fn lookup_identifier(identifier: &str) -> TokenKind {
@@ -76,6 +80,9 @@ pub fn lookup_identifier(identifier: &str) -> TokenKind {
         "if" => TokenKind::IF,
         "else" => TokenKind::ELSE,
         "return" => TokenKind::RETURN,
+        "class" => TokenKind::CLASS,
+        "this" => TokenKind::THIS,
+        "new" => TokenKind::NEW,
         _ => TokenKind::IDENTIFIER {
             name: identifier.to_string(),
         },
@@ -118,6 +125,10 @@ impl fmt::Display for TokenKind {
             TokenKind::ILLEGAL => write!(f, "ILLEGAL"),
             TokenKind::EOF => write!(f, "EOF"),
             TokenKind::COLON => write!(f, ":"),
+            TokenKind::DOT => write!(f, "."),
+            TokenKind::CLASS => write!(f, "class"),
+            TokenKind::THIS => write!(f, "this"),
+            TokenKind::NEW => write!(f, "new"),
         }
     }
 }

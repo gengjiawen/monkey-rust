@@ -34,4 +34,14 @@ impl Environment {
     pub fn set(&mut self, name: String, val: Rc<Object>) {
         self.store.insert(name, val);
     }
+
+    pub fn visible_names(&self) -> Vec<String> {
+        let mut names = self
+            .outer
+            .as_ref()
+            .map(|outer| outer.borrow().visible_names())
+            .unwrap_or_default();
+        names.extend(self.store.keys().cloned());
+        names
+    }
 }

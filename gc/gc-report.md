@@ -32,7 +32,7 @@
 
 按章节顺序读。每一章只多学一件事，且这件事由上一章的缺口逼出来：先让无环世界跑起来，再撞环，再一步步补上回收算法，最后接到 Monkey 值和 VM。
 
-概念处会尽量配上 Monkey 片段。无环例子（嵌套数组、`len`）今天就能跑；环的例子若标了「示意」，是因为语言还不能原地写 `a[0] = b`——对象图等价，语法尚未落地，测试里用 `make_cycle` 代替。
+概念处会尽量配上 Monkey 片段。算法章节仍用测试堆的 `make_cycle` 隔离 collector 本身；完整运行时现在也能通过 class 的可变实例字段，用纯 Monkey 源码构造并回收环。
 
 ---
 
@@ -76,11 +76,11 @@ flowchart LR
 
 在 Monkey VM 里，根主要包括（精确清单见第 10.1 节）：
 
-| 根来源 | 例子 |
-|--------|------|
-| 全局变量槽 | `globals[i]` |
-| 操作数栈槽 | `stack[0..sp)` |
-| 常量表 | 编译期字面量 |
+| 根来源               | 例子             |
+| -------------------- | ---------------- |
+| 全局变量槽           | `globals[i]`     |
+| 操作数栈槽           | `stack[0..sp)`   |
+| 常量表               | 编译期字面量     |
 | 调用过程中的临时持有 | `last_popped` 等 |
 
 对照一段真实程序：
@@ -129,12 +129,12 @@ flowchart LR
 
 这是 GC 唯一的判据——不是"有没有被引用"（环里互相引用也算被引用），而是**能不能从程序还活着的入口走到**。
 
-| 情形 | Monkey 直觉 | 可达？ | 是垃圾？ |
-|------|-------------|--------|----------|
-| 全局变量指着它 | `let xs = [1];` 里的数组 | 是 | 否 |
-| 只有栈上的临时值指着它 | `len([1, 2, 3])` 调用中的临时数组 | 是 | 否 |
-| 两个对象互相指，外部谁都没有 | 环上的节点，全局/栈都已放手 | 否 | **是** |
-| 链式结构，头被 drop 了 | 曾有 `let t = [[1]];`，后来再也摸不到 `t` | 否 | **是** |
+| 情形                         | Monkey 直觉                               | 可达？ | 是垃圾？ |
+| ---------------------------- | ----------------------------------------- | ------ | -------- |
+| 全局变量指着它               | `let xs = [1];` 里的数组                  | 是     | 否       |
+| 只有栈上的临时值指着它       | `len([1, 2, 3])` 调用中的临时数组         | 是     | 否       |
+| 两个对象互相指，外部谁都没有 | 环上的节点，全局/栈都已放手               | 否     | **是**   |
+| 链式结构，头被 drop 了       | 曾有 `let t = [[1]];`，后来再也摸不到 `t` | 否     | **是**   |
 
 再看一个无环、但有堆内边的例子：
 
@@ -179,7 +179,7 @@ flowchart LR
 
 外部根已经放手，但 A.rc = 1（来自 B），B.rc = 1（来自 A）。从可达性看两个都是垃圾；从计数看两个都"还有人要"。
 
-Monkey 今天还不能写 `a[0] = b` 这种原地赋值，所以用户程序里很难自然造出环。概念上它长这样（**示意，不是现行语法**）：
+Monkey 仍不支持 `a[0] = b` 这种数组原地赋值。下面保留早期设计时使用的数组示意：
 
 ```monkey
 # 示意：若数组可原地写，就能造环
@@ -189,7 +189,20 @@ a[0] = b;   # a → b → a
 # 之后若再也没有变量指着 a / b，环仍互相撑着，refcount 漏了
 ```
 
-真实语言里更常见的是「节点互相指」：`n.next = m; m.prev = n`。我们缺可变字段时，环的故事就只好先用测试堆的 `make_cycle` 讲——第 5 章会动手。
+现在可以用 class 的可变实例字段写出同一张图：
+
+```monkey
+class Node {
+  connect(other) { this.next = other; }
+}
+
+let a = new Node();
+let b = new Node();
+a.connect(b);
+b.connect(a);
+```
+
+第 5 章仍先用测试堆的 `make_cycle`，这样失败只归因于 collector；第 10 章再接回完整 Monkey VM。
 
 #### Rc 循环泄漏示例
 
@@ -219,10 +232,10 @@ fn main() {
 
 业界大致两派：
 
-| 流派 | 思路 | 代表 |
-|------|------|------|
-| **Tracing** | 从根出发标记所有可达对象，没标记的是垃圾 | mark-sweep、分代 GC |
-| **Refcount + cycle collector** | 平时靠计数即时释放；定期用额外算法拆掉环 | CPython、QuickJS |
+| 流派                           | 思路                                     | 代表                |
+| ------------------------------ | ---------------------------------------- | ------------------- |
+| **Tracing**                    | 从根出发标记所有可达对象，没标记的是垃圾 | mark-sweep、分代 GC |
+| **Refcount + cycle collector** | 平时靠计数即时释放；定期用额外算法拆掉环 | CPython、QuickJS    |
 
 **Mark-sweep** 干净，但要在 VM 里维护完整的根扫描器，还要处理 STW 或写屏障。
 
@@ -234,36 +247,36 @@ fn main() {
 
 ### 1.6 后文路线图（概念 → 章节）
 
-| 概念 | 首次深入 | 测试锚点 |
-|------|----------|----------|
-| `GcRef` 句柄 | 第 2 章 | `refcount_frees_immediately_without_gc` |
-| dup / free 纪律 | 第 3 章 | `dup_extends_lifetime` |
-| trace / 级联释放 | 第 4 章 | `acyclic_holder_extends_child_lifetime` |
-| 循环泄漏 | 第 5 章 | `collects_simple_cycle`（先红后绿） |
-| trial deletion 三阶段 | 第 6 章 | `mark_func_decref_zeros_isolated_cycle` 等 |
-| 有根的环必须活 | 第 7 章 | `cycle_with_external_root_survives` |
-| 自动触发 | 第 8 章 | `trigger_gc_on_threshold` |
-| Monkey 值 / 桥接 | 第 9 章 | `value_cycle_collected_by_gc` |
-| VM 根集合 | 第 10 章 | `builtin_call_releases_callee_args_and_stack_temporaries` |
+| 概念                  | 首次深入 | 测试锚点                                                  |
+| --------------------- | -------- | --------------------------------------------------------- |
+| `GcRef` 句柄          | 第 2 章  | `refcount_frees_immediately_without_gc`                   |
+| dup / free 纪律       | 第 3 章  | `dup_extends_lifetime`                                    |
+| trace / 级联释放      | 第 4 章  | `acyclic_holder_extends_child_lifetime`                   |
+| 循环泄漏              | 第 5 章  | `collects_simple_cycle`（先红后绿）                       |
+| trial deletion 三阶段 | 第 6 章  | `mark_func_decref_zeros_isolated_cycle` 等                |
+| 有根的环必须活        | 第 7 章  | `cycle_with_external_root_survives`                       |
+| 自动触发              | 第 8 章  | `trigger_gc_on_threshold`                                 |
+| Monkey 值 / 桥接      | 第 9 章  | `value_cycle_collected_by_gc`                             |
+| VM 根集合             | 第 10 章 | `builtin_call_releases_callee_args_and_stack_temporaries` |
 
 ### 1.7 术语表
 
-| 术语 | 含义 |
-|------|------|
-| **根（root）** | 堆外可直接访问的引用：栈槽、全局变量、测试代码手里的 `GcRef` 等 |
-| **可达（reachable）** | 从某个根沿边能走到的对象 |
-| **堆内边** | 两端都在堆上的引用边（数组元素、闭包捕获等）；相对的是「来自根的边」 |
-| **引用计数（refcount）** | 每个对象的持有者数量；`dup` +1，`free` −1 |
-| **外部持有 / 内部持有** | ref_count 的两半（第 6 章展开）：外部持有来自根；内部持有来自堆内边 |
-| **trace** | 对象报告自己引用的所有子对象（出边） |
-| **trial deletion** | 三阶段 GC 的第一阶段：试探性减掉所有堆内边（第 6 章） |
-| **mark（header 字段）** | 阶段内临时标记："我的出边已经减过了"（第 6 章） |
-| **侵入式链表** | `list_prev` / `list_next` 嵌在对象 header 里（第 4 章） |
-| **gc_obj_list** | 存活 GC 对象链表 |
-| **tmp_obj_list** | 阶段 1 后计数归零的**嫌疑人**名单（第 6 章） |
-| **gc_zero_ref_count_list** | 延迟释放队列（第 4、6 章） |
-| **僵尸（free_mark）** | 逻辑已死、槽位暂留（第 6 章） |
-| **写屏障（write barrier）** | 引用写入时自动维护计数的机制；**我们没做** |
+| 术语                        | 含义                                                                 |
+| --------------------------- | -------------------------------------------------------------------- |
+| **根（root）**              | 堆外可直接访问的引用：栈槽、全局变量、测试代码手里的 `GcRef` 等      |
+| **可达（reachable）**       | 从某个根沿边能走到的对象                                             |
+| **堆内边**                  | 两端都在堆上的引用边（数组元素、闭包捕获等）；相对的是「来自根的边」 |
+| **引用计数（refcount）**    | 每个对象的持有者数量；`dup` +1，`free` −1                            |
+| **外部持有 / 内部持有**     | ref_count 的两半（第 6 章展开）：外部持有来自根；内部持有来自堆内边  |
+| **trace**                   | 对象报告自己引用的所有子对象（出边）                                 |
+| **trial deletion**          | 三阶段 GC 的第一阶段：试探性减掉所有堆内边（第 6 章）                |
+| **mark（header 字段）**     | 阶段内临时标记："我的出边已经减过了"（第 6 章）                      |
+| **侵入式链表**              | `list_prev` / `list_next` 嵌在对象 header 里（第 4 章）              |
+| **gc_obj_list**             | 存活 GC 对象链表                                                     |
+| **tmp_obj_list**            | 阶段 1 后计数归零的**嫌疑人**名单（第 6 章）                         |
+| **gc_zero_ref_count_list**  | 延迟释放队列（第 4、6 章）                                           |
+| **僵尸（free_mark）**       | 逻辑已死、槽位暂留（第 6 章）                                        |
+| **写屏障（write barrier）** | 引用写入时自动维护计数的机制；**我们没做**                           |
 
 ---
 
@@ -382,10 +395,10 @@ pub fn free_gc(&mut self, id: GcId) {
 
 `refcount_frees_immediately_without_gc` 的 ref_count 轨迹：
 
-| 步骤 | 操作 | a.ref_count | exists(a) |
-|------|------|-------------|-----------|
-| 1 | `alloc()` | 1（测试代码持有） | true |
-| 2 | `free(a)` | 0 → 释放 | false |
+| 步骤 | 操作      | a.ref_count       | exists(a) |
+| ---- | --------- | ----------------- | --------- |
+| 1    | `alloc()` | 1（测试代码持有） | true      |
+| 2    | `free(a)` | 0 → 释放          | false     |
 
 本章钉住了：堆上有对象、有句柄、无环时 `free` 立刻回收。下一章要回答：同一个对象被两处持有时，谁说了算。
 
@@ -397,11 +410,11 @@ pub fn free_gc(&mut self, id: GcId) {
 
 `ref_count` 不是抽象数字——**每一个 +1 都必须对应一个真实持有者**，每一个 −1 都必须对应某个持有者放手。
 
-| 操作 | 谁多了/少了持有 |
-|------|-----------------|
-| `alloc()` | 返回句柄给调用者，计数从 1 开始 |
-| `dup(id)` | 调用者多持有一份，计数 +1 |
-| `free(id)` | 调用者少持有一份，计数 −1 |
+| 操作       | 谁多了/少了持有                 |
+| ---------- | ------------------------------- |
+| `alloc()`  | 返回句柄给调用者，计数从 1 开始 |
+| `dup(id)`  | 调用者多持有一份，计数 +1       |
+| `free(id)` | 调用者少持有一份，计数 −1       |
 
 整个系统只有两条纪律（后文 VM 每条指令都逃不掉）：
 
@@ -414,11 +427,11 @@ pub fn free_gc(&mut self, id: GcId) {
 
 对象 `x`，`ref_count = 3` 时，合法的持有者清单长这样：
 
-| 持有者 | 来源 |
-|--------|------|
-| 1 | 测试变量 `let a = heap.alloc()` |
-| 1 | `let b = heap.dup(a)` |
-| 1 | 另一个对象 `holder` 的出边（`link(holder, x)` 时 dup 过） |
+| 持有者 | 来源                                                      |
+| ------ | --------------------------------------------------------- |
+| 1      | 测试变量 `let a = heap.alloc()`                           |
+| 1      | `let b = heap.dup(a)`                                     |
+| 1      | 另一个对象 `holder` 的出边（`link(holder, x)` 时 dup 过） |
 
 若少 `dup` 或多 `free`，计数偏低，可能提前释放；若多 `dup` 或少 `free`，计数偏高，造成泄漏。
 
@@ -450,21 +463,21 @@ pub fn dup_gc(&mut self, id: GcId) -> GcId {
 
 ### 3.4 推演验证
 
-| 步骤 | 操作 | a.ref_count | 持有者 |
-|------|------|-------------|--------|
-| 1 | `alloc()` | 1 | 测试代码 |
-| 2 | `dup(a)` | 2 | 测试代码 + dup 代表的那份 |
-| 3 | `free(a)` | 1 | dup 代表的那份 |
-| 4 | `free(a)` | 0 | 无 → 释放 |
+| 步骤 | 操作      | a.ref_count | 持有者                    |
+| ---- | --------- | ----------- | ------------------------- |
+| 1    | `alloc()` | 1           | 测试代码                  |
+| 2    | `dup(a)`  | 2           | 测试代码 + dup 代表的那份 |
+| 3    | `free(a)` | 1           | dup 代表的那份            |
+| 4    | `free(a)` | 0           | 无 → 释放                 |
 
 #### 持有者清单练手
 
 `holder` 通过 `link(holder, child)` 持 `child` 时：
 
-| 对象 | ref_count | 持有者清单 |
-|------|-----------|------------|
-| child | 2 | ① 测试变量 `child` ② `holder` 的出边 |
-| holder | 1 | ① 测试变量 `holder` |
+| 对象   | ref_count | 持有者清单                           |
+| ------ | --------- | ------------------------------------ |
+| child  | 2         | ① 测试变量 `child` ② `holder` 的出边 |
+| holder | 1         | ① 测试变量 `holder`                  |
 
 `free(child)` 后 child.rc = 1，只剩 holder 边——下一章就要处理这种"对象引用对象"的边。
 
@@ -526,12 +539,12 @@ impl GcObject for TestNode {
 }
 ```
 
-| 方法 | 行为 |
-|------|------|
-| `alloc()` | 分配 `TestNode`，在 `edges` 里建空邻接表 |
-| `link(from, to)` | `dup(to)` + 在 `edges[from]` 里加一条边 |
-| `make_cycle(n)` | n 个节点首尾相连（第 5 章） |
-| `drop_external_refs(&[ids])` | 对测试手里的每个句柄 `free` 一次 |
+| 方法                         | 行为                                     |
+| ---------------------------- | ---------------------------------------- |
+| `alloc()`                    | 分配 `TestNode`，在 `edges` 里建空邻接表 |
+| `link(from, to)`             | `dup(to)` + 在 `edges[from]` 里加一条边  |
+| `make_cycle(n)`              | n 个节点首尾相连（第 5 章）              |
+| `drop_external_refs(&[ids])` | 对测试手里的每个句柄 `free` 一次         |
 
 **边在测试自己的 `EdgeMap` 里，不在 `GcRuntime` 里**——这样我们能随意搭图，不必等 Monkey `Value` 写好。
 
@@ -616,13 +629,13 @@ fn free_zero_refcount(&mut self) {
 
 ### 4.5 推演验证：`acyclic_holder_extends_child_lifetime`
 
-| 步骤 | 操作 | child.rc | holder.rc | 说明 |
-|------|------|----------|-----------|------|
-| 1 | `alloc` child | 1 | — | 测试持有 child |
-| 2 | `alloc` holder | — | 1 | 测试持有 holder |
-| 3 | `link(holder, child)` | 2 | 1 | holder 边 dup child |
-| 4 | `free(child)` | 1 | 1 | 测试放手，holder 还在 |
-| 5 | `free(holder)` | 0 | 0 | holder 死 → trace → free child → 子死 |
+| 步骤 | 操作                  | child.rc | holder.rc | 说明                                  |
+| ---- | --------------------- | -------- | --------- | ------------------------------------- |
+| 1    | `alloc` child         | 1        | —         | 测试持有 child                        |
+| 2    | `alloc` holder        | —        | 1         | 测试持有 holder                       |
+| 3    | `link(holder, child)` | 2        | 1         | holder 边 dup child                   |
+| 4    | `free(child)`         | 1        | 1         | 测试放手，holder 还在                 |
+| 5    | `free(holder)`        | 0        | 0         | holder 死 → trace → free child → 子死 |
 
 无环世界到这里能跑通了：句柄、dup/free、trace、级联释放。下一章把两个节点首尾相连——引用计数会当场露馅。
 
@@ -643,7 +656,7 @@ let t = [[1], [2]];
 # 若之后再也摸不到 t，整棵嵌套数组应被 refcount 级联清掉，不必 run_gc
 ```
 
-环则不行。用户语法暂时造不出环，所以第 5 章用测试堆的 `make_cycle` 搭出等价对象图——语义上就是「两个数组互相把对方当元素」。
+环则不行。第 5 章用测试堆的 `make_cycle` 搭出等价对象图，把语言前端和 VM 排除在算法测试之外；完整 VM 测试还会用两个 `Node` instance 的字段互指来覆盖真实源码路径。
 
 ### 5.2 先写一个会红的测试
 
@@ -680,12 +693,12 @@ flowchart LR
 
 ### 5.3 推演：没有 GC 时会发生什么
 
-| 步骤 | 操作 | node0.rc | node1.rc | 备注 |
-|------|------|----------|----------|------|
-| 1 | 各 `alloc` | 1 | 1 | 外部各 1 |
-| 2 | `link(0→1)`, `link(1→0)` | 2 | 2 | 各多环内 1 |
-| 3 | `drop_external_refs` | 1 | 1 | 只剩环内边 |
-| 4 | 尝试 `free` | 不变 | 不变 | rc > 0，无法释放 |
+| 步骤 | 操作                     | node0.rc | node1.rc | 备注             |
+| ---- | ------------------------ | -------- | -------- | ---------------- |
+| 1    | 各 `alloc`               | 1        | 1        | 外部各 1         |
+| 2    | `link(0→1)`, `link(1→0)` | 2        | 2        | 各多环内 1       |
+| 3    | `drop_external_refs`     | 1        | 1        | 只剩环内边       |
+| 4    | 尝试 `free`              | 不变     | 不变     | rc > 0，无法释放 |
 
 **泄漏确认**：两个对象永远挂在 `gc_obj_list` 里。这就是 `Rc` 的洞，现在在我们自己的堆里重现了。
 
@@ -703,10 +716,10 @@ ref_count = 外部持有数 + 内部持有数
 let nest = [[1]];
 ```
 
-| 对象 | 外部持有（根） | 内部持有（堆内边） | ref_count 里混着什么 |
-|------|----------------|--------------------|----------------------|
-| 外层数组 | `globals[nest]` | 无 | 纯外部 = 1 |
-| 内层数组 | 无 | 外层 → 内层 | 纯内部 = 1 |
+| 对象     | 外部持有（根）  | 内部持有（堆内边） | ref_count 里混着什么 |
+| -------- | --------------- | ------------------ | -------------------- |
+| 外层数组 | `globals[nest]` | 无                 | 纯外部 = 1           |
+| 内层数组 | 无              | 外层 → 内层        | 纯内部 = 1           |
 
 环泄漏时，两个节点的「外部」都是 0，「内部」各是 1——混在一个数字里就看不出来。我们不扫根去数外部持有，而是**试探性地把内部边从计数里减掉**，看谁剩 0。怎么减、减完为什么还不能立刻释放、误伤怎么办——一步步来，都在第 6 章。
 
@@ -743,10 +756,10 @@ ref_count = 外部持有数 + 内部持有数
 let xs = [1, 2];
 ```
 
-| 谁指着谁 | 算哪一半 |
-|----------|----------|
-| `globals[xs]` → 数组 | **外部**（根） |
-| 数组 → `1`、数组 → `2` | **内部**（堆内边） |
+| 谁指着谁                  | 算哪一半                                   |
+| ------------------------- | ------------------------------------------ |
+| `globals[xs]` → 数组      | **外部**（根）                             |
+| 数组 → `1`、数组 → `2`    | **内部**（堆内边）                         |
 | 常量表里的字面量 `1`、`2` | 也是根；整数对象可能同时被常量表和数组指着 |
 
 第 5 章的环泄漏，本质就是这两半混在一起算：环内边把计数撑在 1，盖住了"外部已经没人要"的事实。
@@ -774,19 +787,19 @@ flowchart LR
     B --> A
 ```
 
-| 对象 | 初始 rc | 堆内入边 | 减完后 rc |
-|------|---------|----------|-----------|
-| node0 | 1 | 1 | 0 |
-| node1 | 1 | 1 | 0 |
+| 对象  | 初始 rc | 堆内入边 | 减完后 rc |
+| ----- | ------- | -------- | --------- |
+| node0 | 1       | 1        | 0         |
+| node1 | 1       | 1        | 0         |
 
 两边都归零——和"外部持有 = 0"一致。但归零的只是**嫌疑人**，不是立刻释放：有些对象没有外部持有，却能从有外部持有的对象沿边走到；减边时它们也会暂时变成 0。所以删除必须是**可逆**的——这就是 "trial"（试探）的意思。后面会看到怎么平反。
 
 运行时用两张侵入式链表搬对象（第 4 章的 `list_prev` / `list_next`）：
 
-| 名单 | 含义 |
-|------|------|
-| `gc_obj_list` | **未受怀疑**的存活对象；GC 开始前所有对象都在这 |
-| `tmp_obj_list` | **嫌疑人**：减完边后计数归零、但尚未定罪 |
+| 名单           | 含义                                            |
+| -------------- | ----------------------------------------------- |
+| `gc_obj_list`  | **未受怀疑**的存活对象；GC 开始前所有对象都在这 |
+| `tmp_obj_list` | **嫌疑人**：减完边后计数归零、但尚未定罪        |
 
 ```mermaid
 flowchart LR
@@ -857,10 +870,10 @@ fn gc_decref_child(&mut self, id: GcId) {
 
 看 `gc_decref` 的顺序：先 `mark_children(id, Decref)`，**再** `header.mark = 1`。再看 `gc_decref_child`：子对象归零时，**只有它 `mark == 1` 才立刻进 tmp**；否则留在 `gc_obj_list`，等主循环轮到它、把出边减完再判定。
 
-| 失败模式 | 原因 | 后果 |
-|----------|------|------|
-| 少减 | 某条堆内边没减掉 | 垃圾对象 rc 仍 > 0，漏回收 |
-| 多减 | 同一条边减了两次 | 活人 rc 变 0 进 tmp，可能被误杀 |
+| 失败模式 | 原因             | 后果                            |
+| -------- | ---------------- | ------------------------------- |
+| 少减     | 某条堆内边没减掉 | 垃圾对象 rc 仍 > 0，漏回收      |
+| 多减     | 同一条边减了两次 | 活人 rc 变 0 进 tmp，可能被误杀 |
 
 **反例：不守不变量会怎样**
 
@@ -881,12 +894,12 @@ node1 被 node0 的边减量 → rc 0，但 mark 仍为 0
 
 #### 推演：两节点孤立环
 
-| 步骤 | node0.rc | node1.rc | 名单 |
-|------|----------|----------|------|
-| 初始 | 1 | 1 | 空 |
-| 处理 node0，边→node1 | 1 | 0 | node1 尚未处理出边，`mark=0`，仍在 `gc_obj_list` |
-| 处理 node1，边→node0 | 0 | 0 | node0 已 `mark=1`，先进入 tmp |
-| node1 标记完成 | 0 | 0 | node1 也进入 tmp |
+| 步骤                  | node0.rc | node1.rc | 名单                                             |
+| --------------------- | -------- | -------- | ------------------------------------------------ |
+| 初始                  | 1        | 1        | 空                                               |
+| 处理 node0，边 →node1 | 1        | 0        | node1 尚未处理出边，`mark=0`，仍在 `gc_obj_list` |
+| 处理 node1，边 →node0 | 0        | 0        | node0 已 `mark=1`，先进入 tmp                    |
+| node1 标记完成        | 0        | 0        | node1 也进入 tmp                                 |
 
 阶段 1 结束性质：**剩余 rc = 根引用数**（此例根为 0）。孤立环到这里计数对了——但还没真正释放，也还没处理下一节的误伤。
 
@@ -909,11 +922,11 @@ let root = [[[1, 2], 3], 4];
 # 只有 globals[root] 是外部持有；middle / leaf 全靠堆内边活着
 ```
 
-| 对象 | 初始 rc | 堆内入边 | 阶段 1 后 rc |
-|------|---------|----------|--------------|
-| root | 1 | 0 | 1（根持有） |
-| middle | 1 | 1 | 0（误伤） |
-| leaf | 1 | 1 | 0（误伤） |
+| 对象   | 初始 rc | 堆内入边 | 阶段 1 后 rc |
+| ------ | ------- | -------- | ------------ |
+| root   | 1       | 0        | 1（根持有）  |
+| middle | 1       | 1        | 0（误伤）    |
+| leaf   | 1       | 1        | 0（误伤）    |
 
 middle、leaf 从 root 可达，是活的；但它们的计数全来自堆内边，减完变 0，进了嫌疑人名单。阶段 1 只看"减完边后还有没有剩余"，看不到"能不能从活人走过去"。
 
@@ -933,13 +946,13 @@ middle、leaf 从 root 可达，是活的；但它们的计数全来自堆内边
 
 对象图：`root → A → B → C`，阶段 1 后仅 root 存活，A/B/C 全在 tmp。
 
-| 时刻 | 正确做法（动态 list_next） | 错误做法（开头快照 ids = [root]） |
-|------|---------------------------|-----------------------------------|
-| 扫描开始 | current = root | 只遍历 [root] |
-| root 平反 A | A 移到 gc_obj_list 尾部 | A 回到活人堆，但 ids 里没有 A |
-| 继续 | current 走到 A，平反 B | 循环已结束 |
-| 再继续 | A 平反 B，B 平反 C | B、C 永远留在 tmp |
-| 阶段 3 | tmp 空 | **误杀 B、C** |
+| 时刻        | 正确做法（动态 list_next） | 错误做法（开头快照 ids = [root]） |
+| ----------- | -------------------------- | --------------------------------- |
+| 扫描开始    | current = root             | 只遍历 [root]                     |
+| root 平反 A | A 移到 gc_obj_list 尾部    | A 回到活人堆，但 ids 里没有 A     |
+| 继续        | current 走到 A，平反 B     | 循环已结束                        |
+| 再继续      | A 平反 B，B 平反 C         | B、C 永远留在 tmp                 |
+| 阶段 3      | tmp 空                     | **误杀 B、C**                     |
 
 QuickJS 用 `list_for_each` 达到动态效果；我们 `while let Some(id) = current { current = header(id).list_next }` 同理。别问我们怎么知道的。
 
@@ -980,12 +993,12 @@ fn gc_scan(&mut self) {
 
 假设只有 `globals[root]` 持 `root_array`，结构 `root → middle → leaf`。
 
-| 阶段 | root.rc | middle.rc | leaf.rc |
-|------|---------|-----------|---------|
-| GC 前 | 1 | 1 | 1 |
-| 阶段 1 后 | 1 | 0 | 0 |
-| 扫描 root，+middle | 1 | 1 | 0 |
-| 扫描 middle（从尾部捞回），+leaf | 1 | 1 | 1 |
+| 阶段                             | root.rc | middle.rc | leaf.rc |
+| -------------------------------- | ------- | --------- | ------- |
+| GC 前                            | 1       | 1         | 1       |
+| 阶段 1 后                        | 1       | 0         | 0       |
+| 扫描 root，+middle               | 1       | 1         | 0       |
+| 扫描 middle（从尾部捞回），+leaf | 1       | 1         | 1       |
 
 活人救回来了。`tmp` 上剩下的，才是真垃圾——交给阶段 3。
 
@@ -1014,12 +1027,12 @@ fn gc_free_cycles(&mut self) {
 
 #### 推演：A、B 互指环拆尸
 
-| 步骤 | 操作 | A.rc | B.rc | A 槽 | B 槽 |
-|------|------|------|------|------|------|
-| 0 | 阶段 3 入口 | 1 | 1 | 活 | 活 |
-| 1 | free A | 1 | 0 | 僵尸 | 活 |
-| 2 | free B | 0 | 0 | 僵尸 | 已归还 |
-| 3 | 收尾 | — | — | 归还 | — |
+| 步骤 | 操作        | A.rc | B.rc | A 槽 | B 槽   |
+| ---- | ----------- | ---- | ---- | ---- | ------ |
+| 0    | 阶段 3 入口 | 1    | 1    | 活   | 活     |
+| 1    | free A      | 1    | 0    | 僵尸 | 活     |
+| 2    | free B      | 0    | 0    | 僵尸 | 已归还 |
+| 3    | 收尾        | —    | —    | 归还 | —      |
 
 #### 环的变体
 
@@ -1202,14 +1215,14 @@ fn external_ref_to_cycle_entry_survives_gc() {
 - `node0.rc = 3`：`nodes[0]` + `root` + `node1 → node0`
 - `node1.rc = 2`：`nodes[1]` + `node0 → node1`
 
-| 阶段 | 操作 | node0.rc | node1.rc | gc_obj_list | tmp |
-|------|------|----------|----------|-------------|-----|
-| 0 | GC 前 | 3 | 2 | 0,1 | 空 |
-| 1a | 处理 node0，decref node1 | 3 | 1 | 0,1 | 空 |
-| 1b | 处理 node1，decref node0 | 2 | 1 | 0,1 | 空 |
-| 2a | scan node0，incref node1 | 2 | 2 | 0,1 | 空 |
-| 2b | scan node1，incref node0 | 3 | 2 | 0,1 | 空 |
-| 3 | tmp 空 | 3 | 2 | 0,1 | 空 |
+| 阶段 | 操作                     | node0.rc | node1.rc | gc_obj_list | tmp |
+| ---- | ------------------------ | -------- | -------- | ----------- | --- |
+| 0    | GC 前                    | 3        | 2        | 0,1         | 空  |
+| 1a   | 处理 node0，decref node1 | 3        | 1        | 0,1         | 空  |
+| 1b   | 处理 node1，decref node0 | 2        | 1        | 0,1         | 空  |
+| 2a   | scan node0，incref node1 | 2        | 2        | 0,1         | 空  |
+| 2b   | scan node1，incref node0 | 3        | 2        | 0,1         | 空  |
+| 3    | tmp 空                   | 3        | 2        | 0,1         | 空  |
 
 `root` 被 `free`，再 `drop_external_refs(&nodes)` 后，两节点各只剩一条环内边，变成第 5 章的纯环，下一次 GC 回收。
 
@@ -1217,11 +1230,11 @@ fn external_ref_to_cycle_entry_survives_gc() {
 
 对象图：`holder → node0 ↔ node1`，测试已 `free` 对 node0/node1 的直接引用。
 
-| 对象 | GC 前 rc | 外部根？ |
-|------|----------|----------|
-| holder | 1 | 是，测试代码仍持有着（未 free） |
-| node0 | 2 | 否，来自 `holder → node0` 和 `node1 → node0` |
-| node1 | 1 | 否，来自 `node0 → node1` |
+| 对象   | GC 前 rc | 外部根？                                     |
+| ------ | -------- | -------------------------------------------- |
+| holder | 1        | 是，测试代码仍持有着（未 free）              |
+| node0  | 2        | 否，来自 `holder → node0` 和 `node1 → node0` |
+| node1  | 1        | 否，来自 `node0 → node1`                     |
 
 阶段 1 后 `holder.rc = 1`（测试代码持有），`node0` / `node1` 会进入 tmp；阶段 2 从 holder 出发先平反 node0，再动态扫到 node0 平反 node1，整环回到 `gc_obj_list`。`free(holder)` 后再 GC，环变不可达，收掉。
 
@@ -1237,9 +1250,9 @@ fn external_ref_to_cycle_entry_survives_gc() {
 
 无环垃圾已被引用计数**即时**收掉——临时数组、函数返回的中间值在最后一个 `free` 时就死了，根本进不了"需要环检测"的路径。因此：
 
-| 堆行为 | GC 频率 |
-|--------|---------|
-| 稳定，只有无环分配/释放 | 几乎不触发 |
+| 堆行为                         | GC 频率      |
+| ------------------------------ | ------------ |
+| 稳定，只有无环分配/释放        | 几乎不触发   |
 | 猛涨（大量新对象、可能出现环） | 超过阈值才扫 |
 
 **1.5 倍系数**：触发后 `threshold = malloc_size + malloc_size/2`。堆从 100KB 涨到触发点，下次要涨到 150KB 才再触发——避免抖动。注意阈值只在 `trigger_gc()` 实际触发 GC 后重算；普通释放会降低 `malloc_size`，但不会立刻降低 `malloc_gc_threshold`。
@@ -1307,14 +1320,14 @@ pub fn trigger_gc(&mut self, alloc_size: usize) {
 
 ### 9.1 概念：哪些 Monkey 值有出边？
 
-| Value 变体 | 堆内出边 |
-|------------|----------|
-| `Integer`, `Boolean`, `String`, `Null`, `Error` | 无 |
-| `Array` | 每个元素 |
-| `Hash` | 每个值 |
-| `Closure` | `func` + 每个 `free` 捕获 |
-| `CompiledFunction` | 无（字节码元数据） |
-| `Builtin` | 无 |
+| Value 变体                                      | 堆内出边                  |
+| ----------------------------------------------- | ------------------------- |
+| `Integer`, `Boolean`, `String`, `Null`, `Error` | 无                        |
+| `Array`                                         | 每个元素                  |
+| `Hash`                                          | 每个值                    |
+| `Closure`                                       | `func` + 每个 `free` 捕获 |
+| `CompiledFunction`                              | 无（字节码元数据）        |
+| `Builtin`                                       | 无                        |
 
 `object::Object` 内部是 `Rc<Object>`，塞不进我们的堆。在 `gc/value.rs` 做镜像，边全换成 `GcRef`。
 
@@ -1375,10 +1388,10 @@ fn import_object_releases_temporary_child_refs() {
 }
 ```
 
-| 断言 | 若 import 泄漏临时 dup |
-|------|------------------------|
-| `ref_count(nested) == 1` | 可能是 2（import 栈 + 父数组边各一份未 free） |
-| `free(root)` 后 nested 不存在 | 临时引用把子树钉住，级联失败 |
+| 断言                          | 若 import 泄漏临时 dup                        |
+| ----------------------------- | --------------------------------------------- |
+| `ref_count(nested) == 1`      | 可能是 2（import 栈 + 父数组边各一份未 free） |
+| `free(root)` 后 nested 不存在 | 临时引用把子树钉住，级联失败                  |
 
 Value 层也能搭环，且能被 GC 收掉：
 
@@ -1410,14 +1423,14 @@ fn value_cycle_collected_by_gc() {
 
 roundtrip 类测试验证 `import_object` / `export_object` 深拷贝语义一致：
 
-| 测试 | 钉住 |
-|------|------|
-| `import_export_integer_roundtrip` | 标量 |
-| `import_export_string_roundtrip` | 字符串 |
-| `import_export_array_roundtrip` | 一层数组 |
-| `import_export_hash_roundtrip` | 哈希 |
-| `import_export_nested_array_roundtrip` | 嵌套结构 |
-| `hash_key_from_value_matches_object` | 哈希键一致性 |
+| 测试                                   | 钉住         |
+| -------------------------------------- | ------------ |
+| `import_export_integer_roundtrip`      | 标量         |
+| `import_export_string_roundtrip`       | 字符串       |
+| `import_export_array_roundtrip`        | 一层数组     |
+| `import_export_hash_roundtrip`         | 哈希         |
+| `import_export_nested_array_roundtrip` | 嵌套结构     |
+| `hash_key_from_value_matches_object`   | 哈希键一致性 |
 
 不逐行展开；失败时优先查 `import_object` 是否漏 `free` 临时子引用。
 
@@ -1435,7 +1448,10 @@ pub enum Value {
     Error(String),
     CompiledFunction(CompiledFunction),
     Closure(GcClosure),
-    Builtin(BuiltinFunc),
+    Builtin(BuiltinId),
+    Class(GcClass),
+    Instance(GcInstance),
+    BoundMethod(GcBoundMethod),
 }
 
 pub struct GcClosure {
@@ -1451,6 +1467,18 @@ impl Value {
             Value::Closure(c) => {
                 visit(c.func);
                 c.free.iter().for_each(|f| visit(*f));
+            }
+            Value::Class(c) => {
+                c.constructor.iter().for_each(|m| visit(*m));
+                c.methods.values().for_each(|m| visit(*m));
+            }
+            Value::Instance(i) => {
+                visit(i.class);
+                i.fields.values().for_each(|v| visit(*v));
+            }
+            Value::BoundMethod(m) => {
+                visit(m.receiver);
+                visit(m.method);
             }
             _ => {}
         }
@@ -1469,10 +1497,10 @@ pub fn alloc_value(heap: &mut GcHeap, value: Value) -> GcRef {
 flowchart LR
     Obj["object::Object Rc"] -->|import_object| Heap["GcRef / Value"]
     Heap -->|export_object| Obj
-    Builtin["BuiltinFunc"] -->|export 参数| Obj
-    Obj -->|调用| Builtin
-    Builtin -->|import 结果| Heap
+    Builtin["BuiltinId"] -->|native GcRef dispatch| Heap
 ```
+
+import/export 只服务无环兼容 API。GcVM 的 builtin 路径按稳定 `BuiltinId` 直接操作 `GcRef`，class / instance / bound method 也始终留在 GC 图内，不会为了调用 builtin 深拷贝成 `Object`。
 
 值进堆了。最后一章：每条字节码指令说清楚谁持有谁。
 
@@ -1501,14 +1529,14 @@ flowchart TB
     last_popped --> HeapObj
 ```
 
-| 区域 | 角色 |
-|------|------|
-| `constants` | 编译期字面量，全程存活 |
+| 区域           | 角色                                                              |
+| -------------- | ----------------------------------------------------------------- |
+| `constants`    | 编译期字面量，全程存活                                            |
 | 主函数初始引用 | `GcVM::new` 为顶层字节码分配的 `CompiledFunction`；`Frame` 只借用 |
-| `stack[0..sp)` | 操作数栈，活跃槽 |
-| `globals` | 全局变量 |
-| `last_popped` | 最近一次 `OpPop` 结果 |
-| `null` | 空槽占位；每个清空栈槽持有一份 dup |
+| `stack[0..sp)` | 操作数栈，活跃槽                                                  |
+| `globals`      | 全局变量                                                          |
+| `last_popped`  | 最近一次 `OpPop` 结果                                             |
+| `null`         | 空槽占位；每个清空栈槽持有一份 dup                                |
 
 **帧 `Frame` 不 dup 闭包**——被调对象在调用者栈槽活着，靠注释和测试兜底。
 
@@ -1525,23 +1553,26 @@ run_gc_vm_tests(vec![
                 let adder = newAdder(1, 2); adder(8);",
         expected: Object::Integer(11),
     },
-    // ... vm_test.rs 里共有 14 组 run_gc_vm_tests 语义测试
+    // ... vm_test.rs 还覆盖 class、bound method 与 GC report
 ]);
 ```
 
-| 测试函数 | 覆盖 |
-|----------|------|
-| `test_integer_arithmetic` | 整数、四则、一元负号 |
-| `test_boolean_expressions` | 比较、逻辑非 |
-| `test_conditionals` | if/else |
-| `test_global_let_statements` | 全局 let |
-| `test_strings` | 字符串拼接 |
-| `test_arrays` / `test_hash` / `test_index` | 复合类型 |
-| `test_functions_*` / `test_closures` | 调用、闭包 |
-| `test_builtins` | len、push 等 |
-| `test_eval_source_helper` | 顶层 `eval_source` API |
+| 测试函数                                           | 覆盖                                                   |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `test_integer_arithmetic`                          | 整数、四则、一元负号                                   |
+| `test_boolean_expressions`                         | 比较、逻辑非                                           |
+| `test_conditionals`                                | if/else                                                |
+| `test_global_let_statements`                       | 全局 let                                               |
+| `test_strings`                                     | 字符串拼接                                             |
+| `test_arrays` / `test_hash` / `test_index`         | 复合类型                                               |
+| `test_functions_*` / `test_closures`               | 调用、闭包                                             |
+| `test_builtins`                                    | len、push 等                                           |
+| `test_eval_source_helper`                          | 顶层 `eval_source` API                                 |
+| `test_class_semantics`                             | constructor、字段、方法、identity、native builtin      |
+| `two_instance_cycle_is_reported_and_collected`     | 纯 Monkey 源码构造并回收双向环                         |
+| `structured_run_api_reports_all_stages_and_budget` | report、parse/compile/runtime error、instruction limit |
 
-`vm_test.rs` 共有 16 个测试：14 个 `run_gc_vm_tests` 语义测试、1 个 `test_eval_source_helper` 顶层 API 测试、1 个计数测试。
+`vm_test.rs` 当前共有 21 个测试；整个 `monkey-gc` crate 共 47 个测试。
 
 计数测试保证执行期间的临时值都被 `free` 干净：
 
@@ -1566,14 +1597,14 @@ fn builtin_call_releases_callee_args_and_stack_temporaries() {
 
 跑完 `len([1, 2, 3]);` 再 `run_gc()` 后，堆里应**恰好**剩 6 个 GC 对象：
 
-| # | 对象 | 为何还在 |
-|---|------|----------|
-| 1 | `null` 单例 | 空栈槽占位 |
-| 2 | 常量 `1` | `constants` |
-| 3 | 常量 `2` | `constants` |
-| 4 | 常量 `3` | `constants` |
-| 5 | 主函数 `CompiledFunction` | `GcVM::new` 单独分配的 `main_fn` 初始引用；帧只借用它 |
-| 6 | 结果 `Integer(3)` | `last_popped` |
+| #   | 对象                      | 为何还在                                              |
+| --- | ------------------------- | ----------------------------------------------------- |
+| 1   | `null` 单例               | 空栈槽占位                                            |
+| 2   | 常量 `1`                  | `constants`                                           |
+| 3   | 常量 `2`                  | `constants`                                           |
+| 4   | 常量 `3`                  | `constants`                                           |
+| 5   | 主函数 `CompiledFunction` | `GcVM::new` 单独分配的 `main_fn` 初始引用；帧只借用它 |
+| 6   | 结果 `Integer(3)`         | `last_popped`                                         |
 
 **不应存在**：临时数组、`len` builtin 包装、调用期栈上垃圾。多 `dup` 一次 → 计数变 7，测试立刻红。
 
@@ -1652,19 +1683,41 @@ pub struct GcVM {
 }
 ```
 
+### 10.5 Class 环、结构化报告与 Playground
+
+`GcClass` 持有 constructor/method，`GcInstance` 持有 class/fields，`GcBoundMethod` 持有 receiver/method；三者都在 `Value::trace` 中报告强边。下面的函数返回后，只剩两个 instance 互相支撑：
+
+```monkey
+class Node {
+  connect(other) { this.next = other; }
+}
+
+let makeCycle = fn() {
+  let a = new Node();
+  let b = new Node();
+  a.connect(b);
+  b.connect(a);
+};
+makeCycle();
+```
+
+`GcVM::collect_garbage()` 先取 before snapshot，原子运行一次完整 collector，再取 after snapshot，并按对象 ID 差集统计 `collected_by_value_kind`。WASM 的 `run_gc_with_report` 把成功结果或 parse/compile/runtime error 序列化成 tagged JSON；Playground 的显式 **Run GC** 按钮使用这个入口，示例稳定显示 `Instance: 2 -> 0`。
+
+Playground 不暴露单独的 `gc_decref` 按钮。阶段 1 后的 refcount 是 trial-deletion 临时状态，只能继续完成 `gc_scan -> gc_free_cycles`。报告里的 `trackedBytes` 也是 Monkey allocator 的 accounting proxy，不代表浏览器 resident memory 或 WASM linear memory 会缩小。
+
 ---
 
 ## 11. 我们没做什么
 
 照例坦白。这套实现是最小可用系统：
 
-| 没做 | 说明 |
-|------|------|
-| **写屏障** | 全靠手写 `dup`/`free`；安全网是第 10 章那种精确计数测试 |
-| **字符串拆堆** | `Value::String` 内联；`RefCountHeader` API 已预留 |
-| **builtin 深拷贝** | 每次 export/import 一轮，慢但 `object` crate 零改动 |
-| **替换默认 VM** | `wasm` / playground 仍用 `compiler::VM` |
-| **单线程** | 无 `Send`/`Sync` |
+| 没做                  | 说明                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| **写屏障**            | 全靠手写 `dup`/`free`；安全网是第 10 章那种精确计数测试                                   |
+| **字符串拆堆**        | `Value::String` 内联；`RefCountHeader` API 已预留                                         |
+| **兼容 API 的图导出** | `eval_source` 的 `Object` 导出只适合无环结果；结构化 GC 路径使用 cycle-safe string/report |
+| **替换默认 VM**       | 默认 VM 仍保留；WASM / Playground 仅在显式 GC 路径调用 `GcVM`                             |
+| **单线程**            | 无 `Send`/`Sync`                                                                          |
 
 验证：
 
@@ -1672,7 +1725,7 @@ pub struct GcVM {
 cargo test -p monkey-gc
 ```
 
-**42 个测试**：`gc_test.rs` 17 + `value_test.rs` 9 + `vm_test.rs` 16。
+**47 个测试**：`gc_test.rs` 17 + `value_test.rs` 9 + `vm_test.rs` 21。
 
 ---
 
@@ -1683,7 +1736,7 @@ cargo test -p monkey-gc
 1. 下标句柄堆，`alloc` / `free`
 2. `dup` 与所有权纪律
 3. `trace` 与无环级联释放
-4. 撞上环泄漏，再按「等式 → 阶段1 → 发现误伤 → 阶段2 → 阶段3」补齐环回收
+4. 撞上环泄漏，再按「等式 → 阶段 1 → 发现误伤 → 阶段 2 → 阶段 3」补齐环回收
 5. 阈值触发，`Value` 与 `GcVM` 接线
 
 ### 12.2 核心直觉
@@ -1699,27 +1752,27 @@ trial deletion：把堆内边都减掉之后，计数还大于 0 的一定被根
 
 ### 12.3 概念 → 章节 → 测试 索引
 
-| 概念 | 章节 | 代表测试 |
-|------|------|----------|
-| 句柄 / 槽位表 | 2 | `refcount_frees_immediately_without_gc` |
-| finalizer | 2 | `on_free_called_when_collected` |
-| dup / free 纪律 | 3 | `dup_extends_lifetime` |
-| trace / 级联 | 4 | `acyclic_holder_extends_child_lifetime` |
-| 无环整图释放 | 4 | `acyclic_graph_freed_without_gc` |
-| 循环泄漏 | 5 | `collects_simple_cycle` |
-| 核心等式 / 阶段1 | 6.0–6.1 | `mark_func_decref_zeros_isolated_cycle` |
-| 嵌套误伤与平反 | 6.2–6.3 | （推演 + `gc_scan`） |
-| 拆环释放 / 多节点环 | 6.4 | `three_node_cycle_collected`, `four_node_cycle_collected`, `self_cycle_collected` |
-| finalizer 时序 | 6.4 | `self_cycle_finalizer_runs_after_edges_are_released` |
-| 有根环存活 | 7 | `cycle_with_external_root_survives` |
-| 活对象救环 | 7 | `external_ref_to_cycle_entry_survives_gc` |
-| 阈值触发 | 8 | `trigger_gc_on_threshold` |
-| 纯 refcount 预留 | 8 | `ref_counted_freed_without_gc` |
-| Value 所有权 | 9 | `alloc_value_increments_child_refcounts` |
-| import 不泄漏 | 9 | `import_object_releases_temporary_child_refs` |
-| Value 层环 | 9 | `value_cycle_collected_by_gc` |
-| VM 计数 | 10 | `builtin_call_releases_callee_args_and_stack_temporaries` |
-| 端到端语义 | 10 | `test_closures` 等 VM 测试 |
+| 概念                | 章节    | 代表测试                                                                          |
+| ------------------- | ------- | --------------------------------------------------------------------------------- |
+| 句柄 / 槽位表       | 2       | `refcount_frees_immediately_without_gc`                                           |
+| finalizer           | 2       | `on_free_called_when_collected`                                                   |
+| dup / free 纪律     | 3       | `dup_extends_lifetime`                                                            |
+| trace / 级联        | 4       | `acyclic_holder_extends_child_lifetime`                                           |
+| 无环整图释放        | 4       | `acyclic_graph_freed_without_gc`                                                  |
+| 循环泄漏            | 5       | `collects_simple_cycle`                                                           |
+| 核心等式 / 阶段 1   | 6.0–6.1 | `mark_func_decref_zeros_isolated_cycle`                                           |
+| 嵌套误伤与平反      | 6.2–6.3 | （推演 + `gc_scan`）                                                              |
+| 拆环释放 / 多节点环 | 6.4     | `three_node_cycle_collected`, `four_node_cycle_collected`, `self_cycle_collected` |
+| finalizer 时序      | 6.4     | `self_cycle_finalizer_runs_after_edges_are_released`                              |
+| 有根环存活          | 7       | `cycle_with_external_root_survives`                                               |
+| 活对象救环          | 7       | `external_ref_to_cycle_entry_survives_gc`                                         |
+| 阈值触发            | 8       | `trigger_gc_on_threshold`                                                         |
+| 纯 refcount 预留    | 8       | `ref_counted_freed_without_gc`                                                    |
+| Value 所有权        | 9       | `alloc_value_increments_child_refcounts`                                          |
+| import 不泄漏       | 9       | `import_object_releases_temporary_child_refs`                                     |
+| Value 层环          | 9       | `value_cycle_collected_by_gc`                                                     |
+| VM 计数             | 10      | `builtin_call_releases_callee_args_and_stack_temporaries`                         |
+| 端到端语义          | 10      | `test_closures` 等 VM 测试                                                        |
 
 ### 12.4 延伸阅读
 

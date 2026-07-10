@@ -231,4 +231,127 @@ mod tests {
         ];
         apply_test(&test_case);
     }
+
+    #[test]
+    fn test_class_constructor_methods_and_dynamic_fields() {
+        let test_case = [
+            (
+                r#"class Point {
+  constructor(x, y) { this.x = x; this.y = y; }
+  sum() { this.x + this.y; }
+}
+let point = new Point(20, 22);
+point.sum();"#,
+                "42",
+            ),
+            (
+                r#"class Empty { value() { 42; } }
+let empty = new Empty();
+empty.value();"#,
+                "42",
+            ),
+            (
+                r#"class Value { value() { 1; } }
+let value = new Value();
+value.value = 42;
+value.value;"#,
+                "42",
+            ),
+            (
+                r#"class Mutable { constructor(value) { this.value = value; } }
+let value = new Mutable(1);
+value.value = 42;
+value.value;"#,
+                "42",
+            ),
+            (
+                r#"class Trace {
+  constructor() { this.order = 0; }
+  mark(value) { this.order = this.order * 10 + value; value; }
+  target() { this.mark(1); this; }
+}
+class Pair { constructor(left, right) { this.value = left + right; } }
+let trace = new Trace();
+trace.target().value = trace.mark(2);
+let pair = new Pair(trace.mark(3), trace.mark(4));
+trace.order;"#,
+                "1234",
+            ),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_detached_method_and_lexical_this_capture() {
+        let test_case = [
+            (
+                r#"class Counter {
+  constructor(value) { this.value = value; }
+  current() { this.value; }
+}
+let current = new Counter(42).current;
+current();"#,
+                "42",
+            ),
+            (
+                r#"class Box {
+  constructor(value) { this.value = value; }
+  reader() { fn() { fn() { this.value; }; }; }
+}
+let reader = new Box(42).reader();
+reader()();"#,
+                "42",
+            ),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_class_instance_and_bound_method_identity() {
+        let test_case = [
+            ("class A {} let Alias = A; A == Alias;", "true"),
+            ("class A {} new A() == new A();", "false"),
+            ("class A { method() { 1; } } let a = new A(); let f = a.method; f == f;", "true"),
+            ("class A { method() { 1; } } let a = new A(); a.method == a.method;", "false"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_class_errors_and_strict_arity() {
+        let test_case = [
+            (
+                "class Empty {} new Empty(1);",
+                "wrong number of arguments for Empty.constructor: want=0, got=1",
+            ),
+            (
+                "class A { method(value) { value; } } new A().method();",
+                "wrong number of arguments for method: want=1, got=0",
+            ),
+            ("class A {} A();", "class A must be constructed with new"),
+            ("let f = fn() {}; new f();", "cannot construct fn() {  }"),
+            ("class A {} new A().missing;", "property 'missing' does not exist on A"),
+            ("1.value;", "cannot read property 'value' of 1"),
+            ("let f = fn(a) { a; }; f();", "wrong number of arguments: want=1, got=0"),
+            ("class A { constructor() { return 1; } }", "constructor cannot return a value"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn class_cycle_display_is_opaque() {
+        apply_test(&[(
+            "class Node {} let node = new Node(); node.next = node; node;",
+            "[object Node]",
+        )]);
+    }
+
+    #[test]
+    fn validation_accepts_bindings_from_previous_eval() {
+        let env: Env = Rc::new(RefCell::new(Default::default()));
+        eval(parse("let answer = 41;").unwrap(), &env).unwrap();
+
+        let result = eval(parse("answer + 1;").unwrap(), &env).unwrap();
+        assert_eq!(result.as_ref(), &object::Object::Integer(42));
+    }
 }

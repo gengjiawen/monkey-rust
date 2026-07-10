@@ -4,15 +4,25 @@ use std::rc::Rc;
 
 use object::builtins::*;
 use object::environment::*;
-use object::{EvalError, Object};
+use object::{BoundMethodObject, ClassObject, EvalError, InstanceObject, InstanceRef, Object};
 use parser::ast::*;
 use parser::lexer::token::{Token, TokenKind};
+use parser::validation::validate_program;
 
 mod interpreter_test;
 
 pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
     match node {
-        Node::Program(p) => eval_block_statements(&p.body, env),
+        Node::Program(p) => {
+            let mut predefined_names = env.borrow().visible_names();
+            predefined_names.extend(BuiltIns.iter().map(|builtin| builtin.name.to_string()));
+            let predefined_names = predefined_names
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            validate_program(&p, &predefined_names).map_err(|error| error.message)?;
+            eval_block_statements(&p.body, env)
+        }
         Node::Statement(statements) => eval_statement(&statements, env),
         Node::Expression(expression) => eval_expression(&expression, env),
     }
@@ -58,7 +68,41 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
             }
             return Ok(Rc::new(Object::Null));
         }
+        Statement::Class(class) => eval_class_declaration(class, env),
+        Statement::SetProperty(statement) => {
+            let receiver = eval_expression(&statement.object, env)?;
+            let value = eval_expression(&statement.value, env)?;
+            set_property(&receiver, statement.property.name.clone(), value)?;
+            Ok(Rc::new(Object::Null))
+        }
     }
+}
+
+fn eval_class_declaration(
+    declaration: &ClassDeclaration,
+    env: &Env,
+) -> Result<Rc<Object>, EvalError> {
+    let mut constructor = None;
+    let mut methods = HashMap::new();
+    for method in &declaration.methods {
+        let function =
+            Rc::new(Object::Function(method.params.clone(), method.body.clone(), Rc::clone(env)));
+        match method.kind {
+            MethodKind::Constructor => constructor = Some(function),
+            MethodKind::Method => {
+                methods.insert(method.name.name.clone(), function);
+            }
+        }
+    }
+
+    let class = Rc::new(RefCell::new(ClassObject {
+        name: declaration.name.name.clone(),
+        constructor,
+        methods,
+    }));
+    env.borrow_mut()
+        .set(declaration.name.name.clone(), Rc::new(Object::Class(class)));
+    Ok(Rc::new(Object::Null))
 }
 
 fn is_truthy(obj: &Object) -> bool {
@@ -135,7 +179,80 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
             let index = eval_expression(index, env)?;
             eval_index_expression(&literal, &index)
         }
+        Expression::This(_) => eval_identifier("this", env),
+        Expression::Property(property) => {
+            let receiver = eval_expression(&property.object, env)?;
+            get_property(&receiver, &property.property.name)
+        }
+        Expression::New(new_expression) => {
+            let class = eval_identifier(&new_expression.callee.name, env)?;
+            let arguments = eval_expressions(&new_expression.arguments, env)?;
+            construct_instance(&class, &arguments)
+        }
     }
+}
+
+fn get_property(receiver: &Rc<Object>, name: &str) -> Result<Rc<Object>, EvalError> {
+    let Object::Instance(instance) = &**receiver else {
+        return Err(format!("cannot read property '{}' of {}", name, receiver));
+    };
+
+    if let Some(value) = instance.borrow().fields.get(name).cloned() {
+        return Ok(value);
+    }
+
+    let (class_name, method) = {
+        let instance = instance.borrow();
+        let class = instance.class.borrow();
+        (class.name.clone(), class.methods.get(name).cloned())
+    };
+    if let Some(method) = method {
+        return Ok(Rc::new(Object::BoundMethod(Rc::new(BoundMethodObject {
+            receiver: Rc::clone(instance),
+            method,
+            name: name.to_string(),
+        }))));
+    }
+
+    Err(format!("property '{}' does not exist on {}", name, class_name))
+}
+
+fn set_property(receiver: &Rc<Object>, name: String, value: Rc<Object>) -> Result<(), EvalError> {
+    let Object::Instance(instance) = &**receiver else {
+        return Err(format!("cannot set property '{}' of {}", name, receiver));
+    };
+    instance.borrow_mut().fields.insert(name, value);
+    Ok(())
+}
+
+fn construct_instance(
+    class_value: &Rc<Object>,
+    args: &[Rc<Object>],
+) -> Result<Rc<Object>, EvalError> {
+    let Object::Class(class) = &**class_value else {
+        return Err(format!("cannot construct {}", class_value));
+    };
+    let instance = Rc::new(RefCell::new(InstanceObject {
+        class: Rc::clone(class),
+        fields: HashMap::new(),
+    }));
+    let instance_value = Rc::new(Object::Instance(Rc::clone(&instance)));
+    let constructor = class.borrow().constructor.clone();
+    if let Some(constructor) = constructor {
+        apply_method(
+            &constructor,
+            &instance,
+            args,
+            &format!("{}.constructor", class.borrow().name),
+        )?;
+    } else if !args.is_empty() {
+        return Err(format!(
+            "wrong number of arguments for {}.constructor: want=0, got={}",
+            class.borrow().name,
+            args.len()
+        ));
+    }
+    Ok(instance_value)
 }
 
 fn eval_index_expression(left: &Rc<Object>, index: &Rc<Object>) -> Result<Rc<Object>, EvalError> {
@@ -161,6 +278,13 @@ fn eval_index_expression(left: &Rc<Object>, index: &Rc<Object>) -> Result<Rc<Obj
 fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Object>, EvalError> {
     match &**function {
         Object::Function(params, body, env) => {
+            if params.len() != args.len() {
+                return Err(format!(
+                    "wrong number of arguments: want={}, got={}",
+                    params.len(),
+                    args.len()
+                ));
+            }
             let mut env = Environment::new_enclosed_environment(&env);
 
             params.iter().enumerate().for_each(|(i, param)| {
@@ -171,8 +295,41 @@ fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Ob
             return unwrap_return(evaluated);
         }
         Object::Builtin(b) => Ok(b(args.to_vec())),
+        Object::BoundMethod(bound) => {
+            apply_method(&bound.method, &bound.receiver, args, &bound.name)
+        }
+        Object::Class(class) => {
+            Err(format!("class {} must be constructed with new", class.borrow().name))
+        }
         f => Err(format!("expected {} to be a function", f)),
     }
+}
+
+fn apply_method(
+    method: &Rc<Object>,
+    receiver: &InstanceRef,
+    args: &[Rc<Object>],
+    display_name: &str,
+) -> Result<Rc<Object>, EvalError> {
+    let Object::Function(params, body, declaration_env) = &**method else {
+        return Err(format!("{} is not a method", display_name));
+    };
+    if params.len() != args.len() {
+        return Err(format!(
+            "wrong number of arguments for {}: want={}, got={}",
+            display_name,
+            params.len(),
+            args.len()
+        ));
+    }
+
+    let mut call_env = Environment::new_enclosed_environment(declaration_env);
+    call_env.set("this".to_string(), Rc::new(Object::Instance(Rc::clone(receiver))));
+    for (parameter, argument) in params.iter().zip(args) {
+        call_env.set(parameter.name.clone(), Rc::clone(argument));
+    }
+    let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(call_env)))?;
+    unwrap_return(evaluated)
 }
 
 fn unwrap_return(obj: Rc<Object>) -> Result<Rc<Object>, EvalError> {
@@ -196,8 +353,8 @@ fn eval_expressions(exprs: &Vec<Expression>, env: &Env) -> Result<Vec<Rc<Object>
 fn eval_identifier(identifier: &str, env: &Env) -> Result<Rc<Object>, EvalError> {
     match env.borrow().get(identifier) {
         Some(obj) => Ok(obj.clone()),
-        None => match BuiltIns.iter().find(|&&b| b.0 == identifier) {
-            Some(obj) => Ok(Rc::new(Object::Builtin(obj.1))),
+        None => match BuiltIns.iter().find(|builtin| builtin.name == identifier) {
+            Some(obj) => Ok(Rc::new(Object::Builtin(obj.function))),
             None => Err(format!("unknown identifier {}", identifier)),
         },
     }
@@ -227,6 +384,10 @@ fn eval_prefix_minus(expr: &Object) -> Result<Rc<Object>, EvalError> {
 }
 
 fn eval_infix(op: &Token, left: &Object, right: &Object) -> Result<Rc<Object>, EvalError> {
+    if op.kind == TokenKind::EQ || op.kind == TokenKind::NotEq {
+        let equal = left == right;
+        return Ok(Rc::new(Object::Boolean(if op.kind == TokenKind::EQ { equal } else { !equal })));
+    }
     match (left, right) {
         (Object::Integer(left), Object::Integer(right)) => {
             return eval_integer_infix(op, *left, *right);

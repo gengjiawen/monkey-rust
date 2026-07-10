@@ -1,4 +1,4 @@
-use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -6,7 +6,7 @@ use byteorder::{BigEndian, ByteOrder};
 use object::builtins::BuiltIns;
 
 use object::Object::ClosureObj;
-use object::{BuiltinFunc, Closure, CompiledFunction, Object};
+use object::{BoundMethodObject, BuiltinFunc, ClassObject, Closure, InstanceObject, Object};
 
 use crate::compiler::Bytecode;
 use crate::frame::Frame;
@@ -187,7 +187,7 @@ impl VM {
                 Opcode::OpGetBuiltin => {
                     let built_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
-                    let definition = BuiltIns.get(built_index).unwrap().1;
+                    let definition = BuiltIns.get(built_index).unwrap().function;
                     self.push(Rc::new(Object::Builtin(definition)));
                 }
                 Opcode::OpClosure => {
@@ -206,6 +206,53 @@ impl VM {
                     let current_closure = self.current_frame().cl.clone();
                     self.push(Rc::new(Object::ClosureObj(current_closure)));
                 }
+                Opcode::OpClass => {
+                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    self.current_frame().ip += 2;
+                    let name = self.constant_string(name_index);
+                    self.push(Rc::new(Object::Class(Rc::new(RefCell::new(ClassObject {
+                        name,
+                        constructor: None,
+                        methods: HashMap::new(),
+                    })))));
+                }
+                Opcode::OpMethod => {
+                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let kind = ins[ip + 3];
+                    self.current_frame().ip += 3;
+                    let name = self.constant_string(name_index);
+                    let method = self.pop();
+                    let class = match &*self.stack[self.sp - 1] {
+                        Object::Class(class) => Rc::clone(class),
+                        value => panic!("cannot install method on {}", value),
+                    };
+                    if kind == 1 {
+                        class.borrow_mut().constructor = Some(method);
+                    } else {
+                        class.borrow_mut().methods.insert(name, method);
+                    }
+                }
+                Opcode::OpGetProperty => {
+                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    self.current_frame().ip += 2;
+                    let name = self.constant_string(name_index);
+                    let receiver = self.pop();
+                    let value = self.get_property(&receiver, &name);
+                    self.push(value);
+                }
+                Opcode::OpSetProperty => {
+                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    self.current_frame().ip += 2;
+                    let name = self.constant_string(name_index);
+                    let value = self.pop();
+                    let receiver = self.pop();
+                    self.set_property(&receiver, name, value);
+                }
+                Opcode::OpNew => {
+                    let num_args = ins[ip + 1] as usize;
+                    self.current_frame().ip += 1;
+                    self.execute_new(num_args);
+                }
             }
         }
     }
@@ -213,7 +260,7 @@ impl VM {
     fn execute_binary_operation(&mut self, opcode: Opcode) {
         let right = self.pop();
         let left = self.pop();
-        match (left.borrow(), right.borrow()) {
+        match (left.as_ref(), right.as_ref()) {
             (Object::Integer(l), Object::Integer(r)) => {
                 let result = match opcode {
                     Opcode::OpAdd => l + r,
@@ -240,21 +287,20 @@ impl VM {
     fn execute_comparison(&mut self, opcode: Opcode) {
         let right = self.pop();
         let left = self.pop();
-        match (left.borrow(), right.borrow()) {
+        if opcode == Opcode::OpEqual || opcode == Opcode::OpNotEqual {
+            let equal = left.as_ref() == right.as_ref();
+            self.push(Rc::new(Object::Boolean(if opcode == Opcode::OpEqual {
+                equal
+            } else {
+                !equal
+            })));
+            return;
+        }
+        match (left.as_ref(), right.as_ref()) {
             (Object::Integer(l), Object::Integer(r)) => {
                 let result = match opcode {
-                    Opcode::OpEqual => l == r,
-                    Opcode::OpNotEqual => l != r,
                     Opcode::OpGreaterThan => l > r,
                     _ => panic!("Unknown opcode for comparing int"),
-                };
-                self.push(Rc::from(Object::Boolean(result)));
-            }
-            (Object::Boolean(l), Object::Boolean(r)) => {
-                let result = match opcode {
-                    Opcode::OpEqual => l == r,
-                    Opcode::OpNotEqual => l != r,
-                    _ => panic!("Unknown opcode for comparing boolean"),
                 };
                 self.push(Rc::from(Object::Boolean(result)));
             }
@@ -266,7 +312,7 @@ impl VM {
 
     fn execute_minus_operation(&mut self, opcode: Opcode) {
         let operand = self.pop();
-        match operand.borrow() {
+        match operand.as_ref() {
             Object::Integer(l) => {
                 self.push(Rc::from(Object::Integer(-*l)));
             }
@@ -277,7 +323,7 @@ impl VM {
     }
     fn execute_bang_operation(&mut self) {
         let operand = self.pop();
-        match operand.borrow() {
+        match operand.as_ref() {
             Object::Boolean(l) => {
                 self.push(Rc::from(Object::Boolean(!*l)));
             }
@@ -305,7 +351,7 @@ impl VM {
         self.sp += 1;
     }
     fn is_truthy(&self, condition: Rc<Object>) -> bool {
-        match condition.borrow() {
+        match condition.as_ref() {
             Object::Boolean(b) => *b,
             Object::Null => false,
             _ => true,
@@ -330,7 +376,7 @@ impl VM {
     }
 
     fn execute_index_operation(&mut self, left: Rc<Object>, index: Rc<Object>) {
-        match (left.borrow(), index.borrow()) {
+        match (left.as_ref(), index.as_ref()) {
             (Object::Array(l), Object::Integer(i)) => {
                 self.execute_array_index(l, *i);
             }
@@ -382,13 +428,19 @@ impl VM {
     }
 
     fn execute_call(&mut self, num_args: usize) {
-        let callee = &*self.stack[self.sp - 1 - num_args];
-        match callee {
+        let callee = Rc::clone(&self.stack[self.sp - 1 - num_args]);
+        match &*callee {
             Object::ClosureObj(cf) => {
                 self.call_closure(cf.clone(), num_args);
             }
             Object::Builtin(bt) => {
                 self.call_builtin(bt.clone(), num_args);
+            }
+            Object::BoundMethod(bound) => {
+                self.call_bound_method(bound.clone(), num_args);
+            }
+            Object::Class(class) => {
+                panic!("class {} must be constructed with new", class.borrow().name)
             }
             _ => {
                 panic!("calling non-closure")
@@ -431,5 +483,116 @@ impl VM {
                 panic!("not a function {}", o);
             }
         }
+    }
+
+    fn constant_string(&self, index: usize) -> String {
+        match &*self.constants[index] {
+            Object::String(value) => value.clone(),
+            value => panic!("expected string constant, got {}", value),
+        }
+    }
+
+    fn get_property(&self, receiver: &Rc<Object>, name: &str) -> Rc<Object> {
+        let Object::Instance(instance) = &**receiver else {
+            panic!("cannot read property '{}' of {}", name, receiver);
+        };
+        if let Some(value) = instance.borrow().fields.get(name).cloned() {
+            return value;
+        }
+        let (class_name, method) = {
+            let instance_object = instance.borrow();
+            let class = instance_object.class.borrow();
+            (class.name.clone(), class.methods.get(name).cloned())
+        };
+        match method {
+            Some(method) => Rc::new(Object::BoundMethod(Rc::new(BoundMethodObject {
+                receiver: Rc::clone(instance),
+                method,
+                name: name.to_string(),
+            }))),
+            None => panic!("property '{}' does not exist on {}", name, class_name),
+        }
+    }
+
+    fn set_property(&self, receiver: &Rc<Object>, name: String, value: Rc<Object>) {
+        let Object::Instance(instance) = &**receiver else {
+            panic!("cannot set property '{}' of {}", name, receiver);
+        };
+        instance.borrow_mut().fields.insert(name, value);
+    }
+
+    fn execute_new(&mut self, num_args: usize) {
+        let base = self.sp - num_args - 1;
+        let class = match &*self.stack[base] {
+            Object::Class(class) => Rc::clone(class),
+            value => panic!("cannot construct {}", value),
+        };
+        let instance = Rc::new(RefCell::new(InstanceObject {
+            class: Rc::clone(&class),
+            fields: HashMap::new(),
+        }));
+        let instance_value = Rc::new(Object::Instance(instance));
+        let constructor = class.borrow().constructor.clone();
+        let Some(constructor) = constructor else {
+            if num_args != 0 {
+                panic!(
+                    "wrong number of arguments for {}.constructor: want=0, got={}",
+                    class.borrow().name,
+                    num_args
+                );
+            }
+            self.sp = base;
+            self.push(instance_value);
+            return;
+        };
+
+        let closure = match &*constructor {
+            Object::ClosureObj(closure) => closure.clone(),
+            value => panic!("constructor is not a closure: {}", value),
+        };
+        let expected = closure.func.num_parameters.saturating_sub(1);
+        if expected != num_args {
+            panic!(
+                "wrong number of arguments for {}.constructor: want={}, got={}",
+                class.borrow().name,
+                expected,
+                num_args
+            );
+        }
+        self.rewrite_receiver_call(constructor, instance_value, num_args);
+        self.call_closure(closure, num_args + 1);
+    }
+
+    fn call_bound_method(&mut self, bound: Rc<BoundMethodObject>, num_args: usize) {
+        let closure = match &*bound.method {
+            Object::ClosureObj(closure) => closure.clone(),
+            value => panic!("bound method is not a closure: {}", value),
+        };
+        let expected = closure.func.num_parameters.saturating_sub(1);
+        if expected != num_args {
+            let class_name = bound.receiver.borrow().class.borrow().name.clone();
+            panic!(
+                "wrong number of arguments for {}.{}: want={}, got={}",
+                class_name, bound.name, expected, num_args
+            );
+        }
+        let receiver = Rc::new(Object::Instance(Rc::clone(&bound.receiver)));
+        self.rewrite_receiver_call(Rc::clone(&bound.method), receiver, num_args);
+        self.call_closure(closure, num_args + 1);
+    }
+
+    fn rewrite_receiver_call(
+        &mut self,
+        callable: Rc<Object>,
+        receiver: Rc<Object>,
+        num_args: usize,
+    ) {
+        let base = self.sp - num_args - 1;
+        for index in (base + 1..self.sp).rev() {
+            self.stack[index + 1] = Rc::clone(&self.stack[index]);
+        }
+        self.stack[base] = callable;
+        self.stack[base + 1] = receiver;
+        self.sp += 1;
     }
 }
