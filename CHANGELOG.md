@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.2](https://github.com/gengjiawen/monkey-rust/compare/v0.15.1...v0.15.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **ci:** pin npm to 11.x for release publish ([#269](https://github.com/gengjiawen/monkey-rust/issues/269)) ([60e9510](https://github.com/gengjiawen/monkey-rust/commit/60e95100cce1ff76ba14034aafbcc07332583199))
+
 ## [0.15.1](https://github.com/gengjiawen/monkey-rust/compare/v0.15.0...v0.15.1) (2026-07-10)
 
 
