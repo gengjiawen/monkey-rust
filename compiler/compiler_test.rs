@@ -144,13 +144,24 @@ mod tests {
         let output = bytecode.string();
 
         assert!(output.contains("Instructions:\n0000 OpClosure 0 0\n0004 OpSetGlobal 0\n"));
-        assert!(
-            output.contains("Constants:\n0000 CompiledFunction(num_locals=2, num_parameters=2)\n")
-        );
+        assert!(output.contains(
+            "Constants:\n0000 CompiledFunction(name=add, num_locals=2, num_parameters=2)\n"
+        ));
         assert!(output.contains("       0000 OpGetLocal 0\n"));
         assert!(output.contains("       0002 OpGetLocal 1\n"));
         assert!(output.contains("       0004 OpAdd\n"));
         assert!(output.contains("       0005 OpReturnValue\n"));
+    }
+
+    #[test]
+    fn bytecode_string_labels_anonymous_compiled_functions() {
+        let program = parse("fn() {};").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        assert!(bytecode.string().contains(
+            "Constants:\n0000 CompiledFunction(name=<anonymous>, num_locals=0, num_parameters=0)\n"
+        ));
     }
 
     #[test]

@@ -103,9 +103,15 @@ impl Bytecode {
             for (index, constant) in self.constants.iter().enumerate() {
                 match constant.as_ref() {
                     Object::CompiledFunction(function) => {
+                        let name = if function.name.is_empty() {
+                            "<anonymous>"
+                        } else {
+                            function.name.as_str()
+                        };
                         builder.write_line(&format!(
-                            "{index:04} CompiledFunction(num_locals={}, num_parameters={})",
-                            function.num_locals, function.num_parameters
+                            "{index:04} CompiledFunction(name={name}, num_locals={}, num_parameters={})",
+                            function.num_locals,
+                            function.num_parameters
                         ));
                         builder.write_line("     Instructions:");
 
