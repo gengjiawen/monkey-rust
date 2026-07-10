@@ -70,6 +70,9 @@ jobs:
             })
             core.info(`Triggered prepare-release.yml on ${releasePr.head.ref}`)
       - uses: actions/checkout@v6
+      - name: Pin npm to 11.x
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm install -g npm@11
       - run: npx envinfo
       - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
         env:
