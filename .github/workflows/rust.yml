@@ -15,7 +15,10 @@ jobs:
       - run: npx envinfo
       - name: Build
         run: cargo build
-      - name: Run tests
+      # Includes insta snapshot tests (lexer/parser). Fail on mismatch; do not write .snap.new.
+      - name: Run tests (including insta snapshots)
+        env:
+          INSTA_UPDATE: no
         run: cargo test
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
