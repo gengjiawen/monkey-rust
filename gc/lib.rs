@@ -20,8 +20,8 @@ pub use header::{GcId, GcObjectHeader, GcObjectType, GcPhase, RefCountHeader, Re
 pub use heap::{GcHeap, GcRef};
 pub use malloc::{MallocState, DEFAULT_GC_THRESHOLD, MALLOC_OVERHEAD};
 pub use report::{
-    FreeCycleStats, GcCollectionReport, GcPhaseStats, HeapSnapshot, ScanStats, TrialDeletionStats,
-    ValueKindCounts,
+    FreeCycleStats, GcCollectionReport, GcObjectSummary, GcPhaseStats, HeapSnapshot, ScanStats,
+    TrialDeletionStats, ValueKindCounts,
 };
 pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{

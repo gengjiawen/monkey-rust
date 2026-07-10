@@ -613,6 +613,22 @@ mod tests {
         assert_eq!(report.after.by_value_kind[&ValueKind::Instance], 0);
         assert_eq!(report.collected_by_value_kind[&ValueKind::Instance], 2);
         assert!(report.phases.trial_deletion.edges_visited > 0);
+        assert!(report
+            .phases
+            .scan
+            .restored_objects
+            .iter()
+            .all(|object| { object.label.ends_with(&format!("#{}", object.id)) }));
+        assert_eq!(report.phases.scan.garbage_candidate_objects.len(), 2);
+        assert!(report
+            .phases
+            .scan
+            .garbage_candidate_objects
+            .iter()
+            .all(|object| {
+                object.kind == ValueKind::Instance
+                    && object.label == format!("Instance(Node)#{}", object.id)
+            }));
         assert_eq!(report.phases.free_cycles.freed, 2);
 
         let second = vm.collect_garbage();

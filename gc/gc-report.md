@@ -1701,7 +1701,7 @@ let makeCycle = fn() {
 makeCycle();
 ```
 
-`GcVM::collect_garbage()` 先取 before snapshot，原子运行一次完整 collector，再取 after snapshot，并按对象 ID 差集统计 `collected_by_value_kind`。WASM 的 `run_gc_with_report` 把成功结果或 parse/compile/runtime error 序列化成 tagged JSON；Playground 的显式 **Run GC** 按钮使用这个入口，示例稳定显示 `Instance: 2 -> 0`。
+`GcVM::collect_garbage()` 先取 before snapshot，原子运行一次完整 collector，再取 after snapshot，并按对象 ID 差集统计 `collected_by_value_kind`。Scan 完成后、free 开始前还会把 Restored 和 Garbage candidate 转成排序后的结构化摘要：class 与 instance 分别显示为 `Class(Node)#7`、`Instance(Node)#12`，而不是猜测并不存在的唯一源码变量名。WASM 的 `run_gc_with_report` 把成功结果或 parse/compile/runtime error 序列化成 tagged JSON；Playground 的显式 **Run GC** 按钮使用这个入口，示例稳定显示 `Instance: 2 -> 0`。
 
 Playground 不暴露单独的 `gc_decref` 按钮。阶段 1 后的 refcount 是 trial-deletion 临时状态，只能继续完成 `gc_scan -> gc_free_cycles`。报告里的 `trackedBytes` 也是 Monkey allocator 的 accounting proxy，不代表浏览器 resident memory 或 WASM linear memory 会缩小。
 

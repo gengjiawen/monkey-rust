@@ -347,7 +347,7 @@ let report = vm.collect_garbage();
 let result = vm.try_export_last_result()?;
 ```
 
-`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats()`，并返回 `GcCollectionReport`。Playground 不直接调用 `gc_decref`、`gc_scan` 或 `gc_free_cycles`。
+`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats()`，并返回 `GcCollectionReport`。Scan report 会在释放前保存 Restored 与 Garbage candidate 的结构化摘要，例如 `Class(Node)#7` 和 `Instance(Node)#12`；这些 ID 只在单次 report 内有效。Playground 不直接调用 `gc_decref`、`gc_scan` 或 `gc_free_cycles`。
 
 ---
 

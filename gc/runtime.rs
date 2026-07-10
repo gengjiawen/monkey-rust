@@ -3,7 +3,9 @@ use crate::header::{
 };
 use crate::list::{GcList, GcListIter};
 use crate::malloc::{MallocState, DEFAULT_GC_THRESHOLD};
-use crate::report::{FreeCycleStats, GcPhaseStats, ScanStats, TrialDeletionStats};
+use crate::report::{
+    summarize_gc_objects, FreeCycleStats, GcPhaseStats, ScanStats, TrialDeletionStats,
+};
 use std::any::Any;
 
 /// Child-mark callback mode used during the three GC phases.
@@ -343,16 +345,25 @@ impl GcRuntime {
 
     /// Run the three-phase cycle collector. Matches `JS_RunGC`.
     pub fn run_gc(&mut self) {
-        self.run_gc_with_stats();
+        self.gc_decref();
+        self.gc_scan();
+        self.gc_free_cycles();
     }
 
     /// Run all collector phases atomically and return read-only telemetry.
     pub fn run_gc_with_stats(&mut self) -> GcPhaseStats {
         let edges_visited = self.gc_edge_count();
         self.gc_decref();
-        let candidates = self.list_count(GcListKind::Tmp);
+        let candidate_ids = self.sorted_list_ids(GcListKind::Tmp);
         self.gc_scan();
-        let garbage_candidates = self.list_count(GcListKind::Tmp);
+        let garbage_candidate_ids = self.sorted_list_ids(GcListKind::Tmp);
+        let restored_ids = candidate_ids
+            .iter()
+            .copied()
+            .filter(|id| garbage_candidate_ids.binary_search(id).is_err())
+            .collect::<Vec<_>>();
+        let restored_objects = summarize_gc_objects(self, &restored_ids);
+        let garbage_candidate_objects = summarize_gc_objects(self, &garbage_candidate_ids);
         let before_free = self.object_ids().len();
         self.gc_free_cycles();
         let freed = before_free.saturating_sub(self.object_ids().len());
@@ -360,11 +371,13 @@ impl GcRuntime {
         GcPhaseStats {
             trial_deletion: TrialDeletionStats {
                 edges_visited,
-                candidates,
+                candidates: candidate_ids.len(),
             },
             scan: ScanStats {
-                restored: candidates.saturating_sub(garbage_candidates),
-                garbage_candidates,
+                restored: restored_objects.len(),
+                garbage_candidates: garbage_candidate_objects.len(),
+                restored_objects,
+                garbage_candidate_objects,
             },
             free_cycles: FreeCycleStats {
                 freed,
@@ -372,17 +385,19 @@ impl GcRuntime {
         }
     }
 
-    fn list_count(&self, kind: GcListKind) -> usize {
+    fn sorted_list_ids(&self, kind: GcListKind) -> Vec<GcId> {
         let current = match kind {
             GcListKind::GcObj => self.gc_obj_list.head,
             GcListKind::Tmp => self.tmp_obj_list.head,
             GcListKind::ZeroRef => self.gc_zero_ref_count_list.head,
         };
-        GcListIter {
+        let mut ids = GcListIter {
             rt: self,
             current,
         }
-        .count()
+        .collect::<Vec<_>>();
+        ids.sort_unstable();
+        ids
     }
 
     fn gc_edge_count(&self) -> usize {

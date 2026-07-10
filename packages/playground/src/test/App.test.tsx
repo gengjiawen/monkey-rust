@@ -104,7 +104,22 @@ function successEnvelope({
       },
       phases: {
         trialDeletion: { edgesVisited: 11, candidates: 4 },
-        scan: { restored: 2, garbageCandidates: 2 },
+        scan: {
+          restored: 2,
+          garbageCandidates: 2,
+          restoredObjects: [
+            { id: 7, kind: 'class', label: 'Class(Node)#7' },
+            { id: 12, kind: 'instance', label: 'Instance(Node)#12' },
+          ],
+          garbageCandidateObjects: [
+            { id: 13, kind: 'instance', label: 'Instance(Node)#13' },
+            {
+              id: 14,
+              kind: 'boundMethod',
+              label: 'BoundMethod(Node.connect)#14',
+            },
+          ],
+        },
         freeCycles: { freed: collected },
       },
       collectedByValueKind: counts({
@@ -170,6 +185,10 @@ describe('GC playground', () => {
     expect(screen.getByText('Trial deletion')).toBeInTheDocument()
     expect(screen.getByText('Scan')).toBeInTheDocument()
     expect(screen.getByText('Free cycles')).toBeInTheDocument()
+    expect(screen.getByText('Class(Node)#7')).toBeInTheDocument()
+    expect(screen.getByText('Instance(Node)#12')).toBeInTheDocument()
+    expect(screen.getByText('Instance(Node)#13')).toBeInTheDocument()
+    expect(screen.getByText('BoundMethod(Node.connect)#14')).toBeInTheDocument()
     expect(runGcMock).toHaveBeenCalledTimes(1)
   })
 

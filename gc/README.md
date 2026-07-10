@@ -57,7 +57,8 @@ println!("collected instances: {}", run.report.collected_by_value_kind[&gc::Valu
 - `compile` reuses `monkey-compiler` to produce bytecode.
 - `GcVM` executes Monkey bytecode with GC-managed values.
 - `run_source_with_report` returns a staged parse/compile/runtime result plus
-  before/after snapshots and per-phase collection telemetry.
+  before/after snapshots and per-phase collection telemetry. Scan telemetry
+  includes sorted synthetic labels for restored and garbage-candidate objects.
 - `GcVM::collect_garbage` atomically runs all three collector phases and returns
   a `GcCollectionReport`.
 - `GcHeap` exposes allocation, `dup`/`free`, GC triggering, and heap inspection.
@@ -101,6 +102,10 @@ makeCycle();
 Only a complete `gc_decref -> gc_scan -> gc_free_cycles` collection is public.
 Pausing between phases would expose temporary reference counts and violate the
 collector invariants.
+
+Scan labels identify runtime objects without pretending to recover source
+bindings: `Class(Node)#7`, `Instance(Node)#12`, and
+`BoundMethod(Node.connect)#14`. IDs are scoped to one synchronous report.
 
 ## Modules
 

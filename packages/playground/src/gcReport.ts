@@ -22,9 +22,17 @@ export interface TrialDeletionStats {
   candidates: number
 }
 
+export interface GcObjectSummary {
+  id: number
+  kind: ValueKind
+  label: string
+}
+
 export interface ScanStats {
   restored: number
   garbageCandidates: number
+  restoredObjects: GcObjectSummary[]
+  garbageCandidateObjects: GcObjectSummary[]
 }
 
 export interface FreeCycleStats {
@@ -80,6 +88,30 @@ function readNumber(
   return value
 }
 
+function readObjectId(
+  record: Record<string, unknown>,
+  key: string,
+  path: string
+): number {
+  const value = readNumber(record, key, path)
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`${path}.${key} must be a non-negative safe integer`)
+  }
+  return value
+}
+
+function readString(
+  record: Record<string, unknown>,
+  key: string,
+  path: string
+): string {
+  const value = record[key]
+  if (typeof value !== 'string') {
+    throw new Error(`${path}.${key} must be a string`)
+  }
+  return value
+}
+
 function readRecord(
   record: Record<string, unknown>,
   key: string,
@@ -100,6 +132,27 @@ function readValueKindCounts(value: unknown, path: string): ValueKindCounts {
   return Object.fromEntries(
     valueKinds.map((kind) => [kind, readNumber(value, kind, path)])
   ) as ValueKindCounts
+}
+
+function readObjectSummaries(value: unknown, path: string): GcObjectSummary[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${path} must be an array`)
+  }
+
+  return value.map((entry, index) => {
+    const entryPath = `${path}[${index}]`
+    if (!isRecord(entry)) {
+      throw new Error(`${entryPath} must be an object`)
+    }
+    if (!valueKinds.includes(entry.kind as ValueKind)) {
+      throw new Error(`${entryPath}.kind must be a known value kind`)
+    }
+    return {
+      id: readObjectId(entry, 'id', entryPath),
+      kind: entry.kind as ValueKind,
+      label: readString(entry, 'label', entryPath),
+    }
+  })
 }
 
 function readSnapshot(value: unknown, path: string): HeapSnapshot {
@@ -146,6 +199,14 @@ function readReport(value: unknown): GcCollectionReport {
           scan,
           'garbageCandidates',
           'report.phases.scan'
+        ),
+        restoredObjects: readObjectSummaries(
+          scan.restoredObjects,
+          'report.phases.scan.restoredObjects'
+        ),
+        garbageCandidateObjects: readObjectSummaries(
+          scan.garbageCandidateObjects,
+          'report.phases.scan.garbageCandidateObjects'
         ),
       },
       freeCycles: {

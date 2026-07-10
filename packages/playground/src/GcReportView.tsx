@@ -1,4 +1,9 @@
-import type { GcRunEnvelope, HeapSnapshot, ValueKind } from './gcReport'
+import type {
+  GcObjectSummary,
+  GcRunEnvelope,
+  HeapSnapshot,
+  ValueKind,
+} from './gcReport'
 import { valueKinds } from './gcReport'
 
 export type GcPanelState =
@@ -54,6 +59,34 @@ function SnapshotCard({
           ))}
         </tbody>
       </table>
+    </section>
+  )
+}
+
+function ScanObjectList({
+  title,
+  objects,
+}: {
+  title: string
+  objects: GcObjectSummary[]
+}) {
+  return (
+    <section className="gc-object-group" aria-label={title}>
+      <header>
+        <h3>{title}</h3>
+        <span>{objects.length}</span>
+      </header>
+      {objects.length > 0 ? (
+        <ul className="gc-object-list">
+          {objects.map((object) => (
+            <li key={`${object.kind}-${object.id}`}>
+              <code>{object.label}</code>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="gc-muted">None</p>
+      )}
     </section>
   )
 }
@@ -183,6 +216,27 @@ export function GcReportView({ state }: GcReportViewProps) {
               </div>
             </dl>
           </article>
+        </div>
+      </section>
+
+      <section
+        className="gc-card gc-scan-card"
+        aria-label="Scan object decisions"
+      >
+        <h2>Scan object decisions</h2>
+        <p className="gc-muted">
+          Synthetic labels distinguish runtime kinds; IDs are scoped to this
+          report.
+        </p>
+        <div className="gc-scan-object-grid">
+          <ScanObjectList
+            title="Restored objects"
+            objects={report.phases.scan.restoredObjects}
+          />
+          <ScanObjectList
+            title="Garbage candidates"
+            objects={report.phases.scan.garbageCandidateObjects}
+          />
         </div>
       </section>
 

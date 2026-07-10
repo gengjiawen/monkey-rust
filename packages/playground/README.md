@@ -18,6 +18,7 @@ Repo: https://github.com/gengjiawen/monkey-rust
 - JS-style Monkey classes with `constructor`, `this`, `new`, methods, and mutable instance fields
 - A `Class cycle (GC)` example that creates an unreachable two-instance cycle in Monkey source
 - Before/after heap snapshots, per-value-kind counts, and telemetry for the three collector phases
+- Restored and garbage-candidate lists with typed synthetic object labels
 - Tagged parse/compile/runtime errors and stale-request protection for GC runs
 
 The GC view executes only when **Run GC** is pressed. Editing never runs the

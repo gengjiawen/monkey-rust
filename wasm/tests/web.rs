@@ -43,6 +43,16 @@ makeCycle();
     assert_eq!(envelope["report"]["collectedByValueKind"]["instance"], 2);
     assert!(envelope["report"]["phases"]["trialDeletion"]["edgesVisited"].is_number());
     assert!(envelope["report"]["phases"]["scan"]["garbageCandidates"].is_number());
+    let garbage = envelope["report"]["phases"]["scan"]["garbageCandidateObjects"]
+        .as_array()
+        .expect("garbage candidate summaries");
+    assert_eq!(garbage.len(), 2);
+    assert!(garbage.iter().all(|object| {
+        object["kind"] == "instance"
+            && object["label"]
+                .as_str()
+                .is_some_and(|label| label.starts_with("Instance(Node)#"))
+    }));
     assert!(envelope["report"]["phases"]["freeCycles"]["freed"].is_number());
 }
 
