@@ -5,6 +5,13 @@ export const valueKinds = [
   'closure',
   'array',
   'hash',
+  'integer',
+  'boolean',
+  'string',
+  'null',
+  'error',
+  'compiledFunction',
+  'builtin',
   'other',
 ] as const
 

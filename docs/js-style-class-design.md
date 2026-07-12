@@ -1040,7 +1040,12 @@ impl GcVM {
 }
 ```
 
-`ValueKind` 至少稳定区分 `Class`、`Instance`、`BoundMethod`、`Closure`、`Array`、`Hash` 和 `Other`；JSON 使用 lower camel case key。统计职责固定为：
+`ValueKind` 稳定区分 `Class`、`Instance`、`BoundMethod`、`Closure`、`Array`、
+`Hash`、`Integer`、`Boolean`、`String`、`Null`、`Error`、
+`CompiledFunction`、`Builtin` 和 `Other`；JSON 使用 lower camel case key。
+`Other` 只保留给无法映射为 Monkey `Value` 的 GC runtime object，不再混装标量、
+常量和编译函数。Playground 的 snapshot 只列出 collection 前后实际出现的类别，
+同时明确这些数字包含常量与 VM bookkeeping values。统计职责固定为：
 
 1. `GcRuntime::run_gc_with_stats_bundle()` 在一次不可中断的三阶段调用内累计 edge/candidate/restored/freed counters，并在 free 前生成对象摘要及 catalog；`run_gc_with_stats()` 保留为只返回阶段统计的兼容入口，普通 `run_gc()` 不生成调试 label。
 2. `GcHeap` 在 collection 前按 `GcId` 记录 live `ValueCell` 的 `ValueKind`，并从 `malloc_state.malloc_size` / `gc_object_count()` 构造 snapshot。

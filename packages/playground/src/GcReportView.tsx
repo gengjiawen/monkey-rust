@@ -43,7 +43,14 @@ const valueKindLabels: Record<ValueKind, string> = {
   closure: 'Closure',
   array: 'Array',
   hash: 'Hash',
-  other: 'Other',
+  integer: 'Integer',
+  boolean: 'Boolean',
+  string: 'String',
+  null: 'Null',
+  error: 'Error',
+  compiledFunction: 'Compiled function',
+  builtin: 'Builtin',
+  other: 'Other runtime object',
 }
 
 const edgesVisitedDescription =
@@ -55,9 +62,11 @@ const candidatesDescription =
 function SnapshotCard({
   title,
   snapshot,
+  kinds,
 }: {
   title: string
   snapshot: HeapSnapshot
+  kinds: readonly ValueKind[]
 }) {
   return (
     <section
@@ -77,7 +86,7 @@ function SnapshotCard({
       </dl>
       <table className="gc-kind-table">
         <tbody>
-          {valueKinds.map((kind) => (
+          {kinds.map((kind) => (
             <tr key={kind}>
               <th scope="row">{valueKindLabels[kind]}</th>
               <td>{snapshot.byValueKind[kind]}</td>
@@ -738,6 +747,13 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
 
   const { report } = state
   const collectedObjects = report.before.objectCount - report.after.objectCount
+  const snapshotValueKinds = valueKinds.filter(
+    (kind) =>
+      report.before.byValueKind[kind] > 0 || report.after.byValueKind[kind] > 0
+  )
+  const collectedValueKinds = valueKinds.filter(
+    (kind) => report.collectedByValueKind[kind] > 0
+  )
 
   return (
     <div className="gc-report">
@@ -765,9 +781,22 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
       </section>
 
       <div className="gc-snapshot-grid">
-        <SnapshotCard title="Before" snapshot={report.before} />
-        <SnapshotCard title="After" snapshot={report.after} />
+        <SnapshotCard
+          title="Before"
+          snapshot={report.before}
+          kinds={snapshotValueKinds}
+        />
+        <SnapshotCard
+          title="After"
+          snapshot={report.after}
+          kinds={snapshotValueKinds}
+        />
       </div>
+      <p className="gc-footnote">
+        Heap snapshots include source values, compiled functions, constants, and
+        VM bookkeeping values. Only kinds present before or after this
+        collection are listed.
+      </p>
 
       <section className="gc-section" aria-label="Collector phase statistics">
         <h2>Collector phases</h2>
@@ -842,14 +871,18 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
 
       <section className="gc-card gc-collected-card">
         <h2>Collected by value kind</h2>
-        <dl className="gc-kind-list">
-          {valueKinds.map((kind) => (
-            <div key={kind}>
-              <dt>{valueKindLabels[kind]}</dt>
-              <dd>{report.collectedByValueKind[kind]}</dd>
-            </div>
-          ))}
-        </dl>
+        {collectedValueKinds.length > 0 ? (
+          <dl className="gc-kind-list">
+            {collectedValueKinds.map((kind) => (
+              <div key={kind}>
+                <dt>{valueKindLabels[kind]}</dt>
+                <dd>{report.collectedByValueKind[kind]}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="gc-muted">No heap values were collected.</p>
+        )}
       </section>
 
       <p className="gc-footnote">

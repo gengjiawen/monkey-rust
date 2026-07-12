@@ -14,13 +14,20 @@ pub const MAX_RESTORATION_WITNESSES: usize = 500;
 
 pub use crate::value::{EdgeRelation, HashKeyKind};
 
-const VALUE_KINDS: [ValueKind; 7] = [
+const VALUE_KINDS: [ValueKind; 14] = [
     ValueKind::Class,
     ValueKind::Instance,
     ValueKind::BoundMethod,
     ValueKind::Closure,
     ValueKind::Array,
     ValueKind::Hash,
+    ValueKind::Integer,
+    ValueKind::Boolean,
+    ValueKind::String,
+    ValueKind::Null,
+    ValueKind::Error,
+    ValueKind::CompiledFunction,
+    ValueKind::Builtin,
     ValueKind::Other,
 ];
 

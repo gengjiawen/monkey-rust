@@ -63,6 +63,13 @@ pub enum ValueKind {
     Closure,
     Array,
     Hash,
+    Integer,
+    Boolean,
+    String,
+    Null,
+    Error,
+    CompiledFunction,
+    Builtin,
     Other,
 }
 
@@ -176,7 +183,13 @@ impl Value {
             Value::Closure(_) => ValueKind::Closure,
             Value::Array(_) => ValueKind::Array,
             Value::Hash(_) => ValueKind::Hash,
-            _ => ValueKind::Other,
+            Value::Integer(_) => ValueKind::Integer,
+            Value::Boolean(_) => ValueKind::Boolean,
+            Value::String(_) => ValueKind::String,
+            Value::Null => ValueKind::Null,
+            Value::Error(_) => ValueKind::Error,
+            Value::CompiledFunction(_) => ValueKind::CompiledFunction,
+            Value::Builtin(_) => ValueKind::Builtin,
         }
     }
 

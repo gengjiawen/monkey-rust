@@ -14,6 +14,13 @@ const emptyCounts = {
   closure: 0,
   array: 0,
   hash: 0,
+  integer: 0,
+  boolean: 0,
+  string: 0,
+  null: 0,
+  error: 0,
+  compiledFunction: 0,
+  builtin: 0,
   other: 0,
 }
 
@@ -228,6 +235,30 @@ describe('parseGcRunEnvelope', () => {
     expect(envelope.report.phases.scan.restoredObjects).toEqual([
       { id: 3, kind: 'class', label: 'Class(Node)#3' },
     ])
+  })
+
+  it('accepts distinct scalar and VM support value kinds', () => {
+    const report = fullReport()
+    report.objects[0] = {
+      id: 1,
+      kind: 'compiledFunction',
+      label: 'CompiledFunction#1',
+    }
+    report.before.byValueKind.string = 2
+    report.before.byValueKind.null = 1
+    report.before.byValueKind.compiledFunction = 1
+
+    const envelope = parseGcRunEnvelope(okEnvelope(report))
+    expect(envelope.status).toBe('ok')
+    if (envelope.status === 'ok') {
+      expect(envelope.report.objects[0].kind).toBe('compiledFunction')
+      expect(envelope.report.before.byValueKind).toMatchObject({
+        string: 2,
+        null: 1,
+        compiledFunction: 1,
+        other: 0,
+      })
+    }
   })
 
   it('rejects unknown relation kinds', () => {

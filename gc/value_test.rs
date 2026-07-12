@@ -3,13 +3,39 @@ mod tests {
     use std::collections::HashMap;
     use std::rc::Rc;
 
-    use object::Object;
+    use object::builtins::BuiltinId;
+    use object::{CompiledFunction, Object};
 
     use crate::value::{
         alloc_value, export_object, get_value, get_value_mut, import_object, GcClass, GcInstance,
         HashKey, Value, ValueCell, ValueKind,
     };
     use crate::GcHeap;
+
+    #[test]
+    fn scalar_and_vm_support_value_kinds_are_distinct() {
+        let values = [
+            (Value::Integer(1), ValueKind::Integer),
+            (Value::Boolean(true), ValueKind::Boolean),
+            (Value::String("value".to_string()), ValueKind::String),
+            (Value::Null, ValueKind::Null),
+            (Value::Error("error".to_string()), ValueKind::Error),
+            (
+                Value::CompiledFunction(CompiledFunction {
+                    name: "function".to_string(),
+                    instructions: Vec::new(),
+                    num_locals: 0,
+                    num_parameters: 0,
+                }),
+                ValueKind::CompiledFunction,
+            ),
+            (Value::Builtin(BuiltinId::Len), ValueKind::Builtin),
+        ];
+
+        for (value, expected) in values {
+            assert_eq!(value.kind(), expected);
+        }
+    }
 
     #[test]
     fn import_export_integer_roundtrip() {

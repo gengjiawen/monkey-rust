@@ -1,5 +1,12 @@
 import { Theme } from '@radix-ui/themes'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   forwardRef,
@@ -75,13 +82,20 @@ vi.mock('../Editor', () => ({
 import App from '../App'
 
 const counts = (overrides: Partial<ValueKindCounts> = {}): ValueKindCounts => ({
-  class: 1,
+  class: 0,
   instance: 0,
   boundMethod: 0,
-  closure: 2,
+  closure: 0,
   array: 0,
   hash: 0,
-  other: 4,
+  integer: 0,
+  boolean: 0,
+  string: 0,
+  null: 0,
+  error: 0,
+  compiledFunction: 0,
+  builtin: 0,
+  other: 0,
   ...overrides,
 })
 
@@ -102,12 +116,25 @@ function successEnvelope({
       before: {
         objectCount: before,
         trackedBytes: 800,
-        byValueKind: counts({ instance: 2 }),
+        byValueKind: counts({
+          class: 1,
+          instance: 2,
+          closure: 3,
+          string: 9,
+          null: 1,
+          compiledFunction: 4,
+        }),
       },
       after: {
         objectCount: after,
         trackedBytes: 720,
-        byValueKind: counts({ instance: 0 }),
+        byValueKind: counts({
+          class: 1,
+          closure: 3,
+          string: 9,
+          null: 1,
+          compiledFunction: 4,
+        }),
       },
       objects: [
         { id: 1, kind: 'array', label: 'Array#1' },
@@ -230,12 +257,7 @@ function successEnvelope({
         },
         freeCycles: { freed: collected },
       },
-      collectedByValueKind: counts({
-        class: 0,
-        closure: 0,
-        other: 0,
-        instance: collected,
-      }),
+      collectedByValueKind: counts({ instance: collected }),
     },
   }
 }
@@ -294,6 +316,23 @@ describe('GC playground', () => {
     expect(screen.getByLabelText('Collected object count')).toHaveTextContent(
       '2'
     )
+    const beforeSnapshot = screen.getByLabelText('Before heap snapshot')
+    expect(
+      within(beforeSnapshot).getByRole('row', { name: 'String 9' })
+    ).toBeInTheDocument()
+    expect(
+      within(beforeSnapshot).getByRole('row', {
+        name: 'Compiled function 4',
+      })
+    ).toBeInTheDocument()
+    expect(
+      within(beforeSnapshot).queryByRole('row', {
+        name: /Other runtime object/,
+      })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Heap snapshots include source values/)
+    ).toBeInTheDocument()
     expect(screen.getByText('Trial deletion')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Scan' })).toBeInTheDocument()
     expect(screen.getByText('Free cycles')).toBeInTheDocument()
