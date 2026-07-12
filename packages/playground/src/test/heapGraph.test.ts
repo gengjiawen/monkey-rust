@@ -84,6 +84,7 @@ function makeReport(options: {
     after: snapshot,
     objects: options.objects,
     globalRoots: options.globalRoots ?? [],
+    omittedGlobalRoots: 0,
     phases: {
       trialDeletion: {
         edgesVisited: edges.length + (options.omittedEdgeDetails ?? 0),

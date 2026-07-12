@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use byteorder::{BigEndian, ByteOrder};
 use compiler::compiler::{Bytecode, DebugInfo};
@@ -9,13 +9,16 @@ use parser::lexer::token::Span;
 use serde::Serialize;
 
 use crate::frame::Frame;
-use crate::report::{empty_value_kind_counts, GcCollectionReport, GlobalRoot};
+use crate::report::{
+    empty_value_kind_counts, select_global_roots, summarize_gc_object, GcCollectionReport,
+    GlobalRoot,
+};
 use crate::value::{
     alloc_value, call_builtin, export_object, get_value, get_value_mut, import_object,
     try_export_object, value_to_string, GcBoundMethod, GcClass, GcClosure, GcInstance, HashKey,
     Value,
 };
-use crate::{GcHeap, GcRef};
+use crate::{GcHeap, GcId, GcRef};
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 65536;
@@ -165,11 +168,30 @@ impl GcVM {
                 *collected_by_value_kind.entry(kind).or_default() += 1;
             }
         }
+        let mut objects = telemetry.objects;
+        let cataloged: HashSet<GcId> = objects.iter().map(|object| object.id).collect();
+        let (global_roots, omitted_global_roots) = select_global_roots(global_roots, &cataloged);
+        // The phase budgets pick the catalog without looking at the root set,
+        // so a kept root can name an object the catalog dropped. Summarize
+        // those now — named objects survived the collection, so they still
+        // exist. This keeps every reported root resolvable.
+        let mut uncataloged: Vec<GcId> = global_roots
+            .iter()
+            .map(|root| root.object_id)
+            .filter(|id| !cataloged.contains(id))
+            .collect();
+        uncataloged.sort_unstable();
+        uncataloged.dedup();
+        for id in uncataloged {
+            objects.push(summarize_gc_object(self.heap.runtime(), id));
+        }
+        objects.sort_unstable_by_key(|object| object.id);
         GcCollectionReport {
             before,
             after,
-            objects: telemetry.objects,
+            objects,
             global_roots,
+            omitted_global_roots,
             phases: telemetry.phases,
             collected_by_value_kind,
         }

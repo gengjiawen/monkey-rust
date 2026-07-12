@@ -43,6 +43,7 @@ function fullReport(overrides: Record<string, unknown> = {}) {
       { id: 5, kind: 'instance', label: 'Instance(Node)#5' },
     ],
     globalRoots: [{ name: 'holder', objectId: 1 }],
+    omittedGlobalRoots: 0,
     phases: {
       trialDeletion: {
         edgesVisited: 3,
@@ -254,6 +255,12 @@ describe('parseGcRunEnvelope', () => {
     expectReportRejected((report) => {
       report.globalRoots.push({ name: 'leak', objectId: 4 })
     }, 'names candidate object 4')
+    expectReportRejected((report) => {
+      ;(report as Record<string, unknown>).omittedGlobalRoots = undefined
+    }, 'report.omittedGlobalRoots must be a non-negative safe integer')
+    expectReportRejected((report) => {
+      ;(report as Record<string, unknown>).omittedGlobalRoots = -1
+    }, 'report.omittedGlobalRoots must be a non-negative safe integer')
   })
 
   it('accepts distinct scalar and VM support value kinds', () => {

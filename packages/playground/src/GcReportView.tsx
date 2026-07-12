@@ -539,6 +539,11 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
           message={`${report.phases.trialDeletion.omittedObjectDecisions} object decisions were omitted from this report.`}
         />
       ) : null}
+      {report.omittedGlobalRoots > 0 ? (
+        <TruncationNotice
+          message={`${report.omittedGlobalRoots} named global roots were omitted from this report, so some global name chips may be missing.`}
+        />
+      ) : null}
 
       {showEmptyCandidates ? (
         <output className="gc-empty-details">

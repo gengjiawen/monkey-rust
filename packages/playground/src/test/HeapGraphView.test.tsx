@@ -62,6 +62,7 @@ function cycleReport({
     after: snapshot,
     objects,
     globalRoots: [],
+    omittedGlobalRoots: 0,
     phases: {
       trialDeletion: {
         edgesVisited: 2 + omittedEdgeDetails,

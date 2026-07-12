@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::Serialize;
 
@@ -11,6 +11,7 @@ pub type ValueKindCounts = BTreeMap<ValueKind, usize>;
 pub const MAX_EDGE_DETAILS: usize = 500;
 pub const MAX_OBJECT_DECISIONS: usize = 500;
 pub const MAX_RESTORATION_WITNESSES: usize = 500;
+pub const MAX_GLOBAL_ROOTS: usize = 500;
 
 pub use crate::value::{EdgeRelation, HashKeyKind};
 
@@ -245,12 +246,45 @@ pub struct GcCollectionReport {
     pub after: HeapSnapshot,
     pub objects: Vec<GcObjectSummary>,
     pub global_roots: Vec<GlobalRoot>,
+    pub omitted_global_roots: usize,
     pub phases: GcPhaseStats,
     pub collected_by_value_kind: ValueKindCounts,
 }
 
 pub(crate) fn empty_value_kind_counts() -> ValueKindCounts {
     VALUE_KINDS.iter().copied().map(|kind| (kind, 0)).collect()
+}
+
+/// Cap the root list at `MAX_GLOBAL_ROOTS`. Roots whose object the catalog
+/// already explains are kept first, so names attach to rows and graph nodes
+/// the reader can actually see; slot order is preserved within the kept set.
+pub(crate) fn select_global_roots(
+    roots: Vec<GlobalRoot>,
+    cataloged: &HashSet<GcId>,
+) -> (Vec<GlobalRoot>, usize) {
+    if roots.len() <= MAX_GLOBAL_ROOTS {
+        return (roots, 0);
+    }
+    let omitted = roots.len() - MAX_GLOBAL_ROOTS;
+    let mut keep = vec![false; roots.len()];
+    let mut kept = 0usize;
+    for want_cataloged in [true, false] {
+        for (index, root) in roots.iter().enumerate() {
+            if kept == MAX_GLOBAL_ROOTS {
+                break;
+            }
+            if !keep[index] && cataloged.contains(&root.object_id) == want_cataloged {
+                keep[index] = true;
+                kept += 1;
+            }
+        }
+    }
+    let selected = roots
+        .into_iter()
+        .zip(keep)
+        .filter_map(|(root, keep_root)| keep_root.then_some(root))
+        .collect();
+    (selected, omitted)
 }
 
 pub(crate) fn summarize_gc_objects(runtime: &GcRuntime, ids: &[GcId]) -> Vec<GcObjectSummary> {

@@ -126,6 +126,7 @@ export interface GcCollectionReport {
   after: HeapSnapshot
   objects: GcObjectSummary[]
   globalRoots: GlobalRoot[]
+  omittedGlobalRoots: number
   phases: {
     trialDeletion: TrialDeletionStats
     scan: ScanStats
@@ -686,6 +687,7 @@ function readReport(value: unknown): GcCollectionReport {
     'report.globalRoots',
     catalog
   )
+  const omittedGlobalRoots = readNumber(value, 'omittedGlobalRoots', 'report')
 
   const phases = readRecord(value, 'phases', 'report')
   const trialDeletion = readRecord(phases, 'trialDeletion', 'report.phases')
@@ -845,6 +847,7 @@ function readReport(value: unknown): GcCollectionReport {
     after: readSnapshot(value.after, 'report.after'),
     objects,
     globalRoots,
+    omittedGlobalRoots,
     phases: {
       trialDeletion: {
         edgesVisited,

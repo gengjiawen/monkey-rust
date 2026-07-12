@@ -149,6 +149,7 @@ function successEnvelope({
         },
       ],
       globalRoots: [{ name: 'holder', objectId: 1 }],
+      omittedGlobalRoots: 0,
       phases: {
         trialDeletion: {
           edgesVisited: 11,

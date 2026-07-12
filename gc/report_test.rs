@@ -658,4 +658,63 @@ mod tests {
             assert!(!named_ids.contains(&decision.object_id));
         }
     }
+
+    #[test]
+    fn select_global_roots_prefers_cataloged_objects_and_keeps_slot_order() {
+        use std::collections::HashSet;
+
+        use crate::report::{select_global_roots, GlobalRoot, MAX_GLOBAL_ROOTS};
+
+        let total = MAX_GLOBAL_ROOTS + 10;
+        let roots: Vec<GlobalRoot> = (0..total)
+            .map(|index| GlobalRoot {
+                name: format!("g{}", index),
+                object_id: index,
+            })
+            .collect();
+        // Only every fourth object is cataloged, so all of those roots must
+        // be kept and the remaining budget filled in slot order.
+        let cataloged: HashSet<usize> = (0..total).filter(|index| index % 4 == 0).collect();
+        let (selected, omitted) = select_global_roots(roots, &cataloged);
+
+        assert_eq!(omitted, 10);
+        assert_eq!(selected.len(), MAX_GLOBAL_ROOTS);
+        for index in cataloged {
+            assert!(selected.iter().any(|root| root.object_id == index));
+        }
+        let ids: Vec<usize> = selected.iter().map(|root| root.object_id).collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        assert_eq!(ids, sorted, "kept roots stay in slot order");
+    }
+
+    #[test]
+    fn global_roots_stay_resolvable_when_phase_budgets_truncate() {
+        use std::collections::HashSet;
+
+        use crate::report::{MAX_GLOBAL_ROOTS, MAX_OBJECT_DECISIONS};
+
+        // More named globals than any single report budget, each holding a
+        // distinct array so the object count also overflows the decision and
+        // edge budgets (the scenario that used to leave dangling root ids).
+        let total = MAX_GLOBAL_ROOTS.max(MAX_OBJECT_DECISIONS) + 20;
+        let source: String = (0..total)
+            .map(|index| format!("let g{} = [{}];\n", index, index))
+            .collect();
+        let success = run_source_with_report(&source, 10_000_000).unwrap();
+        let report = success.report;
+
+        assert!(report.phases.trial_deletion.omitted_object_decisions > 0);
+        assert_eq!(report.global_roots.len(), MAX_GLOBAL_ROOTS);
+        assert_eq!(report.omitted_global_roots, total - MAX_GLOBAL_ROOTS);
+        let catalog: HashSet<usize> = report.objects.iter().map(|object| object.id).collect();
+        assert_eq!(catalog.len(), report.objects.len(), "catalog ids stay unique");
+        for root in &report.global_roots {
+            assert!(
+                catalog.contains(&root.object_id),
+                "root {} must resolve in the object catalog",
+                root.name
+            );
+        }
+    }
 }

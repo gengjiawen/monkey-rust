@@ -68,6 +68,7 @@ function report(): GcCollectionReport {
       { name: 'holder', objectId: 1 },
       { name: 'alias', objectId: 1 },
     ],
+    omittedGlobalRoots: 0,
     phases: {
       trialDeletion: {
         edgesVisited: 4,
