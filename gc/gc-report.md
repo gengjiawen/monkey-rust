@@ -1717,9 +1717,11 @@ pub struct GcVM {
 }
 ```
 
-### 10.5 Class 环、结构化报告与 Playground
+### 10.5 收官：一个 class 环的死与生
 
-`GcClass` 持有 constructor/method，`GcInstance` 持有 class/fields，`GcBoundMethod` 持有 receiver/method；三者都在 `Value::trace` 中报告强边。下面的函数返回后，只剩两个 instance 互相支撑：
+第 5 章把环泄漏钉成红灯时，用的是测试堆的 `make_cycle`——语言前端被刻意挡在门外。第 9 章把 `GcClass`/`GcInstance`/`GcBoundMethod` 的出边接进 `Value::trace` 之后，这笔账可以还了：用纯 Monkey 源码造一个环，按一次 GC，再用一份结构化报告回答三个问题——**死了谁，救了谁，还剩谁。**
+
+#### 造环：这次不靠测试堆
 
 ```monkey
 class Node {
@@ -1735,9 +1737,70 @@ let makeCycle = fn() {
 makeCycle();
 ```
 
-`GcVM::collect_garbage()` 先取 before snapshot，原子运行一次完整 collector，再取 after snapshot，并按对象 ID 差集统计 `collected_by_value_kind`。Scan 完成后、free 开始前还会把 Restored 和 Garbage candidate 转成排序后的结构化摘要：class 与 instance 分别显示为 `Class(Node)#7`、`Instance(Node)#12`；命名 closure 从 `CompiledFunction` 读取编译时名称并显示为 `Closure(makeCycle)#10`，匿名 closure 则保持 `Closure#18`。这些 label 不会猜测对象当前并不存在的唯一变量别名。WASM 的 `run_gc_with_report` 把成功结果或 parse/compile/runtime error 序列化成 tagged JSON；Playground 的显式 **Run GC** 按钮使用这个入口，示例稳定显示 `Instance: 2 -> 0`。
+`makeCycle()` 返回、帧被弹掉之后，`a`、`b` 的栈槽都清了，堆上的格局变成：
 
-Playground 不暴露单独的 `gc_decref` 按钮。阶段 1 后的 refcount 是 trial-deletion 临时状态，只能继续完成 `gc_scan -> gc_free_cycles`。报告里的 `trackedBytes` 也是 Monkey allocator 的 accounting proxy，不代表浏览器 resident memory 或 WASM linear memory 会缩小。
+```mermaid
+flowchart LR
+    globals["globals（根）"] --> mc["Closure(makeCycle)"]
+    globals --> cls["Class(Node)"]
+    cls -- 方法表 --> conn["Closure(Node.connect)"]
+    A["Instance a"] -- next --> B["Instance b"]
+    B -- next --> A
+    A -- class --> cls
+    B -- class --> cls
+```
+
+两个 instance 靠彼此的 `next` 撑着，对外再无人持有——第 5 章那种标准死环，这回是用户代码自己写出来的。`Class(Node)` 不一样：它在全局槽里，是根持有的；instance 指向它的 class 边只是「孩子指着爹」，既救不了孩子，也拖不死爹。
+
+#### 推演：先手算，再看报告
+
+按第 6 章的三阶段在这张图上手算一遍（只列主角；constants、主函数这些支撑对象都被根直接握着，进不了名单，略去）：
+
+| 对象                    | 阶段 1 前 rc | 其中堆内入边       | `gc_decref` 后 | 判定                 |
+| ----------------------- | ------------ | ------------------ | -------------- | -------------------- |
+| instance `a`            | 1            | 1（`b.next`）      | 0              | 进名单               |
+| instance `b`            | 1            | 1（`a.next`）      | 0              | 进名单               |
+| `Class(Node)`           | 3            | 2（两条 class 边） | 1              | 幸存——根的那份减不掉 |
+| closure `Node.connect`  | 1            | 1（`Node` 方法表） | 0              | 进名单——**误伤**     |
+| closure `makeCycle`     | 1            | 0                  | 1              | 幸存                 |
+
+注意 `connect` 的处境：它唯一的持有者是 `Node` 的方法表，而那是一条堆内边，阶段 1 会把它减到 0。接着 `gc_scan` 从根出发：`globals` 摸到 `Class(Node)`，方法表这条边把 `connect` 拉回来——**平反**；两个 instance 谁也摸不到——**定罪**。最后 `gc_free_cycles` 收走它们，`freed = 2`。
+
+#### 报告：`collect_garbage` 的账本
+
+`GcVM::collect_garbage()` 就是「跑一次 GC + 记账」：先拍 before 快照（对象数、`tracked_bytes`、按 `ValueKind` 分类计数），一口气跑完三阶段并记下每阶段的数字，再拍 after 快照，最后拿对象 ID 的差集算出 `collected_by_value_kind`——这次死的都是什么类型。测试 `two_instance_cycle_is_reported_and_collected` 用上面那段源码，把手算结果逐条钉住（摘录）：
+
+```rust
+let report = vm.collect_garbage();
+assert_eq!(report.before.by_value_kind[&ValueKind::Instance], 2);
+assert_eq!(report.after.by_value_kind[&ValueKind::Instance], 0);
+assert_eq!(report.collected_by_value_kind[&ValueKind::Instance], 2);
+
+// 定罪名单：恰好两个 Instance(Node)
+assert_eq!(report.phases.scan.garbage_candidate_objects.len(), 2);
+// 平反名单：必有那个被误伤的方法闭包
+assert!(report.phases.scan.restored_objects.iter()
+    .any(|o| o.label == format!("Closure(Node.connect)#{}", o.id)));
+assert_eq!(report.phases.free_cycles.freed, 2);
+
+// 再收一次：无事发生
+let second = vm.collect_garbage();
+assert_eq!(second.phases.free_cycles.freed, 0);
+```
+
+第 6 章讲的「先误伤、再修复」，在这份报告里第一次变得肉眼可见。另有两个设计决定值得点破：
+
+- **名单在 scan 之后、free 之前抓取。**这是唯一可行的窗口：再早一步，谁被平反还没有定论；再晚一步，对象已经释放，连「它是谁」都问不出来了。
+- **label 只说事实，不猜别名。**`Class(Node)#7` 用 class 自己的名字，`Instance(Node)#12` 借 class 的名字，`Closure(makeCycle)#10` 用编译期存进 `CompiledFunction` 的函数名（匿名函数只剩 `Closure#18`），bound method 是 `BoundMethod(Node.connect)#15`。报告不知道那两个 instance 曾经叫 `a` 和 `b`——变量名编译后就不在堆对象身上了，一个对象可能同时有三个别名，也可能一个都没有，猜了就是骗人。
+
+#### Playground：一个按钮，一个信封
+
+WASM 入口 `run_gc_with_report` 把这一切装进一个 tagged JSON 信封：成功是 `{status: "ok", result, report}`，失败是 `{status: "error", stage, message, span}`，`stage` 取 `parse` / `compile` / `runtime`（指令预算超限也算 runtime）。错误是信封里的**数据**，不是抛向 JS 的异常，前端不用 try/catch 去猜哪一步炸了；`structured_run_api_reports_all_stages_and_budget` 把每个 stage 都钉住了。Playground 的 **Run GC** 按钮走的就是这个入口：贴上面的源码，报告稳定显示 `Instance: 2 -> 0`，而 `Class` 在 before/after 里都是 1——环死了，根持有的 `Node` 毫发无损。
+
+最后是两个刻意的「不提供」：
+
+- **没有单独的 `gc_decref` 按钮。**阶段 1 之后的计数正处在 1.4 节说的「等式被临时打破」的状态，是手术台上的中间值，单独展示只会教人读错数字。要看，就一口气看完 `gc_decref -> gc_scan -> gc_free_cycles`。
+- **`trackedBytes` 变小 ≠ 浏览器内存变小。**它读的是 allocator 自己的账（`malloc_state().malloc_size`，也就是第 8 章用来触发 GC 的那本账）；GC 后它下降只说明 Monkey 堆的账目变小了，浏览器的 resident memory 和 WASM 线性内存都不保证跟着缩。
 
 ---
 
