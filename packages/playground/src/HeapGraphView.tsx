@@ -62,11 +62,19 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
     const renderGraph = async () => {
       try {
         const { default: mermaid } = await import('mermaid')
+        // mermaid measures labels in a container attached to <body>, outside
+        // the Radix theme scope. 'inherit' would resolve to a different font
+        // there than inside this card, and labels sized with the narrower
+        // font get their trailing characters clipped. Hand mermaid the
+        // resolved font stack so measurement and display agree.
+        const fontFamily = sectionRef.current
+          ? getComputedStyle(sectionRef.current).fontFamily
+          : ''
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'strict',
           theme: isDark ? 'dark' : 'default',
-          fontFamily: 'inherit',
+          ...(fontFamily ? { fontFamily } : {}),
         })
         renderSequence += 1
         const { svg } = await mermaid.render(

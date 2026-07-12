@@ -140,6 +140,9 @@ describe('HeapGraphView', () => {
     expect(initializeMock).toHaveBeenCalledWith(
       expect.objectContaining({ theme: 'default', securityLevel: 'strict' })
     )
+    // 'inherit' resolves to different fonts in mermaid's measurement
+    // container (a child of <body>) and in this card, which clips labels.
+    expect(initializeMock.mock.calls[0][0].fontFamily).not.toBe('inherit')
     const [id, source] = renderMock.mock.calls[0] as [string, string]
     expect(id).toMatch(/^gc-heap-graph-\d+$/)
     expect(source).toContain('flowchart LR')

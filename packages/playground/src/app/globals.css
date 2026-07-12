@@ -652,6 +652,16 @@ body {
   height: auto;
 }
 
+/*
+ * mermaid sizes each label's foreignObject with the font active at render
+ * time; if the client font metrics differ even slightly, foreignObject's
+ * default overflow: hidden amputates the last characters. Painting past the
+ * box is the lesser evil.
+ */
+.gc-graph-canvas foreignObject {
+  overflow: visible;
+}
+
 .gc-graph-head {
   display: flex;
   align-items: center;
