@@ -615,6 +615,94 @@ body {
   color: var(--red-11);
 }
 
+.gc-global-names {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.gc-global-name {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-a6);
+  background: var(--accent-a3);
+  color: var(--accent-11);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.gc-graph-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gc-graph-canvas {
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.gc-graph-canvas svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/*
+ * Fate colors for heap topology nodes. The generator tags nodes with
+ * :::survivor / :::restored / :::freed / :::external but emits no classDef
+ * (mermaid classDef cannot express CSS variables), so the badge palette is
+ * applied here instead.
+ */
+.gc-graph-canvas .node.survivor rect,
+.gc-graph-canvas .node.survivor path,
+.gc-graph-canvas .node.survivor polygon {
+  fill: var(--green-a3);
+  stroke: var(--green-a6);
+}
+
+.gc-graph-canvas .node.survivor .nodeLabel {
+  color: var(--green-11);
+}
+
+.gc-graph-canvas .node.restored rect,
+.gc-graph-canvas .node.restored path,
+.gc-graph-canvas .node.restored polygon {
+  fill: var(--blue-a3);
+  stroke: var(--blue-a6);
+}
+
+.gc-graph-canvas .node.restored .nodeLabel {
+  color: var(--blue-11);
+}
+
+.gc-graph-canvas .node.freed rect,
+.gc-graph-canvas .node.freed path,
+.gc-graph-canvas .node.freed polygon {
+  fill: var(--red-a3);
+  stroke: var(--red-a6);
+}
+
+.gc-graph-canvas .node.freed .nodeLabel {
+  color: var(--red-11);
+}
+
+.gc-graph-canvas .node.external rect,
+.gc-graph-canvas .node.external path,
+.gc-graph-canvas .node.external polygon {
+  fill: var(--gray-a2);
+  stroke: var(--gray-a8);
+  stroke-dasharray: 4 3;
+}
+
+.gc-graph-canvas .node.external .nodeLabel {
+  color: var(--gray-11);
+}
+
 .gc-decision-details {
   display: flex;
   flex-direction: column;

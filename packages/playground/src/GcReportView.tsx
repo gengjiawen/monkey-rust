@@ -21,6 +21,7 @@ import {
   scanResultLabel,
   valueKinds,
 } from './gcReport'
+import { HeapGraphView } from './HeapGraphView'
 
 export type GcPanelState =
   | { status: 'idle' }
@@ -103,6 +104,34 @@ function objectLabel(
   id: number
 ): string {
   return catalog.get(id)?.label ?? `Object#${id}`
+}
+
+function globalNamesById(report: GcCollectionReport): Map<number, string[]> {
+  const names = new Map<number, string[]>()
+  for (const root of report.globalRoots) {
+    const existing = names.get(root.objectId)
+    if (existing) {
+      existing.push(root.name)
+    } else {
+      names.set(root.objectId, [root.name])
+    }
+  }
+  return names
+}
+
+function GlobalNameChips({ names }: { names: string[] | undefined }) {
+  if (!names || names.length === 0) {
+    return null
+  }
+  return (
+    <span className="gc-global-names">
+      {names.map((name) => (
+        <code key={name} className="gc-global-name">
+          {name}
+        </code>
+      ))}
+    </span>
+  )
 }
 
 function trialLabel(decision: ObjectDecision['decision']): string {
@@ -257,6 +286,9 @@ function DecisionRowDetails({
     const restoredFromHere = witnesses
       .filter((witness) => witness.rootId === decision.objectId)
       .map((witness) => objectLabel(catalog, witness.objectId))
+    const globalNames = report.globalRoots
+      .filter((root) => root.objectId === decision.objectId)
+      .map((root) => root.name)
 
     return (
       <div className="gc-decision-details">
@@ -265,6 +297,19 @@ function DecisionRowDetails({
           references that remained after heap incoming edges were subtracted.
           This object is a Scan starting point and does not need to be restored.
         </p>
+        {globalNames.length > 0 ? (
+          <p>
+            Global variable{globalNames.length > 1 ? 's' : ''}{' '}
+            {globalNames.map((name, index) => (
+              <Fragment key={name}>
+                {index > 0 ? ', ' : null}
+                <code>{name}</code>
+              </Fragment>
+            ))}{' '}
+            currently reference{globalNames.length > 1 ? '' : 's'} this object;
+            each named global slot is one of those non-heap references.
+          </p>
+        ) : null}
         <p className="gc-muted">
           Remaining non-heap references may come from the constants table,
           global slots, or VM stack slots. For Null-like bookkeeping objects,
@@ -366,6 +411,7 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
     () => new Map(report.objects.map((object) => [object.id, object])),
     [report.objects]
   )
+  const namesById = useMemo(() => globalNamesById(report), [report])
   const restoredIds = useMemo(
     () =>
       new Set(report.phases.scan.restoredObjects.map((object) => object.id)),
@@ -538,6 +584,9 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
                           <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
                           <code>{label}</code>
                         </button>
+                        <GlobalNameChips
+                          names={namesById.get(decision.objectId)}
+                        />
                       </th>
                       <td>{decision.refCountBefore}</td>
                       <td>{decision.heapIncomingEdges}</td>
@@ -866,6 +915,7 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
         </div>
       </section>
 
+      <HeapGraphView report={report} />
       <ObjectDecisionWalkthrough report={report} />
       <VisitedHeapEdges report={report} />
 

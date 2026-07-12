@@ -99,6 +99,15 @@ export interface GcObjectSummary {
   label: string
 }
 
+/**
+ * A global variable name and the object its slot references at report time.
+ * This is the named root set stated as a fact, not an alias guess.
+ */
+export interface GlobalRoot {
+  name: string
+  objectId: number
+}
+
 export interface ScanStats {
   restored: number
   garbageCandidates: number
@@ -116,6 +125,7 @@ export interface GcCollectionReport {
   before: HeapSnapshot
   after: HeapSnapshot
   objects: GcObjectSummary[]
+  globalRoots: GlobalRoot[]
   phases: {
     trialDeletion: TrialDeletionStats
     scan: ScanStats
@@ -260,6 +270,33 @@ function readObjectSummariesInCatalog(
     }
   }
   return summaries
+}
+
+function readGlobalRoots(
+  value: unknown,
+  path: string,
+  catalog: Set<number>
+): GlobalRoot[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${path} must be an array`)
+  }
+
+  const names = new Set<string>()
+  return value.map((entry, index) => {
+    const entryPath = `${path}[${index}]`
+    if (!isRecord(entry)) {
+      throw new Error(`${entryPath} must be an object`)
+    }
+    const name = readString(entry, 'name', entryPath)
+    if (names.has(name)) {
+      throw new Error(`${path} must not contain duplicate names`)
+    }
+    names.add(name)
+    return {
+      name,
+      objectId: readCatalogId(entry, 'objectId', entryPath, catalog),
+    }
+  })
 }
 
 function uniqueIds<T>(
@@ -644,6 +681,12 @@ function readReport(value: unknown): GcCollectionReport {
     throw new Error('report.objects must not contain duplicate ids')
   }
 
+  const globalRoots = readGlobalRoots(
+    value.globalRoots,
+    'report.globalRoots',
+    catalog
+  )
+
   const phases = readRecord(value, 'phases', 'report')
   const trialDeletion = readRecord(phases, 'trialDeletion', 'report.phases')
   const scan = readRecord(phases, 'scan', 'report.phases')
@@ -783,6 +826,14 @@ function readReport(value: unknown): GcCollectionReport {
   const decisionsById = new Map(
     objectDecisions.map((decision) => [decision.objectId, decision])
   )
+  for (const root of globalRoots) {
+    const decision = decisionsById.get(root.objectId)
+    if (decision && decision.decision !== 'survivor') {
+      throw new Error(
+        `report.globalRoots names candidate object ${root.objectId}; a named global slot is a non-heap reference, so the object must be a trial survivor`
+      )
+    }
+  }
   validateWitnessForest(
     restorationWitnesses,
     decisionsById,
@@ -793,6 +844,7 @@ function readReport(value: unknown): GcCollectionReport {
     before: readSnapshot(value.before, 'report.before'),
     after: readSnapshot(value.after, 'report.after'),
     objects,
+    globalRoots,
     phases: {
       trialDeletion: {
         edgesVisited,

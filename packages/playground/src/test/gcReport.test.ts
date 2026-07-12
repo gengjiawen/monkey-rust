@@ -42,6 +42,7 @@ function fullReport(overrides: Record<string, unknown> = {}) {
       { id: 4, kind: 'instance', label: 'Instance(Node)#4' },
       { id: 5, kind: 'instance', label: 'Instance(Node)#5' },
     ],
+    globalRoots: [{ name: 'holder', objectId: 1 }],
     phases: {
       trialDeletion: {
         edgesVisited: 3,
@@ -235,6 +236,24 @@ describe('parseGcRunEnvelope', () => {
     expect(envelope.report.phases.scan.restoredObjects).toEqual([
       { id: 3, kind: 'class', label: 'Class(Node)#3' },
     ])
+    expect(envelope.report.globalRoots).toEqual([
+      { name: 'holder', objectId: 1 },
+    ])
+  })
+
+  it('validates global roots against the catalog and name uniqueness', () => {
+    expectReportRejected((report) => {
+      report.globalRoots.push({ name: 'ghost', objectId: 99 })
+    }, 'references unknown object 99')
+    expectReportRejected((report) => {
+      report.globalRoots.push({ name: 'holder', objectId: 3 })
+    }, 'must not contain duplicate names')
+    expectReportRejected((report) => {
+      ;(report as Record<string, unknown>).globalRoots = undefined
+    }, 'report.globalRoots must be an array')
+    expectReportRejected((report) => {
+      report.globalRoots.push({ name: 'leak', objectId: 4 })
+    }, 'names candidate object 4')
   })
 
   it('accepts distinct scalar and VM support value kinds', () => {

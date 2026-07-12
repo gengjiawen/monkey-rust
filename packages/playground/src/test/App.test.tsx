@@ -148,6 +148,7 @@ function successEnvelope({
           label: 'BoundMethod(Node.connect)#14',
         },
       ],
+      globalRoots: [{ name: 'holder', objectId: 1 }],
       phases: {
         trialDeletion: {
           edgesVisited: 11,
@@ -337,6 +338,12 @@ describe('GC playground', () => {
     expect(screen.getByRole('heading', { name: 'Scan' })).toBeInTheDocument()
     expect(screen.getByText('Free cycles')).toBeInTheDocument()
     expect(
+      screen.getByRole('heading', { name: 'Heap topology' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/truncated edge or decision details/)
+    ).toBeInTheDocument()
+    expect(
       screen.getByRole('heading', { name: 'Object decision walkthrough' })
     ).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Candidates 5/ })).toBeChecked()
@@ -365,6 +372,16 @@ describe('GC playground', () => {
     ).toBeInTheDocument()
     expect(screen.getAllByText('Garbage').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Freed').length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('radio', { name: /Trial survivors/ }))
+    expect(screen.getByText('holder')).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: /Expand details for Array#1/ })
+    )
+    expect(
+      screen.getByText(/currently references this object/)
+    ).toBeInTheDocument()
+
     expect(runGcMock).toHaveBeenCalledTimes(1)
   })
 
