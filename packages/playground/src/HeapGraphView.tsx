@@ -26,6 +26,11 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
   // Set from an effect so server and first client render agree on "no button".
   const [fullscreenEnabled, setFullscreenEnabled] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
+    'idle'
+  )
+  const copyResetRef = useRef<number | null>(null)
+
   useEffect(() => {
     setFullscreenEnabled(Boolean(document.fullscreenEnabled))
     const onFullscreenChange = () => {
@@ -34,8 +39,27 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
     document.addEventListener('fullscreenchange', onFullscreenChange)
     return () => {
       document.removeEventListener('fullscreenchange', onFullscreenChange)
+      if (copyResetRef.current !== null) {
+        window.clearTimeout(copyResetRef.current)
+      }
     }
   }, [])
+
+  const copySource = async () => {
+    if (source === null) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(source)
+      setCopyState('copied')
+    } catch {
+      setCopyState('failed')
+    }
+    if (copyResetRef.current !== null) {
+      window.clearTimeout(copyResetRef.current)
+    }
+    copyResetRef.current = window.setTimeout(() => setCopyState('idle'), 2000)
+  }
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement === sectionRef.current) {
@@ -107,17 +131,32 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
     >
       <div className="gc-graph-head">
         <h2>Heap topology</h2>
-        {fullscreenEnabled &&
-        graph.status === 'ok' &&
-        renderState.status === 'rendered' ? (
-          <button
-            type="button"
-            className="gc-graph-fullscreen-button"
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? 'Exit full screen' : 'Full screen'}
-          </button>
-        ) : null}
+        <span className="gc-graph-actions">
+          {graph.status === 'ok' ? (
+            <button
+              type="button"
+              className="gc-graph-button"
+              onClick={copySource}
+            >
+              {copyState === 'copied'
+                ? 'Copied'
+                : copyState === 'failed'
+                  ? 'Copy failed'
+                  : 'Copy mermaid source'}
+            </button>
+          ) : null}
+          {fullscreenEnabled &&
+          graph.status === 'ok' &&
+          renderState.status === 'rendered' ? (
+            <button
+              type="button"
+              className="gc-graph-button"
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? 'Exit full screen' : 'Full screen'}
+            </button>
+          ) : null}
+        </span>
       </div>
       {graph.status === 'unavailable' ? (
         <p className="gc-muted">{graph.reason}</p>

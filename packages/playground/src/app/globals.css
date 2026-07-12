@@ -690,7 +690,13 @@ body {
   margin-top: 4px;
 }
 
-.gc-graph-fullscreen-button {
+.gc-graph-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gc-graph-button {
   padding: 4px 10px;
   border: 1px solid var(--gray-a6);
   border-radius: 6px;
@@ -701,7 +707,7 @@ body {
   cursor: pointer;
 }
 
-.gc-graph-fullscreen-button:hover {
+.gc-graph-button:hover {
   background: var(--gray-a3);
 }
 

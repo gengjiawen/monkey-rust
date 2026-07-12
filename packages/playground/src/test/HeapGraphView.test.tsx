@@ -119,6 +119,7 @@ describe('HeapGraphView', () => {
     Reflect.deleteProperty(document, 'fullscreenElement')
     Reflect.deleteProperty(HTMLElement.prototype, 'requestFullscreen')
     Reflect.deleteProperty(document, 'exitFullscreen')
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   beforeEach(() => {
@@ -215,6 +216,44 @@ describe('HeapGraphView', () => {
     setFullscreenElement(null)
     expect(
       await screen.findByRole('button', { name: 'Full screen' })
+    ).toBeInTheDocument()
+  })
+
+  it('copies the mermaid source to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    renderMock.mockResolvedValue({ svg: '<svg></svg>' })
+    render(<HeapGraphView report={cycleReport()} />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Copy mermaid source' })
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Copied' })
+    ).toBeInTheDocument()
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0][0]).toContain('flowchart LR')
+    expect(writeText.mock.calls[0][0]).toContain(
+      'o20 -- "fields[#quot;next#quot;]" --> o21'
+    )
+  })
+
+  it('reports a failed clipboard copy on the button itself', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    })
+    renderMock.mockResolvedValue({ svg: '<svg></svg>' })
+    render(<HeapGraphView report={cycleReport()} />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Copy mermaid source' })
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Copy failed' })
     ).toBeInTheDocument()
   })
 
