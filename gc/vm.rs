@@ -197,7 +197,7 @@ impl GcVM {
                 Opcode::OpConst => {
                     let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    self.dup_and_push(self.constants[const_index]);
+                    self.dup_and_push(self.constants[const_index])?;
                 }
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
                     self.execute_binary_operation(opcode)?;
@@ -206,10 +206,10 @@ impl GcVM {
                     self.pop_discard();
                 }
                 Opcode::OpTrue => {
-                    self.alloc_and_push(Value::Boolean(true));
+                    self.alloc_and_push(Value::Boolean(true))?;
                 }
                 Opcode::OpFalse => {
-                    self.alloc_and_push(Value::Boolean(false));
+                    self.alloc_and_push(Value::Boolean(false))?;
                 }
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
                     self.execute_comparison(opcode)?;
@@ -218,7 +218,7 @@ impl GcVM {
                     self.execute_minus_operation()?;
                 }
                 Opcode::OpBang => {
-                    self.execute_bang_operation();
+                    self.execute_bang_operation()?;
                 }
                 Opcode::OpJump => {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -234,12 +234,12 @@ impl GcVM {
                     self.heap.free(condition);
                 }
                 Opcode::OpNull => {
-                    self.dup_and_push(self.null);
+                    self.dup_and_push(self.null)?;
                 }
                 Opcode::OpGetGlobal => {
                     let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    self.dup_and_push(self.globals[global_index]);
+                    self.dup_and_push(self.globals[global_index])?;
                 }
                 Opcode::OpSetGlobal => {
                     let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -256,7 +256,7 @@ impl GcVM {
                     let array = alloc_value(&mut self.heap, Value::Array(elements));
                     self.clear_stack_range(start, self.sp);
                     self.sp = start;
-                    self.push_raw(array);
+                    self.push_raw(array)?;
                 }
                 Opcode::OpHash => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -266,7 +266,7 @@ impl GcVM {
                     let hash = alloc_value(&mut self.heap, Value::Hash(elements));
                     self.clear_stack_range(start, self.sp);
                     self.sp = start;
-                    self.push_raw(hash);
+                    self.push_raw(hash)?;
                 }
                 Opcode::OpIndex => {
                     let index = self.pop_owned();
@@ -278,18 +278,34 @@ impl GcVM {
                 }
                 Opcode::OpReturnValue => {
                     let return_value = self.pop_owned();
+                    if self.frame_index == 1 {
+                        // A top-level return ends the program with this value
+                        // as its result, matching the interpreter backend.
+                        self.clear_stack_range(0, self.sp);
+                        self.sp = 0;
+                        self.heap.free(self.last_popped);
+                        self.last_popped = return_value;
+                        break;
+                    }
                     let frame = self.pop_frame();
                     let new_sp = frame.base_pointer - 1;
                     self.clear_stack_range(new_sp, self.sp);
                     self.sp = new_sp;
-                    self.push_raw(return_value);
+                    self.push_raw(return_value)?;
                 }
                 Opcode::OpReturn => {
+                    if self.frame_index == 1 {
+                        self.clear_stack_range(0, self.sp);
+                        self.sp = 0;
+                        self.heap.free(self.last_popped);
+                        self.last_popped = self.heap.dup(self.null);
+                        break;
+                    }
                     let frame = self.pop_frame();
                     let new_sp = frame.base_pointer - 1;
                     self.clear_stack_range(new_sp, self.sp);
                     self.sp = new_sp;
-                    self.dup_and_push(self.null);
+                    self.dup_and_push(self.null)?;
                 }
                 Opcode::OpCall => {
                     let num_args = ins[ip + 1] as usize;
@@ -308,29 +324,29 @@ impl GcVM {
                     let local_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let base = self.current_frame().base_pointer;
-                    self.dup_and_push(self.stack[base + local_index]);
+                    self.dup_and_push(self.stack[base + local_index])?;
                 }
                 Opcode::OpGetBuiltin => {
                     let built_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let definition = BuiltIns.get(built_index).unwrap();
-                    self.alloc_and_push(Value::Builtin(definition.id));
+                    self.alloc_and_push(Value::Builtin(definition.id))?;
                 }
                 Opcode::OpClosure => {
                     let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     let num_free = ins[ip + 3] as usize;
                     self.current_frame().ip += 3;
-                    self.push_closure(const_index, num_free);
+                    self.push_closure(const_index, num_free)?;
                 }
                 Opcode::OpGetFree => {
                     let free_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let free_var = self.current_frame().cl.free[free_index];
-                    self.dup_and_push(free_var);
+                    self.dup_and_push(free_var)?;
                 }
                 Opcode::OpCurrentClosure => {
                     let current = self.current_frame().cl.clone();
-                    self.alloc_and_push(Value::Closure(current));
+                    self.alloc_and_push(Value::Closure(current))?;
                 }
                 Opcode::OpClass => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -340,7 +356,7 @@ impl GcVM {
                         name,
                         constructor: None,
                         methods: HashMap::new(),
-                    }));
+                    }))?;
                 }
                 Opcode::OpMethod => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -360,7 +376,7 @@ impl GcVM {
                     let receiver = self.pop_owned();
                     let value = self.get_property(receiver, &name);
                     self.heap.free(receiver);
-                    self.push_raw(value?);
+                    self.push_raw(value?)?;
                 }
                 Opcode::OpSetProperty => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -400,24 +416,27 @@ impl GcVM {
         value_to_string(&self.heap, self.last_popped)
     }
 
-    fn alloc_and_push(&mut self, value: Value) {
+    fn alloc_and_push(&mut self, value: Value) -> Result<(), GcRuntimeError> {
         let reference = alloc_value(&mut self.heap, value);
-        self.push_raw(reference);
+        self.push_raw(reference)
     }
 
-    fn dup_and_push(&mut self, reference: GcRef) {
+    fn dup_and_push(&mut self, reference: GcRef) -> Result<(), GcRuntimeError> {
         let duplicated = self.heap.dup(reference);
-        self.push_raw(duplicated);
+        self.push_raw(duplicated)
     }
 
-    fn push_raw(&mut self, value: GcRef) {
+    fn push_raw(&mut self, value: GcRef) -> Result<(), GcRuntimeError> {
         if self.sp >= STACK_SIZE {
-            panic!("Stack overflow");
+            let error = self.runtime_error("stack limit exceeded");
+            self.heap.free(value);
+            return Err(error);
         }
         let old = self.stack[self.sp];
         self.stack[self.sp] = value;
         self.heap.free(old);
         self.sp += 1;
+        Ok(())
     }
 
     /// Move the top stack slot's owned reference to the caller.
@@ -455,7 +474,10 @@ impl GcVM {
                 Opcode::OpAdd => Ok(Value::Integer(l + r)),
                 Opcode::OpSub => Ok(Value::Integer(l - r)),
                 Opcode::OpMul => Ok(Value::Integer(l * r)),
-                Opcode::OpDiv if *r != 0 => Ok(Value::Integer(l / r)),
+                Opcode::OpDiv if *r != 0 => l
+                    .checked_div(*r)
+                    .map(Value::Integer)
+                    .ok_or_else(|| "integer overflow in division".to_string()),
                 Opcode::OpDiv => Err("division by zero".to_string()),
                 _ => unreachable!(),
             },
@@ -471,10 +493,7 @@ impl GcVM {
         self.heap.free(left);
         self.heap.free(right);
         match result {
-            Ok(value) => {
-                self.alloc_and_push(value);
-                Ok(())
-            }
+            Ok(value) => self.alloc_and_push(value),
             Err(message) => Err(self.runtime_error(message)),
         }
     }
@@ -525,8 +544,7 @@ impl GcVM {
         self.heap.free(left);
         self.heap.free(right);
         if let Some(result) = result {
-            self.alloc_and_push(Value::Boolean(result));
-            Ok(())
+            self.alloc_and_push(Value::Boolean(result))
         } else {
             Err(self.runtime_error(message.unwrap()))
         }
@@ -543,21 +561,20 @@ impl GcVM {
         });
         self.heap.free(operand);
         if let Some(negated) = negated {
-            self.alloc_and_push(Value::Integer(negated));
-            Ok(())
+            self.alloc_and_push(Value::Integer(negated))
         } else {
             Err(self.runtime_error(message.unwrap()))
         }
     }
 
-    fn execute_bang_operation(&mut self) {
+    fn execute_bang_operation(&mut self) -> Result<(), GcRuntimeError> {
         let operand = self.pop_owned();
         let result = match get_value(&self.heap, operand) {
             Value::Boolean(l) => !l,
             _ => false,
         };
-        self.alloc_and_push(Value::Boolean(result));
         self.heap.free(operand);
+        self.alloc_and_push(Value::Boolean(result))
     }
 
     fn build_array(&mut self, start: usize, end: usize) -> Vec<GcRef> {
@@ -591,10 +608,7 @@ impl GcVM {
         let left_value = get_value(&self.heap, left).clone();
         let index_value = get_value(&self.heap, index).clone();
         match (&left_value, &index_value) {
-            (Value::Array(array), Value::Integer(i)) => {
-                self.execute_array_index(array, *i);
-                Ok(())
-            }
+            (Value::Array(array), Value::Integer(i)) => self.execute_array_index(array, *i),
             (Value::Hash(hash), _) => self.execute_hash_index(hash, &index_value),
             _ => Err(self.runtime_error(format!(
                 "unsupported index operation for {} and {}",
@@ -604,11 +618,11 @@ impl GcVM {
         }
     }
 
-    fn execute_array_index(&mut self, array: &[GcRef], index: i64) {
+    fn execute_array_index(&mut self, array: &[GcRef], index: i64) -> Result<(), GcRuntimeError> {
         if index < array.len() as i64 && index >= 0 {
-            self.dup_and_push(array[index as usize]);
+            self.dup_and_push(array[index as usize])
         } else {
-            self.dup_and_push(self.null);
+            self.dup_and_push(self.null)
         }
     }
 
@@ -623,7 +637,6 @@ impl GcVM {
             Some(value) => self.dup_and_push(*value),
             None => self.dup_and_push(self.null),
         }
-        Ok(())
     }
 
     fn current_frame(&mut self) -> &mut Frame {
@@ -648,10 +661,7 @@ impl GcVM {
         let callee = self.stack[self.sp - 1 - num_args];
         match callee_kind(&self.heap, callee) {
             CalleeKind::Closure(closure) => self.call_closure(closure, num_args),
-            CalleeKind::Builtin(builtin) => {
-                self.call_builtin(builtin, num_args);
-                Ok(())
-            }
+            CalleeKind::Builtin(builtin) => self.call_builtin(builtin, num_args),
             CalleeKind::BoundMethod(bound) => self.call_bound_method(bound, num_args),
             CalleeKind::Class(name) => {
                 Err(self.runtime_error(format!("class {} must be constructed with new", name)))
@@ -681,16 +691,16 @@ impl GcVM {
         self.push_frame(frame)
     }
 
-    fn call_builtin(&mut self, builtin: BuiltinId, num_args: usize) {
+    fn call_builtin(&mut self, builtin: BuiltinId, num_args: usize) -> Result<(), GcRuntimeError> {
         let base = self.sp - num_args - 1;
         let args = self.stack[self.sp - num_args..self.sp].to_vec();
         let result = call_builtin(&mut self.heap, builtin, &args, self.null);
         self.clear_stack_range(base, self.sp);
         self.sp = base;
-        self.push_raw(result);
+        self.push_raw(result)
     }
 
-    fn push_closure(&mut self, const_index: usize, num_free: usize) {
+    fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), GcRuntimeError> {
         match get_value(&self.heap, self.constants[const_index]).clone() {
             Value::CompiledFunction(_) => {
                 let start = self.sp - num_free;
@@ -708,7 +718,7 @@ impl GcVM {
                 );
                 self.clear_stack_range(start, self.sp);
                 self.sp = start;
-                self.push_raw(closure);
+                self.push_raw(closure)
             }
             other => panic!("not a function {:?}", other),
         }
@@ -839,8 +849,7 @@ impl GcVM {
             );
             self.clear_stack_range(base, self.sp);
             self.sp = base;
-            self.push_raw(instance);
-            return Ok(());
+            return self.push_raw(instance);
         };
 
         let closure = match get_value(&self.heap, constructor) {
@@ -866,7 +875,7 @@ impl GcVM {
                 fields: HashMap::new(),
             }),
         );
-        self.rewrite_receiver_call(constructor, instance, num_args);
+        self.rewrite_receiver_call(constructor, instance, num_args)?;
         self.call_closure(closure, num_args + 1)
     }
 
@@ -898,12 +907,24 @@ impl GcVM {
             )));
         }
         let receiver = self.heap.dup(bound.receiver);
-        self.rewrite_receiver_call(bound.method, receiver, num_args);
+        self.rewrite_receiver_call(bound.method, receiver, num_args)?;
         self.call_closure(closure, num_args + 1)
     }
 
-    fn rewrite_receiver_call(&mut self, callable: GcRef, receiver: GcRef, num_args: usize) {
+    /// Takes ownership of `receiver` and frees it if the stack cannot hold
+    /// the rewritten call layout.
+    fn rewrite_receiver_call(
+        &mut self,
+        callable: GcRef,
+        receiver: GcRef,
+        num_args: usize,
+    ) -> Result<(), GcRuntimeError> {
         let base = self.sp - num_args - 1;
+        if base + num_args + 2 > STACK_SIZE {
+            let error = self.runtime_error("stack limit exceeded");
+            self.heap.free(receiver);
+            return Err(error);
+        }
         let callable = self.heap.dup(callable);
         let borrowed_arguments = self.stack[self.sp - num_args..self.sp].to_vec();
         let arguments = borrowed_arguments
@@ -912,11 +933,12 @@ impl GcVM {
             .collect::<Vec<_>>();
         self.clear_stack_range(base, self.sp);
         self.sp = base;
-        self.push_raw(callable);
-        self.push_raw(receiver);
+        self.push_raw(callable)?;
+        self.push_raw(receiver)?;
         for argument in arguments {
-            self.push_raw(argument);
+            self.push_raw(argument)?;
         }
+        Ok(())
     }
 }
 

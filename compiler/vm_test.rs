@@ -431,6 +431,24 @@ mod tests {
     }
 
     #[test]
+    fn test_top_level_return() {
+        run_vm_tests(vec![
+            VmTestCase {
+                input: "return 1;",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "if (true) { return 5; } 9;",
+                expected: Object::Integer(5),
+            },
+            VmTestCase {
+                input: "let f = fn() { 2 }; return f() + 1; 9;",
+                expected: Object::Integer(3),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_class_semantics() {
         run_vm_tests(vec![
             VmTestCase {

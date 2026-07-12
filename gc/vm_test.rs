@@ -345,6 +345,24 @@ mod tests {
     }
 
     #[test]
+    fn test_top_level_return() {
+        run_gc_vm_tests(vec![
+            VmTestCase {
+                input: "return 1;",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "if (true) { return 5; } 9;",
+                expected: Object::Integer(5),
+            },
+            VmTestCase {
+                input: "let f = fn() { 2 }; return f() + 1; 9;",
+                expected: Object::Integer(3),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_calling_functions_with_bindings() {
         run_gc_vm_tests(vec![
             VmTestCase {
@@ -872,5 +890,37 @@ mod tests {
                 .unwrap_err();
         assert_eq!(limit_error.stage, crate::GcRunStage::Runtime);
         assert!(limit_error.message.contains("instruction limit exceeded"));
+    }
+
+    #[test]
+    fn structured_run_reports_stack_and_arithmetic_limits() {
+        let returned = crate::run_source_with_report("return 1;", 10_000).unwrap();
+        assert_eq!(returned.result, "1");
+
+        let deep_recursion =
+            crate::run_source_with_report("let f = fn(n) { f(n + 1) }; f(0);", 10_000).unwrap_err();
+        assert_eq!(deep_recursion.stage, crate::GcRunStage::Runtime);
+        assert!(
+            deep_recursion.message.contains("stack limit exceeded")
+                || deep_recursion.message.contains("frame limit exceeded"),
+            "unexpected message: {}",
+            deep_recursion.message
+        );
+
+        let wide_stack = crate::run_source_with_report(
+            &format!("let a = [{}]; 1;", vec!["1"; 2100].join(", ")),
+            10_000,
+        )
+        .unwrap_err();
+        assert_eq!(wide_stack.stage, crate::GcRunStage::Runtime);
+        assert!(wide_stack.message.contains("stack limit exceeded"));
+
+        let division_overflow =
+            crate::run_source_with_report("(0 - 9223372036854775807 - 1) / (0 - 1);", 10_000)
+                .unwrap_err();
+        assert_eq!(division_overflow.stage, crate::GcRunStage::Runtime);
+        assert!(division_overflow
+            .message
+            .contains("integer overflow in division"));
     }
 }

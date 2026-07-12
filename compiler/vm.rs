@@ -160,11 +160,23 @@ impl VM {
                 }
                 Opcode::OpReturnValue => {
                     let return_value = self.pop();
+                    if self.frame_index == 1 {
+                        // A top-level return ends the program with this value
+                        // as its result, matching the interpreter backend.
+                        self.stack[0] = return_value;
+                        self.sp = 0;
+                        break;
+                    }
                     let frame = self.pop_frame();
                     self.sp = frame.base_pointer - 1;
                     self.push(return_value);
                 }
                 Opcode::OpReturn => {
+                    if self.frame_index == 1 {
+                        self.stack[0] = Rc::new(object::Object::Null);
+                        self.sp = 0;
+                        break;
+                    }
                     let frame = self.pop_frame();
                     self.sp = frame.base_pointer - 1;
                     self.push(Rc::new(object::Object::Null));
