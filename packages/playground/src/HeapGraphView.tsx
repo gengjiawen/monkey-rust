@@ -1,7 +1,7 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { GcCollectionReport } from './gcReport'
 import { buildHeapGraph } from './heapGraph'
@@ -22,6 +22,35 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
   const [renderState, setRenderState] = useState<RenderState>({
     status: 'rendering',
   })
+  const sectionRef = useRef<HTMLElement>(null)
+  // Set from an effect so server and first client render agree on "no button".
+  const [fullscreenEnabled, setFullscreenEnabled] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    setFullscreenEnabled(Boolean(document.fullscreenEnabled))
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === sectionRef.current)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+    }
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement === sectionRef.current) {
+      document.exitFullscreen().catch(() => {
+        // Leaving full screen failed; the fullscreenchange listener keeps
+        // the button label in sync with whatever state the browser is in.
+      })
+    } else {
+      sectionRef.current?.requestFullscreen().catch(() => {
+        // The browser refused (permissions, transient state); the card
+        // simply stays inline.
+      })
+    }
+  }
 
   useEffect(() => {
     if (source === null) {
@@ -64,8 +93,25 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
   }, [source, isDark])
 
   return (
-    <section className="gc-card gc-graph-card" aria-label="Heap topology graph">
-      <h2>Heap topology</h2>
+    <section
+      ref={sectionRef}
+      className="gc-card gc-graph-card"
+      aria-label="Heap topology graph"
+    >
+      <div className="gc-graph-head">
+        <h2>Heap topology</h2>
+        {fullscreenEnabled &&
+        graph.status === 'ok' &&
+        renderState.status === 'rendered' ? (
+          <button
+            type="button"
+            className="gc-graph-fullscreen-button"
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? 'Exit full screen' : 'Full screen'}
+          </button>
+        ) : null}
+      </div>
       {graph.status === 'unavailable' ? (
         <p className="gc-muted">{graph.reason}</p>
       ) : (

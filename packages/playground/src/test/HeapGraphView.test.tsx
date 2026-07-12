@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
@@ -96,8 +96,29 @@ function cycleReport({
   }
 }
 
+function grantFullscreenSupport() {
+  Object.defineProperty(document, 'fullscreenEnabled', {
+    configurable: true,
+    value: true,
+  })
+}
+
+function setFullscreenElement(element: Element | null) {
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true,
+    get: () => element,
+  })
+  fireEvent(document, new Event('fullscreenchange'))
+}
+
 describe('HeapGraphView', () => {
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    Reflect.deleteProperty(document, 'fullscreenEnabled')
+    Reflect.deleteProperty(document, 'fullscreenElement')
+    Reflect.deleteProperty(HTMLElement.prototype, 'requestFullscreen')
+    Reflect.deleteProperty(document, 'exitFullscreen')
+  })
 
   beforeEach(() => {
     initializeMock.mockReset()
@@ -145,6 +166,41 @@ describe('HeapGraphView', () => {
       screen.getByText(/truncated edge or decision details/)
     ).toBeInTheDocument()
     expect(renderMock).not.toHaveBeenCalled()
+  })
+
+  it('hides the full screen button when the browser does not support it', async () => {
+    renderMock.mockResolvedValue({ svg: '<svg></svg>' })
+    const { container } = render(<HeapGraphView report={cycleReport()} />)
+
+    await waitFor(() => {
+      expect(container.querySelector('.gc-graph-canvas svg')).not.toBeNull()
+    })
+    expect(screen.queryByRole('button', { name: /full screen/i })).toBeNull()
+  })
+
+  it('toggles full screen through the browser fullscreen API', async () => {
+    grantFullscreenSupport()
+    const requestFullscreenMock = vi.fn().mockResolvedValue(undefined)
+    HTMLElement.prototype.requestFullscreen = requestFullscreenMock
+    document.exitFullscreen = vi.fn().mockResolvedValue(undefined)
+    renderMock.mockResolvedValue({ svg: '<svg></svg>' })
+    const { container } = render(<HeapGraphView report={cycleReport()} />)
+    const card = container.querySelector('.gc-graph-card')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Full screen' }))
+    expect(requestFullscreenMock).toHaveBeenCalledTimes(1)
+    expect(requestFullscreenMock.mock.contexts[0]).toBe(card)
+
+    setFullscreenElement(card)
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Exit full screen' })
+    )
+    expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
+
+    setFullscreenElement(null)
+    expect(
+      await screen.findByRole('button', { name: 'Full screen' })
+    ).toBeInTheDocument()
   })
 
   it('reports a mermaid rendering failure', async () => {
