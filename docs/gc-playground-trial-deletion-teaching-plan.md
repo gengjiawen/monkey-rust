@@ -507,16 +507,22 @@ collector 能遍历该边
 telemetry 却没有报告该边
 ```
 
-建议把 Value 的边定义集中为一个内部 semantic edge visitor：
+原始设想是把边定义集中为一个内部 semantic edge visitor `visit_edges(relation, target)`，让 `Value::trace` 复用它并忽略 `relation`。
 
-```text
-visit_edges(relation, target)
-```
+**实现决策（有意偏离上面的复用设想）**：最终保留了两份手写枚举，`Value::trace` 与 `Value::visit_edges` 并存：
 
-然后：
+- `Value::trace` 保持零分配、不排序，服务普通 collection 的热路径；
+- `Value::visit_edges` 为满足 §12 的确定性要求，对 hash key 与 method/field 名排序后再回调，允许分配；
+- 若让 `trace` 复用 `visit_edges`，每次普通 GC 都要为 telemetry 的排序付出分配开销，得不偿失。
 
-- `Value::trace` 复用它并忽略 `relation`；
-- telemetry 复用它并同时保存 `relation` 和 `target`；
+双实现的漂移风险由三道防线兜住：
+
+1. 两个 match 都显式列举全部 `Value` 变体、不写 `_ =>` catch-all——新增变体时两处都编译失败，强迫作者归类它的边；
+2. `report_test.rs::visit_edges_targets_match_trace_targets` 对每种带边变体断言两者产出的 target 多重集一致；
+3. collection 期间 `debug_assert_eq!(edges_visited, gc_edge_count())` 校验语义捕获的边数与 collector 实际遍历的边数相等。
+
+其余约束照常成立：
+
 - 普通 GC 算法仍只依赖 target，不依赖任何 UI 文案；
 - relation 使用轻量 enum/borrowed metadata，普通 collection 不分配 label string。
 
@@ -525,8 +531,6 @@ visit_edges(relation, target)
 - 仍通过现有 `trace` 捕获 target；
 - relation 回退为 `unknown`；
 - 不得因为缺少调试 relation 而漏算或跳过 GC 边。
-
-应有测试保证 semantic visitor 的 target 序列与 collector trace 的 target 序列一致。
 
 ## 12. 确定性要求
 

@@ -266,7 +266,15 @@ impl Value {
                 visit(EdgeRelation::BoundMethodReceiver, method.receiver);
                 visit(EdgeRelation::BoundMethodFunction, method.method);
             }
-            _ => {}
+            // Leaf variants own no GcRef. No catch-all: adding a Value variant
+            // must fail to compile until its edges are classified here.
+            Value::Integer(_)
+            | Value::Boolean(_)
+            | Value::String(_)
+            | Value::Null
+            | Value::Error(_)
+            | Value::CompiledFunction(_)
+            | Value::Builtin(_) => {}
         }
     }
 
@@ -306,7 +314,15 @@ impl Value {
                 visit(method.receiver);
                 visit(method.method);
             }
-            _ => {}
+            // Leaf variants own no GcRef. No catch-all: adding a Value variant
+            // must fail to compile until its edges are classified here.
+            Value::Integer(_)
+            | Value::Boolean(_)
+            | Value::String(_)
+            | Value::Null
+            | Value::Error(_)
+            | Value::CompiledFunction(_)
+            | Value::Builtin(_) => {}
         }
     }
 
