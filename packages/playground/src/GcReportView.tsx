@@ -2,6 +2,7 @@ import type {
   GcObjectSummary,
   GcRunEnvelope,
   HeapSnapshot,
+  SourceSpan,
   ValueKind,
 } from './gcReport'
 import { valueKinds } from './gcReport'
@@ -14,6 +15,7 @@ export type GcPanelState =
 
 interface GcReportViewProps {
   state: GcPanelState
+  onErrorSpanSelect?: (span: SourceSpan) => void
 }
 
 const valueKindLabels: Record<ValueKind, string> = {
@@ -91,7 +93,7 @@ function ScanObjectList({
   )
 }
 
-export function GcReportView({ state }: GcReportViewProps) {
+export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
   if (state.status === 'idle') {
     return (
       <div className="gc-empty-state">
@@ -126,24 +128,33 @@ export function GcReportView({ state }: GcReportViewProps) {
   }
 
   if (state.status === 'error') {
+    const { span } = state
     return (
       <section className="gc-error" role="alert">
         <span className="gc-stage">{state.stage} error</span>
         <h2>Program could not be collected</h2>
         <pre>{state.message}</pre>
-        {state.span ? (
-          <p className="gc-muted">
-            Source span: {state.span.start}–{state.span.end}
-          </p>
+        {span !== null ? (
+          onErrorSpanSelect ? (
+            <button
+              type="button"
+              className="gc-span-button"
+              onClick={() => onErrorSpanSelect?.(span)}
+            >
+              Show in editor ({span.start}–{span.end})
+            </button>
+          ) : (
+            <p className="gc-muted">
+              Source span: {span.start}–{span.end}
+            </p>
+          )
         ) : null}
       </section>
     )
   }
 
   const { report } = state
-  const beforeInstances = report.before.byValueKind.instance
-  const afterInstances = report.after.byValueKind.instance
-  const collectedInstances = report.collectedByValueKind.instance
+  const collectedObjects = report.before.objectCount - report.after.objectCount
 
   return (
     <div className="gc-report">
@@ -154,18 +165,18 @@ export function GcReportView({ state }: GcReportViewProps) {
 
       <section
         className="gc-cycle-highlight"
-        aria-label="Instance cycle summary"
+        aria-label="Cycle collection summary"
       >
         <div>
-          <span className="gc-eyebrow">Instance</span>
-          <strong aria-label="Instance count before and after collection">
-            {beforeInstances} → {afterInstances}
+          <span className="gc-eyebrow">Heap objects</span>
+          <strong aria-label="Heap object count before and after collection">
+            {report.before.objectCount} → {report.after.objectCount}
           </strong>
         </div>
         <p>
           Collected by cycle GC:{' '}
-          <strong aria-label="Collected instance count">
-            {collectedInstances}
+          <strong aria-label="Collected object count">
+            {collectedObjects}
           </strong>
         </p>
       </section>

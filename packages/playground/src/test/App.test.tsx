@@ -11,7 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GcRunEnvelope, ValueKindCounts } from '../gcReport'
 
-const { runGcMock, parseMock, compileMock } = vi.hoisted(() => ({
+const {
+  runGcMock,
+  parseMock,
+  compileMock,
+  highlightRangeMock,
+  clearHighlightMock,
+} = vi.hoisted(() => ({
   runGcMock: vi.fn(),
   parseMock: vi.fn(() => '{"Program":{"type":"Program","body":[]}}'),
   compileMock: vi.fn(() =>
@@ -22,6 +28,8 @@ const { runGcMock, parseMock, compileMock } = vi.hoisted(() => ({
       instructionLines: [],
     })
   ),
+  highlightRangeMock: vi.fn(),
+  clearHighlightMock: vi.fn(),
 }))
 
 vi.mock('@gengjiawen/monkey-wasm', () => ({
@@ -45,8 +53,8 @@ vi.mock('../Editor', () => ({
     ref: Ref<{ highlightRange(): void; clearHighlight(): void }>
   ) {
     useImperativeHandle(ref, () => ({
-      highlightRange() {},
-      clearHighlight() {},
+      highlightRange: highlightRangeMock,
+      clearHighlight: clearHighlightMock,
     }))
 
     const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -78,29 +86,28 @@ const counts = (overrides: Partial<ValueKindCounts> = {}): ValueKindCounts => ({
 })
 
 function successEnvelope({
-  before = 2,
-  after = 0,
-  collected = 2,
+  before = 20,
+  after = 18,
   result = 'null',
 }: {
   before?: number
   after?: number
-  collected?: number
   result?: string
 } = {}): GcRunEnvelope {
+  const collected = before - after
   return {
     status: 'ok',
     result,
     report: {
       before: {
-        objectCount: 20,
+        objectCount: before,
         trackedBytes: 800,
-        byValueKind: counts({ instance: before }),
+        byValueKind: counts({ instance: 2 }),
       },
       after: {
-        objectCount: 18,
+        objectCount: after,
         trackedBytes: 720,
-        byValueKind: counts({ instance: after }),
+        byValueKind: counts({ instance: 0 }),
       },
       phases: {
         trialDeletion: { edgesVisited: 11, candidates: 5 },
@@ -162,6 +169,8 @@ describe('GC playground', () => {
     runGcMock.mockReset()
     parseMock.mockClear()
     compileMock.mockClear()
+    highlightRangeMock.mockClear()
+    clearHighlightMock.mockClear()
   })
 
   it('runs only on demand and renders the collection report', async () => {
@@ -178,9 +187,11 @@ describe('GC playground', () => {
     await user.click(runButton)
 
     expect(
-      await screen.findByLabelText('Instance count before and after collection')
-    ).toHaveTextContent('2 → 0')
-    expect(screen.getByLabelText('Collected instance count')).toHaveTextContent(
+      await screen.findByLabelText(
+        'Heap object count before and after collection'
+      )
+    ).toHaveTextContent('20 → 18')
+    expect(screen.getByLabelText('Collected object count')).toHaveTextContent(
       '2'
     )
     expect(screen.getByText('Trial deletion')).toBeInTheDocument()
@@ -194,7 +205,7 @@ describe('GC playground', () => {
     expect(runGcMock).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the stage, message, and source span for GC errors', async () => {
+  it('highlights the source span for GC errors', async () => {
     const user = userEvent.setup()
     runGcMock.mockResolvedValue({
       status: 'error',
@@ -209,7 +220,18 @@ describe('GC playground', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('runtime error')
     expect(alert).toHaveTextContent("property 'next' does not exist on Node")
-    expect(alert).toHaveTextContent('Source span: 120–126')
+    expect(highlightRangeMock).toHaveBeenCalledWith(120, 126)
+
+    highlightRangeMock.mockClear()
+    await user.click(
+      screen.getByRole('button', { name: 'Show in editor (120–126)' })
+    )
+    expect(highlightRangeMock).toHaveBeenCalledWith(120, 126)
+
+    clearHighlightMock.mockClear()
+    await user.type(screen.getByLabelText('Source editor'), 'x')
+    expect(clearHighlightMock).toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('ignores a stale run after the source changes and a newer run finishes', async () => {
@@ -218,7 +240,7 @@ describe('GC playground', () => {
     runGcMock
       .mockReturnValueOnce(firstRun.promise)
       .mockResolvedValueOnce(
-        successEnvelope({ before: 5, after: 1, collected: 4, result: 'new' })
+        successEnvelope({ before: 5, after: 1, result: 'new' })
       )
     renderApp()
 
@@ -230,7 +252,9 @@ describe('GC playground', () => {
     await user.click(screen.getByRole('button', { name: 'Run GC' }))
 
     expect(
-      await screen.findByLabelText('Instance count before and after collection')
+      await screen.findByLabelText(
+        'Heap object count before and after collection'
+      )
     ).toHaveTextContent('5 → 1')
 
     await act(async () => {
@@ -240,7 +264,7 @@ describe('GC playground', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText('Instance count before and after collection')
+        screen.getByLabelText('Heap object count before and after collection')
       ).toHaveTextContent('5 → 1')
     })
     expect(screen.getByText('new')).toBeInTheDocument()

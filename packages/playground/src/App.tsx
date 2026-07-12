@@ -12,6 +12,7 @@ import { AstTreeView } from './AstTreeView'
 import { type BytecodeDebugView, spanForBytecodeCursor } from './bytecodeDebug'
 import { Editor, type EditorHandle } from './Editor'
 import { GcReportView, type GcPanelState } from './GcReportView'
+import type { SourceSpan } from './gcReport'
 import { runGc } from './gcRunner'
 
 interface Snippet {
@@ -228,6 +229,10 @@ function App() {
     editorRef.current?.highlightRange(start, end)
   }, [])
 
+  const handleGcErrorSpanSelect = useCallback((span: SourceSpan) => {
+    editorRef.current?.highlightRange(span.start, span.end)
+  }, [])
+
   const handleBytecodeSelection = useCallback(
     (selection: { from: number; to: number }) => {
       if (bytecodeDebugView == null) {
@@ -251,6 +256,22 @@ function App() {
       editorRef.current?.clearHighlight()
     }
   }, [outputView])
+
+  useEffect(() => {
+    if (
+      outputView !== 'gc' ||
+      gcState.status !== 'error' ||
+      gcState.span === null
+    ) {
+      return
+    }
+    const { span } = gcState
+    const editor = editorRef.current
+    editor?.highlightRange(span.start, span.end)
+    return () => {
+      editor?.clearHighlight()
+    }
+  }, [gcState, outputView])
 
   return (
     <Flex className="playground-shell">
@@ -345,7 +366,10 @@ function App() {
           ) : null}
           {outputView === 'gc' ? (
             <Box className="gc-frame">
-              <GcReportView state={gcState} />
+              <GcReportView
+                state={gcState}
+                onErrorSpanSelect={handleGcErrorSpanSelect}
+              />
             </Box>
           ) : null}
           {outputView === 'bytecode' ||
