@@ -634,6 +634,12 @@ body {
   line-height: 1.4;
 }
 
+.gc-global-name-overflow {
+  border-color: var(--gray-a6);
+  background: var(--gray-a3);
+  color: var(--gray-11);
+}
+
 .gc-graph-card {
   display: flex;
   flex-direction: column;

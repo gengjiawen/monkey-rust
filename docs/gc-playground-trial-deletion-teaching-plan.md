@@ -124,7 +124,7 @@ Visited heap edges
 
 对象表回答“为什么做出这个判定”，边列表回答“具体减掉了什么”。两者共享相同对象 label 和 report-scoped ID。
 
-在 Collector phases 与 walkthrough 之间另有一张 **Heap topology** 卡片：用 mermaid 把 `visitedEdges` 画成 flowchart，实线是阶段 1 实际减掉的堆内边，单个 "External refs" 伪节点以虚线按 trial RC 指向每个幸存者，代表它剩下的全部非堆引用（constants / globals / stack 不逐条区分）。被 `globalRoots`（§9.5）命名的对象直接在节点 label 里标注变量名。只有出现在至少一条 visited edge 里的对象和全部 candidate 才成为节点；孤立 survivor（多为 VM bookkeeping 值）不绘制、只计数。卡片右上角提供 Full screen 切换：用浏览器原生 Fullscreen API 把整张卡片放大到全屏，SVG 按 viewBox 等比缩放填满屏幕（不支持该 API 的浏览器不显示按钮，Esc 原生退出）。报告截断了边或 decision 明细、无边可画、或节点数超过上限时，卡片降级为一句文字说明——宁可不画，不画一张缺边的图。
+在 Collector phases 与 walkthrough 之间另有一张 **Heap topology** 卡片：用 mermaid 把 `visitedEdges` 画成 flowchart，实线是阶段 1 实际减掉的堆内边，单个 "External refs" 伪节点以虚线按 trial RC 指向每个幸存者，代表它剩下的全部非堆引用（constants / globals / stack 不逐条区分）。每个节点的 label 末尾写明命运后缀（`· Survivor` / `· Restored` / `· Freed`），颜色只是冗余通道（§16.3：不能只靠颜色区分）；图例明确一句：箭头画的是 collection 前的拓扑，命运是 collection 后的结果。被 `globalRoots`（§9.5）命名的对象直接在节点 label 里标注变量名，最多列 2 个、超出折叠为 `+N more`——同一对象可能被数百个全局槽位别名，显示层必须有独立于报告预算的上限（walkthrough 的名字 chips 同理，上限 3 个）。只有出现在至少一条 visited edge 里的对象和全部 candidate 才成为节点；孤立 survivor（多为 VM bookkeeping 值）不绘制、只计数。卡片右上角提供 Full screen 切换：用浏览器原生 Fullscreen API 把整张卡片放大到全屏，SVG 按 viewBox 等比缩放填满屏幕（不支持该 API 的浏览器不显示按钮，Esc 原生退出）。报告截断了边或 decision 明细、无边可画、或节点数超过上限时，卡片降级为一句文字说明——宁可不画，不画一张缺边的图。
 
 ## 5. Collector phase cards
 

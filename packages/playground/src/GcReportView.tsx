@@ -119,17 +119,31 @@ function globalNamesById(report: GcCollectionReport): Map<number, string[]> {
   return names
 }
 
+// Hundreds of global slots may alias one object; lists of names are always
+// cut off here so no row or sentence grows unbounded.
+const MAX_GLOBAL_NAMES_SHOWN = 3
+
 function GlobalNameChips({ names }: { names: string[] | undefined }) {
   if (!names || names.length === 0) {
     return null
   }
+  const shown = names.slice(0, MAX_GLOBAL_NAMES_SHOWN)
+  const hidden = names.length - shown.length
   return (
     <span className="gc-global-names">
-      {names.map((name) => (
+      {shown.map((name) => (
         <code key={name} className="gc-global-name">
           {name}
         </code>
       ))}
+      {hidden > 0 ? (
+        <span
+          className="gc-global-name gc-global-name-overflow"
+          title={names.slice(MAX_GLOBAL_NAMES_SHOWN).join(', ')}
+        >
+          +{hidden} more
+        </span>
+      ) : null}
     </span>
   )
 }
@@ -300,12 +314,15 @@ function DecisionRowDetails({
         {globalNames.length > 0 ? (
           <p>
             Global variable{globalNames.length > 1 ? 's' : ''}{' '}
-            {globalNames.map((name, index) => (
+            {globalNames.slice(0, MAX_GLOBAL_NAMES_SHOWN).map((name, index) => (
               <Fragment key={name}>
                 {index > 0 ? ', ' : null}
                 <code>{name}</code>
               </Fragment>
-            ))}{' '}
+            ))}
+            {globalNames.length > MAX_GLOBAL_NAMES_SHOWN
+              ? ` and ${globalNames.length - MAX_GLOBAL_NAMES_SHOWN} more`
+              : null}{' '}
             currently reference{globalNames.length > 1 ? '' : 's'} this object;
             each named global slot is one of those non-heap references.
           </p>

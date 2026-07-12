@@ -17,6 +17,14 @@ function fateClass(decision: ObjectDecision): FateClass {
   return decision.final === 'freed' ? 'freed' : 'restored'
 }
 
+// Written into the node text as well as the ::: class: color must not be the
+// only channel carrying the post-collection fate.
+const FATE_TEXT: Record<FateClass, string> = {
+  survivor: 'Survivor',
+  restored: 'Restored',
+  freed: 'Freed',
+}
+
 /**
  * Escape text for use inside a quoted mermaid label. `#` must go first so the
  * `#name;` entities produced by later replacements survive untouched.
@@ -35,6 +43,13 @@ function mergedEdgeLabel(labels: string[]): string {
     return labels.join(', ')
   }
   return `${labels[0]}, ${labels[1]} +${labels.length - 2} more`
+}
+
+// Hundreds of global slots may alias one object; an uncapped list would let a
+// single node label grow past everything the 40-node budget protects.
+function globalNamesLabel(names: string[]): string {
+  const shown = names.slice(0, 2).map(escapeMermaidText).join(', ')
+  return names.length <= 2 ? shown : `${shown} +${names.length - 2} more`
 }
 
 /**
@@ -126,13 +141,13 @@ export function buildHeapGraph(report: GcCollectionReport): HeapGraph {
     const label = escapeMermaidText(labels.get(id) ?? `Object#${id}`)
     const names = globalNames.get(id)
     const nameLine = names
-      ? `<br/><i>global${names.length > 1 ? 's' : ''}: ${names
-          .map(escapeMermaidText)
-          .join(', ')}</i>`
+      ? `<br/><i>global${names.length > 1 ? 's' : ''}: ${globalNamesLabel(names)}</i>`
       : ''
     const decision = decisions.get(id)
-    const fate = decision ? `:::${fateClass(decision)}` : ''
-    lines.push(`  o${id}["${label}${nameLine}"]${fate}`)
+    const fate = decision ? fateClass(decision) : null
+    const fateSuffix = fate ? ` · ${FATE_TEXT[fate]}` : ''
+    const fateTag = fate ? `:::${fate}` : ''
+    lines.push(`  o${id}["${label}${fateSuffix}${nameLine}"]${fateTag}`)
   }
 
   const mergedEdges = new Map<

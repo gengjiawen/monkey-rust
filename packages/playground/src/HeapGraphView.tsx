@@ -26,7 +26,6 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
   // Set from an effect so server and first client render agree on "no button".
   const [fullscreenEnabled, setFullscreenEnabled] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-
   useEffect(() => {
     setFullscreenEnabled(Boolean(document.fullscreenEnabled))
     const onFullscreenChange = () => {
@@ -131,6 +130,11 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
             <li>
               Dotted arrows from External refs mark each trial survivor&apos;s
               remaining non-heap references (×N is its trial RC).
+            </li>
+            <li>
+              The · Survivor / · Restored / · Freed suffix on each node is that
+              object&apos;s fate after the collection; the arrows still show
+              the topology from before it.
             </li>
           </ul>
           {renderState.status === 'rendered' ? (

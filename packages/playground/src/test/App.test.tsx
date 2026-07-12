@@ -386,6 +386,33 @@ describe('GC playground', () => {
     expect(runGcMock).toHaveBeenCalledTimes(1)
   })
 
+  it('caps global name chips and prose for heavily aliased objects', async () => {
+    const user = userEvent.setup()
+    const envelope = successEnvelope()
+    if (envelope.status !== 'ok') {
+      throw new Error('expected a successful test envelope')
+    }
+    envelope.report.globalRoots = ['holder', 'ha', 'hb', 'hc', 'hd'].map(
+      (name) => ({ name, objectId: 1 })
+    )
+    runGcMock.mockResolvedValue(envelope)
+    renderApp()
+
+    await user.click(await openGcTab(user))
+    await user.click(screen.getByRole('radio', { name: /Trial survivors/ }))
+    expect(screen.getByText('holder')).toBeInTheDocument()
+    expect(screen.getByText('hb')).toBeInTheDocument()
+    expect(screen.queryByText('hc')).toBeNull()
+    expect(screen.getByText('+2 more')).toHaveAttribute('title', 'hc, hd')
+
+    await user.click(
+      screen.getByRole('button', { name: /Expand details for Array#1/ })
+    )
+    expect(
+      screen.getByText(/and 2 more currently reference this object/)
+    ).toBeInTheDocument()
+  })
+
   it('uses complete Scan results when decisions are truncated', async () => {
     const user = userEvent.setup()
     const envelope = successEnvelope()

@@ -161,10 +161,10 @@ describe('buildHeapGraph', () => {
     const lines = graph.source.split('\n')
     expect(lines[0]).toBe('flowchart LR')
     expect(lines).toContain(
-      '  o1["Array#35;1<br/><i>global: holder</i>"]:::survivor'
+      '  o1["Array#35;1 · Survivor<br/><i>global: holder</i>"]:::survivor'
     )
-    expect(lines).toContain('  o12["Instance(Node)#35;12"]:::restored')
-    expect(lines).toContain('  o20["Instance(Node)#35;20"]:::freed')
+    expect(lines).toContain('  o12["Instance(Node)#35;12 · Restored"]:::restored')
+    expect(lines).toContain('  o20["Instance(Node)#35;20 · Freed"]:::freed')
     expect(lines).toContain('  o1 -- "items[0]" --> o12')
     expect(lines).toContain('  o12 -- "fields[#quot;next#quot;]" --> o13')
     expect(lines).toContain(
@@ -232,6 +232,32 @@ describe('buildHeapGraph', () => {
     )
   })
 
+  it('caps the alias list in node labels', () => {
+    const graph = buildHeapGraph(
+      makeReport({
+        objects: [
+          { id: 1, kind: 'array', label: 'Array#1' },
+          { id: 2, kind: 'instance', label: 'Instance(Node)#2' },
+        ],
+        globalRoots: ['a', 'b', 'c', 'd'].map((name) => ({
+          name,
+          objectId: 1,
+        })),
+        decisions: [survivor(1, 4), candidate(2, 'retained')],
+        edges: [
+          { fromId: 1, toId: 2, relation: { kind: 'arrayElement', index: 0 } },
+        ],
+      })
+    )
+
+    if (graph.status !== 'ok') {
+      throw new Error(`expected an ok graph, got: ${graph.reason}`)
+    }
+    expect(graph.source).toContain(
+      '  o1["Array#35;1 · Survivor<br/><i>globals: a, b +2 more</i>"]:::survivor'
+    )
+  })
+
   it('escapes mermaid-sensitive characters in labels', () => {
     const graph = buildHeapGraph(
       makeReport({
@@ -254,7 +280,7 @@ describe('buildHeapGraph', () => {
       throw new Error(`expected an ok graph, got: ${graph.reason}`)
     }
     expect(graph.source).toContain(
-      '  o2["String(#quot;#lt;a #amp; b#gt;#quot;)#35;2"]:::restored'
+      '  o2["String(#quot;#lt;a #amp; b#gt;#quot;)#35;2 · Restored"]:::restored'
     )
     expect(graph.source).toContain(
       '  o1 -- "values[#quot;#quot;k#quot;#quot;]" --> o2'
