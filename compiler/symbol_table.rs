@@ -71,6 +71,23 @@ impl SymbolTable {
         names
     }
 
+    /// Names defined in the outermost (global) scope, paired with their slot
+    /// index. Sorted by name so reports stay deterministic.
+    pub fn global_symbols(&self) -> Vec<(String, usize)> {
+        let mut table = self;
+        while let Some(outer) = table.outer.as_deref() {
+            table = outer;
+        }
+        let mut globals: Vec<(String, usize)> = table
+            .symbols
+            .values()
+            .filter(|symbol| symbol.scope == SymbolScope::Global)
+            .map(|symbol| (symbol.name.clone(), symbol.index))
+            .collect();
+        globals.sort();
+        globals
+    }
+
     // Resolve a name in the current scope, capturing free variables from outers when needed.
     pub fn resolve(&mut self, name: String) -> Option<Rc<Symbol>> {
         if let Some(sym) = self.symbols.get(&name) {

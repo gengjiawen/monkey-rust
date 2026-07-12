@@ -68,6 +68,17 @@ makeCycle();
     }));
     assert!(envelope["report"]["phases"]["freeCycles"]["freed"].is_number());
     assert!(envelope["report"]["objects"].is_array());
+    let global_roots = envelope["report"]["globalRoots"]
+        .as_array()
+        .expect("global roots");
+    let root_names: Vec<&str> = global_roots
+        .iter()
+        .filter_map(|root| root["name"].as_str())
+        .collect();
+    assert_eq!(root_names, vec!["Node", "makeCycle"]);
+    assert!(global_roots
+        .iter()
+        .all(|root| root["objectId"].is_number()));
     assert!(envelope["report"]["phases"]["trialDeletion"]["objectDecisions"].is_array());
     assert!(envelope["report"]["phases"]["trialDeletion"]["visitedEdges"].is_array());
     assert!(envelope["report"]["phases"]["scan"]["restorationWitnesses"].is_array());

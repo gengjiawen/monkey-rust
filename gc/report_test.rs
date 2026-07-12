@@ -581,4 +581,81 @@ mod tests {
             assert_eq!(decision.decision, TrialDecision::Survivor);
         }
     }
+
+    #[test]
+    fn global_roots_list_aliases_of_the_same_object() {
+        let success =
+            run_source_with_report("let a = [1, 2]; let b = a; let answer = 42;", 10_000).unwrap();
+        let report = success.report;
+        let array = report
+            .objects
+            .iter()
+            .find(|object| object.kind == ValueKind::Array)
+            .expect("array object in catalog");
+        let array_names: Vec<&str> = report
+            .global_roots
+            .iter()
+            .filter(|root| root.object_id == array.id)
+            .map(|root| root.name.as_str())
+            .collect();
+        assert_eq!(array_names, vec!["a", "b"]);
+        let all_names: Vec<&str> = report
+            .global_roots
+            .iter()
+            .map(|root| root.name.as_str())
+            .collect();
+        assert_eq!(all_names, vec!["a", "answer", "b"]);
+    }
+
+    #[test]
+    fn global_roots_name_survivors_but_never_freed_cycle_members() {
+        let success = run_source_with_report(
+            r#"
+                class Node { connect(other) { this.next = other; } }
+                let makeCycle = fn() {
+                  let a = new Node();
+                  let b = new Node();
+                  a.connect(b);
+                  b.connect(a);
+                };
+                makeCycle();
+            "#,
+            10_000,
+        )
+        .unwrap();
+        let report = success.report;
+        let names: Vec<&str> = report
+            .global_roots
+            .iter()
+            .map(|root| root.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["Node", "makeCycle"]);
+        // Every named root survives the collection, and the freed cycle
+        // instances are exactly the objects no global name points to.
+        for root in &report.global_roots {
+            let object = report
+                .objects
+                .iter()
+                .find(|object| object.id == root.object_id)
+                .expect("named root in catalog");
+            assert_ne!(object.kind, ValueKind::Instance);
+            assert!(report
+                .phases
+                .trial_deletion
+                .object_decisions
+                .iter()
+                .find(|decision| decision.object_id == root.object_id)
+                .is_none_or(|decision| decision.final_fate == FinalFate::Retained));
+        }
+        let named_ids: Vec<_> = report.global_roots.iter().map(|root| root.object_id).collect();
+        let freed_instances = report
+            .phases
+            .trial_deletion
+            .object_decisions
+            .iter()
+            .filter(|decision| decision.final_fate == FinalFate::Freed);
+        for decision in freed_instances {
+            assert!(!named_ids.contains(&decision.object_id));
+        }
+    }
 }

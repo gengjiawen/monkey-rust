@@ -228,12 +228,23 @@ pub struct GcStatsBundle {
     pub phases: GcPhaseStats,
 }
 
+/// A global variable name and the object its slot references at report time.
+/// This is a present-tense fact read from the VM's global table — the defined
+/// root set, not a guess about aliases.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalRoot {
+    pub name: String,
+    pub object_id: GcId,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcCollectionReport {
     pub before: HeapSnapshot,
     pub after: HeapSnapshot,
     pub objects: Vec<GcObjectSummary>,
+    pub global_roots: Vec<GlobalRoot>,
     pub phases: GcPhaseStats,
     pub collected_by_value_kind: ValueKindCounts,
 }

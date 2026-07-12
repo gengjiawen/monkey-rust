@@ -9,7 +9,7 @@ use parser::lexer::token::Span;
 use serde::Serialize;
 
 use crate::frame::Frame;
-use crate::report::{empty_value_kind_counts, GcCollectionReport};
+use crate::report::{empty_value_kind_counts, GcCollectionReport, GlobalRoot};
 use crate::value::{
     alloc_value, call_builtin, export_object, get_value, get_value_mut, import_object,
     try_export_object, value_to_string, GcBoundMethod, GcClass, GcClosure, GcInstance, HashKey,
@@ -43,6 +43,7 @@ pub struct GcVM {
     stack: Vec<GcRef>,
     sp: usize,
     globals: Vec<GcRef>,
+    global_names: Vec<(String, usize)>,
     frames: Vec<Frame>,
     frame_index: usize,
     null: GcRef,
@@ -118,6 +119,7 @@ impl GcVM {
             stack,
             sp: 0,
             globals,
+            global_names: Vec::new(),
             frames,
             frame_index: 1,
             null,
@@ -135,7 +137,24 @@ impl GcVM {
         &mut self.heap
     }
 
+    /// Record which global slot each source-level global name refers to, so
+    /// reports can state the named root set (see `GlobalRoot`).
+    pub fn set_global_names(&mut self, names: Vec<(String, usize)>) {
+        self.global_names = names;
+    }
+
     pub fn collect_garbage(&mut self) -> GcCollectionReport {
+        // Read the named global slots before collecting. Named slots are VM
+        // roots, so every object listed here survives the cycle collector.
+        let global_roots = self
+            .global_names
+            .iter()
+            .filter(|(_, index)| *index < self.globals.len())
+            .map(|(name, index)| GlobalRoot {
+                name: name.clone(),
+                object_id: self.globals[*index].0,
+            })
+            .collect();
         let before_kinds = self.heap.value_kinds_by_id();
         let before = self.heap.snapshot();
         let telemetry = self.heap.run_gc_with_stats_bundle();
@@ -150,6 +169,7 @@ impl GcVM {
             before,
             after,
             objects: telemetry.objects,
+            global_roots,
             phases: telemetry.phases,
             collected_by_value_kind,
         }
