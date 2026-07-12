@@ -2,3 +2,4 @@ stats.html
 .next
 out
 next-env.d.ts
+*.tsbuildinfo
