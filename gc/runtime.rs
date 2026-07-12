@@ -69,6 +69,13 @@ impl GcRuntime {
         }
     }
 
+    /// Run the three-phase cycle collector. Matches `JS_RunGC`.
+    pub fn run_gc(&mut self) {
+        self.gc_decref();
+        self.gc_scan();
+        self.gc_free_cycles();
+    }
+
     pub fn malloc_state(&self) -> &MallocState {
         &self.malloc_state
     }
@@ -346,13 +353,6 @@ impl GcRuntime {
             self.malloc_gc_threshold =
                 self.malloc_state.malloc_size + (self.malloc_state.malloc_size >> 1);
         }
-    }
-
-    /// Run the three-phase cycle collector. Matches `JS_RunGC`.
-    pub fn run_gc(&mut self) {
-        self.gc_decref();
-        self.gc_scan();
-        self.gc_free_cycles();
     }
 
     /// Run all collector phases atomically and return phase telemetry.
