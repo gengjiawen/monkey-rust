@@ -65,7 +65,57 @@ pub enum ValueKind {
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// Typed heap-edge relation used by teaching telemetry.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum EdgeRelation {
+    ArrayElement { index: usize },
+    HashValue { key: String },
+    ClosureFunction,
+    ClosureFree { index: usize },
+    ClassConstructor,
+    ClassMethod { name: String },
+    InstanceClass,
+    InstanceField { name: String },
+    BoundMethodReceiver,
+    BoundMethodFunction,
+    Unknown,
+}
+
+pub const MAX_HASH_KEY_LABEL_LEN: usize = 64;
+
+pub fn format_hash_key_label(key: &HashKey) -> String {
+    match key {
+        HashKey::Integer(value) => value.to_string(),
+        HashKey::Boolean(value) => value.to_string(),
+        HashKey::String(value) => escape_and_truncate_key(value),
+    }
+}
+
+fn escape_and_truncate_key(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            c if c.is_control() => {
+                escaped.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            c => escaped.push(c),
+        }
+        if escaped.len() >= MAX_HASH_KEY_LABEL_LEN {
+            escaped.truncate(MAX_HASH_KEY_LABEL_LEN);
+            escaped.push('…');
+            break;
+        }
+    }
+    escaped
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum HashKey {
     Integer(i64),
     Boolean(bool),
@@ -95,44 +145,84 @@ impl Value {
         }
     }
 
-    pub fn trace(&self, visit: &mut dyn FnMut(GcRef)) {
+    /// Visit heap edges with typed structural relations for telemetry.
+    ///
+    /// Hash keys, class methods, and instance fields are visited in stable
+    /// sorted order so reports stay deterministic. `trace` reuses this visitor
+    /// and ignores relation metadata.
+    pub fn visit_edges(&self, mut visit: impl FnMut(EdgeRelation, GcRef)) {
         match self {
             Value::Array(items) => {
-                for item in items {
-                    visit(*item);
+                for (index, item) in items.iter().enumerate() {
+                    visit(
+                        EdgeRelation::ArrayElement {
+                            index,
+                        },
+                        *item,
+                    );
                 }
             }
             Value::Hash(map) => {
-                for value in map.values() {
-                    visit(*value);
+                let mut entries = map.iter().collect::<Vec<_>>();
+                entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (key, value) in entries {
+                    visit(
+                        EdgeRelation::HashValue {
+                            key: format_hash_key_label(key),
+                        },
+                        *value,
+                    );
                 }
             }
             Value::Closure(closure) => {
-                visit(closure.func);
-                for free in &closure.free {
-                    visit(*free);
+                visit(EdgeRelation::ClosureFunction, closure.func);
+                for (index, free) in closure.free.iter().enumerate() {
+                    visit(
+                        EdgeRelation::ClosureFree {
+                            index,
+                        },
+                        *free,
+                    );
                 }
             }
             Value::Class(class) => {
                 if let Some(constructor) = class.constructor {
-                    visit(constructor);
+                    visit(EdgeRelation::ClassConstructor, constructor);
                 }
-                for method in class.methods.values() {
-                    visit(*method);
+                let mut methods = class.methods.iter().collect::<Vec<_>>();
+                methods.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (name, method) in methods {
+                    visit(
+                        EdgeRelation::ClassMethod {
+                            name: name.clone(),
+                        },
+                        *method,
+                    );
                 }
             }
             Value::Instance(instance) => {
-                visit(instance.class);
-                for field in instance.fields.values() {
-                    visit(*field);
+                visit(EdgeRelation::InstanceClass, instance.class);
+                let mut fields = instance.fields.iter().collect::<Vec<_>>();
+                fields.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (name, value) in fields {
+                    visit(
+                        EdgeRelation::InstanceField {
+                            name: name.clone(),
+                        },
+                        *value,
+                    );
                 }
             }
             Value::BoundMethod(method) => {
-                visit(method.receiver);
-                visit(method.method);
+                visit(EdgeRelation::BoundMethodReceiver, method.receiver);
+                visit(EdgeRelation::BoundMethodFunction, method.method);
             }
             _ => {}
         }
+    }
+
+    pub fn trace(&self, visit: &mut dyn FnMut(GcRef)) {
+        self.visit_edges(|_relation, target| visit(target));
     }
 
     pub fn with_owned_edges(self, heap: &mut GcHeap) -> Self {

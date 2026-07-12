@@ -109,6 +109,11 @@ bindings: `Class(Node)#7`, `Instance(Node)#12`, and
 for example `Closure(makeCycle)#10`; anonymous closures remain `Closure#18`.
 IDs are scoped to one synchronous report.
 
+`run_gc_with_stats()` also emits teaching telemetry: object decisions with the
+RC formula (`refCountBefore − heapIncomingEdges = trialRefCount`), typed
+visited heap edges, and deterministic Scan restoration witnesses. Ordinary
+`run_gc()` skips that path.
+
 ## Modules
 
 - `heap.rs` provides the high-level `GcHeap` and opaque `GcRef` handle.

@@ -200,10 +200,11 @@ mod tests {
         heap.free(node_b);
         let stats = heap.run_gc_with_stats();
 
-        assert_eq!(stats.scan.restored, 2);
-        assert_eq!(stats.scan.garbage_candidates, 0);
+        assert_eq!(stats.phases.scan.restored, 2);
+        assert_eq!(stats.phases.scan.garbage_candidates, 0);
         assert_eq!(
             stats
+                .phases
                 .scan
                 .restored_objects
                 .iter()
@@ -214,6 +215,6 @@ mod tests {
                 (ValueKind::Instance, format!("Instance(Node)#{}", node_b.0),),
             ]
         );
-        assert!(stats.scan.garbage_candidate_objects.is_empty());
+        assert!(stats.phases.scan.garbage_candidate_objects.is_empty());
     }
 }

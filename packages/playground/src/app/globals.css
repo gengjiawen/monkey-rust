@@ -441,69 +441,301 @@ body {
 }
 
 .gc-section h2,
-.gc-scan-card h2,
+.gc-walkthrough-card h2,
+.gc-edges-card h2,
 .gc-collected-card h2 {
   margin-bottom: 12px;
   font-size: 16px;
 }
 
-.gc-scan-card > .gc-muted {
+.gc-walkthrough-card > .gc-muted,
+.gc-edges-card > .gc-muted {
   margin: -4px 0 12px;
 }
 
-.gc-scan-object-grid {
+.gc-helper-text {
+  display: block;
+  margin-top: 2px;
+  color: var(--gray-10);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.gc-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.gc-filter-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-a5);
+  border-radius: 6px;
+  background: var(--gray-a2);
+  color: var(--gray-11);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gc-filter-group label.is-active {
+  border-color: var(--accent-a7);
+  background: var(--accent-a3);
+  color: var(--accent-11);
+}
+
+.gc-filter-group input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+.gc-decision-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gc-decision-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.gc-decision-table th,
+.gc-decision-table td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--gray-a4);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.gc-decision-table thead th {
+  color: var(--gray-10);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.gc-decision-table tbody th {
+  font-weight: 500;
+}
+
+.gc-decision-table td:nth-child(2),
+.gc-decision-table td:nth-child(3),
+.gc-decision-table td:nth-child(4),
+.gc-decision-table thead th:nth-child(2),
+.gc-decision-table thead th:nth-child(3),
+.gc-decision-table thead th:nth-child(4) {
+  text-align: right;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', monospace;
+}
+
+.gc-decision-table tr.is-expanded > th,
+.gc-decision-table tr.is-expanded > td {
+  background: var(--accent-a2);
+}
+
+.gc-decision-detail-row td {
+  padding: 0 10px 12px;
+  white-space: normal;
+  background: var(--gray-a2);
+}
+
+.gc-expand-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gc-expand-button code {
+  color: var(--gray-12);
+  font-size: 12px;
+}
+
+.gc-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-a5);
+  background: var(--gray-a3);
+  color: var(--gray-12);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.gc-badge-candidate,
+.gc-badge-scan-garbage {
+  border-color: var(--amber-a6);
+  background: var(--amber-a3);
+  color: var(--amber-11);
+}
+
+.gc-badge-survivor,
+.gc-badge-scan-scan-root,
+.gc-badge-retained {
+  border-color: var(--green-a6);
+  background: var(--green-a3);
+  color: var(--green-11);
+}
+
+.gc-badge-scan-restored {
+  border-color: var(--blue-a6);
+  background: var(--blue-a3);
+  color: var(--blue-11);
+}
+
+.gc-badge-freed {
+  border-color: var(--red-a6);
+  background: var(--red-a3);
+  color: var(--red-11);
+}
+
+.gc-decision-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.gc-decision-details h4 {
+  margin: 0 0 6px;
+  color: var(--gray-11);
+  font-size: 12px;
+}
+
+.gc-decision-details p {
+  margin: 0;
+  color: var(--gray-11);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.gc-detail-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.gc-object-group {
-  min-width: 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--gray-a3);
-}
-
-.gc-object-group header {
+.gc-detail-list,
+.gc-edge-list {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.gc-object-group header span {
-  color: var(--gray-10);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', monospace;
-  font-size: 12px;
-}
-
-.gc-object-group .gc-muted {
-  margin: 10px 0 0;
-}
-
-.gc-object-list {
-  display: flex;
-  overflow: auto;
-  max-height: 180px;
-  margin: 10px 0 0;
-  padding: 0;
   flex-direction: column;
   gap: 6px;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-.gc-object-list li {
-  min-width: max-content;
+.gc-edge-list li,
+.gc-detail-list li {
   padding: 6px 8px;
   border: 1px solid var(--gray-a4);
   border-radius: 6px;
   background: var(--color-panel-solid);
-}
-
-.gc-object-list code {
   color: var(--gray-12);
   font-size: 12px;
+  line-height: 1.45;
+}
+
+.gc-edge-list code,
+.gc-detail-list code {
+  font-size: 12px;
+}
+
+.gc-edge-arrow {
+  color: var(--gray-10);
+}
+
+.gc-edge-relation {
+  color: var(--accent-11);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', monospace;
+}
+
+.gc-truncation-notice,
+.gc-empty-details,
+.gc-edges-summary {
+  display: block;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.gc-truncation-notice {
+  border: 1px solid var(--amber-a6);
+  background: var(--amber-a3);
+  color: var(--amber-11);
+}
+
+.gc-empty-details,
+.gc-edges-summary {
+  border: 1px solid var(--gray-a5);
+  background: var(--gray-a3);
+  color: var(--gray-11);
+}
+
+.gc-edges-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.gc-edges-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.gc-edges-card > summary h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.gc-edges-card > summary h2::before {
+  content: '▸';
+  color: var(--gray-10);
+  font-size: 12px;
+}
+
+.gc-edges-card[open] > summary h2::before {
+  content: '▾';
+}
+
+.gc-edges-card[open] > summary {
+  margin-bottom: 12px;
+}
+
+.gc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  white-space: nowrap;
 }
 
 .gc-phase-grid {
@@ -638,7 +870,7 @@ details[open] > .tree-summary {
     grid-template-columns: 1fr;
   }
 
-  .gc-scan-object-grid {
+  .gc-detail-columns {
     grid-template-columns: 1fr;
   }
 

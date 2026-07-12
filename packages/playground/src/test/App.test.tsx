@@ -109,8 +109,87 @@ function successEnvelope({
         trackedBytes: 720,
         byValueKind: counts({ instance: 0 }),
       },
+      objects: [
+        { id: 1, kind: 'array', label: 'Array#1' },
+        { id: 7, kind: 'class', label: 'Class(Node)#7' },
+        { id: 10, kind: 'closure', label: 'Closure(makeCycle)#10' },
+        { id: 12, kind: 'instance', label: 'Instance(Node)#12' },
+        { id: 13, kind: 'instance', label: 'Instance(Node)#13' },
+        {
+          id: 14,
+          kind: 'boundMethod',
+          label: 'BoundMethod(Node.connect)#14',
+        },
+      ],
       phases: {
-        trialDeletion: { edgesVisited: 11, candidates: 5 },
+        trialDeletion: {
+          edgesVisited: 11,
+          candidates: 5,
+          objectDecisions: [
+            {
+              objectId: 1,
+              refCountBefore: 2,
+              heapIncomingEdges: 0,
+              trialRefCount: 2,
+              decision: 'survivor',
+              final: 'retained',
+            },
+            {
+              objectId: 7,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'retained',
+            },
+            {
+              objectId: 10,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'retained',
+            },
+            {
+              objectId: 12,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'retained',
+            },
+            {
+              objectId: 13,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'freed',
+            },
+            {
+              objectId: 14,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'freed',
+            },
+          ],
+          visitedEdges: [
+            {
+              fromId: 12,
+              toId: 13,
+              relation: { kind: 'instanceField', name: 'next' },
+            },
+            {
+              fromId: 13,
+              toId: 12,
+              relation: { kind: 'instanceField', name: 'next' },
+            },
+          ],
+          omittedObjectDecisions: 0,
+          omittedEdgeDetails: 9,
+        },
         scan: {
           restored: 3,
           garbageCandidates: 2,
@@ -127,6 +206,27 @@ function successEnvelope({
               label: 'BoundMethod(Node.connect)#14',
             },
           ],
+          restorationWitnesses: [
+            {
+              objectId: 7,
+              rootId: 1,
+              predecessorId: 1,
+              relation: { kind: 'arrayElement', index: 0 },
+            },
+            {
+              objectId: 10,
+              rootId: 1,
+              predecessorId: 1,
+              relation: { kind: 'arrayElement', index: 1 },
+            },
+            {
+              objectId: 12,
+              rootId: 1,
+              predecessorId: 1,
+              relation: { kind: 'arrayElement', index: 2 },
+            },
+          ],
+          omittedWitnesses: 0,
         },
         freeCycles: { freed: collected },
       },
@@ -195,13 +295,37 @@ describe('GC playground', () => {
       '2'
     )
     expect(screen.getByText('Trial deletion')).toBeInTheDocument()
-    expect(screen.getByText('Scan')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Scan' })).toBeInTheDocument()
     expect(screen.getByText('Free cycles')).toBeInTheDocument()
-    expect(screen.getByText('Class(Node)#7')).toBeInTheDocument()
-    expect(screen.getByText('Closure(makeCycle)#10')).toBeInTheDocument()
-    expect(screen.getByText('Instance(Node)#12')).toBeInTheDocument()
-    expect(screen.getByText('Instance(Node)#13')).toBeInTheDocument()
-    expect(screen.getByText('BoundMethod(Node.connect)#14')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Object decision walkthrough' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Candidates 5/ })).toBeChecked()
+    expect(
+      screen.getByRole('button', { name: /Expand details for Class\(Node\)#7/ })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for Closure\(makeCycle\)#10/,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for Instance\(Node\)#12/,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for Instance\(Node\)#13/,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for BoundMethod\(Node.connect\)#14/,
+      })
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('Garbage').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Freed').length).toBeGreaterThan(0)
     expect(runGcMock).toHaveBeenCalledTimes(1)
   })
 

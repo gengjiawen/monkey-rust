@@ -1119,8 +1119,47 @@ pub fn run_gc_with_report(source: &str) -> String;
       "trackedBytes": 848,
       "byValueKind": { "class": 1, "instance": 0 }
     },
+    "objects": [
+      { "id": 12, "kind": "instance", "label": "Instance(Node)#12" },
+      { "id": 13, "kind": "instance", "label": "Instance(Node)#13" }
+    ],
     "phases": {
-      "trialDeletion": { "edgesVisited": 8, "candidates": 2 },
+      "trialDeletion": {
+        "edgesVisited": 8,
+        "candidates": 2,
+        "objectDecisions": [
+          {
+            "objectId": 12,
+            "refCountBefore": 1,
+            "heapIncomingEdges": 1,
+            "trialRefCount": 0,
+            "decision": "candidate",
+            "final": "freed"
+          },
+          {
+            "objectId": 13,
+            "refCountBefore": 1,
+            "heapIncomingEdges": 1,
+            "trialRefCount": 0,
+            "decision": "candidate",
+            "final": "freed"
+          }
+        ],
+        "visitedEdges": [
+          {
+            "fromId": 12,
+            "toId": 13,
+            "relation": { "kind": "instanceField", "name": "next" }
+          },
+          {
+            "fromId": 13,
+            "toId": 12,
+            "relation": { "kind": "instanceField", "name": "next" }
+          }
+        ],
+        "omittedObjectDecisions": 0,
+        "omittedEdgeDetails": 0
+      },
       "scan": {
         "restored": 0,
         "garbageCandidates": 2,
@@ -1128,7 +1167,9 @@ pub fn run_gc_with_report(source: &str) -> String;
         "garbageCandidateObjects": [
           { "id": 12, "kind": "instance", "label": "Instance(Node)#12" },
           { "id": 13, "kind": "instance", "label": "Instance(Node)#13" }
-        ]
+        ],
+        "restorationWitnesses": [],
+        "omittedWitnesses": 0
       },
       "freeCycles": { "freed": 2 }
     },
@@ -1137,6 +1178,13 @@ pub fn run_gc_with_report(source: &str) -> String;
 }
 ```
 
+Teaching telemetry notes:
+
+- Object IDs are valid only within a single report.
+- `edgesVisited` counts heap-to-heap references only (not constants/globals/stack/frame roots).
+- `restorationWitnesses` are deterministic reachability proofs, not the collector's real traversal timeline.
+- Synthetic labels are not source variable names.
+- Detail lists are capped (500); omitted counts keep aggregates exact.
 用户源码失败 contract 固定为：
 
 ```json

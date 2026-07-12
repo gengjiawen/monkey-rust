@@ -347,7 +347,13 @@ let report = vm.collect_garbage();
 let result = vm.try_export_last_result()?;
 ```
 
-`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats()`，并返回 `GcCollectionReport`。Scan report 会在释放前保存 Restored 与 Garbage candidate 的结构化摘要，例如 `Closure(makeCycle)#10`、`Class(Node)#7` 和 `Instance(Node)#12`；closure 名称来自 `CompiledFunction` 保存的编译时原始名称，而不是尝试反查当前变量别名。这些 ID 只在单次 report 内有效。Playground 不直接调用 `gc_decref`、`gc_scan` 或 `gc_free_cycles`。
+`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats()`，并返回 `GcCollectionReport`。Teaching telemetry（仅 `run_gc_with_stats` 路径）会额外记录：
+
+- 规范化 `objects` catalog；
+- Trial deletion 的 `objectDecisions`（`refCountBefore` / `heapIncomingEdges` / `trialRefCount` / Candidate|Survivor / Retained|Freed）与带 typed relation 的 `visitedEdges`；
+- Scan 的 deterministic `restorationWitnesses`（可达性证明，不是真实遍历时间线）。
+
+Scan report 仍会在释放前保存 Restored 与 Garbage candidate 的结构化摘要，例如 `Closure(makeCycle)#10`、`Class(Node)#7` 和 `Instance(Node)#12`；closure 名称来自 `CompiledFunction` 保存的编译时原始名称，而不是尝试反查当前变量别名。这些 ID 只在单次 report 内有效。普通 `run_gc()` 不生成 label/边详情/witness。Playground 不直接调用 `gc_decref`、`gc_scan` 或 `gc_free_cycles`。
 
 ---
 

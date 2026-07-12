@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod gc_test;
 #[cfg(test)]
+mod report_test;
+#[cfg(test)]
 mod value_test;
 #[cfg(test)]
 mod vm_test;
@@ -20,8 +22,9 @@ pub use header::{GcId, GcObjectHeader, GcObjectType, GcPhase, RefCountHeader, Re
 pub use heap::{GcHeap, GcRef};
 pub use malloc::{MallocState, DEFAULT_GC_THRESHOLD, MALLOC_OVERHEAD};
 pub use report::{
-    FreeCycleStats, GcCollectionReport, GcObjectSummary, GcPhaseStats, HeapSnapshot, ScanStats,
-    TrialDeletionStats, ValueKindCounts,
+    EdgeRelation, FinalFate, FreeCycleStats, GcCollectionReport, GcObjectSummary, GcPhaseStats,
+    GcStatsBundle, HeapSnapshot, ObjectDecision, RestorationWitness, ScanStats, TrialDecision,
+    TrialDeletionStats, ValueKindCounts, VisitedEdge,
 };
 pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{

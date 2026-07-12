@@ -138,7 +138,7 @@ impl GcVM {
     pub fn collect_garbage(&mut self) -> GcCollectionReport {
         let before_kinds = self.heap.value_kinds_by_id();
         let before = self.heap.snapshot();
-        let phases = self.heap.run_gc_with_stats();
+        let telemetry = self.heap.run_gc_with_stats();
         let after = self.heap.snapshot();
         let mut collected_by_value_kind = empty_value_kind_counts();
         for (id, kind) in before_kinds {
@@ -149,7 +149,8 @@ impl GcVM {
         GcCollectionReport {
             before,
             after,
-            phases,
+            objects: telemetry.objects,
+            phases: telemetry.phases,
             collected_by_value_kind,
         }
     }

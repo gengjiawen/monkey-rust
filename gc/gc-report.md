@@ -1797,6 +1797,8 @@ assert_eq!(second.phases.free_cycles.freed, 0);
 
 WASM 入口 `run_gc_with_report` 把这一切装进一个 tagged JSON 信封：成功是 `{status: "ok", result, report}`，失败是 `{status: "error", stage, message, span}`，`stage` 取 `parse` / `compile` / `runtime`（指令预算超限也算 runtime）。错误是信封里的**数据**，不是抛向 JS 的异常，前端不用 try/catch 去猜哪一步炸了；`structured_run_api_reports_all_stages_and_budget` 把每个 stage 都钉住了。Playground 的 **Run GC** 按钮走的就是这个入口：贴上面的源码，报告稳定显示 `Instance: 2 -> 0`，而 `Class` 在 before/after 里都是 1——环死了，根持有的 `Node` 毫发无损。
 
+教学路径在同一个信封里继续加料：报告额外序列化 `objectDecisions`（逐对象的 RC 公式与三阶段判定）、typed `visitedEdges`（阶段 1 实际减掉的每条堆内边，带 `fields["next"]` 这样的结构化关系）和 deterministic `restorationWitnesses`（平反对象的可达性证明——是证明，不是真实遍历的时间线）。Playground 的 **Object decision walkthrough** 用这三样把上面的手算表变成可交互的因果链。
+
 最后是两个刻意的「不提供」：
 
 - **没有单独的 `gc_decref` 按钮。**阶段 1 之后的计数正处在 1.4 节说的「等式被临时打破」的状态，是手术台上的中间值，单独展示只会教人读错数字。要看，就一口气看完 `gc_decref -> gc_scan -> gc_free_cycles`。
