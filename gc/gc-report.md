@@ -1750,7 +1750,7 @@ flowchart LR
     B -- class --> cls
 ```
 
-两个 instance 靠彼此的 `next` 撑着，对外再无人持有——第 5 章那种标准死环，这回是用户代码自己写出来的。`Class(Node)` 不一样：它在全局槽里，是根持有的；instance 指向它的 class 边只是「孩子指着爹」，既救不了孩子，也拖不死爹。
+两个 instance 靠彼此的 `next` 撑着，对外再无人持有——第 5 章那种标准死环，这回是用户代码自己写出来的。`Class(Node)` 不一样：它在全局槽里，是根持有的；而 instance 指向它的 class 边是单向的——边只能撑住箭头指向的那一头。这两条边给 `Class(Node)` 的计数各出一份力，反方向却没有任何边从 class 指回 instance：class 活得再稳，也救不了这两个 instance；这两个 instance 被收走，class 也分毫不损。
 
 #### 推演：先手算，再看报告
 
