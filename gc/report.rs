@@ -12,7 +12,7 @@ pub const MAX_EDGE_DETAILS: usize = 500;
 pub const MAX_OBJECT_DECISIONS: usize = 500;
 pub const MAX_RESTORATION_WITNESSES: usize = 500;
 
-pub use crate::value::EdgeRelation;
+pub use crate::value::{EdgeRelation, HashKeyKind};
 
 const VALUE_KINDS: [ValueKind; 7] = [
     ValueKind::Class,
@@ -91,8 +91,9 @@ impl EdgeRelation {
                 index,
             } => RelationSortKey::Index(*index),
             EdgeRelation::HashValue {
+                key_kind,
                 key,
-            } => RelationSortKey::Name(key),
+            } => RelationSortKey::HashKey(*key_kind, key),
             EdgeRelation::ClosureFunction => RelationSortKey::None,
             EdgeRelation::ClosureFree {
                 index,
@@ -116,6 +117,7 @@ impl EdgeRelation {
 pub enum RelationSortKey<'a> {
     None,
     Index(usize),
+    HashKey(HashKeyKind, &'a str),
     Name(&'a str),
 }
 
@@ -126,8 +128,13 @@ impl Ord for RelationSortKey<'_> {
             (RelationSortKey::None, _) => Ordering::Less,
             (_, RelationSortKey::None) => Ordering::Greater,
             (RelationSortKey::Index(a), RelationSortKey::Index(b)) => a.cmp(b),
-            (RelationSortKey::Index(_), RelationSortKey::Name(_)) => Ordering::Less,
-            (RelationSortKey::Name(_), RelationSortKey::Index(_)) => Ordering::Greater,
+            (RelationSortKey::Index(_), _) => Ordering::Less,
+            (_, RelationSortKey::Index(_)) => Ordering::Greater,
+            (RelationSortKey::HashKey(a_kind, a), RelationSortKey::HashKey(b_kind, b)) => {
+                a_kind.cmp(b_kind).then(a.cmp(b))
+            }
+            (RelationSortKey::HashKey(_, _), RelationSortKey::Name(_)) => Ordering::Less,
+            (RelationSortKey::Name(_), RelationSortKey::HashKey(_, _)) => Ordering::Greater,
             (RelationSortKey::Name(a), RelationSortKey::Name(b)) => a.cmp(b),
         }
     }
@@ -206,7 +213,7 @@ pub struct GcPhaseStats {
     pub free_cycles: FreeCycleStats,
 }
 
-/// Telemetry returned by `run_gc_with_stats`: object catalog plus phase stats.
+/// Telemetry returned by `run_gc_with_stats_bundle`: object catalog plus phase stats.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcStatsBundle {

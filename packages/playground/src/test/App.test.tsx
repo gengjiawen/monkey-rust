@@ -329,6 +329,38 @@ describe('GC playground', () => {
     expect(runGcMock).toHaveBeenCalledTimes(1)
   })
 
+  it('uses complete Scan results when decisions are truncated', async () => {
+    const user = userEvent.setup()
+    const envelope = successEnvelope()
+    if (envelope.status !== 'ok') {
+      throw new Error('expected a successful test envelope')
+    }
+    const trial = envelope.report.phases.trialDeletion
+    trial.objectDecisions = trial.objectDecisions.filter(
+      (decision) => decision.objectId !== 14
+    )
+    trial.omittedObjectDecisions = 1
+    trial.edgesVisited = 12
+    trial.visitedEdges.push({
+      fromId: 14,
+      toId: 1,
+      relation: { kind: 'boundMethodReceiver' },
+    })
+    runGcMock.mockResolvedValue(envelope)
+    renderApp()
+
+    await user.click(await openGcTab(user))
+
+    expect(
+      await screen.findByRole('radio', {
+        name: 'Candidates 4 of 5 reported',
+      })
+    ).toBeChecked()
+    expect(
+      screen.getByText('Showing 3 candidate-related edges of 12 visited')
+    ).toBeInTheDocument()
+  })
+
   it('highlights the source span for GC errors', async () => {
     const user = userEvent.setup()
     runGcMock.mockResolvedValue({

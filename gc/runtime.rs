@@ -355,8 +355,13 @@ impl GcRuntime {
         self.gc_free_cycles();
     }
 
-    /// Run all collector phases atomically and return read-only telemetry.
-    pub fn run_gc_with_stats(&mut self) -> GcStatsBundle {
+    /// Run all collector phases atomically and return phase telemetry.
+    pub fn run_gc_with_stats(&mut self) -> GcPhaseStats {
+        self.run_gc_with_stats_bundle().phases
+    }
+
+    /// Run all collector phases atomically and return telemetry plus its object catalog.
+    pub fn run_gc_with_stats_bundle(&mut self) -> GcStatsBundle {
         // 1. Capture immutable graph + RC before trial deletion.
         let live_ids = self.sorted_list_ids(GcListKind::GcObj);
         let mut ref_count_before = HashMap::with_capacity(live_ids.len());

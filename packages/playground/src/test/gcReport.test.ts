@@ -4,6 +4,7 @@ import {
   formatEdgeRelation,
   parseGcRunEnvelope,
   rebuildWitnessPath,
+  scanResultLabel,
 } from '../gcReport'
 
 const emptyCounts = {
@@ -150,6 +151,15 @@ function okEnvelope(report = fullReport()) {
   })
 }
 
+function expectReportRejected(
+  mutate: (report: ReturnType<typeof fullReport>) => void,
+  message: string
+) {
+  const report = fullReport()
+  mutate(report)
+  expect(() => parseGcRunEnvelope(okEnvelope(report))).toThrow(message)
+}
+
 describe('parseGcRunEnvelope', () => {
   it('rejects an untagged partial report', () => {
     expect(() => parseGcRunEnvelope('{"report":{}}')).toThrow(
@@ -266,6 +276,60 @@ describe('parseGcRunEnvelope', () => {
     ).toThrow('name must be a string')
   })
 
+  it('parses typed Hash key relations', () => {
+    const envelope = parseGcRunEnvelope(
+      okEnvelope(
+        fullReport({
+          phases: {
+            trialDeletion: {
+              visitedEdges: [
+                {
+                  fromId: 1,
+                  toId: 3,
+                  relation: {
+                    kind: 'hashValue',
+                    keyKind: 'integer',
+                    key: '1',
+                  },
+                },
+              ],
+              omittedEdgeDetails: 2,
+            },
+          },
+        })
+      )
+    )
+    expect(envelope.status).toBe('ok')
+    if (envelope.status === 'ok') {
+      expect(
+        envelope.report.phases.trialDeletion.visitedEdges[0].relation
+      ).toEqual({ kind: 'hashValue', keyKind: 'integer', key: '1' })
+    }
+  })
+
+  it('rejects Hash relations without a typed key kind', () => {
+    expect(() =>
+      parseGcRunEnvelope(
+        okEnvelope(
+          fullReport({
+            phases: {
+              trialDeletion: {
+                visitedEdges: [
+                  {
+                    fromId: 1,
+                    toId: 3,
+                    relation: { kind: 'hashValue', key: '1' },
+                  },
+                ],
+                omittedEdgeDetails: 2,
+              },
+            },
+          })
+        )
+      )
+    ).toThrow('keyKind must be integer, boolean, or string')
+  })
+
   it('rejects dangling object IDs', () => {
     expect(() =>
       parseGcRunEnvelope(
@@ -336,6 +400,73 @@ describe('parseGcRunEnvelope', () => {
         )
       )
     ).toThrow('final must be freed iff decision is candidate')
+  })
+
+  it('enforces aggregate candidate and Scan summary counts', () => {
+    expectReportRejected((report) => {
+      report.phases.scan.restored = 2
+    }, 'restoredObjects.length must equal restored')
+    expectReportRejected((report) => {
+      report.phases.scan.garbageCandidates = 3
+    }, 'garbageCandidateObjects.length must equal garbageCandidates')
+    expectReportRejected((report) => {
+      report.phases.trialDeletion.candidates = 4
+    }, 'candidates must equal scan.restored + scan.garbageCandidates')
+  })
+
+  it('requires unique, disjoint Scan candidate sets', () => {
+    expectReportRejected((report) => {
+      report.phases.scan.restoredObjects.push({
+        ...report.phases.scan.restoredObjects[0],
+      })
+      report.phases.scan.restored = 2
+      report.phases.trialDeletion.candidates = 4
+    }, 'restoredObjects must not contain duplicate id values')
+    expectReportRejected((report) => {
+      report.phases.scan.garbageCandidateObjects.push({
+        ...report.phases.scan.garbageCandidateObjects[0],
+      })
+      report.phases.scan.garbageCandidates = 3
+      report.phases.trialDeletion.candidates = 4
+    }, 'garbageCandidateObjects must not contain duplicate id values')
+    expectReportRejected((report) => {
+      report.phases.scan.restoredObjects[0] = {
+        ...report.phases.scan.garbageCandidateObjects[0],
+      }
+    }, 'restored and garbage candidate objects must be disjoint')
+  })
+
+  it('validates decision identity, RC arithmetic, and candidate membership', () => {
+    expectReportRejected((report) => {
+      report.phases.trialDeletion.objectDecisions.push({
+        ...report.phases.trialDeletion.objectDecisions[1],
+      })
+    }, 'objectDecisions must not contain duplicate objectId values')
+    expectReportRejected((report) => {
+      report.phases.trialDeletion.objectDecisions[1].trialRefCount = 1
+    }, 'trialRefCount must equal refCountBefore - heapIncomingEdges')
+    expectReportRejected((report) => {
+      const decision = report.phases.trialDeletion.objectDecisions[1]
+      decision.refCountBefore = 2
+      decision.trialRefCount = 1
+    }, 'decision must be candidate iff trialRefCount is zero')
+    expectReportRejected((report) => {
+      const decision = report.phases.trialDeletion.objectDecisions[1]
+      decision.refCountBefore = 2
+      decision.trialRefCount = 1
+      decision.decision = 'survivor'
+    }, 'decision must be candidate iff the object appears in Scan candidate results')
+  })
+
+  it('requires unique witnesses for restored objects', () => {
+    expectReportRejected((report) => {
+      report.phases.scan.restorationWitnesses.push({
+        ...report.phases.scan.restorationWitnesses[0],
+      })
+    }, 'restorationWitnesses must not contain duplicate objectId values')
+    expectReportRejected((report) => {
+      report.phases.scan.restorationWitnesses[0].objectId = 4
+    }, 'objectId must reference a restored object')
   })
 
   it('rejects witness chains that do not end at a survivor', () => {
@@ -442,9 +573,15 @@ describe('teaching helpers', () => {
     expect(formatEdgeRelation({ kind: 'arrayElement', index: 0 })).toBe(
       'items[0]'
     )
-    expect(formatEdgeRelation({ kind: 'hashValue', key: 'name' })).toBe(
-      'values["name"]'
-    )
+    expect(
+      formatEdgeRelation({ kind: 'hashValue', keyKind: 'string', key: '1' })
+    ).toBe('values["1"]')
+    expect(
+      formatEdgeRelation({ kind: 'hashValue', keyKind: 'integer', key: '1' })
+    ).toBe('values[1]')
+    expect(
+      formatEdgeRelation({ kind: 'hashValue', keyKind: 'boolean', key: 'true' })
+    ).toBe('values[true]')
     expect(formatEdgeRelation({ kind: 'instanceField', name: 'next' })).toBe(
       'fields["next"]'
     )
@@ -482,5 +619,22 @@ describe('teaching helpers', () => {
         relation: { kind: 'arrayElement', index: 0 },
       },
     ])
+  })
+
+  it('rejects inconsistent Scan labels instead of guessing Garbage', () => {
+    const candidate = {
+      objectId: 3,
+      refCountBefore: 1,
+      heapIncomingEdges: 1,
+      trialRefCount: 0,
+      decision: 'candidate' as const,
+      final: 'retained' as const,
+    }
+    expect(() => scanResultLabel(candidate, new Set(), new Set())).toThrow(
+      'missing from Scan candidate results'
+    )
+    expect(() =>
+      scanResultLabel(candidate, new Set([3]), new Set([3]))
+    ).toThrow('cannot be both restored and garbage')
   })
 })

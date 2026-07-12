@@ -33,9 +33,12 @@ export const edgeRelationKinds = [
 
 export type EdgeRelationKind = (typeof edgeRelationKinds)[number]
 
+export const hashKeyKinds = ['integer', 'boolean', 'string'] as const
+export type HashKeyKind = (typeof hashKeyKinds)[number]
+
 export type EdgeRelation =
   | { kind: 'arrayElement'; index: number }
-  | { kind: 'hashValue'; key: string }
+  | { kind: 'hashValue'; keyKind: HashKeyKind; key: string }
   | { kind: 'closureFunction' }
   | { kind: 'closureFree'; index: number }
   | { kind: 'classConstructor' }
@@ -154,8 +157,8 @@ function readNumber(
   path: string
 ): number {
   const value = record[key]
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new Error(`${path}.${key} must be a non-negative number`)
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${path}.${key} must be a non-negative safe integer`)
   }
   return value
 }
@@ -165,11 +168,7 @@ function readObjectId(
   key: string,
   path: string
 ): number {
-  const value = readNumber(record, key, path)
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(`${path}.${key} must be a non-negative safe integer`)
-  }
-  return value
+  return readNumber(record, key, path)
 }
 
 function readCatalogId(
@@ -248,10 +247,29 @@ function readObjectSummariesInCatalog(
   const summaries = readObjectSummaries(value, path)
   for (const [index, summary] of summaries.entries()) {
     if (!catalog.has(summary.id)) {
-      throw new Error(`${path}[${index}].id references unknown object ${summary.id}`)
+      throw new Error(
+        `${path}[${index}].id references unknown object ${summary.id}`
+      )
     }
   }
   return summaries
+}
+
+function uniqueIds<T>(
+  values: readonly T[],
+  idOf: (value: T) => number,
+  path: string,
+  field: string
+): Set<number> {
+  const ids = new Set<number>()
+  for (const value of values) {
+    const id = idOf(value)
+    if (ids.has(id)) {
+      throw new Error(`${path} must not contain duplicate ${field} values`)
+    }
+    ids.add(id)
+  }
+  return ids
 }
 
 function readSnapshot(value: unknown, path: string): HeapSnapshot {
@@ -272,7 +290,9 @@ export function formatEdgeRelation(relation: EdgeRelation): string {
     case 'arrayElement':
       return `items[${relation.index}]`
     case 'hashValue':
-      return `values["${relation.key}"]`
+      return relation.keyKind === 'string'
+        ? `values["${relation.key}"]`
+        : `values[${relation.key}]`
     case 'closureFunction':
       return 'function'
     case 'closureFree':
@@ -300,16 +320,30 @@ export function scanResultLabel(
   restoredIds: ReadonlySet<number>,
   garbageIds: ReadonlySet<number>
 ): ScanResultLabel {
+  const restored = restoredIds.has(decision.objectId)
+  const garbage = garbageIds.has(decision.objectId)
+  if (restored && garbage) {
+    throw new Error(
+      `object ${decision.objectId} cannot be both restored and garbage`
+    )
+  }
   if (decision.decision === 'survivor') {
+    if (restored || garbage) {
+      throw new Error(
+        `survivor object ${decision.objectId} cannot appear in Scan candidate results`
+      )
+    }
     return 'Scan root'
   }
-  if (restoredIds.has(decision.objectId)) {
+  if (restored) {
     return 'Restored'
   }
-  if (garbageIds.has(decision.objectId)) {
+  if (garbage) {
     return 'Garbage'
   }
-  return 'Garbage'
+  throw new Error(
+    `candidate object ${decision.objectId} is missing from Scan candidate results`
+  )
 }
 
 /**
@@ -365,7 +399,10 @@ function readEdgeRelation(value: unknown, path: string): EdgeRelation {
     throw new Error(`${path} must be an object`)
   }
   const kind = value.kind
-  if (typeof kind !== 'string' || !edgeRelationKinds.includes(kind as EdgeRelationKind)) {
+  if (
+    typeof kind !== 'string' ||
+    !edgeRelationKinds.includes(kind as EdgeRelationKind)
+  ) {
     throw new Error(`${path}.kind must be a known edge relation kind`)
   }
 
@@ -377,8 +414,20 @@ function readEdgeRelation(value: unknown, path: string): EdgeRelation {
       }
       return { kind: 'arrayElement', index }
     }
-    case 'hashValue':
-      return { kind: 'hashValue', key: readString(value, 'key', path) }
+    case 'hashValue': {
+      const keyKind = value.keyKind
+      if (
+        typeof keyKind !== 'string' ||
+        !hashKeyKinds.includes(keyKind as HashKeyKind)
+      ) {
+        throw new Error(`${path}.keyKind must be integer, boolean, or string`)
+      }
+      return {
+        kind: 'hashValue',
+        keyKind: keyKind as HashKeyKind,
+        key: readString(value, 'key', path),
+      }
+    }
     case 'closureFunction':
       return { kind: 'closureFunction' }
     case 'closureFree': {
@@ -440,6 +489,20 @@ function readObjectDecisions(
     }
     const finalFate = finalValue as FinalFate
 
+    const refCountBefore = readNumber(entry, 'refCountBefore', entryPath)
+    const heapIncomingEdges = readNumber(entry, 'heapIncomingEdges', entryPath)
+    const trialRefCount = readNumber(entry, 'trialRefCount', entryPath)
+    if (refCountBefore - heapIncomingEdges !== trialRefCount) {
+      throw new Error(
+        `${entryPath}.trialRefCount must equal refCountBefore - heapIncomingEdges`
+      )
+    }
+    if ((decision === 'candidate') !== (trialRefCount === 0)) {
+      throw new Error(
+        `${entryPath}.decision must be candidate iff trialRefCount is zero`
+      )
+    }
+
     const expectFreed = decision === 'candidate' && garbageIds.has(objectId)
     if ((finalFate === 'freed') !== expectFreed) {
       throw new Error(
@@ -449,9 +512,9 @@ function readObjectDecisions(
 
     return {
       objectId,
-      refCountBefore: readNumber(entry, 'refCountBefore', entryPath),
-      heapIncomingEdges: readNumber(entry, 'heapIncomingEdges', entryPath),
-      trialRefCount: readNumber(entry, 'trialRefCount', entryPath),
+      refCountBefore,
+      heapIncomingEdges,
+      trialRefCount,
       decision,
       final: finalFate,
     }
@@ -589,9 +652,54 @@ function readReport(value: unknown): GcCollectionReport {
     'report.phases.scan.garbageCandidateObjects',
     catalog
   )
-  const garbageIds = new Set(
-    garbageCandidateObjects.map((object) => object.id)
+  const restored = readNumber(scan, 'restored', 'report.phases.scan')
+  const garbageCandidates = readNumber(
+    scan,
+    'garbageCandidates',
+    'report.phases.scan'
   )
+  if (restoredObjects.length !== restored) {
+    throw new Error(
+      'report.phases.scan.restoredObjects.length must equal restored'
+    )
+  }
+  if (garbageCandidateObjects.length !== garbageCandidates) {
+    throw new Error(
+      'report.phases.scan.garbageCandidateObjects.length must equal garbageCandidates'
+    )
+  }
+
+  const restoredIds = uniqueIds(
+    restoredObjects,
+    (object) => object.id,
+    'report.phases.scan.restoredObjects',
+    'id'
+  )
+  const garbageIds = uniqueIds(
+    garbageCandidateObjects,
+    (object) => object.id,
+    'report.phases.scan.garbageCandidateObjects',
+    'id'
+  )
+  for (const id of restoredIds) {
+    if (garbageIds.has(id)) {
+      throw new Error(
+        'report.phases.scan restored and garbage candidate objects must be disjoint'
+      )
+    }
+  }
+
+  const candidates = readNumber(
+    trialDeletion,
+    'candidates',
+    'report.phases.trialDeletion'
+  )
+  if (candidates !== restored + garbageCandidates) {
+    throw new Error(
+      'report.phases.trialDeletion.candidates must equal scan.restored + scan.garbageCandidates'
+    )
+  }
+  const candidateIds = new Set([...restoredIds, ...garbageIds])
 
   const objectDecisions = readObjectDecisions(
     trialDeletion.objectDecisions,
@@ -599,6 +707,21 @@ function readReport(value: unknown): GcCollectionReport {
     catalog,
     garbageIds
   )
+  uniqueIds(
+    objectDecisions,
+    (decision) => decision.objectId,
+    'report.phases.trialDeletion.objectDecisions',
+    'objectId'
+  )
+  for (const [index, decision] of objectDecisions.entries()) {
+    const isCandidate = candidateIds.has(decision.objectId)
+    if ((decision.decision === 'candidate') !== isCandidate) {
+      throw new Error(
+        `report.phases.trialDeletion.objectDecisions[${index}].decision must be candidate iff the object appears in Scan candidate results`
+      )
+    }
+  }
+
   const visitedEdges = readVisitedEdges(
     trialDeletion.visitedEdges,
     'report.phases.trialDeletion.visitedEdges',
@@ -609,6 +732,19 @@ function readReport(value: unknown): GcCollectionReport {
     'report.phases.scan.restorationWitnesses',
     catalog
   )
+  uniqueIds(
+    restorationWitnesses,
+    (witness) => witness.objectId,
+    'report.phases.scan.restorationWitnesses',
+    'objectId'
+  )
+  for (const [index, witness] of restorationWitnesses.entries()) {
+    if (!restoredIds.has(witness.objectId)) {
+      throw new Error(
+        `report.phases.scan.restorationWitnesses[${index}].objectId must reference a restored object`
+      )
+    }
+  }
 
   const edgesVisited = readNumber(
     trialDeletion,
@@ -626,7 +762,6 @@ function readReport(value: unknown): GcCollectionReport {
     )
   }
 
-  const restored = readNumber(scan, 'restored', 'report.phases.scan')
   const omittedWitnesses = readNumber(
     scan,
     'omittedWitnesses',
@@ -654,11 +789,7 @@ function readReport(value: unknown): GcCollectionReport {
     phases: {
       trialDeletion: {
         edgesVisited,
-        candidates: readNumber(
-          trialDeletion,
-          'candidates',
-          'report.phases.trialDeletion'
-        ),
+        candidates,
         objectDecisions,
         visitedEdges,
         omittedObjectDecisions: readNumber(
@@ -670,11 +801,7 @@ function readReport(value: unknown): GcCollectionReport {
       },
       scan: {
         restored,
-        garbageCandidates: readNumber(
-          scan,
-          'garbageCandidates',
-          'report.phases.scan'
-        ),
+        garbageCandidates,
         restoredObjects,
         garbageCandidateObjects,
         restorationWitnesses,

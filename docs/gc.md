@@ -347,7 +347,7 @@ let report = vm.collect_garbage();
 let result = vm.try_export_last_result()?;
 ```
 
-`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats()`，并返回 `GcCollectionReport`。Teaching telemetry（仅 `run_gc_with_stats` 路径）会额外记录：
+`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats_bundle()`，并返回 `GcCollectionReport`。该 bundle telemetry 路径会额外记录：
 
 - 规范化 `objects` catalog；
 - Trial deletion 的 `objectDecisions`（`refCountBefore` / `heapIncomingEdges` / `trialRefCount` / Candidate|Survivor / Retained|Freed）与带 typed relation 的 `visitedEdges`；

@@ -290,23 +290,25 @@ Array#18
 
 结构关系采用 typed relation，不在 Rust 端拼接 UI 字符串：
 
-| Value 类型    | relation kind           | UI 展示              |
-| ------------- | ----------------------- | -------------------- |
-| Array         | `arrayElement` + index  | `items[0]`           |
-| Hash          | `hashValue` + key label | `values["name"]`     |
-| Closure       | `closureFunction`       | `function`           |
-| Closure       | `closureFree` + index   | `free[0]`            |
-| Class         | `classConstructor`      | `constructor`        |
-| Class         | `classMethod` + name    | `methods["connect"]` |
-| Instance      | `instanceClass`         | `class`              |
-| Instance      | `instanceField` + name  | `fields["next"]`     |
-| BoundMethod   | `boundMethodReceiver`   | `receiver`           |
-| BoundMethod   | `boundMethodFunction`   | `method`             |
-| 其他 GcObject | `unknown`               | `unknown`            |
+| Value 类型    | relation kind                      | UI 展示                        |
+| ------------- | ---------------------------------- | ------------------------------ |
+| Array         | `arrayElement` + index             | `items[0]`                     |
+| Hash          | `hashValue` + key kind + key label | `values["name"]` / `values[1]` |
+| Closure       | `closureFunction`                  | `function`                     |
+| Closure       | `closureFree` + index              | `free[0]`                      |
+| Class         | `classConstructor`                 | `constructor`                  |
+| Class         | `classMethod` + name               | `methods["connect"]`           |
+| Instance      | `instanceClass`                    | `class`                        |
+| Instance      | `instanceField` + name             | `fields["next"]`               |
+| BoundMethod   | `boundMethodReceiver`              | `receiver`                     |
+| BoundMethod   | `boundMethodFunction`              | `method`                       |
+| 其他 GcObject | `unknown`                          | `unknown`                      |
 
 字段名、数组下标和 method 名是准确的结构 slot，可以展示。报告不尝试恢复变量名：同一对象可能存在多个 alias，不存在唯一“对象变量名”。
 
-Hash string key 的展示应转义并设置长度上限；完整 key 不应无限放大 JSON 或 UI。
+Hash relation 必须保留 `integer` / `boolean` / `string` key kind，避免字符串
+`"1"` 与整数 `1` 在教学 UI 中显示成同一个 slot。String key 的展示应转义并设置
+长度上限；完整 key 不应无限放大 JSON 或 UI。
 
 ## 8. Scan reachability witness
 

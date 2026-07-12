@@ -488,6 +488,11 @@ body {
   color: var(--accent-11);
 }
 
+.gc-filter-group label:has(input:focus-visible) {
+  outline: 2px solid var(--accent-8);
+  outline-offset: 2px;
+}
+
 .gc-filter-group input {
   position: absolute;
   width: 1px;

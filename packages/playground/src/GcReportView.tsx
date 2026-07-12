@@ -47,7 +47,7 @@ const valueKindLabels: Record<ValueKind, string> = {
 }
 
 const edgesVisitedDescription =
-  'Count of heap-to-heap references visited during trial deletion. Different fields or array slots that point to the same object are counted separately. Constants, globals, and VM stack or frame roots are not included.'
+  'Count of heap-to-heap references visited during trial deletion. Different fields or array slots that point to the same object are counted separately. Constants, globals, and VM stack slots are not included.'
 
 const candidatesDescription =
   'Objects whose reference count reached zero after subtracting every heap incoming edge. They are only temporary candidates; Scan may still restore some of them.'
@@ -150,7 +150,9 @@ function sortVisitedEdges(
 }
 
 function RelationText({ relation }: { relation: EdgeRelation }) {
-  return <span className="gc-edge-relation">{formatEdgeRelation(relation)}</span>
+  return (
+    <span className="gc-edge-relation">{formatEdgeRelation(relation)}</span>
+  )
 }
 
 function TruncationNotice({ message }: { message: string }) {
@@ -235,7 +237,9 @@ function DecisionRowDetails({
   omittedWitnesses: number
 }) {
   const label = objectLabel(catalog, decision.objectId)
-  const incoming = visitedEdges.filter((edge) => edge.toId === decision.objectId)
+  const incoming = visitedEdges.filter(
+    (edge) => edge.toId === decision.objectId
+  )
   const outgoing = visitedEdges.filter(
     (edge) => edge.fromId === decision.objectId
   )
@@ -254,9 +258,9 @@ function DecisionRowDetails({
         </p>
         <p className="gc-muted">
           Remaining non-heap references may come from the constants table,
-          globals, or VM stack and globals slots. For Null-like bookkeeping
-          objects, most of those references usually come from VM-prefilled
-          stack and globals slots.
+          global slots, or VM stack slots. For Null-like bookkeeping objects,
+          most of those references usually come from VM-prefilled stack and
+          global slots.
         </p>
         {restoredFromHere.length > 0 ? (
           <div>
@@ -270,10 +274,14 @@ function DecisionRowDetails({
             </ul>
           </div>
         ) : (
-          <p className="gc-muted">No candidates were restored from this survivor.</p>
+          <p className="gc-muted">
+            No candidates were restored from this survivor.
+          </p>
         )}
         {omittedWitnesses > 0 ? (
-          <TruncationNotice message={`${omittedWitnesses} restoration witness details were omitted from this report.`} />
+          <TruncationNotice
+            message={`${omittedWitnesses} restoration witness details were omitted from this report.`}
+          />
         ) : null}
       </div>
     )
@@ -307,14 +315,14 @@ function DecisionRowDetails({
           <WitnessPathView steps={path} catalog={catalog} />
         ) : (
           <p className="gc-muted">
-            This candidate was restored, but its reachability witness was omitted
-            from the report.
+            This candidate was restored, but its reachability witness was
+            omitted from the report.
           </p>
         )
       ) : (
         <p>
-          No path from any trial survivor.
-          Remained in the temporary candidate list after Scan.
+          No path from any trial survivor. Remained in the temporary candidate
+          list after Scan.
         </p>
       )}
       {omittedEdges > 0 || omittedWitnesses > 0 ? (
@@ -326,7 +334,7 @@ function DecisionRowDetails({
             omittedWitnesses > 0
               ? `${omittedWitnesses} restoration witness details were omitted.`
               : null,
-            `Some details for ${label} may be incomplete.`
+            `Some details for ${label} may be incomplete.`,
           ]
             .filter(Boolean)
             .join(' ')}
@@ -378,10 +386,30 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
     report.phases.scan.restorationWitnesses,
   ])
   const candidateCount = report.phases.trialDeletion.candidates
-  const survivorCount = report.phases.trialDeletion.objectDecisions.filter(
-    (decision) => decision.decision === 'survivor'
-  ).length
-  const allCount = report.phases.trialDeletion.objectDecisions.length
+  const reportedCandidateCount =
+    report.phases.trialDeletion.objectDecisions.filter(
+      (decision) => decision.decision === 'candidate'
+    ).length
+  const reportedSurvivorCount =
+    report.phases.trialDeletion.objectDecisions.filter(
+      (decision) => decision.decision === 'survivor'
+    ).length
+  const reportedAllCount = report.phases.trialDeletion.objectDecisions.length
+  const omittedCount = report.phases.trialDeletion.omittedObjectDecisions
+  const allCount = reportedAllCount + omittedCount
+  const survivorCount = allCount - candidateCount
+  const candidateCountLabel =
+    omittedCount > 0
+      ? `${reportedCandidateCount} of ${candidateCount} reported`
+      : `${candidateCount}`
+  const survivorCountLabel =
+    omittedCount > 0
+      ? `${reportedSurvivorCount} of ${survivorCount} reported`
+      : `${survivorCount}`
+  const allCountLabel =
+    omittedCount > 0
+      ? `${reportedAllCount} of ${allCount} reported`
+      : `${allCount}`
 
   const filtered = useMemo(() => {
     const decisions = report.phases.trialDeletion.objectDecisions.filter(
@@ -422,10 +450,10 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
             name="gc-decision-filter"
             value="candidates"
             checked={filter === 'candidates'}
-            aria-label={`Candidates ${candidateCount}`}
+            aria-label={`Candidates ${candidateCountLabel}`}
             onChange={() => setFilter('candidates')}
           />
-          Candidates {candidateCount}
+          Candidates {candidateCountLabel}
         </label>
         <label className={filter === 'survivors' ? 'is-active' : undefined}>
           <input
@@ -433,10 +461,10 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
             name="gc-decision-filter"
             value="survivors"
             checked={filter === 'survivors'}
-            aria-label={`Trial survivors ${survivorCount}`}
+            aria-label={`Trial survivors ${survivorCountLabel}`}
             onChange={() => setFilter('survivors')}
           />
-          Trial survivors {survivorCount}
+          Trial survivors {survivorCountLabel}
         </label>
         <label className={filter === 'all' ? 'is-active' : undefined}>
           <input
@@ -444,10 +472,10 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
             name="gc-decision-filter"
             value="all"
             checked={filter === 'all'}
-            aria-label={`All graph objects ${allCount}`}
+            aria-label={`All graph objects ${allCountLabel}`}
             onChange={() => setFilter('all')}
           />
-          All graph objects {allCount}
+          All graph objects {allCountLabel}
         </label>
       </div>
 
@@ -537,9 +565,7 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
                             visitedEdges={
                               report.phases.trialDeletion.visitedEdges
                             }
-                            witnesses={
-                              report.phases.scan.restorationWitnesses
-                            }
+                            witnesses={report.phases.scan.restorationWitnesses}
                             restoredIds={restoredIds}
                             omittedEdges={
                               report.phases.trialDeletion.omittedEdgeDetails
@@ -571,11 +597,15 @@ function VisitedHeapEdges({ report }: { report: GcCollectionReport }) {
   const candidateIds = useMemo(
     () =>
       new Set(
-        report.phases.trialDeletion.objectDecisions
-          .filter((decision) => decision.decision === 'candidate')
-          .map((decision) => decision.objectId)
+        [
+          ...report.phases.scan.restoredObjects,
+          ...report.phases.scan.garbageCandidateObjects,
+        ].map((object) => object.id)
       ),
-    [report.phases.trialDeletion.objectDecisions]
+    [
+      report.phases.scan.restoredObjects,
+      report.phases.scan.garbageCandidateObjects,
+    ]
   )
 
   const allEdges = report.phases.trialDeletion.visitedEdges

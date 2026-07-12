@@ -2,11 +2,12 @@
 mod tests {
     use std::collections::HashMap;
 
-    use crate::report::{EdgeRelation, FinalFate, TrialDecision, MAX_EDGE_DETAILS};
+    use crate::report::{EdgeRelation, FinalFate, HashKeyKind, TrialDecision, MAX_EDGE_DETAILS};
     use crate::value::{
-        alloc_value, get_value_mut, GcClass, GcClosure, GcInstance, HashKey, Value, ValueKind,
+        alloc_value, format_hash_key_label, get_value_mut, GcBoundMethod, GcClass, GcClosure,
+        GcInstance, HashKey, Value, ValueKind, MAX_HASH_KEY_LABEL_LEN,
     };
-    use crate::{run_source_with_report, GcHeap, GcObject};
+    use crate::{run_source_with_report, GcHeap, GcObject, GcRef};
 
     #[test]
     fn unrooted_two_node_cycle_reports_rc_formula_and_freed() {
@@ -51,7 +52,7 @@ mod tests {
         heap.free(node_a);
         heap.free(node_b);
 
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         // Class + two instances all reach trial RC 0 when the cycle is unrooted.
         assert_eq!(report.phases.trial_deletion.candidates, 3);
         assert_eq!(report.phases.scan.garbage_candidates, 3);
@@ -110,7 +111,7 @@ mod tests {
         heap.free(class);
         heap.free(node);
 
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         // Class and self-cyclic instance both become candidates.
         assert_eq!(report.phases.trial_deletion.candidates, 2);
         assert_eq!(report.phases.free_cycles.freed, 2);
@@ -139,7 +140,7 @@ mod tests {
         let root = alloc_value(&mut heap, Value::Array(vec![mid]));
         heap.free(mid);
 
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         assert_eq!(report.phases.free_cycles.freed, 0);
         assert!(
             report.phases.scan.restored >= 2,
@@ -184,7 +185,7 @@ mod tests {
         let holder = alloc_value(&mut heap, Value::Array(vec![target, target]));
         heap.free(target);
 
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         let target_decision = report
             .phases
             .trial_deletion
@@ -255,7 +256,7 @@ mod tests {
             }),
         );
 
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         let relations: Vec<_> = report
             .phases
             .trial_deletion
@@ -309,7 +310,7 @@ mod tests {
                 (HashKey::Boolean(true), v4),
             ])),
         );
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         let hash_edges: Vec<_> = report
             .phases
             .trial_deletion
@@ -320,19 +321,19 @@ mod tests {
         assert_eq!(hash_edges.len(), 4);
         assert!(matches!(
             &hash_edges[0].relation,
-            EdgeRelation::HashValue { key } if key == "1"
+            EdgeRelation::HashValue { key_kind: HashKeyKind::Integer, key } if key == "1"
         ));
         assert!(matches!(
             &hash_edges[1].relation,
-            EdgeRelation::HashValue { key } if key == "true"
+            EdgeRelation::HashValue { key_kind: HashKeyKind::Boolean, key } if key == "true"
         ));
         assert!(matches!(
             &hash_edges[2].relation,
-            EdgeRelation::HashValue { key } if key == "a"
+            EdgeRelation::HashValue { key_kind: HashKeyKind::String, key } if key == "a"
         ));
         assert!(matches!(
             &hash_edges[3].relation,
-            EdgeRelation::HashValue { key } if key == "b"
+            EdgeRelation::HashValue { key_kind: HashKeyKind::String, key } if key == "b"
         ));
     }
 
@@ -366,7 +367,7 @@ mod tests {
         );
         heap.free(child);
 
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         assert!(report
             .phases
             .trial_deletion
@@ -392,16 +393,65 @@ mod tests {
 
     #[test]
     fn visit_edges_targets_match_trace_targets() {
-        let mut heap = GcHeap::new();
-        let child = alloc_value(&mut heap, Value::Integer(1));
-        let a = heap.dup(child);
-        let b = heap.dup(child);
-        let value = Value::Array(vec![a, b]);
-        let mut via_trace = Vec::new();
-        value.trace(&mut |reference| via_trace.push(reference.0));
-        let mut via_visit = Vec::new();
-        value.visit_edges(|_relation, reference| via_visit.push(reference.0));
-        assert_eq!(via_trace, via_visit);
+        fn assert_same_target_multiset(value: &Value) {
+            let mut via_trace = Vec::new();
+            value.trace(&mut |reference| via_trace.push(reference.0));
+            via_trace.sort_unstable();
+
+            let mut via_visit = Vec::new();
+            value.visit_edges(|_relation, reference| via_visit.push(reference.0));
+            via_visit.sort_unstable();
+
+            assert_eq!(via_trace, via_visit);
+        }
+
+        let values = [
+            Value::Array(vec![GcRef(1), GcRef(2)]),
+            Value::Hash(HashMap::from([
+                (HashKey::Integer(1), GcRef(3)),
+                (HashKey::String("key".to_string()), GcRef(4)),
+            ])),
+            Value::Closure(GcClosure {
+                func: GcRef(5),
+                free: vec![GcRef(6)],
+            }),
+            Value::Class(GcClass {
+                name: "Node".to_string(),
+                constructor: Some(GcRef(7)),
+                methods: HashMap::from([("method".to_string(), GcRef(8))]),
+            }),
+            Value::Instance(GcInstance {
+                class: GcRef(9),
+                fields: HashMap::from([("field".to_string(), GcRef(10))]),
+            }),
+            Value::BoundMethod(GcBoundMethod {
+                receiver: GcRef(11),
+                method: GcRef(12),
+                name: "method".to_string(),
+            }),
+        ];
+
+        for value in &values {
+            assert_same_target_multiset(value);
+        }
+    }
+
+    #[test]
+    fn hash_key_labels_truncate_only_at_encoded_boundaries() {
+        let exact = "a".repeat(MAX_HASH_KEY_LABEL_LEN);
+        assert_eq!(format_hash_key_label(&HashKey::String(exact.clone())), exact);
+
+        let unicode_boundary = format!("{}中", "a".repeat(MAX_HASH_KEY_LABEL_LEN - 1));
+        assert_eq!(
+            format_hash_key_label(&HashKey::String(unicode_boundary)),
+            format!("{}…", "a".repeat(MAX_HASH_KEY_LABEL_LEN - 1))
+        );
+
+        let escape_boundary = format!("{}\n", "a".repeat(MAX_HASH_KEY_LABEL_LEN - 1));
+        assert_eq!(
+            format_hash_key_label(&HashKey::String(escape_boundary)),
+            format!("{}…", "a".repeat(MAX_HASH_KEY_LABEL_LEN - 1))
+        );
     }
 
     #[test]
@@ -492,7 +542,7 @@ mod tests {
             items.push(heap.dup(target));
         }
         let _holder = alloc_value(&mut heap, Value::Array(items));
-        let report = heap.run_gc_with_stats();
+        let report = heap.run_gc_with_stats_bundle();
         assert!(report.phases.trial_deletion.edges_visited > MAX_EDGE_DETAILS);
         assert_eq!(report.phases.trial_deletion.visited_edges.len(), MAX_EDGE_DETAILS);
         assert_eq!(

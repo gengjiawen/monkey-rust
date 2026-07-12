@@ -82,6 +82,37 @@ makeCycle();
 }
 
 #[wasm_bindgen_test]
+fn gc_hash_edges_preserve_key_kinds_and_unicode_boundaries() {
+    let unicode_key = format!("{}中", "a".repeat(63));
+    let source = format!(
+        r#"
+let values = {{1: 1, "1": 2, true: 3, "true": 4, "{}": 5}};
+values;
+"#,
+        unicode_key
+    );
+    let envelope = run_gc(&source);
+
+    assert_eq!(envelope["status"], "ok");
+    let edges = envelope["report"]["phases"]["trialDeletion"]["visitedEdges"]
+        .as_array()
+        .expect("visited edges");
+    let has_hash_key = |key_kind: &str, key: &str| {
+        edges.iter().any(|edge| {
+            edge["relation"]["kind"] == "hashValue"
+                && edge["relation"]["keyKind"] == key_kind
+                && edge["relation"]["key"] == key
+        })
+    };
+
+    assert!(has_hash_key("integer", "1"));
+    assert!(has_hash_key("string", "1"));
+    assert!(has_hash_key("boolean", "true"));
+    assert!(has_hash_key("string", "true"));
+    assert!(has_hash_key("string", &format!("{}…", "a".repeat(63))));
+}
+
+#[wasm_bindgen_test]
 fn gc_error_envelope_distinguishes_all_stages_and_instruction_limit() {
     let parse_error = run_gc("let =");
     assert_eq!(parse_error["status"], "error");

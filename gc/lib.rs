@@ -23,8 +23,8 @@ pub use heap::{GcHeap, GcRef};
 pub use malloc::{MallocState, DEFAULT_GC_THRESHOLD, MALLOC_OVERHEAD};
 pub use report::{
     EdgeRelation, FinalFate, FreeCycleStats, GcCollectionReport, GcObjectSummary, GcPhaseStats,
-    GcStatsBundle, HeapSnapshot, ObjectDecision, RestorationWitness, ScanStats, TrialDecision,
-    TrialDeletionStats, ValueKindCounts, VisitedEdge,
+    GcStatsBundle, HashKeyKind, HeapSnapshot, ObjectDecision, RestorationWitness, ScanStats,
+    TrialDecision, TrialDeletionStats, ValueKindCounts, VisitedEdge,
 };
 pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{

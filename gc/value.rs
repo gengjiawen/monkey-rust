@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fmt::Write as _;
 use std::rc::Rc;
 
 use object::builtins::{BuiltIns, BuiltinId};
@@ -69,17 +70,37 @@ pub enum ValueKind {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum EdgeRelation {
-    ArrayElement { index: usize },
-    HashValue { key: String },
+    ArrayElement {
+        index: usize,
+    },
+    HashValue {
+        #[serde(rename = "keyKind")]
+        key_kind: HashKeyKind,
+        key: String,
+    },
     ClosureFunction,
-    ClosureFree { index: usize },
+    ClosureFree {
+        index: usize,
+    },
     ClassConstructor,
-    ClassMethod { name: String },
+    ClassMethod {
+        name: String,
+    },
     InstanceClass,
-    InstanceField { name: String },
+    InstanceField {
+        name: String,
+    },
     BoundMethodReceiver,
     BoundMethodFunction,
     Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HashKeyKind {
+    Integer,
+    Boolean,
+    String,
 }
 
 pub const MAX_HASH_KEY_LABEL_LEN: usize = 64;
@@ -93,24 +114,28 @@ pub fn format_hash_key_label(key: &HashKey) -> String {
 }
 
 fn escape_and_truncate_key(value: &str) -> String {
-    let mut escaped = String::with_capacity(value.len());
+    let mut escaped = String::with_capacity(value.len().min(MAX_HASH_KEY_LABEL_LEN) + 3);
     for ch in value.chars() {
-        match ch {
-            '\\' => escaped.push_str("\\\\"),
-            '"' => escaped.push_str("\\\""),
-            '\n' => escaped.push_str("\\n"),
-            '\r' => escaped.push_str("\\r"),
-            '\t' => escaped.push_str("\\t"),
+        let mut char_buffer = [0; 4];
+        let mut control_buffer = String::new();
+        let encoded = match ch {
+            '\\' => "\\\\",
+            '"' => "\\\"",
+            '\n' => "\\n",
+            '\r' => "\\r",
+            '\t' => "\\t",
             c if c.is_control() => {
-                escaped.push_str(&format!("\\u{:04x}", c as u32));
+                write!(&mut control_buffer, "\\u{:04x}", c as u32)
+                    .expect("writing to a String cannot fail");
+                control_buffer.as_str()
             }
-            c => escaped.push(c),
-        }
-        if escaped.len() >= MAX_HASH_KEY_LABEL_LEN {
-            escaped.truncate(MAX_HASH_KEY_LABEL_LEN);
+            c => c.encode_utf8(&mut char_buffer),
+        };
+        if escaped.len() + encoded.len() > MAX_HASH_KEY_LABEL_LEN {
             escaped.push('…');
             break;
         }
+        escaped.push_str(encoded);
     }
     escaped
 }
@@ -120,6 +145,16 @@ pub enum HashKey {
     Integer(i64),
     Boolean(bool),
     String(String),
+}
+
+impl HashKey {
+    pub fn kind(&self) -> HashKeyKind {
+        match self {
+            HashKey::Integer(_) => HashKeyKind::Integer,
+            HashKey::Boolean(_) => HashKeyKind::Boolean,
+            HashKey::String(_) => HashKeyKind::String,
+        }
+    }
 }
 
 pub struct ValueCell {
@@ -148,8 +183,8 @@ impl Value {
     /// Visit heap edges with typed structural relations for telemetry.
     ///
     /// Hash keys, class methods, and instance fields are visited in stable
-    /// sorted order so reports stay deterministic. `trace` reuses this visitor
-    /// and ignores relation metadata.
+    /// sorted order so reports stay deterministic. The collector's `trace`
+    /// path remains allocation-free and visits only edge targets.
     pub fn visit_edges(&self, mut visit: impl FnMut(EdgeRelation, GcRef)) {
         match self {
             Value::Array(items) => {
@@ -168,6 +203,7 @@ impl Value {
                 for (key, value) in entries {
                     visit(
                         EdgeRelation::HashValue {
+                            key_kind: key.kind(),
                             key: format_hash_key_label(key),
                         },
                         *value,
@@ -222,7 +258,43 @@ impl Value {
     }
 
     pub fn trace(&self, visit: &mut dyn FnMut(GcRef)) {
-        self.visit_edges(|_relation, target| visit(target));
+        match self {
+            Value::Array(items) => {
+                for item in items {
+                    visit(*item);
+                }
+            }
+            Value::Hash(map) => {
+                for value in map.values() {
+                    visit(*value);
+                }
+            }
+            Value::Closure(closure) => {
+                visit(closure.func);
+                for free in &closure.free {
+                    visit(*free);
+                }
+            }
+            Value::Class(class) => {
+                if let Some(constructor) = class.constructor {
+                    visit(constructor);
+                }
+                for method in class.methods.values() {
+                    visit(*method);
+                }
+            }
+            Value::Instance(instance) => {
+                visit(instance.class);
+                for field in instance.fields.values() {
+                    visit(*field);
+                }
+            }
+            Value::BoundMethod(method) => {
+                visit(method.receiver);
+                visit(method.method);
+            }
+            _ => {}
+        }
     }
 
     pub fn with_owned_edges(self, heap: &mut GcHeap) -> Self {
