@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fmt::Write as _;
 use std::rc::Rc;
 
 use object::builtins::{BuiltIns, BuiltinId};
@@ -62,14 +63,105 @@ pub enum ValueKind {
     Closure,
     Array,
     Hash,
+    Integer,
+    Boolean,
+    String,
+    Null,
+    Error,
+    CompiledFunction,
+    Builtin,
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// Typed heap-edge relation used by teaching telemetry.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum EdgeRelation {
+    ArrayElement {
+        index: usize,
+    },
+    HashValue {
+        #[serde(rename = "keyKind")]
+        key_kind: HashKeyKind,
+        key: String,
+    },
+    ClosureFunction,
+    ClosureFree {
+        index: usize,
+    },
+    ClassConstructor,
+    ClassMethod {
+        name: String,
+    },
+    InstanceClass,
+    InstanceField {
+        name: String,
+    },
+    BoundMethodReceiver,
+    BoundMethodFunction,
+    Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HashKeyKind {
+    Integer,
+    Boolean,
+    String,
+}
+
+pub const MAX_HASH_KEY_LABEL_LEN: usize = 64;
+
+pub fn format_hash_key_label(key: &HashKey) -> String {
+    match key {
+        HashKey::Integer(value) => value.to_string(),
+        HashKey::Boolean(value) => value.to_string(),
+        HashKey::String(value) => escape_and_truncate_key(value),
+    }
+}
+
+fn escape_and_truncate_key(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len().min(MAX_HASH_KEY_LABEL_LEN) + 3);
+    for ch in value.chars() {
+        let mut char_buffer = [0; 4];
+        let mut control_buffer = String::new();
+        let encoded = match ch {
+            '\\' => "\\\\",
+            '"' => "\\\"",
+            '\n' => "\\n",
+            '\r' => "\\r",
+            '\t' => "\\t",
+            c if c.is_control() => {
+                write!(&mut control_buffer, "\\u{:04x}", c as u32)
+                    .expect("writing to a String cannot fail");
+                control_buffer.as_str()
+            }
+            c => c.encode_utf8(&mut char_buffer),
+        };
+        if escaped.len() + encoded.len() > MAX_HASH_KEY_LABEL_LEN {
+            escaped.push('…');
+            break;
+        }
+        escaped.push_str(encoded);
+    }
+    escaped
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum HashKey {
     Integer(i64),
     Boolean(bool),
     String(String),
+}
+
+impl HashKey {
+    pub fn kind(&self) -> HashKeyKind {
+        match self {
+            HashKey::Integer(_) => HashKeyKind::Integer,
+            HashKey::Boolean(_) => HashKeyKind::Boolean,
+            HashKey::String(_) => HashKeyKind::String,
+        }
+    }
 }
 
 pub struct ValueCell {
@@ -91,7 +183,98 @@ impl Value {
             Value::Closure(_) => ValueKind::Closure,
             Value::Array(_) => ValueKind::Array,
             Value::Hash(_) => ValueKind::Hash,
-            _ => ValueKind::Other,
+            Value::Integer(_) => ValueKind::Integer,
+            Value::Boolean(_) => ValueKind::Boolean,
+            Value::String(_) => ValueKind::String,
+            Value::Null => ValueKind::Null,
+            Value::Error(_) => ValueKind::Error,
+            Value::CompiledFunction(_) => ValueKind::CompiledFunction,
+            Value::Builtin(_) => ValueKind::Builtin,
+        }
+    }
+
+    /// Visit heap edges with typed structural relations for telemetry.
+    ///
+    /// Hash keys, class methods, and instance fields are visited in stable
+    /// sorted order so reports stay deterministic. The collector's `trace`
+    /// path remains allocation-free and visits only edge targets.
+    pub fn visit_edges(&self, mut visit: impl FnMut(EdgeRelation, GcRef)) {
+        match self {
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    visit(
+                        EdgeRelation::ArrayElement {
+                            index,
+                        },
+                        *item,
+                    );
+                }
+            }
+            Value::Hash(map) => {
+                let mut entries = map.iter().collect::<Vec<_>>();
+                entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (key, value) in entries {
+                    visit(
+                        EdgeRelation::HashValue {
+                            key_kind: key.kind(),
+                            key: format_hash_key_label(key),
+                        },
+                        *value,
+                    );
+                }
+            }
+            Value::Closure(closure) => {
+                visit(EdgeRelation::ClosureFunction, closure.func);
+                for (index, free) in closure.free.iter().enumerate() {
+                    visit(
+                        EdgeRelation::ClosureFree {
+                            index,
+                        },
+                        *free,
+                    );
+                }
+            }
+            Value::Class(class) => {
+                if let Some(constructor) = class.constructor {
+                    visit(EdgeRelation::ClassConstructor, constructor);
+                }
+                let mut methods = class.methods.iter().collect::<Vec<_>>();
+                methods.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (name, method) in methods {
+                    visit(
+                        EdgeRelation::ClassMethod {
+                            name: name.clone(),
+                        },
+                        *method,
+                    );
+                }
+            }
+            Value::Instance(instance) => {
+                visit(EdgeRelation::InstanceClass, instance.class);
+                let mut fields = instance.fields.iter().collect::<Vec<_>>();
+                fields.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (name, value) in fields {
+                    visit(
+                        EdgeRelation::InstanceField {
+                            name: name.clone(),
+                        },
+                        *value,
+                    );
+                }
+            }
+            Value::BoundMethod(method) => {
+                visit(EdgeRelation::BoundMethodReceiver, method.receiver);
+                visit(EdgeRelation::BoundMethodFunction, method.method);
+            }
+            // Leaf variants own no GcRef. No catch-all: adding a Value variant
+            // must fail to compile until its edges are classified here.
+            Value::Integer(_)
+            | Value::Boolean(_)
+            | Value::String(_)
+            | Value::Null
+            | Value::Error(_)
+            | Value::CompiledFunction(_)
+            | Value::Builtin(_) => {}
         }
     }
 
@@ -131,7 +314,15 @@ impl Value {
                 visit(method.receiver);
                 visit(method.method);
             }
-            _ => {}
+            // Leaf variants own no GcRef. No catch-all: adding a Value variant
+            // must fail to compile until its edges are classified here.
+            Value::Integer(_)
+            | Value::Boolean(_)
+            | Value::String(_)
+            | Value::Null
+            | Value::Error(_)
+            | Value::CompiledFunction(_)
+            | Value::Builtin(_) => {}
         }
     }
 

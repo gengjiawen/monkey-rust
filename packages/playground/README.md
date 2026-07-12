@@ -18,14 +18,17 @@ Repo: https://github.com/gengjiawen/monkey-rust
 - JS-style Monkey classes with `constructor`, `this`, `new`, methods, and mutable instance fields
 - A `Class cycle (GC)` example that creates an unreachable two-instance cycle in Monkey source
 - Before/after heap snapshots, per-value-kind counts, and telemetry for the three collector phases
-- Restored and garbage-candidate lists with typed synthetic object labels
+- Object decision walkthrough (RC before / heap in-edges / trial RC / Candidate|Survivor / Scan / Final)
+- Visited heap edges with typed relations (`fields["next"]`, `items[0]`, …) and Scan reachability witnesses
 - Tagged parse/compile/runtime errors and stale-request protection for GC runs
 
 The GC view executes only when **Run GC** is pressed. Editing never runs the
 program automatically, and the collector always runs
-`gc_decref -> gc_scan -> gc_free_cycles` atomically. `Tracked bytes` is Monkey
-collector accounting, not browser resident memory; WebAssembly linear memory
-may remain allocated after objects are reclaimed.
+`gc_decref -> gc_scan -> gc_free_cycles` atomically. Object IDs are scoped to a
+single report; `Edges visited` counts heap-to-heap references only; witnesses
+are deterministic reachability proofs, not the collector's real event order.
+`Tracked bytes` is Monkey collector accounting, not browser resident memory;
+WebAssembly linear memory may remain allocated after objects are reclaimed.
 
 ## Development
 

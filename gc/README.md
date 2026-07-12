@@ -109,6 +109,19 @@ bindings: `Class(Node)#7`, `Instance(Node)#12`, and
 for example `Closure(makeCycle)#10`; anonymous closures remain `Closure#18`.
 IDs are scoped to one synchronous report.
 
+Heap snapshots classify scalar and VM support values separately: integer,
+boolean, string, null, error, compiled function, and builtin values no longer
+collapse into `Other`. `Other` is reserved for GC runtime objects that are not
+Monkey `Value`s. Snapshot totals still include constants and VM bookkeeping
+values, not only objects explicitly created by source-level `new` expressions.
+
+`run_gc_with_stats_bundle()` returns the object catalog plus teaching telemetry:
+object decisions with the RC formula
+(`refCountBefore − heapIncomingEdges = trialRefCount`), typed visited heap
+edges, and deterministic Scan restoration witnesses. `run_gc_with_stats()` is
+the compatibility phase-stats view of the same atomic collection. Ordinary
+`run_gc()` skips telemetry collection.
+
 ## Modules
 
 - `heap.rs` provides the high-level `GcHeap` and opaque `GcRef` handle.

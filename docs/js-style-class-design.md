@@ -1022,9 +1022,15 @@ pub struct GcPhaseStats {
     pub free_cycles: FreeCycleStats,
 }
 
+pub struct GcStatsBundle {
+    pub objects: Vec<GcObjectSummary>,
+    pub phases: GcPhaseStats,
+}
+
 pub struct GcCollectionReport {
     pub before: HeapSnapshot,
     pub after: HeapSnapshot,
+    pub objects: Vec<GcObjectSummary>,
     pub phases: GcPhaseStats,
     pub collected_by_value_kind: ValueKindCounts,
 }
@@ -1034,11 +1040,16 @@ impl GcVM {
 }
 ```
 
-`ValueKind` 至少稳定区分 `Class`、`Instance`、`BoundMethod`、`Closure`、`Array`、`Hash` 和 `Other`；JSON 使用 lower camel case key。统计职责固定为：
+`ValueKind` 稳定区分 `Class`、`Instance`、`BoundMethod`、`Closure`、`Array`、
+`Hash`、`Integer`、`Boolean`、`String`、`Null`、`Error`、
+`CompiledFunction`、`Builtin` 和 `Other`；JSON 使用 lower camel case key。
+`Other` 只保留给无法映射为 Monkey `Value` 的 GC runtime object，不再混装标量、
+常量和编译函数。Playground 的 snapshot 只列出 collection 前后实际出现的类别，
+同时明确这些数字包含常量与 VM bookkeeping values。统计职责固定为：
 
-1. `GcRuntime::run_gc_with_stats()` 在一次不可中断的三阶段调用内累计 edge/candidate/restored/freed counters，并在 free 前生成对象摘要；普通 `run_gc()` 不生成调试 label。
+1. `GcRuntime::run_gc_with_stats_bundle()` 在一次不可中断的三阶段调用内累计 edge/candidate/restored/freed counters，并在 free 前生成对象摘要及 catalog；`run_gc_with_stats()` 保留为只返回阶段统计的兼容入口，普通 `run_gc()` 不生成调试 label。
 2. `GcHeap` 在 collection 前按 `GcId` 记录 live `ValueCell` 的 `ValueKind`，并从 `malloc_state.malloc_size` / `gc_object_count()` 构造 snapshot。
-3. `GcVM::collect_garbage()` 获取 before，调用一次 `run_gc_with_stats()`，获取 after，并以 collection 前后仍存在的 `GcId` 差集计算 `collected_by_value_kind`。这是提供给 WASM/playground 的唯一 public orchestration；UI 不直接调用单阶段函数。
+3. `GcVM::collect_garbage()` 获取 before，调用一次 `run_gc_with_stats_bundle()`，获取 after，并以 collection 前后仍存在的 `GcId` 差集计算 `collected_by_value_kind`。这是提供给 WASM/playground 的唯一 public orchestration；UI 不直接调用单阶段函数。
 
 `GcId` slot 可能在后续 allocation 中复用，所以 kind 差集和 label 都必须在同一次同步 collection 内完成。对象摘要按 ID 排序；ID 只在本次 report 内用于区分对象。
 
@@ -1119,8 +1130,47 @@ pub fn run_gc_with_report(source: &str) -> String;
       "trackedBytes": 848,
       "byValueKind": { "class": 1, "instance": 0 }
     },
+    "objects": [
+      { "id": 12, "kind": "instance", "label": "Instance(Node)#12" },
+      { "id": 13, "kind": "instance", "label": "Instance(Node)#13" }
+    ],
     "phases": {
-      "trialDeletion": { "edgesVisited": 8, "candidates": 2 },
+      "trialDeletion": {
+        "edgesVisited": 8,
+        "candidates": 2,
+        "objectDecisions": [
+          {
+            "objectId": 12,
+            "refCountBefore": 1,
+            "heapIncomingEdges": 1,
+            "trialRefCount": 0,
+            "decision": "candidate",
+            "final": "freed"
+          },
+          {
+            "objectId": 13,
+            "refCountBefore": 1,
+            "heapIncomingEdges": 1,
+            "trialRefCount": 0,
+            "decision": "candidate",
+            "final": "freed"
+          }
+        ],
+        "visitedEdges": [
+          {
+            "fromId": 12,
+            "toId": 13,
+            "relation": { "kind": "instanceField", "name": "next" }
+          },
+          {
+            "fromId": 13,
+            "toId": 12,
+            "relation": { "kind": "instanceField", "name": "next" }
+          }
+        ],
+        "omittedObjectDecisions": 0,
+        "omittedEdgeDetails": 0
+      },
       "scan": {
         "restored": 0,
         "garbageCandidates": 2,
@@ -1128,7 +1178,9 @@ pub fn run_gc_with_report(source: &str) -> String;
         "garbageCandidateObjects": [
           { "id": 12, "kind": "instance", "label": "Instance(Node)#12" },
           { "id": 13, "kind": "instance", "label": "Instance(Node)#13" }
-        ]
+        ],
+        "restorationWitnesses": [],
+        "omittedWitnesses": 0
       },
       "freeCycles": { "freed": 2 }
     },
@@ -1136,6 +1188,14 @@ pub fn run_gc_with_report(source: &str) -> String;
   }
 }
 ```
+
+Teaching telemetry notes:
+
+- Object IDs are valid only within a single report.
+- `edgesVisited` counts heap-to-heap references only (not constants/globals/stack slots).
+- `restorationWitnesses` are deterministic reachability proofs, not the collector's real traversal timeline.
+- Synthetic labels are not source variable names.
+- Detail lists are capped (500); omitted counts keep aggregates exact.
 
 用户源码失败 contract 固定为：
 

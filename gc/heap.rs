@@ -1,6 +1,6 @@
 use crate::header::{GcId, GcObjectType, GcPhase};
 use crate::malloc::MallocState;
-use crate::report::GcPhaseStats;
+use crate::report::{GcPhaseStats, GcStatsBundle};
 use crate::runtime::{GcObject, GcRuntime, MarkFunc};
 
 /// Opaque handle to a GC-managed object.
@@ -58,6 +58,10 @@ impl GcHeap {
 
     pub fn run_gc_with_stats(&mut self) -> GcPhaseStats {
         self.rt.run_gc_with_stats()
+    }
+
+    pub fn run_gc_with_stats_bundle(&mut self) -> GcStatsBundle {
+        self.rt.run_gc_with_stats_bundle()
     }
 
     pub fn trigger_gc(&mut self, alloc_size: usize) {

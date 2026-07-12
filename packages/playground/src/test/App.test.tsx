@@ -1,5 +1,12 @@
 import { Theme } from '@radix-ui/themes'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   forwardRef,
@@ -75,13 +82,20 @@ vi.mock('../Editor', () => ({
 import App from '../App'
 
 const counts = (overrides: Partial<ValueKindCounts> = {}): ValueKindCounts => ({
-  class: 1,
+  class: 0,
   instance: 0,
   boundMethod: 0,
-  closure: 2,
+  closure: 0,
   array: 0,
   hash: 0,
-  other: 4,
+  integer: 0,
+  boolean: 0,
+  string: 0,
+  null: 0,
+  error: 0,
+  compiledFunction: 0,
+  builtin: 0,
+  other: 0,
   ...overrides,
 })
 
@@ -102,15 +116,109 @@ function successEnvelope({
       before: {
         objectCount: before,
         trackedBytes: 800,
-        byValueKind: counts({ instance: 2 }),
+        byValueKind: counts({
+          class: 1,
+          instance: 2,
+          closure: 3,
+          string: 9,
+          null: 1,
+          compiledFunction: 4,
+        }),
       },
       after: {
         objectCount: after,
         trackedBytes: 720,
-        byValueKind: counts({ instance: 0 }),
+        byValueKind: counts({
+          class: 1,
+          closure: 3,
+          string: 9,
+          null: 1,
+          compiledFunction: 4,
+        }),
       },
+      objects: [
+        { id: 1, kind: 'array', label: 'Array#1' },
+        { id: 7, kind: 'class', label: 'Class(Node)#7' },
+        { id: 10, kind: 'closure', label: 'Closure(makeCycle)#10' },
+        { id: 12, kind: 'instance', label: 'Instance(Node)#12' },
+        { id: 13, kind: 'instance', label: 'Instance(Node)#13' },
+        {
+          id: 14,
+          kind: 'boundMethod',
+          label: 'BoundMethod(Node.connect)#14',
+        },
+      ],
+      globalRoots: [{ name: 'holder', objectId: 1 }],
+      omittedGlobalRoots: 0,
       phases: {
-        trialDeletion: { edgesVisited: 11, candidates: 5 },
+        trialDeletion: {
+          edgesVisited: 11,
+          candidates: 5,
+          objectDecisions: [
+            {
+              objectId: 1,
+              refCountBefore: 2,
+              heapIncomingEdges: 0,
+              trialRefCount: 2,
+              decision: 'survivor',
+              final: 'retained',
+            },
+            {
+              objectId: 7,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'retained',
+            },
+            {
+              objectId: 10,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'retained',
+            },
+            {
+              objectId: 12,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'retained',
+            },
+            {
+              objectId: 13,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'freed',
+            },
+            {
+              objectId: 14,
+              refCountBefore: 1,
+              heapIncomingEdges: 1,
+              trialRefCount: 0,
+              decision: 'candidate',
+              final: 'freed',
+            },
+          ],
+          visitedEdges: [
+            {
+              fromId: 12,
+              toId: 13,
+              relation: { kind: 'instanceField', name: 'next' },
+            },
+            {
+              fromId: 13,
+              toId: 12,
+              relation: { kind: 'instanceField', name: 'next' },
+            },
+          ],
+          omittedObjectDecisions: 0,
+          omittedEdgeDetails: 9,
+        },
         scan: {
           restored: 3,
           garbageCandidates: 2,
@@ -127,15 +235,31 @@ function successEnvelope({
               label: 'BoundMethod(Node.connect)#14',
             },
           ],
+          restorationWitnesses: [
+            {
+              objectId: 7,
+              rootId: 1,
+              predecessorId: 1,
+              relation: { kind: 'arrayElement', index: 0 },
+            },
+            {
+              objectId: 10,
+              rootId: 1,
+              predecessorId: 1,
+              relation: { kind: 'arrayElement', index: 1 },
+            },
+            {
+              objectId: 12,
+              rootId: 1,
+              predecessorId: 1,
+              relation: { kind: 'arrayElement', index: 2 },
+            },
+          ],
+          omittedWitnesses: 0,
         },
         freeCycles: { freed: collected },
       },
-      collectedByValueKind: counts({
-        class: 0,
-        closure: 0,
-        other: 0,
-        instance: collected,
-      }),
+      collectedByValueKind: counts({ instance: collected }),
     },
   }
 }
@@ -194,15 +318,131 @@ describe('GC playground', () => {
     expect(screen.getByLabelText('Collected object count')).toHaveTextContent(
       '2'
     )
+    const beforeSnapshot = screen.getByLabelText('Before heap snapshot')
+    expect(
+      within(beforeSnapshot).getByRole('row', { name: 'String 9' })
+    ).toBeInTheDocument()
+    expect(
+      within(beforeSnapshot).getByRole('row', {
+        name: 'Compiled function 4',
+      })
+    ).toBeInTheDocument()
+    expect(
+      within(beforeSnapshot).queryByRole('row', {
+        name: /Other runtime object/,
+      })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Heap snapshots include source values/)
+    ).toBeInTheDocument()
     expect(screen.getByText('Trial deletion')).toBeInTheDocument()
-    expect(screen.getByText('Scan')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Scan' })).toBeInTheDocument()
     expect(screen.getByText('Free cycles')).toBeInTheDocument()
-    expect(screen.getByText('Class(Node)#7')).toBeInTheDocument()
-    expect(screen.getByText('Closure(makeCycle)#10')).toBeInTheDocument()
-    expect(screen.getByText('Instance(Node)#12')).toBeInTheDocument()
-    expect(screen.getByText('Instance(Node)#13')).toBeInTheDocument()
-    expect(screen.getByText('BoundMethod(Node.connect)#14')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Heap topology' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/truncated edge or decision details/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Object decision walkthrough' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Candidates 5/ })).toBeChecked()
+    expect(
+      screen.getByRole('button', { name: /Expand details for Class\(Node\)#7/ })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for Closure\(makeCycle\)#10/,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for Instance\(Node\)#12/,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for Instance\(Node\)#13/,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: /Expand details for BoundMethod\(Node.connect\)#14/,
+      })
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('Garbage').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Freed').length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('radio', { name: /Trial survivors/ }))
+    expect(screen.getByText('holder')).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: /Expand details for Array#1/ })
+    )
+    expect(
+      screen.getByText(/currently references this object/)
+    ).toBeInTheDocument()
+
     expect(runGcMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('caps global name chips and prose for heavily aliased objects', async () => {
+    const user = userEvent.setup()
+    const envelope = successEnvelope()
+    if (envelope.status !== 'ok') {
+      throw new Error('expected a successful test envelope')
+    }
+    envelope.report.globalRoots = ['holder', 'ha', 'hb', 'hc', 'hd'].map(
+      (name) => ({ name, objectId: 1 })
+    )
+    runGcMock.mockResolvedValue(envelope)
+    renderApp()
+
+    await user.click(await openGcTab(user))
+    await user.click(screen.getByRole('radio', { name: /Trial survivors/ }))
+    expect(screen.getByText('holder')).toBeInTheDocument()
+    expect(screen.getByText('hb')).toBeInTheDocument()
+    expect(screen.queryByText('hc')).toBeNull()
+    expect(screen.getByText('+2 more')).toHaveAttribute('title', 'hc, hd')
+
+    await user.click(
+      screen.getByRole('button', { name: /Expand details for Array#1/ })
+    )
+    expect(
+      screen.getByText(/and 2 more currently reference this object/)
+    ).toBeInTheDocument()
+  })
+
+  it('uses complete Scan results when decisions are truncated', async () => {
+    const user = userEvent.setup()
+    const envelope = successEnvelope()
+    if (envelope.status !== 'ok') {
+      throw new Error('expected a successful test envelope')
+    }
+    const trial = envelope.report.phases.trialDeletion
+    trial.objectDecisions = trial.objectDecisions.filter(
+      (decision) => decision.objectId !== 14
+    )
+    trial.omittedObjectDecisions = 1
+    trial.edgesVisited = 12
+    trial.visitedEdges.push({
+      fromId: 14,
+      toId: 1,
+      relation: { kind: 'boundMethodReceiver' },
+    })
+    runGcMock.mockResolvedValue(envelope)
+    renderApp()
+
+    await user.click(await openGcTab(user))
+
+    expect(
+      await screen.findByRole('radio', {
+        name: 'Candidates 4 of 5 reported',
+      })
+    ).toBeChecked()
+    expect(
+      screen.getByText('Showing 3 candidate-related edges of 12 visited')
+    ).toBeInTheDocument()
   })
 
   it('highlights the source span for GC errors', async () => {

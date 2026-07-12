@@ -23,6 +23,13 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - name: Build wasm package
         run: cd wasm && wasm-pack build --release --scope=gengjiawen
+      - name: Run wasm tests
+        run: cd wasm && wasm-pack test --node
+      - name: Run playground tests
+        run: |
+          corepack enable
+          pnpm install --filter monkey-playground... --frozen-lockfile
+          pnpm --filter monkey-playground test
       - name: Build VS Code extension
         run: |
           corepack enable

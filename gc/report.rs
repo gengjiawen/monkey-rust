@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::Serialize;
 
@@ -7,13 +8,27 @@ use crate::{GcHeap, GcId, GcObjectType, GcRef, GcRuntime};
 
 pub type ValueKindCounts = BTreeMap<ValueKind, usize>;
 
-const VALUE_KINDS: [ValueKind; 7] = [
+pub const MAX_EDGE_DETAILS: usize = 500;
+pub const MAX_OBJECT_DECISIONS: usize = 500;
+pub const MAX_RESTORATION_WITNESSES: usize = 500;
+pub const MAX_GLOBAL_ROOTS: usize = 500;
+
+pub use crate::value::{EdgeRelation, HashKeyKind};
+
+const VALUE_KINDS: [ValueKind; 14] = [
     ValueKind::Class,
     ValueKind::Instance,
     ValueKind::BoundMethod,
     ValueKind::Closure,
     ValueKind::Array,
     ValueKind::Hash,
+    ValueKind::Integer,
+    ValueKind::Boolean,
+    ValueKind::String,
+    ValueKind::Null,
+    ValueKind::Error,
+    ValueKind::CompiledFunction,
+    ValueKind::Builtin,
     ValueKind::Other,
 ];
 
@@ -25,11 +40,152 @@ pub struct HeapSnapshot {
     pub by_value_kind: ValueKindCounts,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TrialDecision {
+    Candidate,
+    Survivor,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FinalFate {
+    Retained,
+    Freed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectDecision {
+    pub object_id: GcId,
+    pub ref_count_before: i32,
+    pub heap_incoming_edges: usize,
+    pub trial_ref_count: i32,
+    pub decision: TrialDecision,
+    #[serde(rename = "final")]
+    pub final_fate: FinalFate,
+}
+
+impl EdgeRelation {
+    pub fn kind_rank(&self) -> u8 {
+        match self {
+            EdgeRelation::ArrayElement {
+                ..
+            } => 0,
+            EdgeRelation::HashValue {
+                ..
+            } => 1,
+            EdgeRelation::ClosureFunction => 2,
+            EdgeRelation::ClosureFree {
+                ..
+            } => 3,
+            EdgeRelation::ClassConstructor => 4,
+            EdgeRelation::ClassMethod {
+                ..
+            } => 5,
+            EdgeRelation::InstanceClass => 6,
+            EdgeRelation::InstanceField {
+                ..
+            } => 7,
+            EdgeRelation::BoundMethodReceiver => 8,
+            EdgeRelation::BoundMethodFunction => 9,
+            EdgeRelation::Unknown => 10,
+        }
+    }
+
+    pub fn sort_payload(&self) -> RelationSortKey<'_> {
+        match self {
+            EdgeRelation::ArrayElement {
+                index,
+            } => RelationSortKey::Index(*index),
+            EdgeRelation::HashValue {
+                key_kind,
+                key,
+            } => RelationSortKey::HashKey(*key_kind, key),
+            EdgeRelation::ClosureFunction => RelationSortKey::None,
+            EdgeRelation::ClosureFree {
+                index,
+            } => RelationSortKey::Index(*index),
+            EdgeRelation::ClassConstructor => RelationSortKey::None,
+            EdgeRelation::ClassMethod {
+                name,
+            } => RelationSortKey::Name(name),
+            EdgeRelation::InstanceClass => RelationSortKey::None,
+            EdgeRelation::InstanceField {
+                name,
+            } => RelationSortKey::Name(name),
+            EdgeRelation::BoundMethodReceiver => RelationSortKey::None,
+            EdgeRelation::BoundMethodFunction => RelationSortKey::None,
+            EdgeRelation::Unknown => RelationSortKey::None,
+        }
+    }
+}
+
+#[derive(Eq, PartialEq)]
+pub enum RelationSortKey<'a> {
+    None,
+    Index(usize),
+    HashKey(HashKeyKind, &'a str),
+    Name(&'a str),
+}
+
+impl Ord for RelationSortKey<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (RelationSortKey::None, RelationSortKey::None) => Ordering::Equal,
+            (RelationSortKey::None, _) => Ordering::Less,
+            (_, RelationSortKey::None) => Ordering::Greater,
+            (RelationSortKey::Index(a), RelationSortKey::Index(b)) => a.cmp(b),
+            (RelationSortKey::Index(_), _) => Ordering::Less,
+            (_, RelationSortKey::Index(_)) => Ordering::Greater,
+            (RelationSortKey::HashKey(a_kind, a), RelationSortKey::HashKey(b_kind, b)) => {
+                a_kind.cmp(b_kind).then(a.cmp(b))
+            }
+            (RelationSortKey::HashKey(_, _), RelationSortKey::Name(_)) => Ordering::Less,
+            (RelationSortKey::Name(_), RelationSortKey::HashKey(_, _)) => Ordering::Greater,
+            (RelationSortKey::Name(a), RelationSortKey::Name(b)) => a.cmp(b),
+        }
+    }
+}
+
+impl PartialOrd for RelationSortKey<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisitedEdge {
+    pub from_id: GcId,
+    pub to_id: GcId,
+    pub relation: EdgeRelation,
+}
+
+impl VisitedEdge {
+    pub fn sort_key(&self) -> (GcId, u8, RelationSortKey<'_>, GcId) {
+        (self.from_id, self.relation.kind_rank(), self.relation.sort_payload(), self.to_id)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestorationWitness {
+    pub object_id: GcId,
+    pub root_id: GcId,
+    pub predecessor_id: GcId,
+    pub relation: EdgeRelation,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrialDeletionStats {
     pub edges_visited: usize,
     pub candidates: usize,
+    pub object_decisions: Vec<ObjectDecision>,
+    pub visited_edges: Vec<VisitedEdge>,
+    pub omitted_object_decisions: usize,
+    pub omitted_edge_details: usize,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -39,6 +195,8 @@ pub struct ScanStats {
     pub garbage_candidates: usize,
     pub restored_objects: Vec<GcObjectSummary>,
     pub garbage_candidate_objects: Vec<GcObjectSummary>,
+    pub restoration_witnesses: Vec<RestorationWitness>,
+    pub omitted_witnesses: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -63,17 +221,70 @@ pub struct GcPhaseStats {
     pub free_cycles: FreeCycleStats,
 }
 
+/// Telemetry returned by `run_gc_with_stats_bundle`: object catalog plus phase stats.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GcStatsBundle {
+    pub objects: Vec<GcObjectSummary>,
+    pub phases: GcPhaseStats,
+}
+
+/// A global variable name and the object its slot references at report time.
+/// This is a present-tense fact read from the VM's global table — the defined
+/// root set, not a guess about aliases.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalRoot {
+    pub name: String,
+    pub object_id: GcId,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcCollectionReport {
     pub before: HeapSnapshot,
     pub after: HeapSnapshot,
+    pub objects: Vec<GcObjectSummary>,
+    pub global_roots: Vec<GlobalRoot>,
+    pub omitted_global_roots: usize,
     pub phases: GcPhaseStats,
     pub collected_by_value_kind: ValueKindCounts,
 }
 
 pub(crate) fn empty_value_kind_counts() -> ValueKindCounts {
     VALUE_KINDS.iter().copied().map(|kind| (kind, 0)).collect()
+}
+
+/// Cap the root list at `MAX_GLOBAL_ROOTS`. Roots whose object the catalog
+/// already explains are kept first, so names attach to rows and graph nodes
+/// the reader can actually see; slot order is preserved within the kept set.
+pub(crate) fn select_global_roots(
+    roots: Vec<GlobalRoot>,
+    cataloged: &HashSet<GcId>,
+) -> (Vec<GlobalRoot>, usize) {
+    if roots.len() <= MAX_GLOBAL_ROOTS {
+        return (roots, 0);
+    }
+    let omitted = roots.len() - MAX_GLOBAL_ROOTS;
+    let mut keep = vec![false; roots.len()];
+    let mut kept = 0usize;
+    for want_cataloged in [true, false] {
+        for (index, root) in roots.iter().enumerate() {
+            if kept == MAX_GLOBAL_ROOTS {
+                break;
+            }
+            if !keep[index] && cataloged.contains(&root.object_id) == want_cataloged {
+                keep[index] = true;
+                kept += 1;
+            }
+        }
+    }
+    let selected = roots
+        .into_iter()
+        .zip(keep)
+        .filter_map(|(root, keep_root)| keep_root.then_some(root))
+        .collect();
+    (selected, omitted)
 }
 
 pub(crate) fn summarize_gc_objects(runtime: &GcRuntime, ids: &[GcId]) -> Vec<GcObjectSummary> {
@@ -83,7 +294,7 @@ pub(crate) fn summarize_gc_objects(runtime: &GcRuntime, ids: &[GcId]) -> Vec<GcO
         .collect()
 }
 
-fn summarize_gc_object(runtime: &GcRuntime, id: GcId) -> GcObjectSummary {
+pub(crate) fn summarize_gc_object(runtime: &GcRuntime, id: GcId) -> GcObjectSummary {
     let Some(cell) = runtime.object_downcast::<ValueCell>(id) else {
         let name = match runtime.header(id).gc_obj_type {
             GcObjectType::MonkeyObject => "Object",
