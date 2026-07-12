@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
@@ -33,7 +33,8 @@
     "@types/node": "^20.0.0",
     "prettier": "^3.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.10"
   },
   "files": [
     "dist"

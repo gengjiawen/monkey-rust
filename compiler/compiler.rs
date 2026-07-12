@@ -4,9 +4,12 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use object::Object;
-use parser::ast::{BlockStatement, Expression, Literal, Node, Statement};
+use parser::ast::{
+    BlockStatement, Expression, Literal, MethodDefinition, MethodKind, Node, Statement,
+};
 use parser::lexer::token::Span;
 use parser::lexer::token::TokenKind;
+use parser::validation::validate_program;
 
 use crate::op_code::Opcode::*;
 use crate::op_code::{cast_u8_to_opcode, make_instructions, Instructions, Opcode};
@@ -25,6 +28,7 @@ pub struct Compiler {
     function_debug_info: HashMap<usize, DebugInfo>,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
+    callable_kinds: Vec<CallableKind>,
 }
 
 pub struct Bytecode {
@@ -99,9 +103,15 @@ impl Bytecode {
             for (index, constant) in self.constants.iter().enumerate() {
                 match constant.as_ref() {
                     Object::CompiledFunction(function) => {
+                        let name = if function.name.is_empty() {
+                            "<anonymous>"
+                        } else {
+                            function.name.as_str()
+                        };
                         builder.write_line(&format!(
-                            "{index:04} CompiledFunction(num_locals={}, num_parameters={})",
-                            function.num_locals, function.num_parameters
+                            "{index:04} CompiledFunction(name={name}, num_locals={}, num_parameters={})",
+                            function.num_locals,
+                            function.num_parameters
                         ));
                         builder.write_line("     Instructions:");
 
@@ -223,6 +233,13 @@ pub struct EmittedInstruction {
 
 type CompileError = String;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CallableKind {
+    Function,
+    Method,
+    Constructor,
+}
+
 impl Compiler {
     pub fn new() -> Compiler {
         let main_scope = CompilationScope {
@@ -242,7 +259,7 @@ impl Compiler {
 
         let mut symbol_table = SymbolTable::new();
         for (key, value) in BuiltIns.iter().enumerate() {
-            symbol_table.define_builtin(key, value.0.to_string());
+            symbol_table.define_builtin(key, value.name.to_string());
         }
 
         return Compiler {
@@ -251,6 +268,7 @@ impl Compiler {
             function_debug_info: HashMap::new(),
             scopes: vec![main_scope],
             scope_index: 0,
+            callable_kinds: vec![],
         };
     }
 
@@ -264,6 +282,13 @@ impl Compiler {
     pub fn compile(&mut self, node: &Node) -> Result<Bytecode, CompileError> {
         match node {
             Node::Program(p) => {
+                let mut predefined_names = self.symbol_table.visible_names();
+                predefined_names.extend(BuiltIns.iter().map(|builtin| builtin.name.to_string()));
+                let predefined_names = predefined_names
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
+                validate_program(p, &predefined_names).map_err(|error| error.message)?;
                 for stmt in &p.body {
                     self.compile_stmt(stmt)?;
                 }
@@ -302,14 +327,46 @@ impl Compiler {
                 return Ok(());
             }
             Statement::Return(r) => {
+                if self.callable_kinds.last() == Some(&CallableKind::Constructor) {
+                    return Err("constructor cannot return a value".to_string());
+                }
                 self.compile_expr(&r.argument)?;
                 self.emit_with_span(Opcode::OpReturnValue, &vec![], &r.span);
                 return Ok(());
             }
             Statement::Expr(e) => {
                 self.compile_expr(e)?;
-                self.emit_with_span(OpPop, &vec![], expression_span(e));
+                self.emit_with_span(OpPop, &vec![], e.span());
                 return Ok(());
+            }
+            Statement::Class(class) => {
+                let symbol = self.symbol_table.define(class.name.name.clone());
+                let class_name = self.add_constant(Object::String(class.name.name.clone()));
+                self.emit_with_span(OpClass, &vec![class_name], &class.span);
+
+                for method in &class.methods {
+                    self.compile_method(&class.name.name, method)?;
+                    let method_name = self.add_constant(Object::String(method.name.name.clone()));
+                    let kind = match method.kind {
+                        MethodKind::Method => 0,
+                        MethodKind::Constructor => 1,
+                    };
+                    self.emit_with_span(OpMethod, &vec![method_name, kind], &method.span);
+                }
+
+                self.emit_with_span(OpSetGlobal, &vec![symbol.index], &class.span);
+                self.emit_with_span(OpNull, &vec![], &class.span);
+                self.emit_with_span(OpPop, &vec![], &class.span);
+                Ok(())
+            }
+            Statement::SetProperty(statement) => {
+                self.compile_expr(&statement.object)?;
+                self.compile_expr(&statement.value)?;
+                let property = self.add_constant(Object::String(statement.property.name.clone()));
+                self.emit_with_span(OpSetProperty, &vec![property], &statement.span);
+                self.emit_with_span(OpNull, &vec![], &statement.span);
+                self.emit_with_span(OpPop, &vec![], &statement.span);
+                Ok(())
             }
         }
     }
@@ -360,7 +417,7 @@ impl Compiler {
                 }
             },
             Expression::PREFIX(prefix) => {
-                self.compile_expr(&prefix.operand).unwrap();
+                self.compile_expr(&prefix.operand)?;
                 match prefix.op.kind {
                     TokenKind::MINUS => {
                         self.emit_with_span(OpMinus, &vec![], &prefix.span);
@@ -375,13 +432,13 @@ impl Compiler {
             }
             Expression::INFIX(infix) => {
                 if infix.op.kind == TokenKind::LT {
-                    self.compile_expr(&infix.right).unwrap();
-                    self.compile_expr(&infix.left).unwrap();
+                    self.compile_expr(&infix.right)?;
+                    self.compile_expr(&infix.left)?;
                     self.emit_with_span(Opcode::OpGreaterThan, &vec![], &infix.span);
                     return Ok(());
                 }
-                self.compile_expr(&infix.left).unwrap();
-                self.compile_expr(&infix.right).unwrap();
+                self.compile_expr(&infix.left)?;
+                self.compile_expr(&infix.right)?;
                 match infix.op.kind {
                     TokenKind::PLUS => {
                         self.emit_with_span(OpAdd, &vec![], &infix.span);
@@ -442,7 +499,7 @@ impl Compiler {
             Expression::FUNCTION(f) => {
                 let function_span = f.span.clone();
                 self.enter_scope();
-                // f.name
+                self.callable_kinds.push(CallableKind::Function);
                 for param in f.params.iter() {
                     self.symbol_table.define(param.name.clone());
                 }
@@ -456,11 +513,13 @@ impl Compiler {
                 let num_locals = self.symbol_table.num_definitions;
                 let free_symbols = self.symbol_table.free_symbols.clone();
                 let scoped_instructions = self.leave_scope();
+                self.callable_kinds.pop();
                 for x in free_symbols.clone() {
                     self.load_symbol(&x, &function_span);
                 }
 
                 let compiled_function = Rc::from(object::CompiledFunction {
+                    name: f.name.clone(),
                     instructions: scoped_instructions.instructions.data,
                     num_locals,
                     num_parameters: f.params.len(),
@@ -478,6 +537,35 @@ impl Compiler {
                     self.compile_expr(arg)?;
                 }
                 self.emit_with_span(OpCall, &vec![fc.arguments.len()], &fc.span);
+            }
+            Expression::This(this) => {
+                let symbol = self
+                    .symbol_table
+                    .resolve("this".to_string())
+                    .ok_or_else(|| "this is only available inside a method".to_string())?;
+                self.load_symbol(&symbol, &this.span);
+            }
+            Expression::Property(property) => {
+                self.compile_expr(&property.object)?;
+                let name = self.add_constant(Object::String(property.property.name.clone()));
+                self.emit_with_span(OpGetProperty, &vec![name], &property.span);
+            }
+            Expression::New(new_expression) => {
+                let symbol = self
+                    .symbol_table
+                    .resolve(new_expression.callee.name.clone())
+                    .ok_or_else(|| {
+                        format!("Undefined variable '{}'", new_expression.callee.name)
+                    })?;
+                self.load_symbol(&symbol, &new_expression.callee.span);
+                for argument in &new_expression.arguments {
+                    self.compile_expr(argument)?;
+                }
+                self.emit_with_span(
+                    OpNew,
+                    &vec![new_expression.arguments.len()],
+                    &new_expression.span,
+                );
             }
         }
 
@@ -539,6 +627,61 @@ impl Compiler {
         for stmt in &block_statement.body {
             self.compile_stmt(stmt)?;
         }
+        Ok(())
+    }
+
+    fn compile_method(
+        &mut self,
+        class_name: &str,
+        method: &MethodDefinition,
+    ) -> Result<(), CompileError> {
+        let method_span = method.span.clone();
+        self.enter_scope();
+        let callable_kind = match method.kind {
+            MethodKind::Method => CallableKind::Method,
+            MethodKind::Constructor => CallableKind::Constructor,
+        };
+        self.callable_kinds.push(callable_kind);
+
+        self.symbol_table.define("this".to_string());
+        for parameter in &method.params {
+            self.symbol_table.define(parameter.name.clone());
+        }
+        self.compile_block_statement(&method.body)?;
+
+        match method.kind {
+            MethodKind::Constructor => {
+                self.emit_with_span(OpGetLocal, &vec![0], &method_span);
+                self.emit_with_span(OpReturnValue, &vec![], &method_span);
+            }
+            MethodKind::Method => {
+                if self.last_instruction_is(OpPop) {
+                    self.replace_last_pop_with_return();
+                }
+                if !self.last_instruction_is(OpReturnValue) {
+                    self.emit_with_span(OpReturn, &vec![], &method_span);
+                }
+            }
+        }
+
+        let num_locals = self.symbol_table.num_definitions;
+        let free_symbols = self.symbol_table.free_symbols.clone();
+        let scoped_instructions = self.leave_scope();
+        self.callable_kinds.pop();
+        for symbol in &free_symbols {
+            self.load_symbol(symbol, &method_span);
+        }
+
+        let compiled_function = Rc::new(object::CompiledFunction {
+            name: format!("{}.{}", class_name, method.name.name),
+            instructions: scoped_instructions.instructions.data,
+            num_locals,
+            num_parameters: method.params.len() + 1,
+        });
+        let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
+        self.function_debug_info_mut()
+            .insert(constant_index, scoped_instructions.debug_info);
+        self.emit_with_span(OpClosure, &vec![constant_index, free_symbols.len()], &method_span);
         Ok(())
     }
 
@@ -650,28 +793,5 @@ impl Compiler {
             instructions,
             debug_info,
         };
-    }
-}
-
-fn expression_span(expression: &Expression) -> &Span {
-    match expression {
-        Expression::IDENTIFIER(identifier) => &identifier.span,
-        Expression::LITERAL(literal) => literal_span(literal),
-        Expression::PREFIX(prefix) => &prefix.span,
-        Expression::INFIX(infix) => &infix.span,
-        Expression::IF(if_expression) => &if_expression.span,
-        Expression::FUNCTION(function) => &function.span,
-        Expression::FunctionCall(function_call) => &function_call.span,
-        Expression::Index(index) => &index.span,
-    }
-}
-
-fn literal_span(literal: &Literal) -> &Span {
-    match literal {
-        Literal::Integer(integer) => &integer.span,
-        Literal::Boolean(boolean) => &boolean.span,
-        Literal::String(string) => &string.span,
-        Literal::Array(array) => &array.span,
-        Literal::Hash(hash) => &hash.span,
     }
 }

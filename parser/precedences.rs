@@ -8,8 +8,7 @@ pub enum Precedence {
     SUM,         // + or =
     PRODUCT,     // * or /
     PREFIX,      // -X or !X
-    CALL,        // myFunction(x)
-    INDEX,       // array[index]
+    POSTFIX,     // call, index, property
 }
 
 pub fn get_token_precedence(token: &TokenKind) -> Precedence {
@@ -22,8 +21,7 @@ pub fn get_token_precedence(token: &TokenKind) -> Precedence {
         TokenKind::MINUS => Precedence::SUM,
         TokenKind::ASTERISK => Precedence::PRODUCT,
         TokenKind::SLASH => Precedence::PRODUCT,
-        TokenKind::LPAREN => Precedence::CALL,
-        TokenKind::LBRACKET => Precedence::INDEX,
+        TokenKind::LPAREN | TokenKind::LBRACKET | TokenKind::DOT => Precedence::POSTFIX,
         _ => Precedence::LOWEST,
     }
 }

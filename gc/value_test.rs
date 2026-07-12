@@ -6,7 +6,8 @@ mod tests {
     use object::Object;
 
     use crate::value::{
-        alloc_value, export_object, get_value, import_object, HashKey, Value, ValueCell,
+        alloc_value, export_object, get_value, get_value_mut, import_object, GcClass, GcInstance,
+        HashKey, Value, ValueCell, ValueKind,
     };
     use crate::GcHeap;
 
@@ -150,5 +151,69 @@ mod tests {
         heap.run_gc();
         assert!(!heap.exists(node_a));
         assert!(!heap.exists(node_b));
+    }
+
+    #[test]
+    fn scan_report_distinguishes_restored_class_and_instance_labels() {
+        let mut heap = GcHeap::new();
+        let class = alloc_value(
+            &mut heap,
+            Value::Class(GcClass {
+                name: "Node".to_string(),
+                constructor: None,
+                methods: HashMap::new(),
+            }),
+        );
+        let node_a = alloc_value(
+            &mut heap,
+            Value::Instance(GcInstance {
+                class,
+                fields: HashMap::new(),
+            }),
+        );
+        let node_b = alloc_value(
+            &mut heap,
+            Value::Instance(GcInstance {
+                class,
+                fields: HashMap::new(),
+            }),
+        );
+
+        let node_b_edge = heap.dup(node_b);
+        match get_value_mut(&mut heap, node_a) {
+            Value::Instance(instance) => {
+                instance.fields.insert("next".to_string(), node_b_edge);
+            }
+            other => panic!("expected node_a instance, got {:?}", other),
+        }
+        let node_a_edge = heap.dup(node_a);
+        match get_value_mut(&mut heap, node_b) {
+            Value::Instance(instance) => {
+                instance.fields.insert("next".to_string(), node_a_edge);
+            }
+            other => panic!("expected node_b instance, got {:?}", other),
+        }
+
+        // Keep node_a as the only external root. Scan must restore node_b and
+        // their class after trial deletion temporarily moves both to `tmp`.
+        heap.free(class);
+        heap.free(node_b);
+        let stats = heap.run_gc_with_stats();
+
+        assert_eq!(stats.scan.restored, 2);
+        assert_eq!(stats.scan.garbage_candidates, 0);
+        assert_eq!(
+            stats
+                .scan
+                .restored_objects
+                .iter()
+                .map(|object| (object.kind, object.label.clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                (ValueKind::Class, format!("Class(Node)#{}", class.0)),
+                (ValueKind::Instance, format!("Instance(Node)#{}", node_b.0),),
+            ]
+        );
+        assert!(stats.scan.garbage_candidate_objects.is_empty());
     }
 }

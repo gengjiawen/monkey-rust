@@ -89,6 +89,7 @@ impl<'a> Lexer<'a> {
             '}' => TokenKind::RBRACE,
             '[' => TokenKind::LBRACKET,
             ':' => TokenKind::COLON,
+            '.' => TokenKind::DOT,
             ']' => TokenKind::RBRACKET,
             '"' => {
                 let (start, end, string) = self.read_string();
@@ -172,7 +173,7 @@ impl<'a> Lexer<'a> {
 
     fn read_identifier(&mut self) -> (usize, usize, String) {
         let pos = self.position;
-        while is_letter(self.ch) {
+        while is_letter(self.ch) || is_digit(self.ch) {
             self.read_char();
         }
 

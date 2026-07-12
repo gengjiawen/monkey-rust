@@ -1,15 +1,60 @@
 use crate::{BuiltinFunc, Object};
 use std::rc::Rc;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BuiltinId {
+    Len,
+    Puts,
+    First,
+    Last,
+    Rest,
+    Push,
+}
+
+#[derive(Clone, Copy)]
+pub struct BuiltinDefinition {
+    pub name: &'static str,
+    pub id: BuiltinId,
+    pub function: BuiltinFunc,
+}
+
 lazy_static! {
-    pub static ref BuiltIns: Vec<(&'static str, BuiltinFunc)> = vec![
-        ("len", len),
-        ("puts", puts),
-        ("first", first),
-        ("last", last),
-        ("rest", rest),
-        ("push", push),
-        ("print", puts)
+    pub static ref BuiltIns: Vec<BuiltinDefinition> = vec![
+        BuiltinDefinition {
+            name: "len",
+            id: BuiltinId::Len,
+            function: len
+        },
+        BuiltinDefinition {
+            name: "puts",
+            id: BuiltinId::Puts,
+            function: puts
+        },
+        BuiltinDefinition {
+            name: "first",
+            id: BuiltinId::First,
+            function: first
+        },
+        BuiltinDefinition {
+            name: "last",
+            id: BuiltinId::Last,
+            function: last
+        },
+        BuiltinDefinition {
+            name: "rest",
+            id: BuiltinId::Rest,
+            function: rest
+        },
+        BuiltinDefinition {
+            name: "push",
+            id: BuiltinId::Push,
+            function: push
+        },
+        BuiltinDefinition {
+            name: "print",
+            id: BuiltinId::Puts,
+            function: puts
+        },
     ];
 }
 

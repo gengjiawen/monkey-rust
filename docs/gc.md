@@ -31,12 +31,12 @@ lexer → parser → compiler (bytecode) → VM
 
 `monkey-gc` crate 提供一套 **QuickJS 风格的 GC 运行时**，作为现有 bytecode VM 的**并行替代实现**：
 
-| 维度 | `compiler::VM` | `monkey-gc::GcVM` |
-|------|----------------|-------------------|
-| 堆管理 | `Rc<Object>` | `GcHeap` + `GcRef` |
-| 环回收 | 不支持 | 三阶段 cycle collector |
-| `object` crate | 直接使用 | 不修改；通过 import/export 桥接 |
-| 字节码 | `Bytecode` | 复用同一套 `Bytecode` |
+| 维度           | `compiler::VM` | `monkey-gc::GcVM`                                               |
+| -------------- | -------------- | --------------------------------------------------------------- |
+| 堆管理         | `Rc<Object>`   | `GcHeap` + `GcRef`                                              |
+| 环回收         | 不支持         | 三阶段 cycle collector                                          |
+| `object` crate | 直接使用       | 共享 class 类型与 `BuiltinId`；兼容 API 使用 import/export 桥接 |
+| 字节码         | `Bytecode`     | 复用同一套 `Bytecode`                                           |
 
 算法参考 QuickJS 源码（`JS_RunGC`、`gc_decref`、`gc_scan`、`gc_free_cycles`）。
 
@@ -46,15 +46,16 @@ lexer → parser → compiler (bytecode) → VM
 
 ### 2.1 目标
 
-- 在独立 crate 中实现可环回收的堆，不修改 `object` / `interpreter`。
+- 在独立 crate 中实现可环回收的堆，并与共享 class / builtin 语义保持一致。
 - 复用 `compiler` 产出的 `Bytecode` 与 opcode 定义。
-- 提供与 `compiler::VM` 等价的 Monkey 语义（算术、闭包、builtins 等）。
+- 提供与 interpreter、`compiler::VM` 等价的 Monkey 语义（算术、闭包、class、可变实例字段、bound method、builtins 等）。
 - 对外暴露 `eval_source` 等便捷 API，返回 `object::Object` 以便与现有工具链对接。
+- 提供带 instruction budget、错误 stage/span 和 GC telemetry 的结构化执行 API，供 WASM / Playground 使用。
 - 保持与 QuickJS GC 算法结构一致，便于对照阅读和后续优化。
 
 ### 2.2 非目标
 
-- 当前不替换 `wasm` / `playground` 中的默认 VM。
+- 不把 Playground 的普通 AST / Bytecode 路径整体替换成 `GcVM`；独立 GC tab 通过 WASM 明确调用它。
 - 当前不把 `object::Object` 本身改为 GC 管理。
 - 当前不实现多线程 / `Send` / `Sync` 保证。
 - 当前不实现写屏障；引用维护依赖显式 `dup` / `free`。
@@ -87,7 +88,7 @@ lexer → parser → compiler (bytecode) → VM
 ```
 monkey-gc
   ├── monkey-compiler  (Bytecode, Opcode, Compiler)
-  ├── monkey-object    (Object, BuiltinFunc, BuiltIns)
+  ├── monkey-object    (Object, BuiltinId, BuiltIns)
   ├── monkey-parser    (eval_source 解析)
   └── byteorder        (指令解码)
 ```
@@ -98,17 +99,18 @@ Workspace 成员：根 `Cargo.toml` → `"gc"`。
 
 ## 4. 模块设计
 
-| 模块 | 文件 | 职责 |
-|------|------|------|
-| 入口 | `lib.rs` | 导出公共 API；`compile` / `eval` / `eval_source` |
-| 堆 API | `heap.rs` | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发 |
-| 运行时核心 | `runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理 |
-| 对象头 | `header.rs` | `GcObjectHeader`、`GcPhase`、`GcObjectType` |
-| 侵入式链表 | `list.rs` | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表 |
-| 分配统计 | `malloc.rs` | `MallocState`、GC 阈值触发 |
-| 值模型 | `value.rs` | `Value`、`ValueCell`、import/export 桥接 |
-| 调用帧 | `frame.rs` | `Frame`（闭包 + IP + 栈基址） |
-| 虚拟机 | `vm.rs` | `GcVM`：opcode 解释执行 |
+| 模块       | 文件         | 职责                                                  |
+| ---------- | ------------ | ----------------------------------------------------- |
+| 入口       | `lib.rs`     | 导出公共 API；`compile` / `eval` / `eval_source`      |
+| 堆 API     | `heap.rs`    | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发              |
+| 运行时核心 | `runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理          |
+| 对象头     | `header.rs`  | `GcObjectHeader`、`GcPhase`、`GcObjectType`           |
+| 侵入式链表 | `list.rs`    | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表      |
+| 分配统计   | `malloc.rs`  | `MallocState`、GC 阈值触发                            |
+| 值模型     | `value.rs`   | `Value`、`ValueCell`、import/export 桥接              |
+| 报告       | `report.rs`  | before/after snapshot、分阶段 telemetry、按值类型统计 |
+| 调用帧     | `frame.rs`   | `Frame`（闭包 + IP + 栈基址）                         |
+| 虚拟机     | `vm.rs`      | `GcVM`：opcode 解释执行                               |
 
 ### 4.1 核心类型
 
@@ -126,7 +128,7 @@ pub trait GcObject: Any {
 }
 ```
 
-所有 Monkey 运行时值包装在 `ValueCell` 中，实现 `GcObject::trace` 以遍历 `Array` / `Hash` / `Closure` 的子引用。
+所有 Monkey 运行时值包装在 `ValueCell` 中，实现 `GcObject::trace` 以遍历 `Array` / `Hash` / `Closure` / `Class` / `Instance` / `BoundMethod` 的子引用。
 
 ---
 
@@ -134,10 +136,10 @@ pub trait GcObject: Any {
 
 ### 5.1 两类对象
 
-| 类型 | Header | 环检测 | 用途 |
-|------|--------|--------|------|
-| GC 对象 | `GcObjectHeader` | 是 | `ValueCell`、未来可扩展的 function bytecode 等 |
-| 纯 refcount 对象 | `RefCountHeader` | 否 | 字符串等（API 已预留，`add_ref_counted`） |
+| 类型             | Header           | 环检测 | 用途                                           |
+| ---------------- | ---------------- | ------ | ---------------------------------------------- |
+| GC 对象          | `GcObjectHeader` | 是     | `ValueCell`、未来可扩展的 function bytecode 等 |
+| 纯 refcount 对象 | `RefCountHeader` | 否     | 字符串等（API 已预留，`add_ref_counted`）      |
 
 ### 5.2 对象头
 
@@ -245,21 +247,24 @@ pub enum Value {
     Error(String),
     CompiledFunction(CompiledFunction),
     Closure(GcClosure),       // { func: GcRef, free: Vec<GcRef> }
-    Builtin(BuiltinFunc),
+    Builtin(BuiltinId),
+    Class(GcClass),             // constructor + methods
+    Instance(GcInstance),       // class + mutable fields
+    BoundMethod(GcBoundMethod), // receiver + method
 }
 ```
 
 ### 6.2 所有权语义
 
-| 操作 | 行为 |
-|------|------|
-| `alloc_value` | `with_owned_edges` 对所有子 `GcRef` 执行 `dup`，再分配；调用方仍负责释放传入的临时边 |
-| `import_object` | 递归 import 子对象，父对象分配完成后释放这些临时子引用，只保留父对象持有的边 |
-| VM `push` | 对已有引用执行 `dup` 后入栈；`push_raw` 表示转移一份已拥有的引用 |
-| VM `pop` | 将栈槽持有的引用转移给调用方，并把槽位重置为 `null` 引用 |
-| VM 覆盖栈槽/全局变量 | 先 `free` 旧值，再写入新 `GcRef` |
-| VM 构造数组/哈希/闭包 | 用栈上的临时引用分配父对象，随后清空对应栈区间，避免临时引用泄漏 |
-| 运算消费操作数 | `free(left)` + `free(right)` |
+| 操作                  | 行为                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `alloc_value`         | `with_owned_edges` 对所有子 `GcRef` 执行 `dup`，再分配；调用方仍负责释放传入的临时边 |
+| `import_object`       | 递归 import 子对象，父对象分配完成后释放这些临时子引用，只保留父对象持有的边         |
+| VM `push`             | 对已有引用执行 `dup` 后入栈；`push_raw` 表示转移一份已拥有的引用                     |
+| VM `pop`              | 将栈槽持有的引用转移给调用方，并把槽位重置为 `null` 引用                             |
+| VM 覆盖栈槽/全局变量  | 先 `free` 旧值，再写入新 `GcRef`                                                     |
+| VM 构造数组/哈希/闭包 | 用栈上的临时引用分配父对象，随后清空对应栈区间，避免临时引用泄漏                     |
+| 运算消费操作数        | `free(left)` + `free(right)`                                                         |
 
 ### 6.3 import / export 桥接
 
@@ -269,8 +274,8 @@ GcRef (Value)          ──export_object──►  object::Object (Rc)
 ```
 
 - **import**：递归深拷贝到 GC 堆，建立 `GcRef` 边。
-- **export**：递归导出为 `Rc<Object>`，供 builtins 和外部 API 使用。
-- **builtins**：`call_builtin` 先 export 参数 → 调用 `BuiltinFunc` → import 结果。
+- **export**：递归导出为 `Rc<Object>`，仅供无环兼容 API 使用；循环图使用 cycle-safe string/report 路径。
+- **builtins**：`Value::Builtin(BuiltinId)` 直接操作 `GcRef`，不再经过 `Object` 深拷贝桥。
 
 `Object::Function`（解释器 AST 函数）**不可导入**，会 panic。
 
@@ -300,18 +305,19 @@ pub struct GcVM {
 
 完整覆盖当前 Monkey bytecode 指令集：
 
-| 类别 | Opcodes |
-|------|---------|
-| 常量/字面量 | `OpConst`, `OpTrue`, `OpFalse`, `OpNull` |
-| 算术 | `OpAdd`, `OpSub`, `OpMul`, `OpDiv`, `OpMinus` |
-| 比较/逻辑 | `OpEqual`, `OpNotEqual`, `OpGreaterThan`, `OpBang` |
-| 控制流 | `OpJump`, `OpJumpNotTruthy` |
-| 栈 | `OpPop` |
-| 全局/局部 | `OpGetGlobal`, `OpSetGlobal`, `OpGetLocal`, `OpSetLocal` |
-| 复合类型 | `OpArray`, `OpHash`, `OpIndex` |
-| 函数 | `OpCall`, `OpReturn`, `OpReturnValue` |
-| 闭包 | `OpClosure`, `OpGetFree`, `OpCurrentClosure` |
-| 内置 | `OpGetBuiltin` |
+| 类别        | Opcodes                                                          |
+| ----------- | ---------------------------------------------------------------- |
+| 常量/字面量 | `OpConst`, `OpTrue`, `OpFalse`, `OpNull`                         |
+| 算术        | `OpAdd`, `OpSub`, `OpMul`, `OpDiv`, `OpMinus`                    |
+| 比较/逻辑   | `OpEqual`, `OpNotEqual`, `OpGreaterThan`, `OpBang`               |
+| 控制流      | `OpJump`, `OpJumpNotTruthy`                                      |
+| 栈          | `OpPop`                                                          |
+| 全局/局部   | `OpGetGlobal`, `OpSetGlobal`, `OpGetLocal`, `OpSetLocal`         |
+| 复合类型    | `OpArray`, `OpHash`, `OpIndex`                                   |
+| 函数        | `OpCall`, `OpReturn`, `OpReturnValue`                            |
+| 闭包        | `OpClosure`, `OpGetFree`, `OpCurrentClosure`                     |
+| 内置        | `OpGetBuiltin`                                                   |
+| class       | `OpClass`, `OpMethod`, `OpGetProperty`, `OpSetProperty`, `OpNew` |
 
 ### 7.3 借用检查策略
 
@@ -328,13 +334,20 @@ Rust 借用规则要求 VM 在「读堆」与「写堆」之间拆分步骤：
 pub fn eval_source(source: &str) -> Result<Object, String>;
 pub fn eval(program: &Node) -> Result<Object, String>;
 pub fn compile(program: &Node) -> Result<Bytecode, String>;
+pub fn run_source_with_report(
+    source: &str,
+    instruction_budget: usize,
+) -> Result<GcRunSuccess, GcRunError>;
 
 // 手动控制
 let bytecode = Compiler::new().compile(&program)?;
 let mut vm = GcVM::new(bytecode);
-vm.run();
-let result = vm.export_last_result();  // Option<Object>
+vm.run_with_budget(DEFAULT_INSTRUCTION_BUDGET)?;
+let report = vm.collect_garbage();
+let result = vm.try_export_last_result()?;
 ```
+
+`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats()`，并返回 `GcCollectionReport`。Scan report 会在释放前保存 Restored 与 Garbage candidate 的结构化摘要，例如 `Closure(makeCycle)#10`、`Class(Node)#7` 和 `Instance(Node)#12`；closure 名称来自 `CompiledFunction` 保存的编译时原始名称，而不是尝试反查当前变量别名。这些 ID 只在单次 report 内有效。Playground 不直接调用 `gc_decref`、`gc_scan` 或 `gc_free_cycles`。
 
 ---
 
@@ -348,9 +361,9 @@ let result = vm.export_last_result();  // Option<Object>
 │ AST 求值     │ 编译 + Rc VM │ 编译 + GC VM           │
 │ Rc<Object>   │ Rc<Object>   │ GcRef                  │
 ├──────────────┴──────────────┴───────────────────────┤
-│ object (共享类型定义，未修改)                          │
+│ object (共享 class 类型与 builtin registry)            │
 │ parser / lexer (共享前端)                             │
-│ wasm / playground (当前仍用 compiler::VM)             │
+│ wasm / playground (GC tab 明确调用 gc::GcVM)           │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -358,27 +371,27 @@ let result = vm.export_last_result();  // Option<Object>
 
 ## 9. 已知限制
 
-| 限制 | 说明 |
-|------|------|
-| QuickJS 对象模型未完整移植 | 当前只实现 Monkey `ValueCell` 所需的 `MonkeyObject`/`FunctionBytecode` 风格路径，没有 shape、realm、var ref、async function 等完整对象系统 |
-| finalizer 能力较小 | `on_free` 对应 QuickJS finalizer；调用前 trace 边已经释放，但 Rust 对象字段不会像 QuickJS C 结构那样逐字段置空，因此 `on_free` 不应再次释放 trace 边 |
-| 陈旧边防护 | `free_gc` 对已释放子节点做 `object_exists` 检查，避免沿已拆除的环边 panic |
-| 字符串未拆堆 | `Value::String` 内联在 `ValueCell` 中，未使用 `RefCountHeader` 路径 |
-| `GcObjectType` 预留 | `FunctionBytecode`, `Shape`, `VarRef`, `AsyncFunction`, `MonkeyContext` 等 tag 已定义但未使用 |
-| 无写屏障 | 与 QuickJS 一致，依赖显式 `dup`/`free` 维护 refcount |
-| 单线程 | 无 `Send`/`Sync` 保证，设计为单线程 VM |
+| 限制                       | 说明                                                                                                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QuickJS 对象模型未完整移植 | 当前只实现 Monkey `ValueCell` 所需的 `MonkeyObject`/`FunctionBytecode` 风格路径，没有 shape、realm、var ref、async function 等完整对象系统           |
+| finalizer 能力较小         | `on_free` 对应 QuickJS finalizer；调用前 trace 边已经释放，但 Rust 对象字段不会像 QuickJS C 结构那样逐字段置空，因此 `on_free` 不应再次释放 trace 边 |
+| 陈旧边防护                 | `free_gc` 对已释放子节点做 `object_exists` 检查，避免沿已拆除的环边 panic                                                                            |
+| 字符串未拆堆               | `Value::String` 内联在 `ValueCell` 中，未使用 `RefCountHeader` 路径                                                                                  |
+| `GcObjectType` 预留        | `FunctionBytecode`, `Shape`, `VarRef`, `AsyncFunction`, `MonkeyContext` 等 tag 已定义但未使用                                                        |
+| 无写屏障                   | 与 QuickJS 一致，依赖显式 `dup`/`free` 维护 refcount                                                                                                 |
+| 单线程                     | 无 `Send`/`Sync` 保证，设计为单线程 VM                                                                                                               |
 
 ---
 
 ## 10. 测试策略
 
-当前 **42 个测试**，分三层：
+当前 **50 个测试**，分三层：
 
-| 层 | 文件 | 覆盖 |
-|----|------|------|
-| GC 算法 | `gc_test.rs` (17) | refcount、dup、2/3/4 节点环、自环、外部根间接保活整个环、无环图、on_free 顺序、GC 阈值、mark 函数、幂等性 |
-| 值桥接 | `value_test.rs` (9) | import/export 往返、HashKey、子 refcount、import 临时引用释放、Value 层环回收 |
-| 端到端 VM | `vm_test.rs` (16) | 算术、布尔、条件、let、字符串、数组、哈希、索引、函数、闭包、builtins、调用后临时引用清理 |
+| 层        | 文件                | 覆盖                                                                                                      |
+| --------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
+| GC 算法   | `gc_test.rs` (17)   | refcount、dup、2/3/4 节点环、自环、外部根间接保活整个环、无环图、on_free 顺序、GC 阈值、mark 函数、幂等性 |
+| 值桥接    | `value_test.rs` (9) | import/export 往返、HashKey、子 refcount、import 临时引用释放、Value 层环回收                             |
+| 端到端 VM | `vm_test.rs` (24)   | 原有 VM 语义、class / instance / bound method、源码级环回收、report/error contract、调用后临时引用清理    |
 
 运行：
 
@@ -390,11 +403,10 @@ cargo test -p monkey-gc
 
 ## 11. 后续演进
 
-1. **wasm 集成** — 在 wasm crate 增加 `GcVM` 导出，供 playground 切换。
-2. **字符串拆堆** — 大字符串走 `RefCountHeader`，减 `ValueCell` 体积。
-3. **递归 / 复杂环场景** — 继续补充真实程序级回归，验证闭包与容器组合后的生产行为。
-4. **GC 统计 API** — 暴露 `gc_object_count`、`malloc_state` 供 playground 调试面板。
-5. **性能对比** — 与 `Rc` VM 建立 benchmark（分配速率、GC 暂停）。
+1. **字符串拆堆** — 大字符串走 `RefCountHeader`，减 `ValueCell` 体积。
+2. **递归 / 复杂环场景** — 继续补充真实程序级回归，验证闭包、class 与容器组合后的生产行为。
+3. **性能对比** — 与 `Rc` VM 建立 benchmark（分配速率、GC 暂停）。
+4. **可选对象图 inspector** — 在保持 cycle-safe、只读的前提下扩展教学信息。
 
 ---
 
@@ -409,6 +421,7 @@ gc/
 ├── list.rs         # 侵入式链表
 ├── malloc.rs       # 分配统计 + 阈值
 ├── value.rs        # Value + import/export
+├── report.rs       # Heap snapshot + collection telemetry
 ├── frame.rs        # 调用帧
 ├── vm.rs           # GcVM
 ├── gc_test.rs      # GC 单元测试

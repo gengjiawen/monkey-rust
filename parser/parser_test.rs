@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::ast::{Expression, MethodKind, Node, Statement};
     use crate::parse;
 
     fn verify_program(test_cases: &[(&str, &str)]) {
@@ -169,5 +170,86 @@ mod tests {
             ),
         ];
         verify_program(&test_case);
+    }
+
+    #[test]
+    fn parses_class_new_property_and_bound_method_syntax() {
+        let input = r#"class Node {
+  constructor(value) { this.value = value; }
+  connect(other) { this.next = other; }
+}
+let node = new Node(1);
+node.connect(node);
+let connect = node.connect;
+connect();"#;
+        let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
+        let Statement::Class(class) = &program.body[0] else {
+            panic!("expected class declaration")
+        };
+
+        assert_eq!(class.name.name, "Node");
+        assert_eq!(class.methods.len(), 2);
+        assert_eq!(class.methods[0].kind, MethodKind::Constructor);
+        assert_eq!(class.methods[1].name.name, "connect");
+        assert_eq!(&input[class.span.start..class.span.end], &input[..class.span.end]);
+
+        let Statement::Let(node) = &program.body[1] else { panic!("expected node binding") };
+        assert!(matches!(node.expr, Expression::New(_)));
+        let Statement::Expr(Expression::FunctionCall(call)) = &program.body[2] else {
+            panic!("expected method call")
+        };
+        assert!(matches!(*call.callee, Expression::Property(_)));
+    }
+
+    #[test]
+    fn parses_property_set_as_statement() {
+        let input = "node.next.value = new Node(1);";
+        let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
+        let Statement::SetProperty(set) = &program.body[0] else { panic!("expected property set") };
+        assert_eq!(set.property.name, "value");
+        assert!(matches!(*set.object, Expression::Property(_)));
+        assert_eq!(&input[set.span.start..set.span.end], input);
+    }
+
+    #[test]
+    fn postfix_spans_include_grouping_without_expanding_inner_nodes() {
+        for input in ["(a + b).value", "((a)).value"] {
+            let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
+            let Statement::Expr(Expression::Property(property)) = &program.body[0] else {
+                panic!("expected property")
+            };
+            assert_eq!(&input[property.span.start..property.span.end], input);
+        }
+
+        let input = "(fn() { 1 })()";
+        let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
+        let Statement::Expr(Expression::FunctionCall(call)) = &program.body[0] else {
+            panic!("expected call")
+        };
+        assert_eq!(&input[call.span.start..call.span.end], input);
+    }
+
+    #[test]
+    fn rejects_invalid_class_and_assignment_forms_without_panicking() {
+        for (input, expected) in [
+            ("class A { constructor() {} constructor() {} }", "more than one constructor"),
+            ("class A { method() {} method() {} }", "duplicate method"),
+            ("class A { let value = 1; }", "expected method definition"),
+            ("fn() { class A {} }", "only allowed at top level"),
+            ("new A", "requires an argument list"),
+            ("value = 1", "only instance property assignment"),
+            ("let value = object.field = 1", "only allowed as a statement"),
+            ("1 + ;", "no prefix function"),
+            ("fn() { 1 + ; }", "no prefix function"),
+        ] {
+            let errors = parse(input).unwrap_err();
+            assert!(
+                errors.iter().any(|error| error.contains(expected)),
+                "{:?}: expected {:?}, got {:?}",
+                input,
+                expected,
+                errors
+            );
+        }
     }
 }

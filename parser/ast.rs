@@ -52,7 +52,42 @@ impl fmt::Display for Program {
 pub enum Statement {
     Let(Let),
     Return(ReturnStatement),
+    Class(ClassDeclaration),
+    SetProperty(SetPropertyStatement),
     Expr(Expression),
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct ClassDeclaration {
+    pub name: IDENTIFIER,
+    pub methods: Vec<MethodDefinition>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct MethodDefinition {
+    pub kind: MethodKind,
+    pub name: IDENTIFIER,
+    pub params: Vec<IDENTIFIER>,
+    pub body: BlockStatement,
+    pub span: Span,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+pub enum MethodKind {
+    Constructor,
+    Method,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct SetPropertyStatement {
+    pub object: Box<Expression>,
+    pub property: IDENTIFIER,
+    pub value: Expression,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
@@ -92,8 +127,32 @@ impl fmt::Display for Statement {
             }) => {
                 write!(f, "return {};", argument)
             }
+            Statement::Class(class) => {
+                let methods = class
+                    .methods
+                    .iter()
+                    .map(|method| method.to_string())
+                    .collect::<Vec<_>>()
+                    .join("");
+                write!(f, "class {} {{{}}}", class.name, methods)
+            }
+            Statement::SetProperty(set) => {
+                write!(f, "{}.{} = {};", set.object, set.property, set.value)
+            }
             Statement::Expr(expr) => write!(f, "{}", expr),
         }
+    }
+}
+
+impl fmt::Display for MethodDefinition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let params = self
+            .params
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}({}) {{{}}}", self.name, params, self.body)
     }
 }
 
@@ -121,6 +180,31 @@ pub enum Expression {
     FUNCTION(FunctionDeclaration),
     FunctionCall(FunctionCall),
     Index(Index),
+    This(ThisExpression),
+    Property(PropertyExpression),
+    New(NewExpression),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct ThisExpression {
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct PropertyExpression {
+    pub object: Box<Expression>,
+    pub property: IDENTIFIER,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct NewExpression {
+    pub callee: IDENTIFIER,
+    pub arguments: Vec<Expression>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
@@ -250,6 +334,59 @@ impl fmt::Display for Expression {
             }) => {
                 write!(f, "({}[{}])", object, index)
             }
+            Expression::This(_) => write!(f, "this"),
+            Expression::Property(PropertyExpression {
+                object,
+                property,
+                ..
+            }) => write!(f, "{}.{}", object, property),
+            Expression::New(NewExpression {
+                callee,
+                arguments,
+                ..
+            }) => write!(f, "new {}({})", callee, format_expressions(arguments)),
+        }
+    }
+}
+
+impl Statement {
+    pub fn span(&self) -> &Span {
+        match self {
+            Statement::Let(statement) => &statement.span,
+            Statement::Return(statement) => &statement.span,
+            Statement::Class(statement) => &statement.span,
+            Statement::SetProperty(statement) => &statement.span,
+            Statement::Expr(expression) => expression.span(),
+        }
+    }
+}
+
+impl Expression {
+    pub fn span(&self) -> &Span {
+        match self {
+            Expression::IDENTIFIER(identifier) => &identifier.span,
+            Expression::LITERAL(literal) => literal.span(),
+            Expression::PREFIX(expression) => &expression.span,
+            Expression::INFIX(expression) => &expression.span,
+            Expression::IF(expression) => &expression.span,
+            Expression::FUNCTION(expression) => &expression.span,
+            Expression::FunctionCall(expression) => &expression.span,
+            Expression::Index(expression) => &expression.span,
+            Expression::This(expression) => &expression.span,
+            Expression::Property(expression) => &expression.span,
+            Expression::New(expression) => &expression.span,
+        }
+    }
+}
+
+impl Literal {
+    pub fn span(&self) -> &Span {
+        match self {
+            Literal::Integer(literal) => &literal.span,
+            Literal::Boolean(literal) => &literal.span,
+            Literal::String(literal) => &literal.span,
+            Literal::Array(literal) => &literal.span,
+            Literal::Hash(literal) => &literal.span,
         }
     }
 }

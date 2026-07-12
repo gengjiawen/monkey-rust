@@ -1,4 +1,4 @@
-import { doc, type AstPath, type Doc, type Options } from 'prettier';
+import { doc, util, type AstPath, type Doc, type Options } from 'prettier'
 import type {
   Program,
   BlockStatement,
@@ -18,82 +18,128 @@ import type {
   ArrayLiteral,
   HashLiteral,
   MonkeyComment,
-} from './types';
+  ASTNode,
+  ClassDeclaration,
+  MethodDefinition,
+  SetPropertyStatement,
+  ThisExpression,
+  PropertyExpression,
+  NewExpression,
+} from './types'
 
-const {
-  group,
-  indent,
-  line,
-  softline,
-  hardline,
-  join,
-  ifBreak,
-} = doc.builders;
+const { group, indent, line, softline, hardline, join, ifBreak } = doc.builders
 
 export function print(
   path: AstPath,
   options: Options,
   print: (path: AstPath) => Doc
 ): Doc {
-  const node = path.getValue();
+  const node = path.getValue()
 
   if (!node) {
-    return '';
+    return ''
   }
 
   switch (node.type) {
     case 'Program':
-      return printProgram(node as Program, path, print, options);
+      return printProgram(node as Program, path, print, options)
     case 'Let':
-      return printLetStatement(node as LetStatement, path, print, options);
+      return printLetStatement(node as LetStatement, path, print, options)
     case 'ReturnStatement':
-      return printReturnStatement(node as ReturnStatement, path, print, options);
+      return printReturnStatement(node as ReturnStatement, path, print, options)
     case 'BlockStatement':
-      return printBlockStatement(node as BlockStatement, path, print, options);
+      return printBlockStatement(node as BlockStatement, path, print, options)
+    case 'ClassDeclaration':
+      return printClassDeclaration(node as ClassDeclaration, path, print)
+    case 'MethodDefinition':
+      return printMethodDefinition(node as MethodDefinition, path, print)
+    case 'SetPropertyStatement':
+      return printSetPropertyStatement(
+        node as SetPropertyStatement,
+        path,
+        print
+      )
     case 'IDENTIFIER':
-      return printIdentifier(node as Identifier);
+      return printIdentifier(node as Identifier)
     case 'UnaryExpression':
-      return printUnaryExpression(node as UnaryExpression, path, print, options);
+      return printUnaryExpression(node as UnaryExpression, path, print, options)
     case 'BinaryExpression':
-      return printBinaryExpression(node as BinaryExpression, path, print, options);
+      return printBinaryExpression(
+        node as BinaryExpression,
+        path,
+        print,
+        options
+      )
     case 'IF':
-      return printIfExpression(node as IfExpression, path, print, options);
+      return printIfExpression(node as IfExpression, path, print, options)
     case 'FunctionDeclaration':
-      return printFunctionDeclaration(node as FunctionDeclaration, path, print, options);
+      return printFunctionDeclaration(
+        node as FunctionDeclaration,
+        path,
+        print,
+        options
+      )
     case 'FunctionCall':
-      return printFunctionCall(node as FunctionCall, path, print, options);
+      return printFunctionCall(node as FunctionCall, path, print, options)
     case 'Index':
-      return printIndexExpression(node as IndexExpression, path, print, options);
+      return printIndexExpression(node as IndexExpression, path, print, options)
+    case 'ThisExpression':
+      return printThisExpression(node as ThisExpression)
+    case 'PropertyExpression':
+      return printPropertyExpression(node as PropertyExpression, path, print)
+    case 'NewExpression':
+      return printNewExpression(node as NewExpression, path, print)
     case 'Integer':
     case 'Boolean':
     case 'String':
     case 'Array':
     case 'Hash':
-      return printLiteral(node as Literal, path, print, options);
+      return printLiteral(node as Literal, path, print, options)
     default:
-      throw new Error(`Unknown node type: ${String(node.type)}`);
+      throw new Error(`Unknown node type: ${String(node.type)}`)
   }
 }
 
 export function canAttachComment(node: unknown): boolean {
-  return !!node && typeof node === 'object' && 'type' in node;
+  return !!node && typeof node === 'object' && 'type' in node
 }
 
 export function isBlockComment(comment: MonkeyComment): boolean {
-  return comment.type === 'CommentBlock';
+  return comment.type === 'CommentBlock'
 }
 
 export function printComment(commentPath: AstPath): Doc {
-  const comment = commentPath.getValue() as MonkeyComment | null;
+  const comment = commentPath.getValue() as MonkeyComment | null
   if (!comment) {
-    return '';
+    return ''
   }
 
+  return printCommentNode(comment)
+}
+
+export function handleOwnLineComment(
+  comment: MonkeyComment & {
+    enclosingNode?: ASTNode
+  }
+): boolean {
+  const enclosingNode = comment.enclosingNode
+  if (
+    enclosingNode?.type === 'ClassDeclaration' &&
+    (enclosingNode as ClassDeclaration).methods.length === 0
+  ) {
+    util.addDanglingComment(enclosingNode, comment, undefined)
+    return true
+  }
+
+  return false
+}
+
+function printCommentNode(comment: MonkeyComment): Doc {
   if (comment.type === 'CommentBlock') {
-    return `/*${comment.value}*/`;
+    return `/*${comment.value}*/`
   }
 
-  return `//${comment.value}`;
+  return `//${comment.value}`
 }
 
 function printProgram(
@@ -103,16 +149,16 @@ function printProgram(
   options: Options
 ): Doc {
   if (node.body.length === 0) {
-    return '';
+    return ''
   }
 
-  const parts: Doc[] = [];
+  const parts: Doc[] = []
 
   path.each((statementPath: AstPath) => {
-    parts.push(print(statementPath));
-  }, 'body');
+    parts.push(print(statementPath))
+  }, 'body')
 
-  return [join(hardline, parts), hardline];
+  return [join(hardline, parts), hardline]
 }
 
 function printLetStatement(
@@ -121,15 +167,9 @@ function printLetStatement(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  const identifierName = (node.identifier.kind as any).value?.name || '';
+  const identifierName = (node.identifier.kind as any).value?.name || ''
 
-  return group([
-    'let ',
-    identifierName,
-    ' = ',
-    path.call(print, 'expr'),
-    ';',
-  ]);
+  return group(['let ', identifierName, ' = ', path.call(print, 'expr'), ';'])
 }
 
 function printReturnStatement(
@@ -138,7 +178,7 @@ function printReturnStatement(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  return group(['return ', path.call(print, 'argument'), ';']);
+  return group(['return ', path.call(print, 'argument'), ';'])
 }
 
 function printBlockStatement(
@@ -148,24 +188,84 @@ function printBlockStatement(
   options: Options
 ): Doc {
   if (node.body.length === 0) {
-    return '{}';
+    const comments = printInnerComments(node)
+    if (comments.length === 0) {
+      return '{}'
+    }
+
+    return group([
+      '{',
+      indent([hardline, join(hardline, comments)]),
+      hardline,
+      '}',
+    ])
   }
 
-  const parts: Doc[] = [];
+  const parts: Doc[] = []
   path.each((statementPath: AstPath) => {
-    parts.push(print(statementPath));
-  }, 'body');
+    parts.push(print(statementPath))
+  }, 'body')
+
+  return group(['{', indent([hardline, join(hardline, parts)]), hardline, '}'])
+}
+
+function printClassDeclaration(
+  node: ClassDeclaration,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  const methods: Doc[] = []
+  path.each((methodPath: AstPath) => {
+    methods.push(print(methodPath))
+  }, 'methods')
+
+  const danglingComments = printInnerComments(node)
+  const members = [...methods, ...danglingComments]
+
+  if (members.length === 0) {
+    return ['class ', path.call(print, 'name'), ' {}']
+  }
 
   return group([
-    '{',
-    indent([hardline, join(hardline, parts)]),
+    'class ',
+    path.call(print, 'name'),
+    ' {',
+    indent([hardline, join([hardline, hardline], members)]),
     hardline,
     '}',
-  ]);
+  ])
+}
+
+function printMethodDefinition(
+  node: MethodDefinition,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    path.call(print, 'name'),
+    printDelimitedList(path, print, 'params'),
+    ' ',
+    path.call(print, 'body'),
+  ])
+}
+
+function printSetPropertyStatement(
+  node: SetPropertyStatement,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    printPostfixChild(node.object, path.call(print, 'object')),
+    '.',
+    path.call(print, 'property'),
+    ' = ',
+    path.call(print, 'value'),
+    ';',
+  ])
 }
 
 function printIdentifier(node: Identifier): Doc {
-  return node.name;
+  return node.name
 }
 
 function printUnaryExpression(
@@ -174,8 +274,8 @@ function printUnaryExpression(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  const operator = getTokenValue(node.op);
-  return group(['(', operator, path.call(print, 'operand'), ')']);
+  const operator = getTokenValue(node.op)
+  return group(['(', operator, path.call(print, 'operand'), ')'])
 }
 
 function printBinaryExpression(
@@ -184,15 +284,15 @@ function printBinaryExpression(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  const operator = getTokenValue(node.op);
+  const operator = getTokenValue(node.op)
 
   // Only add parentheses for nested binary expressions
   const needsParens = (n: any): boolean => {
-    return n && (n.type === 'BinaryExpression' || n.type === 'UnaryExpression');
-  };
+    return n && (n.type === 'BinaryExpression' || n.type === 'UnaryExpression')
+  }
 
-  const leftNeedsParens = needsParens(node.left);
-  const rightNeedsParens = needsParens(node.right);
+  const leftNeedsParens = needsParens(node.left)
+  const rightNeedsParens = needsParens(node.right)
 
   return group([
     leftNeedsParens ? '(' : '',
@@ -204,7 +304,7 @@ function printBinaryExpression(
     rightNeedsParens ? '(' : '',
     path.call(print, 'right'),
     rightNeedsParens ? ')' : '',
-  ]);
+  ])
 }
 
 function printIfExpression(
@@ -218,13 +318,13 @@ function printIfExpression(
     path.call(print, 'condition'),
     ') ',
     path.call(print, 'consequent'),
-  ];
+  ]
 
   if (node.alternate) {
-    parts.push(' else ', path.call(print, 'alternate'));
+    parts.push(' else ', path.call(print, 'alternate'))
   }
 
-  return group(parts);
+  return group(parts)
 }
 
 function printFunctionDeclaration(
@@ -233,20 +333,12 @@ function printFunctionDeclaration(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  const params: Doc[] = [];
-
-  path.each((paramPath: AstPath) => {
-    params.push(print(paramPath));
-  }, 'params');
-
-  const paramsDoc = params.length > 0 ? join(', ', params) : '';
-
   return group([
-    'fn(',
-    paramsDoc,
-    ') ',
+    'fn',
+    printDelimitedList(path, print, 'params'),
+    ' ',
     path.call(print, 'body'),
-  ]);
+  ])
 }
 
 function printFunctionCall(
@@ -255,21 +347,10 @@ function printFunctionCall(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  const args: Doc[] = [];
-
-  path.each((argPath: AstPath) => {
-    args.push(print(argPath));
-  }, 'arguments');
-
-  const argsDoc = args.length > 0 ? join([',', line], args) : '';
-
   return group([
-    path.call(print, 'callee'),
-    '(',
-    indent([softline, argsDoc]),
-    softline,
-    ')',
-  ]);
+    printPostfixChild(node.callee, path.call(print, 'callee')),
+    printDelimitedList(path, print, 'arguments'),
+  ])
 }
 
 function printIndexExpression(
@@ -279,13 +360,92 @@ function printIndexExpression(
   options: Options
 ): Doc {
   return group([
-    '(',
-    path.call(print, 'object'),
+    printPostfixChild(node.object, path.call(print, 'object')),
     '[',
     path.call(print, 'index'),
     ']',
+  ])
+}
+
+function printThisExpression(node: ThisExpression): Doc {
+  return 'this'
+}
+
+function printPropertyExpression(
+  node: PropertyExpression,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    printPostfixChild(node.object, path.call(print, 'object')),
+    '.',
+    path.call(print, 'property'),
+  ])
+}
+
+function printNewExpression(
+  node: NewExpression,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    'new ',
+    path.call(print, 'callee'),
+    printDelimitedList(path, print, 'arguments'),
+  ])
+}
+
+function printDelimitedList(
+  path: AstPath,
+  print: (path: AstPath) => Doc,
+  property: 'params' | 'arguments'
+): Doc {
+  const items: Doc[] = []
+  path.each((itemPath: AstPath) => {
+    items.push(print(itemPath))
+  }, property)
+
+  if (items.length === 0) {
+    return '()'
+  }
+
+  return group([
+    '(',
+    indent([softline, join([',', line], items)]),
+    softline,
     ')',
-  ]);
+  ])
+}
+
+function printPostfixChild(node: ASTNode, childDoc: Doc): Doc {
+  if (
+    node.type === 'BinaryExpression' ||
+    node.type === 'IF' ||
+    node.type === 'FunctionDeclaration'
+  ) {
+    return ['(', childDoc, ')']
+  }
+
+  return childDoc
+}
+
+function printInnerComments(node: ASTNode): Doc[] {
+  if (!node.comments || !node.span) {
+    return []
+  }
+
+  const comments: Doc[] = []
+  for (const comment of node.comments) {
+    if (
+      comment.start >= node.span.start &&
+      comment.end <= node.span.end &&
+      !comment.printed
+    ) {
+      comment.printed = true
+      comments.push(printCommentNode(comment))
+    }
+  }
+  return comments
 }
 
 function printLiteral(
@@ -296,19 +456,19 @@ function printLiteral(
 ): Doc {
   switch (node.type) {
     case 'Integer':
-      return String((node as IntegerLiteral).raw);
+      return String((node as IntegerLiteral).raw)
     case 'Boolean':
-      return String((node as BooleanLiteral).raw);
+      return String((node as BooleanLiteral).raw)
     case 'String': {
-      const str = (node as StringLiteral).raw;
-      return `"${str}"`;
+      const str = (node as StringLiteral).raw
+      return `"${str}"`
     }
     case 'Array':
-      return printArrayLiteral(node as ArrayLiteral, path, print, options);
+      return printArrayLiteral(node as ArrayLiteral, path, print, options)
     case 'Hash':
-      return printHashLiteral(node as HashLiteral, path, print, options);
+      return printHashLiteral(node as HashLiteral, path, print, options)
     default:
-      return '';
+      return ''
   }
 }
 
@@ -319,16 +479,16 @@ function printArrayLiteral(
   options: Options
 ): Doc {
   if (node.elements.length === 0) {
-    return '[]';
+    return '[]'
   }
 
-  const elements: Doc[] = [];
+  const elements: Doc[] = []
 
   path.each((elementPath: AstPath) => {
-    elements.push(print(elementPath));
-  }, 'elements');
+    elements.push(print(elementPath))
+  }, 'elements')
 
-  const shouldBreak = node.elements.length > 3;
+  const shouldBreak = node.elements.length > 3
 
   return group(
     [
@@ -342,7 +502,7 @@ function printArrayLiteral(
       ']',
     ],
     { shouldBreak }
-  );
+  )
 }
 
 function printHashLiteral(
@@ -352,19 +512,19 @@ function printHashLiteral(
   options: Options
 ): Doc {
   if (node.elements.length === 0) {
-    return '{}';
+    return '{}'
   }
 
-  const pairs: Doc[] = [];
+  const pairs: Doc[] = []
 
   node.elements.forEach((_, index) => {
-    const key = path.call(print, 'elements', index, 0);
-    const value = path.call(print, 'elements', index, 1);
+    const key = path.call(print, 'elements', index, 0)
+    const value = path.call(print, 'elements', index, 1)
 
-    pairs.push(group([key, ': ', value]));
-  });
+    pairs.push(group([key, ': ', value]))
+  })
 
-  const shouldBreak = node.elements.length > 2;
+  const shouldBreak = node.elements.length > 2
 
   return group(
     [
@@ -380,34 +540,34 @@ function printHashLiteral(
       '}',
     ],
     { shouldBreak }
-  );
+  )
 }
 
 function getTokenValue(token: any): string {
-  const kind = token.kind;
+  const kind = token.kind
 
   switch (kind.type) {
     case 'PLUS':
-      return '+';
+      return '+'
     case 'MINUS':
-      return '-';
+      return '-'
     case 'ASTERISK':
-      return '*';
+      return '*'
     case 'SLASH':
-      return '/';
+      return '/'
     case 'BANG':
-      return '!';
+      return '!'
     case 'LT':
-      return '<';
+      return '<'
     case 'GT':
-      return '>';
+      return '>'
     case 'EQ':
-      return '==';
+      return '=='
     case 'NotEq':
-      return '!=';
+      return '!='
     case 'ASSIGN':
-      return '=';
+      return '='
     default:
-      return '';
+      return ''
   }
 }

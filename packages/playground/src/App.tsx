@@ -9,11 +9,11 @@ import type { Plugin } from 'prettier'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AstTreeView } from './AstTreeView'
-import {
-  type BytecodeDebugView,
-  spanForBytecodeCursor,
-} from './bytecodeDebug'
+import { type BytecodeDebugView, spanForBytecodeCursor } from './bytecodeDebug'
 import { Editor, type EditorHandle } from './Editor'
+import { GcReportView, type GcPanelState } from './GcReportView'
+import type { SourceSpan } from './gcReport'
+import { runGc } from './gcRunner'
 
 interface Snippet {
   label: string
@@ -69,9 +69,32 @@ let people = [
 people[0]["name"];
 `.trimStart(),
   },
+  {
+    label: 'Class cycle (GC)',
+    code: `
+class Node {
+  constructor(value) {
+    this.value = value;
+  }
+
+  connect(other) {
+    this.next = other;
+  }
+}
+
+let makeCycle = fn() {
+  let a = new Node("a");
+  let b = new Node("b");
+  a.connect(b);
+  b.connect(a);
+};
+
+makeCycle();
+`.trimStart(),
+  },
 ]
 
-type OutputView = 'ast' | 'bytecode'
+type OutputView = 'ast' | 'bytecode' | 'gc'
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
@@ -94,6 +117,8 @@ function App() {
     useState<BytecodeDebugView | null>(null)
   const [vimMode, setVimMode] = useState(true)
   const [isFormatting, setIsFormatting] = useState(false)
+  const [gcState, setGcState] = useState<GcPanelState>({ status: 'idle' })
+  const gcRequestId = useRef(0)
   const editorRef = useRef<EditorHandle>(null)
 
   const compileCode = useCallback((source: string) => {
@@ -121,29 +146,30 @@ function App() {
 
   const debouncedCompile = useMemo(
     () => debounce(compileCode, 200),
-    [compileCode],
+    [compileCode]
   )
 
-  const editorOnChange = useCallback(
-    (value: string) => {
-      setCode(value)
-      debouncedCompile(value)
-    },
-    [debouncedCompile],
-  )
+  const editorOnChange = useCallback((value: string) => {
+    setCode(value)
+    gcRequestId.current += 1
+    setGcState({ status: 'idle' })
+  }, [])
 
   const formatCode = useCallback(async () => {
     setIsFormatting(true)
     try {
       const prettier = await import('prettier/standalone')
-      const monkeyPlugin =
-        await import('../../prettier-plugin-monkey/src/index')
+      const monkeyPlugin = await import(
+        '../../prettier-plugin-monkey/src/index'
+      )
       const formatted = await prettier.format(code, {
         parser: 'monkey',
         plugins: [monkeyPlugin.default as unknown as Plugin],
       })
       setCode(formatted)
       setSelection(null)
+      gcRequestId.current += 1
+      setGcState({ status: 'idle' })
       compileCode(formatted)
     } catch (error) {
       const message = getErrorMessage(error)
@@ -156,8 +182,8 @@ function App() {
   }, [code, compileCode])
 
   useEffect(() => {
-    compileCode(code)
-  }, [code, compileCode])
+    debouncedCompile(code)
+  }, [code, debouncedCompile])
 
   useEffect(() => () => debouncedCompile.cancel(), [debouncedCompile])
 
@@ -167,11 +193,44 @@ function App() {
       setSnippetIndex(index)
     }
     setSelection(null)
+    gcRequestId.current += 1
+    setGcState({ status: 'idle' })
     setCode(snippets[index].code)
   }, [snippetIndex, setSnippetIndex])
 
+  useEffect(
+    () => () => {
+      gcRequestId.current += 1
+    },
+    []
+  )
+
+  const runGarbageCollector = useCallback(async () => {
+    const requestId = gcRequestId.current + 1
+    gcRequestId.current = requestId
+    setGcState({ status: 'running' })
+
+    try {
+      const result = await runGc(code)
+      if (gcRequestId.current === requestId) {
+        setGcState(result)
+      }
+    } catch (error) {
+      if (gcRequestId.current === requestId) {
+        setGcState({
+          status: 'invalid',
+          message: getErrorMessage(error),
+        })
+      }
+    }
+  }, [code])
+
   const handleNodeSelect = useCallback((start: number, end: number) => {
     editorRef.current?.highlightRange(start, end)
+  }, [])
+
+  const handleGcErrorSpanSelect = useCallback((span: SourceSpan) => {
+    editorRef.current?.highlightRange(span.start, span.end)
   }, [])
 
   const handleBytecodeSelection = useCallback(
@@ -189,7 +248,7 @@ function App() {
 
       editorRef.current?.highlightRange(span.start, span.end)
     },
-    [bytecodeDebugView],
+    [bytecodeDebugView]
   )
 
   useEffect(() => {
@@ -197,6 +256,22 @@ function App() {
       editorRef.current?.clearHighlight()
     }
   }, [outputView])
+
+  useEffect(() => {
+    if (
+      outputView !== 'gc' ||
+      gcState.status !== 'error' ||
+      gcState.span === null
+    ) {
+      return
+    }
+    const { span } = gcState
+    const editor = editorRef.current
+    editor?.highlightRange(span.start, span.end)
+    return () => {
+      editor?.clearHighlight()
+    }
+  }, [gcState, outputView])
 
   return (
     <Flex className="playground-shell">
@@ -250,7 +325,14 @@ function App() {
       </Flex>
 
       <Flex direction="column" className="panel output-column">
-        <Flex className="toolbar" align="center" px="3" py="2">
+        <Flex
+          className="toolbar"
+          align="center"
+          justify="between"
+          gap="3"
+          px="3"
+          py="2"
+        >
           <SegmentedControl.Root
             size="2"
             value={outputView}
@@ -260,11 +342,21 @@ function App() {
             <SegmentedControl.Item value="bytecode">
               Bytecode
             </SegmentedControl.Item>
+            <SegmentedControl.Item value="gc">GC</SegmentedControl.Item>
           </SegmentedControl.Root>
+          {outputView === 'gc' ? (
+            <Button
+              size="2"
+              onClick={runGarbageCollector}
+              loading={gcState.status === 'running'}
+            >
+              Run GC
+            </Button>
+          ) : null}
         </Flex>
         <Box className="editor-frame">
-          {astData !== null ? (
-            <Box className="ast-frame" hidden={outputView !== 'ast'}>
+          {outputView === 'ast' && astData !== null ? (
+            <Box className="ast-frame">
               <AstTreeView
                 data={astData}
                 selection={selection}
@@ -272,17 +364,30 @@ function App() {
               />
             </Box>
           ) : null}
-          <Box hidden={outputView === 'ast' && astData !== null} className="output-editor">
-            <Editor
-              code={outputView === 'ast' ? astOutput : compilerOutput}
-              extra={{ readOnly: true, editable: false }}
-              onSelectionChange={
-                outputView === 'bytecode' ? handleBytecodeSelection : undefined
-              }
-              vimMode={false}
-              fill
-            />
-          </Box>
+          {outputView === 'gc' ? (
+            <Box className="gc-frame">
+              <GcReportView
+                state={gcState}
+                onErrorSpanSelect={handleGcErrorSpanSelect}
+              />
+            </Box>
+          ) : null}
+          {outputView === 'bytecode' ||
+          (outputView === 'ast' && astData === null) ? (
+            <Box className="output-editor">
+              <Editor
+                code={outputView === 'ast' ? astOutput : compilerOutput}
+                extra={{ readOnly: true, editable: false }}
+                onSelectionChange={
+                  outputView === 'bytecode'
+                    ? handleBytecodeSelection
+                    : undefined
+                }
+                vimMode={false}
+                fill
+              />
+            </Box>
+          ) : null}
         </Box>
       </Flex>
     </Flex>

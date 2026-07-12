@@ -2,14 +2,11 @@ pub mod ast;
 mod ast_tree_test;
 mod parser_test;
 mod precedences;
+pub mod validation;
 
 pub extern crate lexer;
 
-use crate::ast::{
-    Array, BinaryExpression, BlockStatement, Boolean, Expression, FunctionCall,
-    FunctionDeclaration, Hash, Index, Integer, Let, Literal, Node, Program, ReturnStatement,
-    Statement, StringType, UnaryExpression, IDENTIFIER, IF,
-};
+use crate::ast::*;
 use crate::precedences::{get_token_precedence, Precedence};
 use lexer::token::{Span, Token, TokenKind};
 use lexer::Lexer;
@@ -22,6 +19,7 @@ pub struct Parser<'a> {
     current_token: Token,
     peek_token: Token,
     errors: ParseErrors,
+    block_depth: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -43,6 +41,7 @@ impl<'a> Parser<'a> {
             current_token: cur,
             peek_token: next,
             errors,
+            block_depth: 0,
         };
 
         return p;
@@ -93,6 +92,8 @@ impl<'a> Parser<'a> {
         match self.current_token.kind {
             TokenKind::LET => self.parse_let_statement(),
             TokenKind::RETURN => self.parse_return_statement(),
+            TokenKind::CLASS if self.block_depth == 0 => self.parse_class_declaration(),
+            TokenKind::CLASS => Err("class declarations are only allowed at top level".to_string()),
             _ => self.parse_expression_statement(),
         }
     }
@@ -102,13 +103,10 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let name = self.current_token.clone();
-        let mut identifier_name = "".to_string();
-        match &self.current_token.kind {
+        let identifier_name = match &self.current_token.kind {
             TokenKind::IDENTIFIER {
                 name,
-            } => {
-                identifier_name = name.to_string();
-            }
+            } => name.to_string(),
             _ => return Err(format!("{} not an identifier", self.current_token)),
         };
 
@@ -116,6 +114,9 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let mut value = self.parse_expression(Precedence::LOWEST)?.0;
+        if self.peek_token_is(&TokenKind::ASSIGN) {
+            return Err("property assignment is only allowed as a statement".to_string());
+        }
         match value {
             Expression::FUNCTION(ref mut f) => {
                 f.name = identifier_name;
@@ -145,6 +146,10 @@ impl<'a> Parser<'a> {
 
         let value = self.parse_expression(Precedence::LOWEST)?.0;
 
+        if self.peek_token_is(&TokenKind::ASSIGN) {
+            return Err("property assignment is only allowed as a statement".to_string());
+        }
+
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
@@ -160,7 +165,38 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
-        let expr = self.parse_expression(Precedence::LOWEST)?.0;
+        let (expr, cover_span) = self.parse_expression(Precedence::LOWEST)?;
+
+        if self.peek_token_is(&TokenKind::ASSIGN) {
+            let property_expression = match expr {
+                Expression::Property(property) => property,
+                _ => return Err("only instance property assignment is supported".to_string()),
+            };
+
+            self.next_token();
+            self.next_token();
+            let (value, value_span) = self.parse_expression(Precedence::LOWEST)?;
+            if self.peek_token_is(&TokenKind::ASSIGN) {
+                return Err("chained property assignment is not supported".to_string());
+            }
+
+            let mut end = value_span.end;
+            if self.peek_token_is(&TokenKind::SEMICOLON) {
+                self.next_token();
+                end = self.current_token.span.end;
+            }
+
+            return Ok(Statement::SetProperty(SetPropertyStatement {
+                object: property_expression.object,
+                property: property_expression.property,
+                value,
+                span: Span {
+                    start: cover_span.start,
+                    end,
+                },
+            }));
+        }
+
         if self.peek_token_is(&TokenKind::SEMICOLON) {
             self.next_token();
         }
@@ -172,100 +208,136 @@ impl<'a> Parser<'a> {
         &mut self,
         precedence: Precedence,
     ) -> Result<(Expression, Span), ParseError> {
-        let mut left_start = self.current_token.span.start;
-        let mut left = self.parse_prefix_expression()?;
+        let (mut left, mut cover_span) = self.parse_prefix_expression()?;
         while self.peek_token.kind != TokenKind::SEMICOLON
             && precedence < get_token_precedence(&self.peek_token.kind)
         {
-            match self.parse_infix_expression(&left, left_start) {
+            match self.parse_infix_expression(&left, &cover_span) {
                 Some(infix) => {
-                    left = infix?;
-                    if let Expression::INFIX(b) = left.clone() {
-                        left_start = b.span.start;
-                    }
+                    (left, cover_span) = infix?;
                 }
                 None => {
-                    return Ok((
-                        left,
-                        Span {
-                            start: left_start,
-                            end: self.current_token.span.end,
-                        },
-                    ))
+                    return Ok((left, cover_span));
                 }
             }
         }
 
-        let end = self.current_token.span.end;
-
-        Ok((
-            left,
-            Span {
-                start: left_start,
-                end,
-            },
-        ))
+        Ok((left, cover_span))
     }
 
-    fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_prefix_expression(&mut self) -> Result<(Expression, Span), ParseError> {
         // this is prefix fn map :)
         match &self.current_token.kind {
             TokenKind::IDENTIFIER {
                 name,
             } => {
-                return Ok(Expression::IDENTIFIER(IDENTIFIER {
-                    name: name.clone(),
-                    span: self.current_token.clone().span,
-                }))
+                let span = self.current_token.span.clone();
+                return Ok((
+                    Expression::IDENTIFIER(IDENTIFIER {
+                        name: name.clone(),
+                        span: span.clone(),
+                    }),
+                    span,
+                ));
             }
             TokenKind::INT(i) => {
-                return Ok(Expression::LITERAL(Literal::Integer(Integer {
-                    raw: *i,
-                    span: self.current_token.clone().span,
-                })))
+                let span = self.current_token.span.clone();
+                return Ok((
+                    Expression::LITERAL(Literal::Integer(Integer {
+                        raw: *i,
+                        span: span.clone(),
+                    })),
+                    span,
+                ));
             }
             TokenKind::STRING(s) => {
-                return Ok(Expression::LITERAL(Literal::String(StringType {
-                    raw: s.to_string(),
-                    span: self.current_token.clone().span,
-                })))
+                let span = self.current_token.span.clone();
+                return Ok((
+                    Expression::LITERAL(Literal::String(StringType {
+                        raw: s.to_string(),
+                        span: span.clone(),
+                    })),
+                    span,
+                ));
             }
             b @ TokenKind::TRUE | b @ TokenKind::FALSE => {
-                return Ok(Expression::LITERAL(Literal::Boolean(Boolean {
-                    raw: *b == TokenKind::TRUE,
-                    span: self.current_token.clone().span,
-                })))
+                let span = self.current_token.span.clone();
+                return Ok((
+                    Expression::LITERAL(Literal::Boolean(Boolean {
+                        raw: *b == TokenKind::TRUE,
+                        span: span.clone(),
+                    })),
+                    span,
+                ));
             }
             TokenKind::BANG | TokenKind::MINUS => {
                 let start = self.current_token.span.start;
                 let prefix_op = self.current_token.clone();
                 self.next_token();
                 let (expr, span) = self.parse_expression(Precedence::PREFIX)?;
-                return Ok(Expression::PREFIX(UnaryExpression {
-                    op: prefix_op,
-                    operand: Box::new(expr),
-                    span: Span {
-                        start,
-                        end: span.end,
-                    },
-                }));
+                let expression_span = Span {
+                    start,
+                    end: span.end,
+                };
+                return Ok((
+                    Expression::PREFIX(UnaryExpression {
+                        op: prefix_op,
+                        operand: Box::new(expr),
+                        span: expression_span.clone(),
+                    }),
+                    expression_span,
+                ));
             }
             TokenKind::LPAREN => {
+                let start = self.current_token.span.start;
                 self.next_token();
                 let expr = self.parse_expression(Precedence::LOWEST)?.0;
                 self.expect_peek(&TokenKind::RPAREN)?;
-                return Ok(expr);
+                let span = Span {
+                    start,
+                    end: self.current_token.span.end,
+                };
+                return Ok((expr, span));
             }
-            TokenKind::IF => self.parse_if_expression(),
-            TokenKind::FUNCTION => self.parse_fn_expression(),
+            TokenKind::IF => {
+                let expression = self.parse_if_expression()?;
+                let span = expression.span().clone();
+                Ok((expression, span))
+            }
+            TokenKind::FUNCTION => {
+                let expression = self.parse_fn_expression()?;
+                let span = expression.span().clone();
+                Ok((expression, span))
+            }
             TokenKind::LBRACKET => {
                 let (elements, span) = self.parse_expression_list(&TokenKind::RBRACKET)?;
-                return Ok(Expression::LITERAL(Literal::Array(Array {
-                    elements,
+                return Ok((
+                    Expression::LITERAL(Literal::Array(Array {
+                        elements,
+                        span: span.clone(),
+                    })),
                     span,
-                })));
+                ));
             }
-            TokenKind::LBRACE => self.parse_hash_expression(),
+            TokenKind::LBRACE => {
+                let expression = self.parse_hash_expression()?;
+                let span = expression.span().clone();
+                Ok((expression, span))
+            }
+            TokenKind::THIS => {
+                let span = self.current_token.span.clone();
+                Ok((
+                    Expression::This(ThisExpression {
+                        span: span.clone(),
+                    }),
+                    span,
+                ))
+            }
+            TokenKind::NEW => {
+                let expression = self.parse_new_expression()?;
+                let span = expression.span().clone();
+                Ok((expression, span))
+            }
             _ => Err(format!("no prefix function for token: {}", self.current_token)),
         }
     }
@@ -273,8 +345,8 @@ impl<'a> Parser<'a> {
     fn parse_infix_expression(
         &mut self,
         left: &Expression,
-        left_start: usize,
-    ) -> Option<Result<Expression, ParseError>> {
+        left_span: &Span,
+    ) -> Option<Result<(Expression, Span), ParseError>> {
         match self.peek_token.kind {
             TokenKind::PLUS
             | TokenKind::MINUS
@@ -288,24 +360,36 @@ impl<'a> Parser<'a> {
                 let infix_op = self.current_token.clone();
                 let precedence_value = get_token_precedence(&self.current_token.kind);
                 self.next_token();
-                let (right, span) = self.parse_expression(precedence_value).unwrap();
-                return Some(Ok(Expression::INFIX(BinaryExpression {
-                    op: infix_op,
-                    left: Box::new(left.clone()),
-                    right: Box::new(right),
-                    span: Span {
-                        start: left_start,
-                        end: span.end,
-                    },
-                })));
+                let result = self
+                    .parse_expression(precedence_value)
+                    .map(|(right, span)| {
+                        let expression_span = Span {
+                            start: left_span.start,
+                            end: span.end,
+                        };
+                        (
+                            Expression::INFIX(BinaryExpression {
+                                op: infix_op,
+                                left: Box::new(left.clone()),
+                                right: Box::new(right),
+                                span: expression_span.clone(),
+                            }),
+                            expression_span,
+                        )
+                    });
+                return Some(result);
             }
             TokenKind::LPAREN => {
                 self.next_token();
-                return Some(self.parse_fn_call_expression(left.clone()));
+                return Some(self.parse_fn_call_expression(left.clone(), left_span.start));
             }
             TokenKind::LBRACKET => {
                 self.next_token();
-                return Some(self.parse_index_expression(left.clone()));
+                return Some(self.parse_index_expression(left.clone(), left_span.start));
+            }
+            TokenKind::DOT => {
+                self.next_token();
+                return Some(self.parse_property_expression(left.clone(), left_span.start));
             }
             _ => None,
         }
@@ -345,16 +429,27 @@ impl<'a> Parser<'a> {
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
         let start = self.current_token.span.start;
+        self.block_depth += 1;
         self.next_token();
         let mut block_statement = Vec::new();
 
         while !self.current_token_is(&TokenKind::RBRACE) && !self.current_token_is(&TokenKind::EOF)
         {
-            if let Ok(statement) = self.parse_statement() {
-                block_statement.push(statement)
-            }
+            let statement = match self.parse_statement() {
+                Ok(statement) => statement,
+                Err(error) => {
+                    self.block_depth -= 1;
+                    return Err(error);
+                }
+            };
+            block_statement.push(statement);
 
             self.next_token();
+        }
+
+        self.block_depth -= 1;
+        if self.current_token_is(&TokenKind::EOF) {
+            return Err("expected '}' before end of input".to_string());
         }
 
         let end = self.current_token.span.end;
@@ -436,27 +531,27 @@ impl<'a> Parser<'a> {
         return Ok(params);
     }
 
-    fn parse_fn_call_expression(&mut self, expr: Expression) -> Result<Expression, ParseError> {
-        // fake positive
-        #[allow(unused_assignments)]
-        let mut start = self.current_token.span.start;
+    fn parse_fn_call_expression(
+        &mut self,
+        expr: Expression,
+        start: usize,
+    ) -> Result<(Expression, Span), ParseError> {
         let (arguments, ..) = self.parse_expression_list(&TokenKind::RPAREN)?;
         let end = self.current_token.span.end;
-        match &expr {
-            Expression::IDENTIFIER(i) => start = i.span.start,
-            Expression::FUNCTION(f) => start = f.span.start,
-            _ => return Err(format!("expected function")),
-        }
         let callee = Box::new(expr);
+        let span = Span {
+            start,
+            end,
+        };
 
-        Ok(Expression::FunctionCall(FunctionCall {
-            callee,
-            arguments,
-            span: Span {
-                start,
-                end,
-            },
-        }))
+        Ok((
+            Expression::FunctionCall(FunctionCall {
+                callee,
+                arguments,
+                span: span.clone(),
+            }),
+            span,
+        ))
     }
 
     fn parse_expression_list(
@@ -499,8 +594,11 @@ impl<'a> Parser<'a> {
         ));
     }
 
-    fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
-        let start = self.current_token.span.start;
+    fn parse_index_expression(
+        &mut self,
+        left: Expression,
+        start: usize,
+    ) -> Result<(Expression, Span), ParseError> {
         self.next_token();
         let index = self.parse_expression(Precedence::LOWEST)?.0;
 
@@ -508,14 +606,153 @@ impl<'a> Parser<'a> {
 
         let end = self.current_token.span.end;
 
-        return Ok(Expression::Index(Index {
-            object: Box::new(left),
-            index: Box::new(index),
+        let span = Span {
+            start,
+            end,
+        };
+        return Ok((
+            Expression::Index(Index {
+                object: Box::new(left),
+                index: Box::new(index),
+                span: span.clone(),
+            }),
+            span,
+        ));
+    }
+
+    fn parse_property_expression(
+        &mut self,
+        object: Expression,
+        start: usize,
+    ) -> Result<(Expression, Span), ParseError> {
+        self.next_token();
+        let property = match &self.current_token.kind {
+            TokenKind::IDENTIFIER {
+                name,
+            } => IDENTIFIER {
+                name: name.clone(),
+                span: self.current_token.span.clone(),
+            },
+            _ => return Err("expected property name after '.'".to_string()),
+        };
+        let span = Span {
+            start,
+            end: property.span.end,
+        };
+        Ok((
+            Expression::Property(PropertyExpression {
+                object: Box::new(object),
+                property,
+                span: span.clone(),
+            }),
+            span,
+        ))
+    }
+
+    fn parse_new_expression(&mut self) -> Result<Expression, ParseError> {
+        let start = self.current_token.span.start;
+        self.next_token();
+        let callee = match &self.current_token.kind {
+            TokenKind::IDENTIFIER {
+                name,
+            } => IDENTIFIER {
+                name: name.clone(),
+                span: self.current_token.span.clone(),
+            },
+            _ => return Err("expected class name after 'new'".to_string()),
+        };
+
+        if !self.peek_token_is(&TokenKind::LPAREN) {
+            return Err("new expression requires an argument list".to_string());
+        }
+        self.next_token();
+        let (arguments, arguments_span) = self.parse_expression_list(&TokenKind::RPAREN)?;
+        Ok(Expression::New(NewExpression {
+            callee,
+            arguments,
             span: Span {
                 start,
-                end,
+                end: arguments_span.end,
             },
-        }));
+        }))
+    }
+
+    fn parse_class_declaration(&mut self) -> Result<Statement, ParseError> {
+        let start = self.current_token.span.start;
+        self.next_token();
+        let class_name = match &self.current_token.kind {
+            TokenKind::IDENTIFIER {
+                name,
+            } => IDENTIFIER {
+                name: name.clone(),
+                span: self.current_token.span.clone(),
+            },
+            _ => return Err("expected class name after 'class'".to_string()),
+        };
+
+        self.expect_peek(&TokenKind::LBRACE)?;
+        let mut methods = Vec::new();
+        let mut method_names = std::collections::HashSet::new();
+        let mut has_constructor = false;
+
+        while !self.peek_token_is(&TokenKind::RBRACE) {
+            self.next_token();
+            if self.current_token_is(&TokenKind::EOF) {
+                return Err(format!("expected '}}' after class {}", class_name.name));
+            }
+
+            let method_name = match &self.current_token.kind {
+                TokenKind::IDENTIFIER {
+                    name,
+                } => IDENTIFIER {
+                    name: name.clone(),
+                    span: self.current_token.span.clone(),
+                },
+                _ => return Err("expected method definition in class body".to_string()),
+            };
+            let method_start = method_name.span.start;
+            let kind = if method_name.name == "constructor" {
+                if has_constructor {
+                    return Err(format!("class {} has more than one constructor", class_name.name));
+                }
+                has_constructor = true;
+                MethodKind::Constructor
+            } else {
+                if !method_names.insert(method_name.name.clone()) {
+                    return Err(format!(
+                        "duplicate method {}.{}",
+                        class_name.name, method_name.name
+                    ));
+                }
+                MethodKind::Method
+            };
+
+            self.expect_peek(&TokenKind::LPAREN)?;
+            let params = self.parse_fn_parameters()?;
+            self.expect_peek(&TokenKind::LBRACE)?;
+            let body = self.parse_block_statement()?;
+            let method_end = body.span.end;
+            methods.push(MethodDefinition {
+                kind,
+                name: method_name,
+                params,
+                body,
+                span: Span {
+                    start: method_start,
+                    end: method_end,
+                },
+            });
+        }
+
+        self.next_token();
+        Ok(Statement::Class(ClassDeclaration {
+            name: class_name,
+            methods,
+            span: Span {
+                start,
+                end: self.current_token.span.end,
+            },
+        }))
     }
 
     fn parse_hash_expression(&mut self) -> Result<Expression, ParseError> {

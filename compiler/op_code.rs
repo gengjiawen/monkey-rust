@@ -49,6 +49,11 @@ pub enum Opcode {
     OpClosure,
     OpGetFree,
     OpCurrentClosure,
+    OpClass,
+    OpMethod,
+    OpGetProperty,
+    OpSetProperty,
+    OpNew,
 }
 
 lazy_static! {
@@ -262,6 +267,41 @@ lazy_static! {
             OpcodeDefinition {
                 name: "OpCurrentClosure",
                 operand_width: vec![],
+            },
+        );
+        m.insert(
+            Opcode::OpClass,
+            OpcodeDefinition {
+                name: "OpClass",
+                operand_width: vec![2],
+            },
+        );
+        m.insert(
+            Opcode::OpMethod,
+            OpcodeDefinition {
+                name: "OpMethod",
+                operand_width: vec![2, 1],
+            },
+        );
+        m.insert(
+            Opcode::OpGetProperty,
+            OpcodeDefinition {
+                name: "OpGetProperty",
+                operand_width: vec![2],
+            },
+        );
+        m.insert(
+            Opcode::OpSetProperty,
+            OpcodeDefinition {
+                name: "OpSetProperty",
+                operand_width: vec![2],
+            },
+        );
+        m.insert(
+            Opcode::OpNew,
+            OpcodeDefinition {
+                name: "OpNew",
+                operand_width: vec![1],
             },
         );
         return m;

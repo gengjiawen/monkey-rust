@@ -34,10 +34,20 @@ let bytecode = gc::compile(&program).unwrap();
 let mut vm = gc::GcVM::new(bytecode);
 
 vm.run();
-vm.heap_mut().run_gc();
+let report = vm.collect_garbage();
 
 let result = vm.export_last_result().expect("no result on stack");
 assert_eq!(result, object::Object::Integer(42));
+assert_eq!(report.phases.free_cycles.freed, 0);
+```
+
+Run untrusted/demo source with a fixed instruction budget and a structured
+collection report:
+
+```rust
+let run = gc::run_source_with_report(source, 10_000)?;
+println!("{}", run.result);
+println!("collected instances: {}", run.report.collected_by_value_kind[&gc::ValueKind::Instance]);
 ```
 
 ## Public API
@@ -46,6 +56,11 @@ assert_eq!(result, object::Object::Integer(42));
 - `eval` runs a parsed AST node through the bytecode compiler and GC VM.
 - `compile` reuses `monkey-compiler` to produce bytecode.
 - `GcVM` executes Monkey bytecode with GC-managed values.
+- `run_source_with_report` returns a staged parse/compile/runtime result plus
+  before/after snapshots and per-phase collection telemetry. Scan telemetry
+  includes sorted synthetic labels for restored and garbage-candidate objects.
+- `GcVM::collect_garbage` atomically runs all three collector phases and returns
+  a `GcCollectionReport`.
 - `GcHeap` exposes allocation, `dup`/`free`, GC triggering, and heap inspection.
 - `Value`, `GcClosure`, `import_object`, and `export_object` bridge between
   GC-managed values and `object::Object`.
@@ -58,9 +73,41 @@ assert_eq!(result, object::Object::Integer(42));
 lexer -> parser -> compiler -> gc::GcVM
 ```
 
-The crate does not replace the default `compiler::VM`, `wasm`, or playground
-runtime. Instead, it reuses the same `Bytecode` and opcode definitions while
-testing an alternate heap implementation.
+The crate remains a parallel runtime rather than replacing `compiler::VM`.
+The WASM package exposes it through `run_gc_with_report`, and the playground's
+explicit GC tab uses that endpoint; the ordinary AST and bytecode views keep
+their existing paths.
+
+Class, instance, and bound-method values are native `GcRef` graphs. Builtins
+dispatch by stable `BuiltinId` directly against GC values, so VM execution does
+not depend on the legacy `Object` export/import bridge. The bridge remains for
+acyclic compatibility APIs such as `eval_source`.
+
+The playground can construct an unreachable cycle entirely in Monkey source:
+
+```monkey
+class Node {
+  connect(other) { this.next = other; }
+}
+
+let makeCycle = fn() {
+  let a = new Node();
+  let b = new Node();
+  a.connect(b);
+  b.connect(a);
+};
+makeCycle();
+```
+
+Only a complete `gc_decref -> gc_scan -> gc_free_cycles` collection is public.
+Pausing between phases would expose temporary reference counts and violate the
+collector invariants.
+
+Scan labels identify runtime objects without pretending to recover source
+bindings: `Class(Node)#7`, `Instance(Node)#12`, and
+`BoundMethod(Node.connect)#14`. Named closures retain their compile-time name,
+for example `Closure(makeCycle)#10`; anonymous closures remain `Closure#18`.
+IDs are scoped to one synchronous report.
 
 ## Modules
 
@@ -69,6 +116,7 @@ testing an alternate heap implementation.
 - `header.rs`, `list.rs`, and `malloc.rs` hold GC object metadata and allocator
   accounting.
 - `value.rs` defines GC-managed Monkey values plus import/export helpers.
+- `report.rs` defines heap snapshots and collection telemetry.
 - `frame.rs` and `vm.rs` implement the bytecode VM runtime.
 
 ## Development
