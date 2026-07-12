@@ -134,6 +134,14 @@ describe('HeapGraphView', () => {
     expect(
       screen.getByRole('heading', { name: 'Heap topology' })
     ).toBeInTheDocument()
+    const graphKeyItems = screen.getAllByRole('listitem')
+    expect(graphKeyItems).toHaveLength(2)
+    expect(graphKeyItems[0]).toHaveTextContent(
+      'Solid arrows show heap-to-heap references at collection start.'
+    )
+    expect(graphKeyItems[1]).toHaveTextContent(
+      "Dotted arrows from External refs mark each trial survivor's remaining non-heap references (×N is its trial RC)."
+    )
     await waitFor(() => {
       expect(container.querySelector('.gc-graph-canvas svg')).not.toBeNull()
     })

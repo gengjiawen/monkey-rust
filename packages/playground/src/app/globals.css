@@ -675,6 +675,15 @@ body {
   font-size: 16px;
 }
 
+.gc-graph-key {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.gc-graph-key li + li {
+  margin-top: 4px;
+}
+
 .gc-graph-fullscreen-button {
   padding: 4px 10px;
   border: 1px solid var(--gray-a6);

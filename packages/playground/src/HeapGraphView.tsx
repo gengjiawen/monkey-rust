@@ -124,11 +124,15 @@ export function HeapGraphView({ report }: { report: GcCollectionReport }) {
         <p className="gc-muted">{graph.reason}</p>
       ) : (
         <>
-          <p className="gc-muted">
-            Solid arrows are the heap-to-heap references visited during trial
-            deletion. Dotted arrows from External refs mark each trial
-            survivor&apos;s remaining non-heap references (×N is its trial RC).
-          </p>
+          <ul className="gc-muted gc-graph-key">
+            <li>
+              Solid arrows show heap-to-heap references at collection start.
+            </li>
+            <li>
+              Dotted arrows from External refs mark each trial survivor&apos;s
+              remaining non-heap references (×N is its trial RC).
+            </li>
+          </ul>
           {renderState.status === 'rendered' ? (
             <div
               className="gc-graph-canvas"
