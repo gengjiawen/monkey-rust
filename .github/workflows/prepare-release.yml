@@ -4,10 +4,6 @@ on:
     branches:
       - 'release-*'
       - 'release/*'
-  create:
-    branches:
-      - 'release-*'
-      - 'release/*'
   workflow_dispatch:
 jobs:
   prepare-dist:
