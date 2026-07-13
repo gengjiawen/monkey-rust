@@ -148,6 +148,11 @@ impl GcVM {
         self.clear_stack_range(0, self.sp);
         self.sp = 0;
 
+        // Reset the last result so statements that never pop (e.g. a bare
+        // `let`) report null instead of the previous program's result.
+        self.heap.free(self.last_popped);
+        self.last_popped = self.heap.dup(self.null);
+
         for reference in self.constants.drain(..) {
             self.heap.free(reference);
         }
