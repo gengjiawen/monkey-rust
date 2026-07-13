@@ -125,7 +125,7 @@ the compatibility phase-stats view of the same atomic collection. Ordinary
 ## Modules
 
 - `heap.rs` provides the high-level `GcHeap` and opaque `GcRef` handle.
-- `runtime.rs` implements reference counting and three-phase cycle collection.
+- `gc_runtime.rs` implements reference counting and three-phase cycle collection.
 - `header.rs`, `list.rs`, and `malloc.rs` hold GC object metadata and allocator
   accounting.
 - `value.rs` defines GC-managed Monkey values plus import/export helpers.

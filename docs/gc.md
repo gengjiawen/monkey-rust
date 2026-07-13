@@ -103,7 +103,7 @@ Workspace 成员：根 `Cargo.toml` → `"gc"`。
 | ---------- | ------------ | ----------------------------------------------------- |
 | 入口       | `lib.rs`     | 导出公共 API；`compile` / `eval` / `eval_source`      |
 | 堆 API     | `heap.rs`    | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发              |
-| 运行时核心 | `runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理          |
+| 运行时核心 | `gc_runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理          |
 | 对象头     | `header.rs`  | `GcObjectHeader`、`GcPhase`、`GcObjectType`           |
 | 侵入式链表 | `list.rs`    | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表      |
 | 分配统计   | `malloc.rs`  | `MallocState`、GC 阈值触发                            |
@@ -423,7 +423,7 @@ cargo test -p monkey-gc
 gc/
 ├── lib.rs          # 入口 + eval API
 ├── heap.rs         # GcHeap / GcRef
-├── runtime.rs      # GcRuntime + GC 三阶段
+├── gc_runtime.rs   # GcRuntime + GC 三阶段
 ├── header.rs       # 对象头 + 类型 tag
 ├── list.rs         # 侵入式链表
 ├── malloc.rs       # 分配统计 + 阈值
@@ -433,5 +433,6 @@ gc/
 ├── vm.rs           # GcVM
 ├── gc_test.rs      # GC 单元测试
 ├── value_test.rs   # 值层测试
-└── vm_test.rs      # VM 集成测试
+├── vm_test.rs      # VM 集成测试
+└── repl_test.rs    # REPL 集成测试
 ```
