@@ -979,7 +979,7 @@ Playground 只能原子调用完整 collection：
 gc_decref -> gc_scan -> gc_free_cycles
 ```
 
-然后返回只读 telemetry。不能暴露 `gc_decref()` Monkey builtin，也不能让 UI 暂停 collector 中间阶段。
+然后返回只读 diagnostics。不能暴露 `gc_decref()` Monkey builtin，也不能让 UI 暂停 collector 中间阶段。
 
 ### 12.3 Collection report
 
@@ -1055,7 +1055,7 @@ impl GcVM {
 
 合成 label 不尝试恢复对象当前绑定的变量名：alias 会让“对象的变量名”没有唯一答案。closure 使用编译时保存在 `CompiledFunction` 上的原始函数名，class 和方法使用运行时名称，其余对象使用类型与 ID，例如 `Closure(makeCycle)#10`、`Class(Node)#7`、`Instance(Node)#12`、`BoundMethod(Node.connect)#14`、`Array#15`。匿名 closure 保持为 `Closure#18`。
 
-阶段 telemetry 至少包括：
+阶段 diagnostics 至少包括：
 
 | 阶段           | 指标                                         |
 | -------------- | -------------------------------------------- |
@@ -1189,7 +1189,7 @@ pub fn run_gc_with_report(source: &str) -> String;
 }
 ```
 
-Teaching telemetry notes:
+Teaching diagnostics notes:
 
 - Object IDs are valid only within a single report.
 - `edgesVisited` counts heap-to-heap references only (not constants/globals/stack slots).
@@ -1566,7 +1566,7 @@ f();
 - 三个执行后端运行同一组 class 语义测试；
 - detached method、identity、constructor/new 和错误语义一致；
 - GcVM 从纯 Monkey 源码构造并回收双向 instance cycle；
-- playground 显示 `Instance: 2 -> 0` 及三阶段原子 telemetry；
+- playground 显示 `Instance: 2 -> 0` 及三阶段原子 diagnostics；
 - AST/Prettier/WASM round-trip 无旧包污染；
 - 当前 GC 文档、playground README 和 VS Code grammar 不再保留与实现冲突的旧限制；
 - 全 workspace Rust tests、Prettier tests/build、VS Code build、playground test/lint/build 和 WASM node tests 通过。

@@ -50,7 +50,7 @@ lexer → parser → compiler (bytecode) → VM
 - 复用 `compiler` 产出的 `Bytecode` 与 opcode 定义。
 - 提供与 interpreter、`compiler::VM` 等价的 Monkey 语义（算术、闭包、class、可变实例字段、bound method、builtins 等）。
 - 对外暴露 `eval_source` 等便捷 API，返回 `object::Object` 以便与现有工具链对接。
-- 提供带 instruction budget、错误 stage/span 和 GC telemetry 的结构化执行 API，供 WASM / Playground 使用。
+- 提供带 instruction budget、错误 stage/span 和 GC diagnostics 的结构化执行 API，供 WASM / Playground 使用。
 - 保持与 QuickJS GC 算法结构一致，便于对照阅读和后续优化。
 
 ### 2.2 非目标
@@ -99,19 +99,19 @@ Workspace 成员：根 `Cargo.toml` → `"gc"`。
 
 ## 4. 模块设计
 
-| 模块       | 文件            | 职责                                                  |
-| ---------- | --------------- | ----------------------------------------------------- |
-| 入口       | `lib.rs`        | 导出公共 API；`compile` / `eval` / `eval_source`      |
-| 堆 API     | `heap.rs`       | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发              |
-| 运行时核心 | `gc_runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理          |
-| GC 诊断    | `gc_stats.rs`   | `run_gc_with_stats_bundle`：边捕获、对象判定、恢复见证 |
-| 对象头     | `header.rs`     | `GcObjectHeader`、`GcPhase`、`GcObjectType`           |
-| 侵入式链表 | `list.rs`       | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表      |
-| 分配统计   | `malloc.rs`     | `MallocState`、GC 阈值触发                            |
-| 值模型     | `value.rs`      | `Value`、`ValueCell`、import/export 桥接              |
-| 报告       | `report.rs`     | before/after snapshot、分阶段 telemetry、按值类型统计 |
-| 调用帧     | `frame.rs`      | `Frame`（闭包 + IP + 栈基址）                         |
-| 虚拟机     | `vm.rs`         | `GcVM`：opcode 解释执行                               |
+| 模块       | 文件            | 职责                                                    |
+| ---------- | --------------- | ------------------------------------------------------- |
+| 入口       | `lib.rs`        | 导出公共 API；`compile` / `eval` / `eval_source`        |
+| 堆 API     | `heap.rs`       | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发                |
+| 运行时核心 | `gc_runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理            |
+| GC 诊断    | `gc_stats.rs`   | `run_gc_with_stats_bundle`：边捕获、对象判定、恢复见证  |
+| 对象头     | `header.rs`     | `GcObjectHeader`、`GcPhase`、`GcObjectType`             |
+| 侵入式链表 | `list.rs`       | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表        |
+| 分配统计   | `malloc.rs`     | `MallocState`、GC 阈值触发                              |
+| 值模型     | `value.rs`      | `Value`、`ValueCell`、import/export 桥接                |
+| 报告       | `report.rs`     | before/after snapshot、分阶段 diagnostics、按值类型统计 |
+| 调用帧     | `frame.rs`      | `Frame`（闭包 + IP + 栈基址）                           |
+| 虚拟机     | `vm.rs`         | `GcVM`：opcode 解释执行                                 |
 
 ### 4.1 核心类型
 
@@ -348,7 +348,7 @@ let report = vm.collect_garbage();
 let result = vm.try_export_last_result()?;
 ```
 
-`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats_bundle()`，并返回 `GcCollectionReport`。该 bundle telemetry 路径会额外记录：
+`GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats_bundle()`，并返回 `GcCollectionReport`。该 bundle diagnostics 路径会额外记录：
 
 - 规范化 `objects` catalog；
 - 细分到 String、Null、CompiledFunction 等具体 runtime value 的 before / after 与 collected 计数；
@@ -430,7 +430,7 @@ gc/
 ├── list.rs         # 侵入式链表
 ├── malloc.rs       # 分配统计 + 阈值
 ├── value.rs        # Value + import/export
-├── report.rs       # Heap snapshot + collection telemetry
+├── report.rs       # Heap snapshot + collection diagnostics
 ├── frame.rs        # 调用帧
 ├── vm.rs           # GcVM
 ├── gc_test.rs      # GC 单元测试

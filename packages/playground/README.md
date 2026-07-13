@@ -17,7 +17,7 @@ Repo: https://github.com/gengjiawen/monkey-rust
 - Formatting powered by [prettier-plugin-monkey](https://www.npmjs.com/package/prettier-plugin-monkey)
 - JS-style Monkey classes with `constructor`, `this`, `new`, methods, and mutable instance fields
 - A `Class cycle (GC)` example that creates an unreachable two-instance cycle in Monkey source
-- Before/after heap snapshots, per-value-kind counts, and telemetry for the three collector phases
+- Before/after heap snapshots, per-value-kind counts, and diagnostics for the three collector phases
 - Object decision walkthrough (RC before / heap in-edges / trial RC / Candidate|Survivor / Scan / Final)
 - Visited heap edges with typed relations (`fields["next"]`, `items[0]`, …) and Scan reachability witnesses
 - Tagged parse/compile/runtime errors and stale-request protection for GC runs

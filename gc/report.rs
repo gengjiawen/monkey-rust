@@ -221,7 +221,7 @@ pub struct GcPhaseStats {
     pub free_cycles: FreeCycleStats,
 }
 
-/// Telemetry returned by `run_gc_with_stats_bundle`: object catalog plus phase stats.
+/// Diagnostics returned by `run_gc_with_stats_bundle`: object catalog plus phase stats.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcStatsBundle {
