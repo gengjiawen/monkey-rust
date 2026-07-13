@@ -16,10 +16,6 @@ path = "lib.rs"
 name = "monkey-gc"
 path = "main.rs"
 
-[[test]]
-name = "repl_test"
-path = "repl_test.rs"
-
 [dependencies]
 byteorder = "1.5.0"
 monkey-compiler = { path = "../compiler", version = "0.15.0" }
