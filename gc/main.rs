@@ -33,7 +33,8 @@ impl Repl {
 
         // Compile against clones and commit only after a successful run, so a
         // failed line cannot leak a half-defined binding into the next one.
-        let mut compiler = Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
+        let mut compiler =
+            Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
         let bytecode = compiler.compile(&program)?;
         self.vm
             .set_global_names(compiler.symbol_table.global_symbols());

@@ -1,7 +1,7 @@
 use crate::header::{GcId, GcObjectType, GcPhase};
 use crate::malloc::MallocState;
 use crate::report::{GcPhaseStats, GcStatsBundle};
-use crate::gc_runtime::{GcObject, GcRuntime, MarkFunc};
+use crate::runtime::{GcObject, GcRuntime, MarkFunc};
 
 /// Opaque handle to a GC-managed object.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

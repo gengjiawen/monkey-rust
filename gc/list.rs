@@ -1,5 +1,5 @@
 use crate::header::GcId;
-use crate::gc_runtime::GcRuntime;
+use crate::runtime::GcRuntime;
 
 /// Intrusive doubly-linked list head/tail, indexed by `GcId`.
 /// Rust equivalent of QuickJS `list.h` + embedded `list_head`.

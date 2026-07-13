@@ -12,8 +12,11 @@ pub mod header;
 pub mod heap;
 pub mod list;
 pub mod malloc;
-pub mod gc_runtime;
 pub mod report;
+// The file is named gc_runtime.rs for editor clarity, but the module keeps
+// its historical public path `gc::runtime`.
+#[path = "gc_runtime.rs"]
+pub mod runtime;
 pub mod value;
 pub mod vm;
 
@@ -26,7 +29,7 @@ pub use report::{
     GcStatsBundle, GlobalRoot, HashKeyKind, HeapSnapshot, ObjectDecision, RestorationWitness,
     ScanStats, TrialDecision, TrialDeletionStats, ValueKindCounts, VisitedEdge,
 };
-pub use gc_runtime::{GcObject, GcRuntime, MarkFunc};
+pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{
     export_object, import_object, try_export_object, value_to_string, GcClosure, Value, ValueKind,
 };

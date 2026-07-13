@@ -17,11 +17,7 @@ fn repl_does_not_commit_state_from_failed_lines() {
     let error = repl
         .eval_line("let x = 1 / 0;")
         .expect_err("division by zero should fail");
-    assert!(
-        error.contains("division by zero"),
-        "expected runtime error, got: {:?}",
-        error
-    );
+    assert!(error.contains("division by zero"), "expected runtime error, got: {:?}", error);
 
     let error = repl
         .eval_line("x;")

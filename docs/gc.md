@@ -99,18 +99,18 @@ Workspace 成员：根 `Cargo.toml` → `"gc"`。
 
 ## 4. 模块设计
 
-| 模块       | 文件         | 职责                                                  |
-| ---------- | ------------ | ----------------------------------------------------- |
-| 入口       | `lib.rs`     | 导出公共 API；`compile` / `eval` / `eval_source`      |
-| 堆 API     | `heap.rs`    | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发              |
+| 模块       | 文件            | 职责                                                  |
+| ---------- | --------------- | ----------------------------------------------------- |
+| 入口       | `lib.rs`        | 导出公共 API；`compile` / `eval` / `eval_source`      |
+| 堆 API     | `heap.rs`       | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发              |
 | 运行时核心 | `gc_runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理          |
-| 对象头     | `header.rs`  | `GcObjectHeader`、`GcPhase`、`GcObjectType`           |
-| 侵入式链表 | `list.rs`    | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表      |
-| 分配统计   | `malloc.rs`  | `MallocState`、GC 阈值触发                            |
-| 值模型     | `value.rs`   | `Value`、`ValueCell`、import/export 桥接              |
-| 报告       | `report.rs`  | before/after snapshot、分阶段 telemetry、按值类型统计 |
-| 调用帧     | `frame.rs`   | `Frame`（闭包 + IP + 栈基址）                         |
-| 虚拟机     | `vm.rs`      | `GcVM`：opcode 解释执行                               |
+| 对象头     | `header.rs`     | `GcObjectHeader`、`GcPhase`、`GcObjectType`           |
+| 侵入式链表 | `list.rs`       | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表      |
+| 分配统计   | `malloc.rs`     | `MallocState`、GC 阈值触发                            |
+| 值模型     | `value.rs`      | `Value`、`ValueCell`、import/export 桥接              |
+| 报告       | `report.rs`     | before/after snapshot、分阶段 telemetry、按值类型统计 |
+| 调用帧     | `frame.rs`      | `Frame`（闭包 + IP + 栈基址）                         |
+| 虚拟机     | `vm.rs`         | `GcVM`：opcode 解释执行                               |
 
 ### 4.1 核心类型
 
@@ -434,5 +434,5 @@ gc/
 ├── gc_test.rs      # GC 单元测试
 ├── value_test.rs   # 值层测试
 ├── vm_test.rs      # VM 集成测试
-└── repl_test.rs    # REPL 集成测试
+└── repl_test.rs    # REPL 单元测试（随 main.rs 编译）
 ```
