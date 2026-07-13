@@ -15,9 +15,9 @@ mod stats;
 /// Matches QuickJS `gc_decref_child`, `gc_scan_incref_child`, `gc_scan_incref_child2`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkFunc {
-    Decref,
-    ScanIncref,
-    ScanIncref2,
+    Decref,      // Phase 1 trial deletion: subtract each heap edge from the child's ref count.
+    ScanIncref,  // Phase 2: give the edge back and rescue a child whose refs return above zero.
+    ScanIncref2, // Phase 2: give the edge back to remaining candidates without rescuing them.
 }
 
 /// Trait for objects stored in the GC heap. Implementors expose graph edges via `trace`.
@@ -72,6 +72,78 @@ impl GcRuntime {
         self.gc_decref();
         self.gc_scan();
         self.gc_free_cycles();
+    }
+
+    /// Phase 1: trial deletion.
+    fn gc_decref(&mut self) {
+        assert!(
+            self.tmp_obj_list.is_empty(),
+            "temporary GC list must be empty before trial deletion"
+        );
+        let mut current = self.gc_obj_list.head;
+        while let Some(id) = current {
+            let next = self.header(id).list_next;
+            assert_eq!(self.header(id).mark, 0);
+            self.mark_children(id, MarkFunc::Decref);
+            self.header_mut(id).mark = 1;
+            if self.header(id).ref_count == 0 {
+                self.list_move(GcListKind::GcObj, GcListKind::Tmp, id);
+            }
+            current = next;
+        }
+    }
+
+    /// Phase 2: restore live refs.
+    fn gc_scan(&mut self) {
+        let mut current = self.gc_obj_list.head;
+        while let Some(id) = current {
+            assert!(self.header(id).ref_count > 0);
+            self.header_mut(id).mark = 0;
+            self.mark_children(id, MarkFunc::ScanIncref);
+            current = self.header(id).list_next;
+        }
+
+        let mut current = self.tmp_obj_list.head;
+        while let Some(id) = current {
+            let next = self.header(id).list_next;
+            self.mark_children(id, MarkFunc::ScanIncref2);
+            current = next;
+        }
+    }
+
+    /// Phase 3: free cyclic garbage.
+    fn gc_free_cycles(&mut self) {
+        self.gc_phase = GcPhase::RemoveCycles;
+
+        loop {
+            let id = self.tmp_obj_list.head;
+            if id.is_none() {
+                break;
+            }
+            let id = id.unwrap();
+            let gc_obj_type = self.header(id).gc_obj_type;
+            match gc_obj_type {
+                GcObjectType::MonkeyObject | GcObjectType::FunctionBytecode => {
+                    self.free_gc_object(id);
+                }
+                _ => {
+                    self.list_move(GcListKind::Tmp, GcListKind::ZeroRef, id);
+                }
+            }
+        }
+
+        self.gc_phase = GcPhase::None;
+
+        while let Some(id) = self.gc_zero_ref_count_list.head {
+            let ty = self.header(id).gc_obj_type;
+            assert!(
+                ty == GcObjectType::MonkeyObject || ty == GcObjectType::FunctionBytecode,
+                "unexpected deferred type: {:?}",
+                ty
+            );
+            self.list_remove_current(id);
+            self.free_slot(id);
+        }
     }
 
     pub fn malloc_state(&self) -> &MallocState {
@@ -395,24 +467,6 @@ impl GcRuntime {
         }
     }
 
-    fn gc_decref(&mut self) {
-        assert!(
-            self.tmp_obj_list.is_empty(),
-            "temporary GC list must be empty before trial deletion"
-        );
-        let mut current = self.gc_obj_list.head;
-        while let Some(id) = current {
-            let next = self.header(id).list_next;
-            assert_eq!(self.header(id).mark, 0);
-            self.mark_children(id, MarkFunc::Decref);
-            self.header_mut(id).mark = 1;
-            if self.header(id).ref_count == 0 {
-                self.list_move(GcListKind::GcObj, GcListKind::Tmp, id);
-            }
-            current = next;
-        }
-    }
-
     // --- Phase 2: restore live refs ---
 
     fn gc_scan_incref_child(&mut self, id: GcId) {
@@ -427,58 +481,7 @@ impl GcRuntime {
         self.header_mut(id).ref_count += 1;
     }
 
-    fn gc_scan(&mut self) {
-        let mut current = self.gc_obj_list.head;
-        while let Some(id) = current {
-            assert!(self.header(id).ref_count > 0);
-            self.header_mut(id).mark = 0;
-            self.mark_children(id, MarkFunc::ScanIncref);
-            current = self.header(id).list_next;
-        }
-
-        let mut current = self.tmp_obj_list.head;
-        while let Some(id) = current {
-            let next = self.header(id).list_next;
-            self.mark_children(id, MarkFunc::ScanIncref2);
-            current = next;
-        }
-    }
-
     // --- Phase 3: free cyclic garbage ---
-
-    fn gc_free_cycles(&mut self) {
-        self.gc_phase = GcPhase::RemoveCycles;
-
-        loop {
-            let id = self.tmp_obj_list.head;
-            if id.is_none() {
-                break;
-            }
-            let id = id.unwrap();
-            let gc_obj_type = self.header(id).gc_obj_type;
-            match gc_obj_type {
-                GcObjectType::MonkeyObject | GcObjectType::FunctionBytecode => {
-                    self.free_gc_object(id);
-                }
-                _ => {
-                    self.list_move(GcListKind::Tmp, GcListKind::ZeroRef, id);
-                }
-            }
-        }
-
-        self.gc_phase = GcPhase::None;
-
-        while let Some(id) = self.gc_zero_ref_count_list.head {
-            let ty = self.header(id).gc_obj_type;
-            assert!(
-                ty == GcObjectType::MonkeyObject || ty == GcObjectType::FunctionBytecode,
-                "unexpected deferred type: {:?}",
-                ty
-            );
-            self.list_remove_current(id);
-            self.free_slot(id);
-        }
-    }
 
     fn free_zero_refcount(&mut self) {
         self.gc_phase = GcPhase::Decref;
