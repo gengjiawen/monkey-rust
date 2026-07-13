@@ -15,16 +15,9 @@ mod stats;
 /// Matches QuickJS `gc_decref_child`, `gc_scan_incref_child`, `gc_scan_incref_child2`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkFunc {
-    /// Phase 1 trial deletion: subtract each heap edge from the child's
-    /// ref count; an already-scanned child that hits zero becomes a cycle
-    /// candidate on the tmp list.
-    Decref,
-    /// Phase 2 scan from live objects: give the edge back, and rescue a child
-    /// whose ref count returns above zero from the tmp list.
-    ScanIncref,
-    /// Phase 2 scan over remaining candidates: give the edge back without
-    /// rescuing, so freeing the cycle later balances ref counts to zero.
-    ScanIncref2,
+    Decref,      // Phase 1 trial deletion: subtract each heap edge from the child's ref count.
+    ScanIncref,  // Phase 2: give the edge back and rescue a child whose refs return above zero.
+    ScanIncref2, // Phase 2: give the edge back to remaining candidates without rescuing them.
 }
 
 /// Trait for objects stored in the GC heap. Implementors expose graph edges via `trace`.
