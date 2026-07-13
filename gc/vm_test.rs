@@ -558,6 +558,26 @@ mod tests {
     }
 
     #[test]
+    fn test_load_bytecode_resolves_builtins_from_bootstrap_state() {
+        // Mirror the REPL: persistent symbol table and constants must come
+        // from Compiler::new(), which registers builtins; a bare
+        // SymbolTable::new() would make `len` unresolvable.
+        let mut bootstrap_compiler = Compiler::new();
+        let bootstrap = bootstrap_compiler.compile(&parse("").unwrap()).unwrap();
+        let symbol_table = bootstrap_compiler.symbol_table;
+        let constants = bootstrap_compiler.constants;
+        let mut vm = GcVM::new(bootstrap);
+
+        let program = parse("len([1, 2, 3]);").unwrap();
+        let mut compiler = Compiler::new_with_state(symbol_table, constants);
+        let bytecode = compiler.compile(&program).unwrap();
+        vm.load_bytecode(bytecode);
+        vm.run();
+
+        assert_eq!(vm.export_last_result(), Some(Object::Integer(3)));
+    }
+
+    #[test]
     fn test_class_semantics() {
         run_gc_vm_tests(vec![
             VmTestCase {

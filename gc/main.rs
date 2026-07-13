@@ -1,22 +1,19 @@
 use compiler::compiler::Compiler;
-use compiler::symbol_table::SymbolTable;
 use gc::GcVM;
-use object::Object;
 use parser::parse;
 use std::io::stdin;
 use std::io::{self, Write};
-use std::rc::Rc;
 
 fn main() {
     println!("Welcome to monkey gc by gengjiawen");
-    let mut constants: Vec<Rc<Object>> = vec![];
-    let mut symbol_table = SymbolTable::new();
-    let bootstrap = {
-        let mut compiler = Compiler::new();
-        compiler
-            .compile(&parse("").expect("empty program should parse"))
-            .expect("empty program should compile")
-    };
+    // Seed the persistent state from Compiler::new() so builtins like `len`
+    // stay resolvable; new_with_state replaces the symbol table wholesale.
+    let mut bootstrap_compiler = Compiler::new();
+    let bootstrap = bootstrap_compiler
+        .compile(&parse("").expect("empty program should parse"))
+        .expect("empty program should compile");
+    let mut symbol_table = bootstrap_compiler.symbol_table;
+    let mut constants = bootstrap_compiler.constants;
     let mut vm = GcVM::new(bootstrap);
 
     loop {
@@ -38,13 +35,19 @@ fn main() {
             }
         };
 
-        let mut compiler = Compiler::new_with_state(symbol_table, constants);
+        // Compile against clones and commit only after a successful run, so a
+        // failed line cannot leak a half-defined binding into the next one.
+        let mut compiler = Compiler::new_with_state(symbol_table.clone(), constants.clone());
         match compiler.compile(&program) {
             Ok(bytecode) => {
                 vm.set_global_names(compiler.symbol_table.global_symbols());
                 vm.load_bytecode(bytecode);
                 match vm.run_with_budget(usize::MAX) {
-                    Ok(()) => println!("{}", vm.last_result_string()),
+                    Ok(()) => {
+                        println!("{}", vm.last_result_string());
+                        symbol_table = compiler.symbol_table;
+                        constants = compiler.constants;
+                    }
                     Err(error) => eprintln!("{}", error.message),
                 }
             }
@@ -52,8 +55,5 @@ fn main() {
                 eprintln!("{}", error);
             }
         }
-
-        symbol_table = compiler.symbol_table;
-        constants = compiler.constants;
     }
 }
