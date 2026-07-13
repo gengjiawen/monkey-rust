@@ -85,6 +85,30 @@ mod tests {
         assert_eq!(tokens.last().unwrap().kind, TokenKind::EOF);
     }
 
+    fn assert_eof_span(input: &str) {
+        let mut l = Lexer::new(input);
+        let tokens = test_token_set(&mut l);
+        let eof = tokens.last().unwrap();
+        assert_eq!(eof.kind, TokenKind::EOF);
+        assert_eq!(eof.span.start, input.len());
+        assert_eq!(eof.span.end, input.len());
+    }
+
+    #[test]
+    fn eof_span_is_zero_width_for_empty_input() {
+        assert_eof_span("");
+    }
+
+    #[test]
+    fn eof_span_is_zero_width_after_trailing_whitespace_and_comments() {
+        assert_eof_span("let x = 5;   \n// trailing comment\n\t  ");
+    }
+
+    #[test]
+    fn eof_span_is_zero_width_for_non_ascii_input() {
+        assert_eof_span(r#""你好"; let x = 1;"#);
+    }
+
     #[test]
     fn test_comments_then_blank_line() {
         // Ensure comments followed by a blank line are skipped correctly

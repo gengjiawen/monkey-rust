@@ -48,11 +48,11 @@ impl<'a> Lexer<'a> {
         self.skip_ignorable();
         let start = self.position;
         if self.ch == '\0' {
-            self.read_char();
+            // EOF consumes no source bytes; keep a zero-width span at input.len().
             return Token {
                 span: Span {
                     start,
-                    end: start + 1,
+                    end: start,
                 },
                 kind: TokenKind::EOF,
             };

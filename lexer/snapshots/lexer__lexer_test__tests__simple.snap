@@ -90,7 +90,7 @@ expression: "=+(){},:;"
     },
     "span": {
       "start": 9,
-      "end": 10
+      "end": 9
     }
   }
 ]

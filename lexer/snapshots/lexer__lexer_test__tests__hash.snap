@@ -132,7 +132,7 @@ expression: "{\"one\": 1, \"two\": 2, \"three\": 3}"
     },
     "span": {
       "start": 32,
-      "end": 33
+      "end": 32
     }
   }
 ]
