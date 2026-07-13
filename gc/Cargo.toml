@@ -12,6 +12,10 @@ license = "MIT"
 name = "gc"
 path = "lib.rs"
 
+[[bin]]
+name = "monkey-gc"
+path = "main.rs"
+
 [dependencies]
 byteorder = "1.5.0"
 monkey-compiler = { path = "../compiler", version = "0.15.0" }

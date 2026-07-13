@@ -499,6 +499,34 @@ mod tests {
     }
 
     #[test]
+    fn test_load_bytecode_preserves_globals() {
+        let mut symbol_table = compiler::symbol_table::SymbolTable::new();
+        let mut constants = vec![];
+
+        let bootstrap = {
+            let mut compiler = Compiler::new();
+            compiler.compile(&parse("").unwrap()).unwrap()
+        };
+        let mut vm = GcVM::new(bootstrap);
+
+        let first = parse("let answer = 21 * 2;").unwrap();
+        let mut compiler = Compiler::new_with_state(symbol_table, constants);
+        let bytecode = compiler.compile(&first).unwrap();
+        vm.load_bytecode(bytecode);
+        vm.run();
+        symbol_table = compiler.symbol_table;
+        constants = compiler.constants;
+
+        let second = parse("answer;").unwrap();
+        let mut compiler = Compiler::new_with_state(symbol_table, constants);
+        let bytecode = compiler.compile(&second).unwrap();
+        vm.load_bytecode(bytecode);
+        vm.run();
+
+        assert_eq!(vm.export_last_result(), Some(Object::Integer(42)));
+    }
+
+    #[test]
     fn test_class_semantics() {
         run_gc_vm_tests(vec![
             VmTestCase {

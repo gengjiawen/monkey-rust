@@ -132,6 +132,15 @@ the compatibility phase-stats view of the same atomic collection. Ordinary
 - `report.rs` defines heap snapshots and collection telemetry.
 - `frame.rs` and `vm.rs` implement the bytecode VM runtime.
 
+## REPL
+
+This crate also ships a `monkey-gc` binary with a stateful REPL (globals and
+compiler constants persist across lines), matching `monkey-compiler`:
+
+```sh
+cargo run -p monkey-gc
+```
+
 ## Development
 
 Run the crate tests from the workspace root:

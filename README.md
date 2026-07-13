@@ -23,7 +23,7 @@ Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **inf
 ## Features
 
 - Split packages to make everything minimum
-- **REPL**: A Read-Eval-Print-Loop (REPL) for Monkey tokenizer, parser, evaluator, compiler
+- **REPL**: A Read-Eval-Print-Loop (REPL) for Monkey tokenizer, parser, evaluator, compiler, and GC runtime
 - location info for ast
 - test for every module
 - **Wasm**: A WebAssembly target, thus run monkey on browser is directly supported.

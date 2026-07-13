@@ -132,6 +132,76 @@ impl GcVM {
         }
     }
 
+    /// Replace the current main program while preserving the heap and globals.
+    ///
+    /// Used by the REPL so later lines can read bindings created earlier. Old
+    /// constant-pool owning refs are released; objects still reachable from
+    /// globals stay alive.
+    pub fn load_bytecode(&mut self, bytecode: Bytecode) {
+        let Bytecode {
+            instructions,
+            constants: object_constants,
+            debug_info: main_debug_info,
+            function_debug_info: object_function_debug_info,
+        } = bytecode;
+
+        self.clear_stack_range(0, self.sp);
+        self.sp = 0;
+
+        for reference in self.constants.drain(..) {
+            self.heap.free(reference);
+        }
+        self.function_debug_info.clear();
+
+        let old_main = self.frames[0].cl.func;
+        self.heap.free(old_main);
+
+        self.constants = object_constants
+            .iter()
+            .map(|constant| import_object(&mut self.heap, constant))
+            .collect::<Vec<_>>();
+        self.function_debug_info = object_function_debug_info
+            .into_iter()
+            .filter_map(|(index, debug_info)| {
+                self.constants
+                    .get(index)
+                    .copied()
+                    .map(|reference| (reference, debug_info))
+            })
+            .collect();
+        self.main_debug_info = main_debug_info;
+
+        let main_fn = alloc_value(
+            &mut self.heap,
+            Value::CompiledFunction(object::CompiledFunction {
+                name: String::new(),
+                instructions: instructions.data,
+                num_locals: 0,
+                num_parameters: 0,
+            }),
+        );
+        let main_instructions = compiled_instructions(&self.heap, main_fn);
+        let main_frame = Frame::new(
+            GcClosure {
+                func: main_fn,
+                free: vec![],
+            },
+            main_instructions,
+            0,
+        );
+        let empty_frame = Frame::new(
+            GcClosure {
+                func: main_fn,
+                free: vec![],
+            },
+            vec![],
+            0,
+        );
+        self.frames = vec![empty_frame; MAX_FRAMES];
+        self.frames[0] = main_frame;
+        self.frame_index = 1;
+    }
+
     pub fn heap(&self) -> &GcHeap {
         &self.heap
     }
