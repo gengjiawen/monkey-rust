@@ -194,7 +194,7 @@ describe('parseGcRunEnvelope', () => {
     })
   })
 
-  it('accepts a full report with teaching telemetry', () => {
+  it('accepts a full report with teaching diagnostics', () => {
     const envelope = parseGcRunEnvelope(okEnvelope())
     expect(envelope.status).toBe('ok')
     if (envelope.status !== 'ok') {

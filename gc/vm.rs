@@ -235,7 +235,7 @@ impl GcVM {
             .collect();
         let before_kinds = self.heap.value_kinds_by_id();
         let before = self.heap.snapshot();
-        let telemetry = self.heap.run_gc_with_stats_bundle();
+        let diagnostics = self.heap.run_gc_with_stats_bundle();
         let after = self.heap.snapshot();
         let mut collected_by_value_kind = empty_value_kind_counts();
         for (id, kind) in before_kinds {
@@ -243,7 +243,7 @@ impl GcVM {
                 *collected_by_value_kind.entry(kind).or_default() += 1;
             }
         }
-        let mut objects = telemetry.objects;
+        let mut objects = diagnostics.objects;
         let cataloged: HashSet<GcId> = objects.iter().map(|object| object.id).collect();
         let (global_roots, omitted_global_roots) = select_global_roots(global_roots, &cataloged);
         // The phase budgets pick the catalog without looking at the root set,
@@ -267,7 +267,7 @@ impl GcVM {
             objects,
             global_roots,
             omitted_global_roots,
-            phases: telemetry.phases,
+            phases: diagnostics.phases,
             collected_by_value_kind,
         }
     }

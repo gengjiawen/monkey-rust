@@ -57,7 +57,7 @@ println!("collected instances: {}", run.report.collected_by_value_kind[&gc::Valu
 - `compile` reuses `monkey-compiler` to produce bytecode.
 - `GcVM` executes Monkey bytecode with GC-managed values.
 - `run_source_with_report` returns a staged parse/compile/runtime result plus
-  before/after snapshots and per-phase collection telemetry. Scan telemetry
+  before/after snapshots and per-phase collection diagnostics. Scan diagnostics
   includes sorted synthetic labels for restored and garbage-candidate objects.
 - `GcVM::collect_garbage` atomically runs all three collector phases and returns
   a `GcCollectionReport`.
@@ -115,21 +115,23 @@ collapse into `Other`. `Other` is reserved for GC runtime objects that are not
 Monkey `Value`s. Snapshot totals still include constants and VM bookkeeping
 values, not only objects explicitly created by source-level `new` expressions.
 
-`run_gc_with_stats_bundle()` returns the object catalog plus teaching telemetry:
+`run_gc_with_stats_bundle()` returns the object catalog plus teaching diagnostics:
 object decisions with the RC formula
 (`refCountBefore − heapIncomingEdges = trialRefCount`), typed visited heap
 edges, and deterministic Scan restoration witnesses. `run_gc_with_stats()` is
 the compatibility phase-stats view of the same atomic collection. Ordinary
-`run_gc()` skips telemetry collection.
+`run_gc()` skips diagnostics collection.
 
 ## Modules
 
 - `heap.rs` provides the high-level `GcHeap` and opaque `GcRef` handle.
 - `gc_runtime.rs` implements reference counting and three-phase cycle collection.
+- `gc_stats.rs` gathers `run_gc_with_stats` diagnostics: visited edges, object
+  decisions, and restoration witnesses.
 - `header.rs`, `list.rs`, and `malloc.rs` hold GC object metadata and allocator
   accounting.
 - `value.rs` defines GC-managed Monkey values plus import/export helpers.
-- `report.rs` defines heap snapshots and collection telemetry.
+- `report.rs` defines heap snapshots and collection diagnostics.
 - `frame.rs` and `vm.rs` implement the bytecode VM runtime.
 
 ## REPL

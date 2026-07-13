@@ -73,7 +73,7 @@ pub enum ValueKind {
     Other,
 }
 
-/// Typed heap-edge relation used by teaching telemetry.
+/// Typed heap-edge relation used by teaching diagnostics.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum EdgeRelation {
@@ -193,7 +193,7 @@ impl Value {
         }
     }
 
-    /// Visit heap edges with typed structural relations for telemetry.
+    /// Visit heap edges with typed structural relations for diagnostics.
     ///
     /// Hash keys, class methods, and instance fields are visited in stable
     /// sorted order so reports stay deterministic. The collector's `trace`
