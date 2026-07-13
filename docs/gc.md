@@ -104,6 +104,7 @@ Workspace 成员：根 `Cargo.toml` → `"gc"`。
 | 入口       | `lib.rs`        | 导出公共 API；`compile` / `eval` / `eval_source`      |
 | 堆 API     | `heap.rs`       | `GcHeap`、`GcRef`；分配 / 释放 / GC 触发              |
 | 运行时核心 | `gc_runtime.rs` | `GcRuntime`：refcount、三阶段 GC、对象槽管理          |
+| GC 诊断    | `gc_stats.rs`   | `run_gc_with_stats_bundle`：边捕获、对象判定、恢复见证 |
 | 对象头     | `header.rs`     | `GcObjectHeader`、`GcPhase`、`GcObjectType`           |
 | 侵入式链表 | `list.rs`       | `GcList`：`gc_obj` / `tmp` / `zero_ref` 三条链表      |
 | 分配统计   | `malloc.rs`     | `MallocState`、GC 阈值触发                            |
@@ -424,6 +425,7 @@ gc/
 ├── lib.rs          # 入口 + eval API
 ├── heap.rs         # GcHeap / GcRef
 ├── gc_runtime.rs   # GcRuntime + GC 三阶段
+├── gc_stats.rs     # run_gc_with_stats 诊断
 ├── header.rs       # 对象头 + 类型 tag
 ├── list.rs         # 侵入式链表
 ├── malloc.rs       # 分配统计 + 阈值
