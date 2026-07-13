@@ -1504,7 +1504,7 @@ assert_eq!(report.collected_by_value_kind.instance, 2);
 | interpreter   | `interpreter/lib.rs`, `interpreter/interpreter_test.rs`                                                        |
 | bytecode      | `compiler/op_code.rs`, `compiler/compiler.rs`, `compiler/symbol_table.rs`, compiler instruction/tests          |
 | default VM    | `compiler/vm.rs`, VM tests                                                                                     |
-| GcVM          | `gc/lib.rs`, `gc/value.rs`, `gc/vm.rs`, `gc/heap.rs`, `gc/runtime.rs`, GC tests                                |
+| GcVM          | `gc/lib.rs`, `gc/value.rs`, `gc/vm.rs`, `gc/heap.rs`, `gc/gc_runtime.rs`, GC tests                             |
 | WASM/build    | `wasm/Cargo.toml`, `wasm/src/lib.rs`, WASM tests, root `Cargo.lock`                                            |
 | Prettier      | `packages/prettier-plugin-monkey/src/types.ts`, `printer.ts`, fixtures/tests                                   |
 | Playground    | `packages/playground/package.json`, `src/App.tsx`, report types、styles/components、Vitest/RTL tests           |

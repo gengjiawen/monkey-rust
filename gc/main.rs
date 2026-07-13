@@ -1,20 +1,56 @@
 use compiler::compiler::Compiler;
+use compiler::symbol_table::SymbolTable;
 use gc::GcVM;
+use object::Object;
 use parser::parse;
 use std::io::stdin;
 use std::io::{self, Write};
+use std::rc::Rc;
+
+struct Repl {
+    symbol_table: SymbolTable,
+    constants: Vec<Rc<Object>>,
+    vm: GcVM,
+}
+
+impl Repl {
+    fn new() -> Self {
+        // Seed the persistent state from Compiler::new() so builtins like `len`
+        // stay resolvable; new_with_state replaces the symbol table wholesale.
+        let mut bootstrap_compiler = Compiler::new();
+        let bootstrap = bootstrap_compiler
+            .compile(&parse("").expect("empty program should parse"))
+            .expect("empty program should compile");
+        Self {
+            symbol_table: bootstrap_compiler.symbol_table,
+            constants: bootstrap_compiler.constants,
+            vm: GcVM::new(bootstrap),
+        }
+    }
+
+    fn eval_line(&mut self, input: &str) -> Result<String, String> {
+        let program = parse(input).map_err(|errors| format!("parse error: {}", errors[0]))?;
+
+        // Compile against clones and commit only after a successful run, so a
+        // failed line cannot leak a half-defined binding into the next one.
+        let mut compiler =
+            Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
+        let bytecode = compiler.compile(&program)?;
+        self.vm
+            .set_global_names(compiler.symbol_table.global_symbols());
+        self.vm.load_bytecode(bytecode);
+        self.vm
+            .run_with_budget(usize::MAX)
+            .map_err(|error| error.message)?;
+        self.symbol_table = compiler.symbol_table;
+        self.constants = compiler.constants;
+        Ok(self.vm.last_result_string())
+    }
+}
 
 fn main() {
     println!("Welcome to monkey gc by gengjiawen");
-    // Seed the persistent state from Compiler::new() so builtins like `len`
-    // stay resolvable; new_with_state replaces the symbol table wholesale.
-    let mut bootstrap_compiler = Compiler::new();
-    let bootstrap = bootstrap_compiler
-        .compile(&parse("").expect("empty program should parse"))
-        .expect("empty program should compile");
-    let mut symbol_table = bootstrap_compiler.symbol_table;
-    let mut constants = bootstrap_compiler.constants;
-    let mut vm = GcVM::new(bootstrap);
+    let mut repl = Repl::new();
 
     loop {
         print!("> ");
@@ -27,33 +63,12 @@ fn main() {
             std::process::exit(0);
         }
 
-        let program = match parse(&input) {
-            Ok(node) => node,
-            Err(errors) => {
-                eprintln!("parse error: {}", errors[0]);
-                continue;
-            }
-        };
-
-        // Compile against clones and commit only after a successful run, so a
-        // failed line cannot leak a half-defined binding into the next one.
-        let mut compiler = Compiler::new_with_state(symbol_table.clone(), constants.clone());
-        match compiler.compile(&program) {
-            Ok(bytecode) => {
-                vm.set_global_names(compiler.symbol_table.global_symbols());
-                vm.load_bytecode(bytecode);
-                match vm.run_with_budget(usize::MAX) {
-                    Ok(()) => {
-                        println!("{}", vm.last_result_string());
-                        symbol_table = compiler.symbol_table;
-                        constants = compiler.constants;
-                    }
-                    Err(error) => eprintln!("{}", error.message),
-                }
-            }
-            Err(error) => {
-                eprintln!("{}", error);
-            }
+        match repl.eval_line(&input) {
+            Ok(result) => println!("{}", result),
+            Err(error) => eprintln!("{}", error),
         }
     }
 }
+
+#[cfg(test)]
+mod repl_test;

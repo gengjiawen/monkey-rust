@@ -13,6 +13,9 @@ pub mod heap;
 pub mod list;
 pub mod malloc;
 pub mod report;
+// The file is named gc_runtime.rs for editor clarity, but the module keeps
+// its historical public path `gc::runtime`.
+#[path = "gc_runtime.rs"]
 pub mod runtime;
 pub mod value;
 pub mod vm;

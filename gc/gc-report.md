@@ -378,7 +378,7 @@ pub type GcId = usize;
 对象表（简化）：
 
 ```rust
-// gc/runtime.rs
+// gc/gc_runtime.rs
 pub struct GcRuntime {
     objects: Vec<Option<GcObjectEntry>>,
     free_slots: Vec<GcId>,
