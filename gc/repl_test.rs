@@ -19,7 +19,8 @@ fn repl_does_not_commit_state_from_failed_lines() {
         .expect_err("division by zero should fail");
     assert!(
         error.contains("division by zero"),
-        "expected runtime error, got: {error:?}"
+        "expected runtime error, got: {:?}",
+        error
     );
 
     let error = repl
@@ -27,7 +28,8 @@ fn repl_does_not_commit_state_from_failed_lines() {
         .expect_err("ghost binding must not survive");
     assert!(
         error.to_lowercase().contains("undefined variable 'x'"),
-        "ghost binding survived a failed line, got: {error:?}"
+        "ghost binding survived a failed line, got: {:?}",
+        error
     );
 }
 
