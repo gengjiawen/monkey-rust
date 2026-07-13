@@ -83,10 +83,11 @@ impl GcRuntime {
         let mut current = self.gc_obj_list.head;
         while let Some(id) = current {
             let next = self.header(id).list_next;
-            assert_eq!(self.header(id).mark, 0);
+            debug_assert_eq!(self.header(id).mark, 0);
             self.mark_children(id, MarkFunc::Decref);
-            self.header_mut(id).mark = 1;
-            if self.header(id).ref_count == 0 {
+            let header = self.header_mut(id);
+            header.mark = 1;
+            if header.ref_count == 0 {
                 self.list_move(GcListKind::GcObj, GcListKind::Tmp, id);
             }
             current = next;
@@ -97,8 +98,9 @@ impl GcRuntime {
     fn gc_scan(&mut self) {
         let mut current = self.gc_obj_list.head;
         while let Some(id) = current {
-            assert!(self.header(id).ref_count > 0);
-            self.header_mut(id).mark = 0;
+            let header = self.header_mut(id);
+            debug_assert!(header.ref_count > 0);
+            header.mark = 0;
             self.mark_children(id, MarkFunc::ScanIncref);
             current = self.header(id).list_next;
         }
@@ -136,7 +138,7 @@ impl GcRuntime {
 
         while let Some(id) = self.gc_zero_ref_count_list.head {
             let ty = self.header(id).gc_obj_type;
-            assert!(
+            debug_assert!(
                 ty == GcObjectType::MonkeyObject || ty == GcObjectType::FunctionBytecode,
                 "unexpected deferred type: {:?}",
                 ty
@@ -205,7 +207,7 @@ impl GcRuntime {
 
         {
             let header = self.header_mut(id);
-            assert!(
+            debug_assert!(
                 header.list_kind.is_none(),
                 "object already belongs to a GC list: {:?}",
                 header.list_kind
@@ -228,11 +230,10 @@ impl GcRuntime {
     }
 
     fn list_remove(&mut self, kind: GcListKind, id: GcId) {
-        assert_eq!(self.header(id).list_kind, Some(kind), "object is not on the expected GC list");
-
         let list_ptr = self.list_ptr(kind);
         let (prev, next) = {
             let header = self.header(id);
+            debug_assert_eq!(header.list_kind, Some(kind), "object is not on the expected GC list");
             (header.list_prev, header.list_next)
         };
 
@@ -318,13 +319,12 @@ impl GcRuntime {
     /// Decrement refcount and free when it reaches zero.
     /// Matches QuickJS `JS_FreeValueRT` for GC objects.
     pub fn free_gc(&mut self, id: GcId) {
-        if !self.object_exists(id) {
-            return;
-        }
-        let ref_count = {
-            let header = self.header_mut(id);
-            header.ref_count -= 1;
-            header.ref_count
+        let ref_count = match self.objects.get_mut(id).and_then(|slot| slot.as_mut()) {
+            Some(entry) => {
+                entry.header.ref_count -= 1;
+                entry.header.ref_count
+            }
+            None => return,
         };
 
         if ref_count > 0 {
@@ -460,9 +460,10 @@ impl GcRuntime {
     // --- Phase 1: trial deletion ---
 
     fn gc_decref_child(&mut self, id: GcId) {
-        assert!(self.header(id).ref_count > 0);
-        self.header_mut(id).ref_count -= 1;
-        if self.header(id).ref_count == 0 && self.header(id).mark == 1 {
+        let header = self.header_mut(id);
+        debug_assert!(header.ref_count > 0);
+        header.ref_count -= 1;
+        if header.ref_count == 0 && header.mark == 1 {
             self.list_move(GcListKind::GcObj, GcListKind::Tmp, id);
         }
     }
@@ -470,8 +471,9 @@ impl GcRuntime {
     // --- Phase 2: restore live refs ---
 
     fn gc_scan_incref_child(&mut self, id: GcId) {
-        self.header_mut(id).ref_count += 1;
-        if self.header(id).ref_count == 1 {
+        let header = self.header_mut(id);
+        header.ref_count += 1;
+        if header.ref_count == 1 {
             self.list_move(GcListKind::Tmp, GcListKind::GcObj, id);
             self.header_mut(id).mark = 0;
         }
@@ -491,7 +493,7 @@ impl GcRuntime {
                 break;
             }
             let id = id.unwrap();
-            assert_eq!(self.header(id).ref_count, 0);
+            debug_assert_eq!(self.header(id).ref_count, 0);
             self.free_gc_object(id);
         }
         self.gc_phase = GcPhase::None;
