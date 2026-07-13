@@ -9,7 +9,7 @@ expression: // I am comments
     },
     "span": {
       "start": 16,
-      "end": 17
+      "end": 16
     }
   }
 ]
