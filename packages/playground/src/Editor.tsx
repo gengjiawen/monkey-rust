@@ -19,6 +19,13 @@ import {
 
 const setHighlight = StateEffect.define<{ from: number; to: number } | null>()
 
+// CodeMirror injects its own unlayered styles at runtime, so the contested
+// declarations (height, scroller font) carry `!` to keep winning over them.
+const fillClass =
+  'flex h-full min-h-0 flex-1 overflow-hidden [&_.cm-editor]:h-full! [&_.cm-editor]:max-h-full [&_.cm-editor]:min-h-0 [&_.cm-editor]:flex-1 [&_.cm-editor]:bg-(--color-background) [&_.cm-editor]:text-[14px] [&_.cm-scroller]:overflow-auto'
+
+const scrollerFontClass = '[&_.cm-scroller]:font-mono!'
+
 const highlightMark = Decoration.mark({ class: 'cm-ast-highlight' })
 
 const playgroundEditorTheme = EditorView.theme({
@@ -175,7 +182,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   return (
     <CodeMirror
       {...extraProps}
-      className={fill ? 'editor-fill' : undefined}
+      className={fill ? `${fillClass} ${scrollerFontClass}` : scrollerFontClass}
       value={code}
       height="100%"
       theme="none"

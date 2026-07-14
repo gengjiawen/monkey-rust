@@ -176,7 +176,8 @@ export function buildHeapGraph(report: GcCollectionReport): HeapGraph {
   }
 
   // No classDef lines: mermaid still adds the ::: class names to each node's
-  // SVG class attribute, and globals.css styles them with the same Radix
-  // tokens as the walkthrough badges (classDef cannot express CSS variables).
+  // SVG class attribute, and HeapGraphView's canvas styles them with the same
+  // Radix tokens as the walkthrough badges (classDef cannot express CSS
+  // variables).
   return { status: 'ok', source: lines.join('\n'), droppedIsolated }
 }

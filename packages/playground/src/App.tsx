@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Button, Flex, SegmentedControl, Select } from '@radix-ui/themes'
+import { Button, SegmentedControl, Select } from '@radix-ui/themes'
 import { compile_with_debug, parse } from '@gengjiawen/monkey-wasm'
 import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
@@ -95,6 +95,15 @@ makeCycle();
 ]
 
 type OutputView = 'ast' | 'bytecode' | 'gc'
+
+const panelClass =
+  'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
+
+const toolbarClass =
+  'flex shrink-0 items-center justify-between gap-3 border-b border-(--gray-a5) bg-(--color-background) px-3 py-2'
+
+const editorFrameClass =
+  'flex min-h-0 flex-1 flex-col overflow-hidden bg-(--color-background)'
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
@@ -274,17 +283,12 @@ function App() {
   }, [gcState, outputView])
 
   return (
-    <Flex className="playground-shell">
-      <Flex direction="column" className="panel editor-column">
-        <Flex
-          className="toolbar"
-          align="center"
-          justify="between"
-          gap="3"
-          px="3"
-          py="2"
-        >
-          <Flex align="center" gap="3">
+    <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden max-[780px]:grid-cols-1 max-[780px]:grid-rows-2">
+      <div
+        className={`${panelClass} border-r border-(--gray-a5) max-[780px]:border-r-0 max-[780px]:border-b`}
+      >
+        <div className={toolbarClass}>
+          <div className="flex items-center gap-3">
             <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
             </Button>
@@ -302,7 +306,7 @@ function App() {
                 ))}
               </Select.Content>
             </Select.Root>
-          </Flex>
+          </div>
           <SegmentedControl.Root
             size="2"
             value={vimMode ? 'vim' : 'plain'}
@@ -311,8 +315,8 @@ function App() {
             <SegmentedControl.Item value="vim">Vim</SegmentedControl.Item>
             <SegmentedControl.Item value="plain">Plain</SegmentedControl.Item>
           </SegmentedControl.Root>
-        </Flex>
-        <Box className="editor-frame">
+        </div>
+        <div className={editorFrameClass}>
           <Editor
             ref={editorRef}
             code={code}
@@ -321,18 +325,11 @@ function App() {
             vimMode={vimMode}
             fill
           />
-        </Box>
-      </Flex>
+        </div>
+      </div>
 
-      <Flex direction="column" className="panel output-column">
-        <Flex
-          className="toolbar"
-          align="center"
-          justify="between"
-          gap="3"
-          px="3"
-          py="2"
-        >
+      <div className={panelClass}>
+        <div className={toolbarClass}>
           <SegmentedControl.Root
             size="2"
             value={outputView}
@@ -353,28 +350,28 @@ function App() {
               Run GC
             </Button>
           ) : null}
-        </Flex>
-        <Box className="editor-frame">
+        </div>
+        <div className={editorFrameClass}>
           {outputView === 'ast' && astData !== null ? (
-            <Box className="ast-frame">
+            <div className="min-h-0 flex-1 overflow-auto bg-(--color-background) px-2.5 pt-2 pb-4">
               <AstTreeView
                 data={astData}
                 selection={selection}
                 onNodeSelect={handleNodeSelect}
               />
-            </Box>
+            </div>
           ) : null}
           {outputView === 'gc' ? (
-            <Box className="gc-frame">
+            <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) bg-[image:radial-gradient(circle_at_top_right,var(--accent-a3),transparent_34%)] p-4.5">
               <GcReportView
                 state={gcState}
                 onErrorSpanSelect={handleGcErrorSpanSelect}
               />
-            </Box>
+            </div>
           ) : null}
           {outputView === 'bytecode' ||
           (outputView === 'ast' && astData === null) ? (
-            <Box className="output-editor">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <Editor
                 code={outputView === 'ast' ? astOutput : compilerOutput}
                 extra={{ readOnly: true, editable: false }}
@@ -386,11 +383,11 @@ function App() {
                 vimMode={false}
                 fill
               />
-            </Box>
+            </div>
           ) : null}
-        </Box>
-      </Flex>
-    </Flex>
+        </div>
+      </div>
+    </div>
   )
 }
 
