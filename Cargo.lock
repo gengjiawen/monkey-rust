@@ -236,6 +236,7 @@ name = "monkey-compiler"
 version = "0.15.1"
 dependencies = [
  "byteorder",
+ "insta",
  "lazy_static",
  "monkey-object",
  "monkey-parser",

@@ -3,6 +3,8 @@ mod gc_test;
 #[cfg(test)]
 mod report_test;
 #[cfg(test)]
+mod runner_test;
+#[cfg(test)]
 mod value_test;
 #[cfg(test)]
 mod vm_test;
@@ -13,6 +15,7 @@ pub mod heap;
 pub mod list;
 pub mod malloc;
 pub mod report;
+pub mod runner;
 // The file is named gc_runtime.rs for editor clarity, but the module keeps
 // its historical public path `gc::runtime`.
 #[path = "gc_runtime.rs"]
@@ -29,6 +32,7 @@ pub use report::{
     GcStatsBundle, GlobalRoot, HashKeyKind, HeapSnapshot, ObjectDecision, RestorationWitness,
     ScanStats, TrialDecision, TrialDeletionStats, ValueKindCounts, VisitedEdge,
 };
+pub use runner::{compile_source, run_bytecode};
 pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{
     export_object, import_object, try_export_object, value_to_string, GcClosure, Value, ValueKind,
