@@ -14,6 +14,12 @@ import { Editor, type EditorHandle } from './Editor'
 import { GcReportView, type GcPanelState } from './GcReportView'
 import type { SourceSpan } from './gcReport'
 import { runGc } from './gcRunner'
+import {
+  SnapshotView,
+  type SnapshotBuildState,
+  type SnapshotRunState,
+} from './SnapshotView'
+import { buildSnapshot, runSnapshot } from './snapshotRunner'
 
 interface Snippet {
   label: string
@@ -94,7 +100,7 @@ makeCycle();
   },
 ]
 
-type OutputView = 'ast' | 'bytecode' | 'gc'
+type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot'
 
 const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
@@ -128,30 +134,52 @@ function App() {
   const [isFormatting, setIsFormatting] = useState(false)
   const [gcState, setGcState] = useState<GcPanelState>({ status: 'idle' })
   const gcRequestId = useRef(0)
+  const [stripDebug, setStripDebug] = useState(false)
+  const [snapshotBuild, setSnapshotBuild] = useState<SnapshotBuildState>({
+    status: 'idle',
+  })
+  const [snapshotRun, setSnapshotRun] = useState<SnapshotRunState>({
+    status: 'idle',
+  })
+  const snapshotRunRequestId = useRef(0)
   const editorRef = useRef<EditorHandle>(null)
 
-  const compileCode = useCallback((source: string) => {
-    try {
-      const astJson = parse(source)
-      const ast = JSON.parse(astJson) as unknown
-      setAstData(ast)
-      setAstOutput(JSON.stringify(ast, null, 2))
-    } catch (error) {
-      const message = getErrorMessage(error)
-      setAstData(null)
-      setAstOutput(message)
-    }
+  const compileCode = useCallback(
+    (source: string) => {
+      try {
+        const astJson = parse(source)
+        const ast = JSON.parse(astJson) as unknown
+        setAstData(ast)
+        setAstOutput(JSON.stringify(ast, null, 2))
+      } catch (error) {
+        const message = getErrorMessage(error)
+        setAstData(null)
+        setAstOutput(message)
+      }
 
-    try {
-      const debugJson = compile_with_debug(source)
-      const view = JSON.parse(debugJson) as BytecodeDebugView
-      setBytecodeDebugView(view)
-      setCompilerOutput(view.detail)
-    } catch (error) {
-      setBytecodeDebugView(null)
-      setCompilerOutput(getErrorMessage(error))
-    }
-  }, [])
+      try {
+        const debugJson = compile_with_debug(source)
+        const view = JSON.parse(debugJson) as BytecodeDebugView
+        setBytecodeDebugView(view)
+        setCompilerOutput(view.detail)
+      } catch (error) {
+        setBytecodeDebugView(null)
+        setCompilerOutput(getErrorMessage(error))
+      }
+
+      snapshotRunRequestId.current += 1
+      setSnapshotRun({ status: 'idle' })
+      try {
+        setSnapshotBuild(buildSnapshot(source, stripDebug))
+      } catch (error) {
+        setSnapshotBuild({
+          status: 'invalid',
+          message: getErrorMessage(error),
+        })
+      }
+    },
+    [stripDebug]
+  )
 
   const debouncedCompile = useMemo(
     () => debounce(compileCode, 200),
@@ -162,6 +190,8 @@ function App() {
     setCode(value)
     gcRequestId.current += 1
     setGcState({ status: 'idle' })
+    snapshotRunRequestId.current += 1
+    setSnapshotRun({ status: 'idle' })
   }, [])
 
   const formatCode = useCallback(async () => {
@@ -234,11 +264,34 @@ function App() {
     }
   }, [code])
 
+  const runSnapshotBytes = useCallback(async () => {
+    if (snapshotBuild.status !== 'ok') {
+      return
+    }
+    const requestId = snapshotRunRequestId.current + 1
+    snapshotRunRequestId.current = requestId
+    setSnapshotRun({ status: 'running' })
+
+    try {
+      const result = await runSnapshot(snapshotBuild.bytes)
+      if (snapshotRunRequestId.current === requestId) {
+        setSnapshotRun(result)
+      }
+    } catch (error) {
+      if (snapshotRunRequestId.current === requestId) {
+        setSnapshotRun({
+          status: 'invalid',
+          message: getErrorMessage(error),
+        })
+      }
+    }
+  }, [snapshotBuild])
+
   const handleNodeSelect = useCallback((start: number, end: number) => {
     editorRef.current?.highlightRange(start, end)
   }, [])
 
-  const handleGcErrorSpanSelect = useCallback((span: SourceSpan) => {
+  const handleErrorSpanSelect = useCallback((span: SourceSpan) => {
     editorRef.current?.highlightRange(span.start, span.end)
   }, [])
 
@@ -281,6 +334,22 @@ function App() {
       editor?.clearHighlight()
     }
   }, [gcState, outputView])
+
+  useEffect(() => {
+    if (
+      outputView !== 'snapshot' ||
+      snapshotRun.status !== 'error' ||
+      snapshotRun.span === null
+    ) {
+      return
+    }
+    const { span } = snapshotRun
+    const editor = editorRef.current
+    editor?.highlightRange(span.start, span.end)
+    return () => {
+      editor?.clearHighlight()
+    }
+  }, [snapshotRun, outputView])
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden max-[780px]:grid-cols-1 max-[780px]:grid-rows-2">
@@ -340,6 +409,9 @@ function App() {
               Bytecode
             </SegmentedControl.Item>
             <SegmentedControl.Item value="gc">GC</SegmentedControl.Item>
+            <SegmentedControl.Item value="snapshot">
+              Snapshot
+            </SegmentedControl.Item>
           </SegmentedControl.Root>
           {outputView === 'gc' ? (
             <Button
@@ -348,6 +420,16 @@ function App() {
               loading={gcState.status === 'running'}
             >
               Run GC
+            </Button>
+          ) : null}
+          {outputView === 'snapshot' ? (
+            <Button
+              size="2"
+              onClick={runSnapshotBytes}
+              disabled={snapshotBuild.status !== 'ok'}
+              loading={snapshotRun.status === 'running'}
+            >
+              Run snapshot
             </Button>
           ) : null}
         </div>
@@ -365,7 +447,18 @@ function App() {
             <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) bg-[image:radial-gradient(circle_at_top_right,var(--accent-a3),transparent_34%)] p-4.5">
               <GcReportView
                 state={gcState}
-                onErrorSpanSelect={handleGcErrorSpanSelect}
+                onErrorSpanSelect={handleErrorSpanSelect}
+              />
+            </div>
+          ) : null}
+          {outputView === 'snapshot' ? (
+            <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) p-4.5">
+              <SnapshotView
+                build={snapshotBuild}
+                run={snapshotRun}
+                stripDebug={stripDebug}
+                onStripDebugChange={setStripDebug}
+                onErrorSpanSelect={handleErrorSpanSelect}
               />
             </div>
           ) : null}

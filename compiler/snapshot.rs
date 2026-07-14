@@ -540,17 +540,23 @@ impl<'a> Reader<'a> {
         }
     }
 
+    /// Cursor offset from the start of the buffer, for byte-range annotation
+    /// (see `snapshot_layout`).
+    pub(crate) fn position(&self) -> usize {
+        self.pos
+    }
+
     fn remaining(&self) -> usize {
         self.buf.len() - self.pos
     }
 
-    fn read_u8(&mut self) -> Result<u8, SnapshotError> {
+    pub(crate) fn read_u8(&mut self) -> Result<u8, SnapshotError> {
         let byte = *self.buf.get(self.pos).ok_or(SnapshotError::UnexpectedEof)?;
         self.pos += 1;
         Ok(byte)
     }
 
-    fn read_exact(&mut self, len: usize) -> Result<&'a [u8], SnapshotError> {
+    pub(crate) fn read_exact(&mut self, len: usize) -> Result<&'a [u8], SnapshotError> {
         if len > self.remaining() {
             return Err(SnapshotError::UnexpectedEof);
         }
@@ -606,7 +612,7 @@ impl<'a> Reader<'a> {
     }
 
     /// ULEB128 checked into `usize` (they differ on wasm32).
-    fn read_usize(&mut self) -> Result<usize, SnapshotError> {
+    pub(crate) fn read_usize(&mut self) -> Result<usize, SnapshotError> {
         let value = self.read_uleb128()?;
         usize::try_from(value).map_err(|_| SnapshotError::IntegerOverflow)
     }

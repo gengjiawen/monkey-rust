@@ -3,7 +3,7 @@
 #![cfg(target_arch = "wasm32")]
 
 extern crate wasm_bindgen_test;
-use monkey_wasm::{parse, run_gc_with_report};
+use monkey_wasm::{compile_to_snapshot, parse, run_gc_with_report, run_snapshot};
 use serde_json::Value;
 use wasm_bindgen_test::*;
 
@@ -152,4 +152,129 @@ fn gc_error_envelope_distinguishes_all_stages_and_instruction_limit() {
         .as_str()
         .unwrap()
         .contains("instruction limit exceeded"));
+}
+
+fn build_snapshot(source: &str, strip_debug: bool) -> Value {
+    serde_json::from_str(&compile_to_snapshot(source, strip_debug))
+        .expect("valid snapshot envelope JSON")
+}
+
+fn snapshot_bytes(envelope: &Value) -> Vec<u8> {
+    let hex = envelope["bytesHex"].as_str().expect("bytesHex string");
+    (0..hex.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).expect("hex byte"))
+        .collect()
+}
+
+fn run_bytes(bytes: &[u8]) -> Value {
+    serde_json::from_str(&run_snapshot(bytes)).expect("valid snapshot run envelope JSON")
+}
+
+#[wasm_bindgen_test]
+fn snapshot_envelope_roundtrips_through_the_vm() {
+    let envelope = build_snapshot("let add = fn(a, b) { a + b }; add(1, 2)", false);
+    assert_eq!(envelope["status"], "ok");
+
+    let bytes = snapshot_bytes(&envelope);
+    assert_eq!(envelope["layout"]["byteLength"], bytes.len());
+
+    let run = run_bytes(&bytes);
+    assert_eq!(run["status"], "ok");
+    assert_eq!(run["result"], "3");
+}
+
+#[wasm_bindgen_test]
+fn snapshot_layout_regions_tile_the_buffer_and_disassemble() {
+    let envelope = build_snapshot("let add = fn(a, b) { a + b }; add(1, 2)", false);
+    let layout = &envelope["layout"];
+    assert_eq!(layout["formatVersion"], 1);
+    assert_eq!(layout["hasDebugInfo"], true);
+    assert!(layout["abiFingerprint"].as_str().unwrap().starts_with("0x"));
+
+    let regions = layout["regions"].as_array().expect("regions array");
+    let labels: Vec<&str> = regions
+        .iter()
+        .take(4)
+        .filter_map(|region| region["label"].as_str())
+        .collect();
+    assert_eq!(labels, vec!["magic", "version", "abi fingerprint", "flags"]);
+
+    let mut cursor = 0u64;
+    for region in regions {
+        assert_eq!(region["offset"], cursor);
+        cursor += region["length"].as_u64().expect("region length");
+    }
+    assert_eq!(Value::from(cursor), layout["byteLength"]);
+    assert!(regions
+        .iter()
+        .any(|region| region["label"] == "OpCall 2" && region["section"] == "main"));
+}
+
+#[wasm_bindgen_test]
+fn stripped_snapshots_drop_debug_info_and_error_spans() {
+    let source = "let not_callable = 5; not_callable()";
+    let with_debug = build_snapshot(source, false);
+    let stripped = build_snapshot(source, true);
+
+    assert_eq!(stripped["layout"]["hasDebugInfo"], false);
+    assert!(
+        stripped["layout"]["byteLength"].as_u64().unwrap()
+            < with_debug["layout"]["byteLength"].as_u64().unwrap()
+    );
+    assert!(stripped["layout"]["regions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|region| region["section"] != "debug"));
+
+    let with_debug_run = run_bytes(&snapshot_bytes(&with_debug));
+    assert_eq!(with_debug_run["status"], "error");
+    assert_eq!(with_debug_run["stage"], "runtime");
+    assert!(with_debug_run["span"]["start"].is_number());
+
+    let stripped_run = run_bytes(&snapshot_bytes(&stripped));
+    assert_eq!(stripped_run["status"], "error");
+    assert_eq!(stripped_run["stage"], "runtime");
+    assert!(stripped_run["span"].is_null());
+    assert_eq!(stripped_run["message"], with_debug_run["message"]);
+}
+
+#[wasm_bindgen_test]
+fn hostile_snapshot_bytes_are_rejected_before_the_vm() {
+    let mut bytes = snapshot_bytes(&build_snapshot("1", false));
+    bytes[0] = b'X';
+
+    let run = run_bytes(&bytes);
+    assert_eq!(run["status"], "error");
+    assert_eq!(run["stage"], "snapshot");
+    assert!(run["message"].as_str().unwrap().contains("BadMagic"));
+}
+
+#[wasm_bindgen_test]
+fn snapshot_runs_share_the_playground_instruction_budget() {
+    let source = "
+let fibonacci = fn(n) {
+  if (n < 2) { n } else { fibonacci(n - 1) + fibonacci(n - 2) }
+};
+fibonacci(30);
+";
+    let run = run_bytes(&snapshot_bytes(&build_snapshot(source, false)));
+    assert_eq!(run["status"], "error");
+    assert_eq!(run["stage"], "runtime");
+    assert!(run["message"]
+        .as_str()
+        .unwrap()
+        .contains("instruction limit exceeded"));
+}
+
+#[wasm_bindgen_test]
+fn snapshot_parse_and_compile_failures_are_envelope_data() {
+    let parse_error = build_snapshot("let =", false);
+    assert_eq!(parse_error["status"], "error");
+    assert_eq!(parse_error["stage"], "parse");
+
+    let compile_error = build_snapshot("this;", false);
+    assert_eq!(compile_error["status"], "error");
+    assert_eq!(compile_error["stage"], "compile");
 }

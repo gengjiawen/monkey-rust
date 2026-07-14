@@ -17,11 +17,14 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GcRunEnvelope, ValueKindCounts } from '../gcReport'
+import type { SnapshotBuildSuccess, SnapshotRunEnvelope } from '../snapshot'
 
 const {
   runGcMock,
   parseMock,
   compileMock,
+  buildSnapshotMock,
+  runSnapshotMock,
   highlightRangeMock,
   clearHighlightMock,
 } = vi.hoisted(() => ({
@@ -35,6 +38,8 @@ const {
       instructionLines: [],
     })
   ),
+  buildSnapshotMock: vi.fn(),
+  runSnapshotMock: vi.fn(),
   highlightRangeMock: vi.fn(),
   clearHighlightMock: vi.fn(),
 }))
@@ -46,6 +51,11 @@ vi.mock('@gengjiawen/monkey-wasm', () => ({
 
 vi.mock('../gcRunner', () => ({
   runGc: runGcMock,
+}))
+
+vi.mock('../snapshotRunner', () => ({
+  buildSnapshot: buildSnapshotMock,
+  runSnapshot: runSnapshotMock,
 }))
 
 interface MockEditorProps {
@@ -272,6 +282,28 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+function snapshotEnvelope(): SnapshotBuildSuccess {
+  return {
+    status: 'ok',
+    bytes: new Uint8Array([0x4d, 0x42, 0x43, 0x00]),
+    layout: {
+      byteLength: 4,
+      formatVersion: 1,
+      abiFingerprint: '0x0000002a',
+      hasDebugInfo: true,
+      regions: [
+        {
+          offset: 0,
+          length: 4,
+          section: 'header',
+          label: 'magic',
+          detail: 'file signature "MBC\\0"',
+        },
+      ],
+    },
+  }
+}
+
 function renderApp() {
   return render(
     <Theme>
@@ -285,18 +317,26 @@ async function openGcTab(user: ReturnType<typeof userEvent.setup>) {
   return screen.getByRole('button', { name: 'Run GC' })
 }
 
+async function openSnapshotTab(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('radio', { name: 'Snapshot' }))
+  return screen.getByRole('button', { name: 'Run snapshot' })
+}
+
+afterEach(cleanup)
+
+beforeEach(() => {
+  localStorage.clear()
+  runGcMock.mockReset()
+  parseMock.mockClear()
+  compileMock.mockClear()
+  buildSnapshotMock.mockReset()
+  buildSnapshotMock.mockImplementation(() => snapshotEnvelope())
+  runSnapshotMock.mockReset()
+  highlightRangeMock.mockClear()
+  clearHighlightMock.mockClear()
+})
+
 describe('GC playground', () => {
-  afterEach(cleanup)
-
-  beforeEach(() => {
-    localStorage.clear()
-    runGcMock.mockReset()
-    parseMock.mockClear()
-    compileMock.mockClear()
-    highlightRangeMock.mockClear()
-    clearHighlightMock.mockClear()
-  })
-
   it('runs only on demand and renders the collection report', async () => {
     const user = userEvent.setup()
     runGcMock.mockResolvedValue(successEnvelope())
@@ -509,5 +549,125 @@ describe('GC playground', () => {
     })
     expect(screen.getByText('new')).toBeInTheDocument()
     expect(runGcMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Snapshot playground', () => {
+  it('builds the snapshot automatically and runs the bytes on demand', async () => {
+    const user = userEvent.setup()
+    runSnapshotMock.mockResolvedValue({
+      status: 'ok',
+      result: '3',
+    } satisfies SnapshotRunEnvelope)
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+
+    expect(await screen.findByLabelText('Snapshot size')).toHaveTextContent(
+      '4 bytes'
+    )
+    expect(screen.getByText('magic')).toBeInTheDocument()
+    expect(screen.getByText('4d 42 43 00')).toBeInTheDocument()
+    expect(buildSnapshotMock).toHaveBeenLastCalledWith(
+      expect.any(String),
+      false
+    )
+    expect(runSnapshotMock).not.toHaveBeenCalled()
+
+    await user.click(runButton)
+
+    expect(
+      await screen.findByLabelText('Snapshot run result')
+    ).toHaveTextContent('3')
+    expect(runSnapshotMock).toHaveBeenCalledTimes(1)
+    expect(Array.from(runSnapshotMock.mock.calls[0][0] as Uint8Array)).toEqual([
+      0x4d, 0x42, 0x43, 0x00,
+    ])
+  })
+
+  it('highlights the span for snapshot runtime errors until the source changes', async () => {
+    const user = userEvent.setup()
+    runSnapshotMock.mockResolvedValue({
+      status: 'error',
+      stage: 'runtime',
+      message: 'not a function: Integer',
+      span: { start: 22, end: 36 },
+    } satisfies SnapshotRunEnvelope)
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    await user.click(runButton)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('runtime error')
+    expect(alert).toHaveTextContent('not a function: Integer')
+    expect(highlightRangeMock).toHaveBeenCalledWith(22, 36)
+
+    clearHighlightMock.mockClear()
+    await user.type(screen.getByLabelText('Source editor'), 'x')
+    expect(clearHighlightMock).toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('rebuilds the snapshot when the strip toggle changes', async () => {
+    const user = userEvent.setup()
+    buildSnapshotMock.mockImplementation(
+      (_source: string, stripDebug: boolean) => {
+        const envelope = snapshotEnvelope()
+        return {
+          ...envelope,
+          layout: { ...envelope.layout, hasDebugInfo: !stripDebug },
+        }
+      }
+    )
+    renderApp()
+
+    await openSnapshotTab(user)
+    expect(
+      await screen.findByLabelText('Snapshot debug info')
+    ).toHaveTextContent('included')
+    expect(buildSnapshotMock).toHaveBeenLastCalledWith(
+      expect.any(String),
+      false
+    )
+
+    await user.click(screen.getByRole('radio', { name: 'Stripped' }))
+
+    await waitFor(() => {
+      expect(buildSnapshotMock).toHaveBeenLastCalledWith(
+        expect.any(String),
+        true
+      )
+    })
+    await waitFor(() => {
+      expect(screen.getByLabelText('Snapshot debug info')).toHaveTextContent(
+        'stripped'
+      )
+    })
+  })
+
+  it('ignores a snapshot run that resolves after the source changes', async () => {
+    const user = userEvent.setup()
+    const staleRun = deferred<SnapshotRunEnvelope>()
+    runSnapshotMock.mockReturnValueOnce(staleRun.promise)
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    await user.click(runButton)
+    expect(runSnapshotMock).toHaveBeenCalledTimes(1)
+
+    await user.type(screen.getByLabelText('Source editor'), 'x')
+
+    await act(async () => {
+      staleRun.resolve({ status: 'ok', result: 'stale' })
+      await staleRun.promise
+    })
+
+    expect(screen.queryByText('stale')).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/executes the bytes above on the GC VM/)
+    ).toBeInTheDocument()
   })
 })
