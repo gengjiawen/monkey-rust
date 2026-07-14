@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use byteorder::{BigEndian, ByteOrder};
 use compiler::compiler::{Bytecode, DebugInfo};
-use compiler::op_code::{cast_u8_to_opcode, Opcode};
+use compiler::op_code::Opcode;
 use object::builtins::{BuiltIns, BuiltinId};
 use object::Object;
 use parser::lexer::token::Span;
@@ -309,19 +309,21 @@ impl GcVM {
             executed += 1;
             let ins = self.current_frame().instructions.clone();
             let op = *ins.get(ip).unwrap();
-            let opcode = cast_u8_to_opcode(op);
+            let opcode = Opcode::from_repr(op)
+                .ok_or_else(|| self.runtime_error(format!("unknown opcode 0x{:02x}", op)))?;
 
             match opcode {
                 Opcode::OpConst => {
                     let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    self.dup_and_push(self.constants[const_index])?;
+                    let constant = self.constant(const_index)?;
+                    self.dup_and_push(constant)?;
                 }
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
                     self.execute_binary_operation(opcode)?;
                 }
                 Opcode::OpPop => {
-                    self.pop_discard();
+                    self.pop_discard()?;
                 }
                 Opcode::OpTrue => {
                     self.alloc_and_push(Value::Boolean(true))?;
@@ -345,7 +347,7 @@ impl GcVM {
                 Opcode::OpJumpNotTruthy => {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let condition = self.pop_owned();
+                    let condition = self.pop_owned()?;
                     if !is_truthy(&self.heap, condition) {
                         self.current_frame().ip = pos as i32 - 1;
                     }
@@ -362,14 +364,14 @@ impl GcVM {
                 Opcode::OpSetGlobal => {
                     let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let value = self.pop_owned();
+                    let value = self.pop_owned()?;
                     self.heap.free(self.globals[global_index]);
                     self.globals[global_index] = value;
                 }
                 Opcode::OpArray => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let start = self.sp - count;
+                    let start = self.stack_base_for(count)?;
                     let elements = self.build_array(start, self.sp);
                     let array = alloc_value(&mut self.heap, Value::Array(elements));
                     self.clear_stack_range(start, self.sp);
@@ -379,7 +381,7 @@ impl GcVM {
                 Opcode::OpHash => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let start = self.sp - count;
+                    let start = self.stack_base_for(count)?;
                     let elements = self.build_hash(start, self.sp)?;
                     let hash = alloc_value(&mut self.heap, Value::Hash(elements));
                     self.clear_stack_range(start, self.sp);
@@ -387,15 +389,14 @@ impl GcVM {
                     self.push_raw(hash)?;
                 }
                 Opcode::OpIndex => {
-                    let index = self.pop_owned();
-                    let left = self.pop_owned();
+                    let (index, left) = self.pop_owned_pair()?;
                     let result = self.execute_index_operation(left, index);
                     self.heap.free(index);
                     self.heap.free(left);
                     result?;
                 }
                 Opcode::OpReturnValue => {
-                    let return_value = self.pop_owned();
+                    let return_value = self.pop_owned()?;
                     if self.frame_index == 1 {
                         // A top-level return ends the program with this value
                         // as its result, matching the interpreter backend.
@@ -434,20 +435,24 @@ impl GcVM {
                     let local_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let base = self.current_frame().base_pointer;
-                    let value = self.pop_owned();
-                    self.heap.free(self.stack[base + local_index]);
-                    self.stack[base + local_index] = value;
+                    let slot = self.local_slot(base, local_index)?;
+                    let value = self.pop_owned()?;
+                    self.heap.free(self.stack[slot]);
+                    self.stack[slot] = value;
                 }
                 Opcode::OpGetLocal => {
                     let local_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let base = self.current_frame().base_pointer;
-                    self.dup_and_push(self.stack[base + local_index])?;
+                    let slot = self.local_slot(base, local_index)?;
+                    self.dup_and_push(self.stack[slot])?;
                 }
                 Opcode::OpGetBuiltin => {
                     let built_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
-                    let definition = BuiltIns.get(built_index).unwrap();
+                    let definition = BuiltIns.get(built_index).ok_or_else(|| {
+                        self.runtime_error(format!("builtin index {} out of range", built_index))
+                    })?;
                     self.alloc_and_push(Value::Builtin(definition.id))?;
                 }
                 Opcode::OpClosure => {
@@ -459,7 +464,13 @@ impl GcVM {
                 Opcode::OpGetFree => {
                     let free_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
-                    let free_var = self.current_frame().cl.free[free_index];
+                    let free_var = self.current_frame().cl.free.get(free_index).copied();
+                    let free_var = free_var.ok_or_else(|| {
+                        self.runtime_error(format!(
+                            "free variable index {} out of range",
+                            free_index
+                        ))
+                    })?;
                     self.dup_and_push(free_var)?;
                 }
                 Opcode::OpCurrentClosure => {
@@ -469,7 +480,7 @@ impl GcVM {
                 Opcode::OpClass => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let name = self.constant_string(name_index);
+                    let name = self.constant_string(name_index)?;
                     self.alloc_and_push(Value::Class(GcClass {
                         name,
                         constructor: None,
@@ -480,8 +491,12 @@ impl GcVM {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     let kind = ins[ip + 3];
                     self.current_frame().ip += 3;
-                    let name = self.constant_string(name_index);
-                    let method = self.pop_owned();
+                    let name = self.constant_string(name_index)?;
+                    let method = self.pop_owned()?;
+                    if self.sp == 0 {
+                        self.heap.free(method);
+                        return Err(self.runtime_error("stack underflow"));
+                    }
                     let class = self.stack[self.sp - 1];
                     let result = self.install_method(class, name, method, kind == 1);
                     self.heap.free(method);
@@ -490,8 +505,8 @@ impl GcVM {
                 Opcode::OpGetProperty => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let name = self.constant_string(name_index);
-                    let receiver = self.pop_owned();
+                    let name = self.constant_string(name_index)?;
+                    let receiver = self.pop_owned()?;
                     let value = self.get_property(receiver, &name);
                     self.heap.free(receiver);
                     self.push_raw(value?)?;
@@ -499,9 +514,8 @@ impl GcVM {
                 Opcode::OpSetProperty => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
-                    let name = self.constant_string(name_index);
-                    let value = self.pop_owned();
-                    let receiver = self.pop_owned();
+                    let name = self.constant_string(name_index)?;
+                    let (value, receiver) = self.pop_owned_pair()?;
                     let result = self.set_property(receiver, name, value);
                     self.heap.free(value);
                     self.heap.free(receiver);
@@ -561,17 +575,50 @@ impl GcVM {
     ///
     /// The caller must either free the returned ref or store it in another
     /// owning location. The vacated stack slot is reset to a null ref.
-    fn pop_owned(&mut self) -> GcRef {
+    fn pop_owned(&mut self) -> Result<GcRef, GcRuntimeError> {
+        if self.sp == 0 {
+            return Err(self.runtime_error("stack underflow"));
+        }
         self.sp -= 1;
         let value = self.stack[self.sp];
         self.stack[self.sp] = self.heap.dup(self.null);
-        value
+        Ok(value)
     }
 
-    fn pop_discard(&mut self) {
-        let value = self.pop_owned();
+    fn pop_discard(&mut self) -> Result<(), GcRuntimeError> {
+        let value = self.pop_owned()?;
         self.heap.free(self.last_popped);
         self.last_popped = value;
+        Ok(())
+    }
+
+    /// Pop the top two owned references (top first). On underflow neither
+    /// reference leaks.
+    fn pop_owned_pair(&mut self) -> Result<(GcRef, GcRef), GcRuntimeError> {
+        let top = self.pop_owned()?;
+        match self.pop_owned() {
+            Ok(below) => Ok((top, below)),
+            Err(error) => {
+                self.heap.free(top);
+                Err(error)
+            }
+        }
+    }
+
+    /// Bounds-checked `sp - count` for opcodes that consume `count` stack
+    /// slots.
+    fn stack_base_for(&self, count: usize) -> Result<usize, GcRuntimeError> {
+        self.sp
+            .checked_sub(count)
+            .ok_or_else(|| self.runtime_error("stack underflow"))
+    }
+
+    fn local_slot(&self, base: usize, local_index: usize) -> Result<usize, GcRuntimeError> {
+        let slot = base + local_index;
+        if slot >= STACK_SIZE {
+            return Err(self.runtime_error(format!("local index {} out of range", local_index)));
+        }
+        Ok(slot)
     }
 
     fn clear_stack_range(&mut self, start: usize, end: usize) {
@@ -583,8 +630,7 @@ impl GcVM {
     }
 
     fn execute_binary_operation(&mut self, opcode: Opcode) -> Result<(), GcRuntimeError> {
-        let right = self.pop_owned();
-        let left = self.pop_owned();
+        let (right, left) = self.pop_owned_pair()?;
         let left_value = get_value(&self.heap, left).clone();
         let right_value = get_value(&self.heap, right).clone();
         let result = match (&left_value, &right_value) {
@@ -617,8 +663,7 @@ impl GcVM {
     }
 
     fn execute_comparison(&mut self, opcode: Opcode) -> Result<(), GcRuntimeError> {
-        let right = self.pop_owned();
-        let left = self.pop_owned();
+        let (right, left) = self.pop_owned_pair()?;
         let result = match (get_value(&self.heap, left), get_value(&self.heap, right)) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
                 Opcode::OpEqual => Some(l == r),
@@ -669,7 +714,7 @@ impl GcVM {
     }
 
     fn execute_minus_operation(&mut self) -> Result<(), GcRuntimeError> {
-        let operand = self.pop_owned();
+        let operand = self.pop_owned()?;
         let negated = match get_value(&self.heap, operand) {
             Value::Integer(value) => Some(-value),
             _ => None,
@@ -686,7 +731,7 @@ impl GcVM {
     }
 
     fn execute_bang_operation(&mut self) -> Result<(), GcRuntimeError> {
-        let operand = self.pop_owned();
+        let operand = self.pop_owned()?;
         let result = match get_value(&self.heap, operand) {
             Value::Boolean(l) => !l,
             _ => false,
@@ -776,7 +821,8 @@ impl GcVM {
     }
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), GcRuntimeError> {
-        let callee = self.stack[self.sp - 1 - num_args];
+        let callee_slot = self.stack_base_for(num_args + 1)?;
+        let callee = self.stack[callee_slot];
         match callee_kind(&self.heap, callee) {
             CalleeKind::Closure(closure) => self.call_closure(closure, num_args),
             CalleeKind::Builtin(builtin) => self.call_builtin(builtin, num_args),
@@ -801,10 +847,13 @@ impl GcVM {
         }
 
         let frame = Frame::new(closure, compiled.instructions, self.sp - num_args);
-        let next_sp = frame.base_pointer + compiled.num_locals;
-        if next_sp > STACK_SIZE {
-            return Err(self.runtime_error("stack limit exceeded"));
-        }
+        // checked_add: num_locals comes from bytecode, so it can be an
+        // arbitrary usize, not just a compiler-emitted small count.
+        let next_sp = frame
+            .base_pointer
+            .checked_add(compiled.num_locals)
+            .filter(|next_sp| *next_sp <= STACK_SIZE)
+            .ok_or_else(|| self.runtime_error("stack limit exceeded"))?;
         self.sp = next_sp;
         self.push_frame(frame)
     }
@@ -819,33 +868,42 @@ impl GcVM {
     }
 
     fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), GcRuntimeError> {
-        match get_value(&self.heap, self.constants[const_index]).clone() {
-            Value::CompiledFunction(_) => {
-                let start = self.sp - num_free;
-                let mut free = Vec::with_capacity(num_free);
-                for i in 0..num_free {
-                    free.push(self.stack[start + i]);
-                }
-                let func = self.constants[const_index];
-                let closure = alloc_value(
-                    &mut self.heap,
-                    Value::Closure(GcClosure {
-                        func,
-                        free,
-                    }),
-                );
-                self.clear_stack_range(start, self.sp);
-                self.sp = start;
-                self.push_raw(closure)
-            }
-            other => panic!("not a function {:?}", other),
+        let func = self.constant(const_index)?;
+        if !matches!(get_value(&self.heap, func), Value::CompiledFunction(_)) {
+            return Err(self.runtime_error(format!(
+                "cannot build closure over {}",
+                value_to_string(&self.heap, func)
+            )));
         }
+        let start = self.stack_base_for(num_free)?;
+        let mut free = Vec::with_capacity(num_free);
+        for i in 0..num_free {
+            free.push(self.stack[start + i]);
+        }
+        let closure = alloc_value(
+            &mut self.heap,
+            Value::Closure(GcClosure {
+                func,
+                free,
+            }),
+        );
+        self.clear_stack_range(start, self.sp);
+        self.sp = start;
+        self.push_raw(closure)
     }
 
-    fn constant_string(&self, index: usize) -> String {
-        match get_value(&self.heap, self.constants[index]) {
-            Value::String(value) => value.clone(),
-            value => panic!("expected string constant, got {}", value),
+    fn constant(&self, index: usize) -> Result<GcRef, GcRuntimeError> {
+        self.constants
+            .get(index)
+            .copied()
+            .ok_or_else(|| self.runtime_error(format!("constant index {} out of range", index)))
+    }
+
+    fn constant_string(&self, index: usize) -> Result<String, GcRuntimeError> {
+        let constant = self.constant(index)?;
+        match get_value(&self.heap, constant) {
+            Value::String(value) => Ok(value.clone()),
+            value => Err(self.runtime_error(format!("expected string constant, got {}", value))),
         }
     }
 
@@ -939,7 +997,7 @@ impl GcVM {
     }
 
     fn execute_new(&mut self, num_args: usize) -> Result<(), GcRuntimeError> {
-        let base = self.sp - num_args - 1;
+        let base = self.stack_base_for(num_args + 1)?;
         let class_reference = self.stack[base];
         let (class_name, constructor) = match get_value(&self.heap, class_reference) {
             Value::Class(class) => (class.name.clone(), class.constructor),

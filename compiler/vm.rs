@@ -10,7 +10,7 @@ use object::{BoundMethodObject, BuiltinFunc, ClassObject, Closure, InstanceObjec
 
 use crate::compiler::Bytecode;
 use crate::frame::Frame;
-use crate::op_code::{cast_u8_to_opcode, Opcode};
+use crate::op_code::Opcode;
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 65536;
@@ -85,7 +85,7 @@ impl VM {
             ins = self.current_frame().instructions().data.clone();
 
             let op: u8 = *ins.get(ip).unwrap();
-            let opcode = cast_u8_to_opcode(op);
+            let opcode = Opcode::from_repr(op).expect("unknown opcode in compiled bytecode");
 
             match opcode {
                 Opcode::OpConst => {

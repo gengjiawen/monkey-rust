@@ -12,7 +12,7 @@ use parser::lexer::token::TokenKind;
 use parser::validation::validate_program;
 
 use crate::op_code::Opcode::*;
-use crate::op_code::{cast_u8_to_opcode, make_instructions, Instructions, Opcode};
+use crate::op_code::{make_instructions, Instructions, Opcode};
 use crate::symbol_table::{Symbol, SymbolScope, SymbolTable};
 
 struct CompilationScope {
@@ -739,7 +739,8 @@ impl Compiler {
     }
 
     fn change_operand(&mut self, pos: usize, operand: usize) {
-        let op = cast_u8_to_opcode(self.current_instruction().data[pos]);
+        let op = Opcode::from_repr(self.current_instruction().data[pos])
+            .expect("compiler emitted an unknown opcode");
         let ins = make_instructions(op, &vec![operand]);
         self.replace_instruction(pos, &ins);
     }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use byteorder;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
-use strum::{EnumCount, EnumIter};
+use strum::{EnumCount, EnumIter, FromRepr};
 
 // why not type, see https://stackoverflow.com/a/35569079/1713757
 #[derive(Hash, Eq, Debug, Clone, PartialEq, PartialOrd)]
@@ -16,8 +16,18 @@ pub struct OpcodeDefinition {
     operand_width: Vec<i32>,
 }
 
+impl OpcodeDefinition {
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub fn operand_widths(&self) -> &[i32] {
+        &self.operand_width
+    }
+}
+
 #[repr(u8)]
-#[derive(Debug, Hash, Eq, Clone, Copy, PartialEq, EnumCount, EnumIter)]
+#[derive(Debug, Hash, Eq, Clone, Copy, PartialEq, EnumCount, EnumIter, FromRepr)]
 pub enum Opcode {
     OpConst,
     OpAdd,
@@ -368,21 +378,25 @@ pub fn concat_instructions(expected: &Vec<Instructions>) -> Instructions {
     return out;
 }
 
-pub fn cast_u8_to_opcode(op: u8) -> Opcode {
-    // https://stackoverflow.com/a/42382144/1713757
-    return unsafe { ::std::mem::transmute(op) };
-}
-
 impl Instructions {
     // prettify bytecodes
     pub fn string(&self) -> String {
         let mut ret = String::new();
         let mut i = 0;
         while i < self.data.len() {
-            let op: u8 = *self.data.get(i).unwrap();
-            let opcode = cast_u8_to_opcode(op);
+            let op: u8 = self.data[i];
+            let Some(opcode) = Opcode::from_repr(op) else {
+                ret.push_str(&format!("{:04} <unknown opcode 0x{:02x}>\n", i, op));
+                i += 1;
+                continue;
+            };
 
             let definition = DEFINITIONS.get(&opcode).unwrap();
+            let width: usize = definition.operand_width.iter().map(|w| *w as usize).sum();
+            if i + 1 + width > self.data.len() {
+                ret.push_str(&format!("{:04} {} <truncated operands>\n", i, definition.name));
+                break;
+            }
             let (operands, read_size) = read_operands(definition, &self.data[i + 1..]);
             ret.push_str(&format!("{:04} {}\n", i, Self::fmt_instructions(definition, &operands)));
             i = i + 1 + read_size;
