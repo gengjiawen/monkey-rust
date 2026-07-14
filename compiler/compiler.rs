@@ -31,6 +31,7 @@ pub struct Compiler {
     callable_kinds: Vec<CallableKind>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Rc<Object>>,

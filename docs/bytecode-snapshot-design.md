@@ -207,6 +207,7 @@ pub enum SnapshotError {
     TrailingBytes,
     InvalidInstruction(String),   // §6 L1 指令流静态校验失败,含定位信息
     DuplicateDebugEntry(usize),
+    DebugPcNotIncreasing { pc: usize },
     DebugIndexNotFunction(usize), // fn_debug 的 constant_index 未指向 TAG_FUNCTION
     DebugPcOutOfRange { pc: usize, len: usize },
 }
