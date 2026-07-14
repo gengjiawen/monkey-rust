@@ -145,6 +145,19 @@ function findNodePathForSelection(
   return visit(data, []).best?.path ?? null
 }
 
+const treeKeyClass = 'text-(--blue-11)'
+const treeLeafClass = 'min-h-[21px] pl-4 whitespace-nowrap'
+const treeNullClass = 'italic text-(--gray-10)'
+const treeNumberClass = 'text-(--orange-11)'
+const treeChildrenClass = 'pl-4.5'
+
+const treeSummaryBase =
+  'rounded-sm px-[3px] whitespace-nowrap outline-none list-outside [list-style-type:disclosure-closed] [details[open]>&]:[list-style-type:disclosure-open]'
+const treeSummaryIdle = `${treeSummaryBase} cursor-default hover:bg-(--gray-a3)`
+const treeSummaryClickable = `${treeSummaryBase} cursor-pointer hover:bg-(--gray-a4)`
+const treeOnPathClass = 'bg-(--blue-a2)'
+const treeActiveClass = 'bg-(--blue-a4) shadow-[inset_2px_0_0_var(--accent-9)]'
+
 export function AstTreeView({
   data,
   selection,
@@ -156,7 +169,7 @@ export function AstTreeView({
   }, [data, selection])
 
   return (
-    <div className="ast-tree">
+    <div className="font-mono text-[13px] leading-[1.6] text-(--gray-12)">
       <TreeNode
         value={data}
         depth={0}
@@ -204,45 +217,45 @@ function TreeNode({
 
   if (value === null || value === undefined) {
     return (
-      <div className="tree-leaf">
-        {label && <span className="tree-key">{label}: </span>}
-        <span className="tree-null">null</span>
+      <div className={treeLeafClass}>
+        {label && <span className={treeKeyClass}>{label}: </span>}
+        <span className={treeNullClass}>null</span>
       </div>
     )
   }
 
   if (typeof value === 'bigint') {
     return (
-      <div className="tree-leaf">
-        {label && <span className="tree-key">{label}: </span>}
-        <span className="tree-number">{String(value)}n</span>
+      <div className={treeLeafClass}>
+        {label && <span className={treeKeyClass}>{label}: </span>}
+        <span className={treeNumberClass}>{String(value)}n</span>
       </div>
     )
   }
 
   if (typeof value === 'boolean' || typeof value === 'number') {
     return (
-      <div className="tree-leaf">
-        {label && <span className="tree-key">{label}: </span>}
-        <span className="tree-number">{String(value)}</span>
+      <div className={treeLeafClass}>
+        {label && <span className={treeKeyClass}>{label}: </span>}
+        <span className={treeNumberClass}>{String(value)}</span>
       </div>
     )
   }
 
   if (typeof value === 'string') {
     return (
-      <div className="tree-leaf">
-        {label && <span className="tree-key">{label}: </span>}
-        <span className="tree-string">"{value}"</span>
+      <div className={treeLeafClass}>
+        {label && <span className={treeKeyClass}>{label}: </span>}
+        <span className="text-(--amber-11)">"{value}"</span>
       </div>
     )
   }
 
   if (value instanceof Uint8Array) {
     return (
-      <div className="tree-leaf">
-        {label && <span className="tree-key">{label}: </span>}
-        <span className="tree-null">[bytes({value.length})]</span>
+      <div className={treeLeafClass}>
+        {label && <span className={treeKeyClass}>{label}: </span>}
+        <span className={treeNullClass}>[bytes({value.length})]</span>
       </div>
     )
   }
@@ -250,9 +263,9 @@ function TreeNode({
   if (Array.isArray(value)) {
     if (value.length === 0) {
       return (
-        <div className="tree-leaf">
-          {label && <span className="tree-key">{label}: </span>}
-          <span className="tree-null">[]</span>
+        <div className={treeLeafClass}>
+          {label && <span className={treeKeyClass}>{label}: </span>}
+          <span className={treeNullClass}>[]</span>
         </div>
       )
     }
@@ -263,12 +276,12 @@ function TreeNode({
       <details ref={detailsRef} open={depth < 2}>
         <summary
           ref={summaryRef}
-          className={`tree-summary ${isOnPath ? 'tree-on-path' : ''}`}
+          className={`${treeSummaryIdle} ${isOnPath ? treeOnPathClass : ''}`}
         >
-          {label && <span className="tree-key">{label}: </span>}
-          <span className="tree-bracket">[{value.length}]</span>
+          {label && <span className={treeKeyClass}>{label}: </span>}
+          <span className="text-(--gray-10)">[{value.length}]</span>
         </summary>
-        <div className="tree-children">
+        <div className={treeChildrenClass}>
           {value.map((item, index) => {
             const childOnPath = nextKey === String(index)
             return (
@@ -302,10 +315,9 @@ function TreeNode({
 
     const nextKey = activePath?.[pathIndex]
     const summaryClassName = [
-      'tree-summary',
-      sourceSpan ? 'tree-clickable' : '',
-      isOnPath ? 'tree-on-path' : '',
-      isTarget ? 'tree-active' : '',
+      sourceSpan ? treeSummaryClickable : treeSummaryIdle,
+      isOnPath ? treeOnPathClass : '',
+      isTarget ? treeActiveClass : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -317,14 +329,14 @@ function TreeNode({
           className={summaryClassName}
           onClick={handleClick}
         >
-          {label && <span className="tree-key">{label}: </span>}
+          {label && <span className={treeKeyClass}>{label}: </span>}
           {typeName ? (
-            <span className="tree-type">{typeName}</span>
+            <span className="font-semibold text-(--green-11)">{typeName}</span>
           ) : (
-            <span className="tree-bracket">{`{${keys.length}}`}</span>
+            <span className="text-(--gray-10)">{`{${keys.length}}`}</span>
           )}
         </summary>
-        <div className="tree-children">
+        <div className={treeChildrenClass}>
           {keys.map((key) => {
             const childOnPath = nextKey === key
             return (
@@ -345,8 +357,8 @@ function TreeNode({
   }
 
   return (
-    <div className="tree-leaf">
-      {label && <span className="tree-key">{label}: </span>}
+    <div className={treeLeafClass}>
+      {label && <span className={treeKeyClass}>{label}: </span>}
       <span>{String(value)}</span>
     </div>
   )

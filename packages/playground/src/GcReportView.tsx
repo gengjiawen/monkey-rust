@@ -37,6 +37,139 @@ interface GcReportViewProps {
 type DecisionFilter = 'candidates' | 'survivors' | 'all'
 type EdgeFilter = 'candidate-related' | 'all'
 
+const cardClass =
+  'rounded-[10px] border border-(--gray-a5) bg-(--color-panel-solid) p-4 shadow-[0_1px_2px_var(--black-a3)]'
+
+const mutedClass = 'text-xs text-(--gray-10)'
+
+const footnoteClass = 'mx-0.5 mt-0 mb-2 text-xs leading-normal text-(--gray-10)'
+
+const eyebrowClass =
+  'block text-[11px] font-bold tracking-[0.08em] uppercase text-(--accent-11)'
+
+// gc-section / collected-card <h2>: margins reset, 16px, near-black.
+const sectionHeadingClass = 'm-0 mb-3 text-base text-(--gray-12)'
+
+// <h3> inside cards keeps its user-agent size; only margins/color are set.
+const cardSubheadingClass = 'm-0 mb-3 text-(--gray-12)'
+
+const helperTextClass =
+  'mt-0.5 block text-[11px] leading-[1.35] font-normal text-(--gray-10)'
+
+const phaseIndexClass =
+  'mb-2 inline-grid size-[22px] place-items-center rounded-full bg-(--accent-a4) text-xs font-bold text-(--accent-11)'
+
+const dlTextClass =
+  '[&_dt]:text-[11px] [&_dt]:text-(--gray-10) [&_dd]:m-0 [&_dd]:mt-0.5 [&_dd]:font-mono [&_dd]:font-bold [&_dd]:text-(--gray-12)'
+
+const summaryBoxClass =
+  '[&>div]:min-w-0 [&>div]:rounded-md [&>div]:bg-(--gray-a3) [&>div]:p-2'
+
+const summaryListClass = `m-0 mb-3 grid grid-cols-2 gap-2 ${summaryBoxClass} ${dlTextClass}`
+
+const phaseSummaryListClass = `m-0 grid grid-cols-1 gap-2 ${summaryBoxClass} ${dlTextClass}`
+
+const kindListClass = `m-0 grid grid-cols-7 gap-2 max-[780px]:grid-cols-4 [&>div]:min-w-0 [&>div]:text-center ${dlTextClass}`
+
+const kindTableClass = 'w-full border-collapse text-xs text-(--gray-11)'
+
+const kindTableHeadClass =
+  'border-t border-(--gray-a4) px-[3px] py-[5px] text-left font-medium'
+
+const kindTableCellClass =
+  'border-t border-(--gray-a4) px-[3px] py-[5px] text-right font-mono'
+
+const filterGroupClass = 'm-0 mb-3 flex flex-wrap gap-2'
+
+const filterLabelBaseClass =
+  'inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-(--accent-8)'
+
+const filterLabelIdleClass = `${filterLabelBaseClass} border-(--gray-a5) bg-(--gray-a2) text-(--gray-11)`
+
+const filterLabelActiveClass = `${filterLabelBaseClass} border-(--accent-a7) bg-(--accent-a3) text-(--accent-11)`
+
+const decisionCellClass =
+  'border-t border-(--gray-a4) px-2.5 py-2 align-middle whitespace-nowrap'
+
+const decisionHeadCellClass = `${decisionCellClass} text-left text-[11px] font-semibold text-(--gray-10)`
+
+const decisionNumHeadCellClass = `${decisionCellClass} text-right font-mono text-[11px] font-semibold text-(--gray-10)`
+
+const decisionRowHeadClass = `${decisionCellClass} text-left font-medium`
+
+const decisionNumCellClass = `${decisionCellClass} text-right font-mono`
+
+const decisionBadgeCellClass = `${decisionCellClass} text-left`
+
+const decisionDetailCellClass =
+  'border-t border-(--gray-a4) bg-(--gray-a2) px-2.5 pt-0 pb-3 whitespace-normal'
+
+const expandButtonClass =
+  'inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit [font:inherit]'
+
+const badgeBaseClass =
+  'inline-block rounded-full border px-[7px] py-0.5 text-[11px] leading-[1.4] font-semibold'
+
+const badgeTones = {
+  amber: 'border-(--amber-a6) bg-(--amber-a3) text-(--amber-11)',
+  green: 'border-(--green-a6) bg-(--green-a3) text-(--green-11)',
+  blue: 'border-(--blue-a6) bg-(--blue-a3) text-(--blue-11)',
+  red: 'border-(--red-a6) bg-(--red-a3) text-(--red-11)',
+} as const
+
+function badgeClass(tone: keyof typeof badgeTones): string {
+  return `${badgeBaseClass} ${badgeTones[tone]}`
+}
+
+const scanBadgeTone: Record<
+  ReturnType<typeof scanResultLabel>,
+  keyof typeof badgeTones
+> = {
+  Garbage: 'amber',
+  Restored: 'blue',
+  'Scan root': 'green',
+}
+
+const globalChipBaseClass =
+  'inline-block rounded-full border px-1.5 py-px text-[11px] leading-[1.4]'
+
+const globalChipClass = `${globalChipBaseClass} border-(--accent-a6) bg-(--accent-a3) text-(--accent-11)`
+
+const globalChipOverflowClass = `${globalChipBaseClass} border-(--gray-a6) bg-(--gray-a3) text-(--gray-11)`
+
+// Paragraphs and headings inside an expanded decision row.
+const detailTextClass = 'm-0 text-xs leading-[1.5] text-(--gray-11)'
+
+const detailHeadingClass = 'm-0 mb-1.5 text-xs text-(--gray-11)'
+
+const edgeListClass = 'm-0 flex list-none flex-col gap-1.5 p-0'
+
+const edgeItemClass =
+  'rounded-md border border-(--gray-a4) bg-(--color-panel-solid) px-2 py-1.5 text-xs leading-[1.45] text-(--gray-12) [&_code]:text-xs'
+
+const noticeBaseClass =
+  'm-0 mb-3 block rounded-md border px-2.5 py-2 text-xs leading-[1.45]'
+
+const truncationNoticeClass = `${noticeBaseClass} border-(--amber-a6) bg-(--amber-a3) text-(--amber-11)`
+
+const grayNoticeClass = `${noticeBaseClass} border-(--gray-a5) bg-(--gray-a3) text-(--gray-11)`
+
+const emptyStateClass =
+  'mx-auto my-16 block max-w-[520px] rounded-xl border border-(--gray-a5) bg-(--color-panel-solid) p-6 text-center'
+
+const errorCardClass =
+  'mx-auto my-16 block max-w-[520px] rounded-xl border border-(--red-a7) bg-(--color-panel-solid) p-6'
+
+const stateHeadingClass = 'm-0 text-(--gray-12)'
+
+const stateTextClass = 'm-0 mt-2.5'
+
+const errorStageClass =
+  'mb-1.5 block text-[11px] font-bold tracking-[0.08em] uppercase text-(--red-11)'
+
+const spanButtonClass =
+  'mt-3 cursor-pointer rounded-md border border-(--red-a7) bg-transparent px-2.5 py-1 text-xs leading-[inherit] text-(--red-11) [font-family:inherit] hover:bg-(--red-a3)'
+
 const valueKindLabels: Record<ValueKind, string> = {
   class: 'Class',
   instance: 'Instance',
@@ -70,12 +203,9 @@ function SnapshotCard({
   kinds: readonly ValueKind[]
 }) {
   return (
-    <section
-      className="gc-card gc-snapshot"
-      aria-label={`${title} heap snapshot`}
-    >
-      <h3>{title}</h3>
-      <dl className="gc-summary-list">
+    <section className={cardClass} aria-label={`${title} heap snapshot`}>
+      <h3 className={cardSubheadingClass}>{title}</h3>
+      <dl className={summaryListClass}>
         <div>
           <dt>Objects</dt>
           <dd>{snapshot.objectCount}</dd>
@@ -85,12 +215,16 @@ function SnapshotCard({
           <dd>{snapshot.trackedBytes}</dd>
         </div>
       </dl>
-      <table className="gc-kind-table">
+      <table className={kindTableClass}>
         <tbody>
           {kinds.map((kind) => (
             <tr key={kind}>
-              <th scope="row">{valueKindLabels[kind]}</th>
-              <td>{snapshot.byValueKind[kind]}</td>
+              <th scope="row" className={kindTableHeadClass}>
+                {valueKindLabels[kind]}
+              </th>
+              <td className={kindTableCellClass}>
+                {snapshot.byValueKind[kind]}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -130,15 +264,15 @@ function GlobalNameChips({ names }: { names: string[] | undefined }) {
   const shown = names.slice(0, MAX_GLOBAL_NAMES_SHOWN)
   const hidden = names.length - shown.length
   return (
-    <span className="gc-global-names">
+    <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
       {shown.map((name) => (
-        <code key={name} className="gc-global-name">
+        <code key={name} className={globalChipClass}>
           {name}
         </code>
       ))}
       {hidden > 0 ? (
         <span
-          className="gc-global-name gc-global-name-overflow"
+          className={globalChipOverflowClass}
           title={names.slice(MAX_GLOBAL_NAMES_SHOWN).join(', ')}
         >
           +{hidden} more
@@ -203,12 +337,14 @@ function sortVisitedEdges(
 
 function RelationText({ relation }: { relation: EdgeRelation }) {
   return (
-    <span className="gc-edge-relation">{formatEdgeRelation(relation)}</span>
+    <span className="font-mono text-(--accent-11)">
+      {formatEdgeRelation(relation)}
+    </span>
   )
 }
 
 function TruncationNotice({ message }: { message: string }) {
-  return <output className="gc-truncation-notice">{message}</output>
+  return <output className={truncationNoticeClass}>{message}</output>
 }
 
 function WitnessPathView({
@@ -219,16 +355,16 @@ function WitnessPathView({
   catalog: Map<number, GcObjectSummary>
 }) {
   return (
-    <div className="gc-witness-path">
-      <p className="gc-muted">
+    <div>
+      <p className={detailTextClass}>
         Reachability witness: a deterministic reachability path, not the
         collector&apos;s actual event order.
       </p>
-      <ol className="gc-edge-list">
+      <ol className={edgeListClass}>
         {steps.map((step, index) => (
-          <li key={`${step.fromId}-${step.toId}-${index}`}>
+          <li key={`${step.fromId}-${step.toId}-${index}`} className={edgeItemClass}>
             <code>{objectLabel(catalog, step.fromId)}</code>
-            <span className="gc-edge-arrow">
+            <span className="text-(--gray-10)">
               {' '}
               -- <RelationText relation={step.relation} /> --&gt;{' '}
             </span>
@@ -250,15 +386,15 @@ function EdgeList({
   emptyLabel: string
 }) {
   if (edges.length === 0) {
-    return <p className="gc-muted">{emptyLabel}</p>
+    return <p className={`m-0 ${mutedClass}`}>{emptyLabel}</p>
   }
 
   return (
-    <ul className="gc-edge-list">
+    <ul className={edgeListClass}>
       {edges.map((edge, index) => (
-        <li key={`${edge.fromId}-${edge.toId}-${index}`}>
+        <li key={`${edge.fromId}-${edge.toId}-${index}`} className={edgeItemClass}>
           <code>{objectLabel(catalog, edge.fromId)}</code>
-          <span className="gc-edge-arrow">
+          <span className="text-(--gray-10)">
             {' '}
             -- <RelationText relation={edge.relation} /> --&gt;{' '}
           </span>
@@ -305,14 +441,14 @@ function DecisionRowDetails({
       .map((root) => root.name)
 
     return (
-      <div className="gc-decision-details">
-        <p>
+      <div className="flex flex-col gap-2.5 pt-2.5">
+        <p className={detailTextClass}>
           Trial RC {decision.trialRefCount} is the count of direct non-heap
           references that remained after heap incoming edges were subtracted.
           This object is a Scan starting point and does not need to be restored.
         </p>
         {globalNames.length > 0 ? (
-          <p>
+          <p className={detailTextClass}>
             Global variable{globalNames.length > 1 ? 's' : ''}{' '}
             {globalNames.slice(0, MAX_GLOBAL_NAMES_SHOWN).map((name, index) => (
               <Fragment key={name}>
@@ -327,7 +463,7 @@ function DecisionRowDetails({
             each named global slot is one of those non-heap references.
           </p>
         ) : null}
-        <p className="gc-muted">
+        <p className={detailTextClass}>
           Remaining non-heap references may come from the constants table,
           global slots, or VM stack slots. For Null-like bookkeeping objects,
           most of those references usually come from VM-prefilled stack and
@@ -335,17 +471,19 @@ function DecisionRowDetails({
         </p>
         {restoredFromHere.length > 0 ? (
           <div>
-            <h4>Restored candidates from this survivor</h4>
-            <ul className="gc-detail-list">
+            <h4 className={detailHeadingClass}>
+              Restored candidates from this survivor
+            </h4>
+            <ul className={edgeListClass}>
               {restoredFromHere.map((name) => (
-                <li key={name}>
+                <li key={name} className={edgeItemClass}>
                   <code>{name}</code>
                 </li>
               ))}
             </ul>
           </div>
         ) : (
-          <p className="gc-muted">
+          <p className={detailTextClass}>
             No candidates were restored from this survivor.
           </p>
         )}
@@ -362,10 +500,10 @@ function DecisionRowDetails({
   const isRestored = restoredIds.has(decision.objectId)
 
   return (
-    <div className="gc-decision-details">
-      <div className="gc-detail-columns">
+    <div className="flex flex-col gap-2.5 pt-2.5">
+      <div className="grid grid-cols-2 gap-3 max-[780px]:grid-cols-1">
         <div>
-          <h4>Incoming reported edges</h4>
+          <h4 className={detailHeadingClass}>Incoming reported edges</h4>
           <EdgeList
             edges={incoming}
             catalog={catalog}
@@ -373,7 +511,7 @@ function DecisionRowDetails({
           />
         </div>
         <div>
-          <h4>Outgoing reported edges</h4>
+          <h4 className={detailHeadingClass}>Outgoing reported edges</h4>
           <EdgeList
             edges={outgoing}
             catalog={catalog}
@@ -385,13 +523,13 @@ function DecisionRowDetails({
         path ? (
           <WitnessPathView steps={path} catalog={catalog} />
         ) : (
-          <p className="gc-muted">
+          <p className={detailTextClass}>
             This candidate was restored, but its reachability witness was
             omitted from the report.
           </p>
         )
       ) : (
-        <p>
+        <p className={detailTextClass}>
           No path from any trial survivor. Remained in the temporary candidate
           list after Scan.
         </p>
@@ -501,48 +639,60 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
   const showEmptyCandidates = filter === 'candidates' && candidateCount === 0
 
   return (
-    <section
-      className="gc-card gc-walkthrough-card"
-      aria-label="Object decision walkthrough"
-    >
-      <h2>Object decision walkthrough</h2>
-      <p className="gc-muted">
+    <section className={cardClass} aria-label="Object decision walkthrough">
+      <h2 className="mb-3 text-base">Object decision walkthrough</h2>
+      <p className={`mx-0 -mt-1 mb-3 ${mutedClass}`}>
         Synthetic labels distinguish runtime kinds; IDs are scoped to this
         report. Trial RC = RC before − heap incoming edges.
       </p>
 
       <div
-        className="gc-filter-group"
+        className={filterGroupClass}
         role="radiogroup"
         aria-label="Object decision filter"
       >
-        <label className={filter === 'candidates' ? 'is-active' : undefined}>
+        <label
+          className={
+            filter === 'candidates' ? filterLabelActiveClass : filterLabelIdleClass
+          }
+        >
           <input
             type="radio"
             name="gc-decision-filter"
             value="candidates"
+            className="sr-only"
             checked={filter === 'candidates'}
             aria-label={`Candidates ${candidateCountLabel}`}
             onChange={() => setFilter('candidates')}
           />
           Candidates {candidateCountLabel}
         </label>
-        <label className={filter === 'survivors' ? 'is-active' : undefined}>
+        <label
+          className={
+            filter === 'survivors' ? filterLabelActiveClass : filterLabelIdleClass
+          }
+        >
           <input
             type="radio"
             name="gc-decision-filter"
             value="survivors"
+            className="sr-only"
             checked={filter === 'survivors'}
             aria-label={`Trial survivors ${survivorCountLabel}`}
             onChange={() => setFilter('survivors')}
           />
           Trial survivors {survivorCountLabel}
         </label>
-        <label className={filter === 'all' ? 'is-active' : undefined}>
+        <label
+          className={
+            filter === 'all' ? filterLabelActiveClass : filterLabelIdleClass
+          }
+        >
           <input
             type="radio"
             name="gc-decision-filter"
             value="all"
+            className="sr-only"
             checked={filter === 'all'}
             aria-label={`All graph objects ${allCountLabel}`}
             onChange={() => setFilter('all')}
@@ -563,22 +713,36 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
       ) : null}
 
       {showEmptyCandidates ? (
-        <output className="gc-empty-details">
+        <output className={grayNoticeClass}>
           No candidates in this collection. Every live object kept a positive
           trial reference count after heap incoming edges were subtracted.
         </output>
       ) : (
-        <div className="gc-decision-table-wrap">
-          <table className="gc-decision-table">
+        <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+          <table className="w-full min-w-[720px] border-collapse text-xs">
             <thead>
               <tr>
-                <th scope="col">Object</th>
-                <th scope="col">RC before</th>
-                <th scope="col">Heap in-edges</th>
-                <th scope="col">Trial RC</th>
-                <th scope="col">Trial</th>
-                <th scope="col">Scan</th>
-                <th scope="col">Final</th>
+                <th scope="col" className={decisionHeadCellClass}>
+                  Object
+                </th>
+                <th scope="col" className={decisionNumHeadCellClass}>
+                  RC before
+                </th>
+                <th scope="col" className={decisionNumHeadCellClass}>
+                  Heap in-edges
+                </th>
+                <th scope="col" className={decisionNumHeadCellClass}>
+                  Trial RC
+                </th>
+                <th scope="col" className={decisionHeadCellClass}>
+                  Trial
+                </th>
+                <th scope="col" className={decisionHeadCellClass}>
+                  Scan
+                </th>
+                <th scope="col" className={decisionHeadCellClass}>
+                  Final
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -588,11 +752,15 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
                 const expanded = expandedId === decision.objectId
                 return (
                   <Fragment key={decision.objectId}>
-                    <tr className={expanded ? 'is-expanded' : undefined}>
-                      <th scope="row">
+                    <tr
+                      className={
+                        expanded ? '[&>:is(th,td)]:bg-(--accent-a2)' : undefined
+                      }
+                    >
+                      <th scope="row" className={decisionRowHeadClass}>
                         <button
                           type="button"
-                          className="gc-expand-button"
+                          className={expandButtonClass}
                           aria-expanded={expanded}
                           aria-label={
                             expanded
@@ -604,40 +772,52 @@ function ObjectDecisionWalkthrough({ report }: { report: GcCollectionReport }) {
                           }
                         >
                           <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
-                          <code>{label}</code>
+                          <code className="text-xs text-(--gray-12)">
+                            {label}
+                          </code>
                         </button>
                         <GlobalNameChips
                           names={namesById.get(decision.objectId)}
                         />
                       </th>
-                      <td>{decision.refCountBefore}</td>
-                      <td>{decision.heapIncomingEdges}</td>
-                      <td>{decision.trialRefCount}</td>
-                      <td>
+                      <td className={decisionNumCellClass}>
+                        {decision.refCountBefore}
+                      </td>
+                      <td className={decisionNumCellClass}>
+                        {decision.heapIncomingEdges}
+                      </td>
+                      <td className={decisionNumCellClass}>
+                        {decision.trialRefCount}
+                      </td>
+                      <td className={decisionBadgeCellClass}>
                         <span
-                          className={`gc-badge gc-badge-${decision.decision}`}
+                          className={badgeClass(
+                            decision.decision === 'candidate'
+                              ? 'amber'
+                              : 'green'
+                          )}
                         >
                           {trialLabel(decision.decision)}
                         </span>
                       </td>
-                      <td>
-                        <span
-                          className={`gc-badge gc-badge-scan-${scan
-                            .toLowerCase()
-                            .replace(' ', '-')}`}
-                        >
+                      <td className={decisionBadgeCellClass}>
+                        <span className={badgeClass(scanBadgeTone[scan])}>
                           {scan}
                         </span>
                       </td>
-                      <td>
-                        <span className={`gc-badge gc-badge-${decision.final}`}>
+                      <td className={decisionBadgeCellClass}>
+                        <span
+                          className={badgeClass(
+                            decision.final === 'freed' ? 'red' : 'green'
+                          )}
+                        >
                           {finalLabel(decision.final)}
                         </span>
                       </td>
                     </tr>
                     {expanded ? (
-                      <tr className="gc-decision-detail-row">
-                        <td colSpan={7}>
+                      <tr>
+                        <td colSpan={7} className={decisionDetailCellClass}>
                           <DecisionRowDetails
                             decision={decision}
                             report={report}
@@ -698,41 +878,51 @@ function VisitedHeapEdges({ report }: { report: GcCollectionReport }) {
   const visitedTotal = report.phases.trialDeletion.edgesVisited
 
   return (
-    <details className="gc-card gc-edges-card">
-      <summary>
-        <h2>Visited heap edges</h2>
+    <details className={`group ${cardClass}`}>
+      <summary className="cursor-pointer list-none group-open:mb-3 [&::-webkit-details-marker]:hidden">
+        <h2 className="mb-0 inline-flex items-center gap-2 text-base before:text-xs before:text-(--gray-10) before:content-['▸'] group-open:before:content-['▾']">
+          Visited heap edges
+        </h2>
       </summary>
-      <output className="gc-edges-summary">
+      <output className={grayNoticeClass}>
         {edgeFilter === 'candidate-related'
           ? `Showing ${candidateRelated.length} candidate-related edges of ${visitedTotal} visited`
           : `Showing ${allEdges.length} reported edges of ${visitedTotal} visited`}
       </output>
 
       <div
-        className="gc-filter-group"
+        className={filterGroupClass}
         role="radiogroup"
         aria-label="Visited heap edges filter"
       >
         <label
           className={
-            edgeFilter === 'candidate-related' ? 'is-active' : undefined
+            edgeFilter === 'candidate-related'
+              ? filterLabelActiveClass
+              : filterLabelIdleClass
           }
         >
           <input
             type="radio"
             name="gc-edge-filter"
             value="candidate-related"
+            className="sr-only"
             checked={edgeFilter === 'candidate-related'}
             aria-label="Candidate-related"
             onChange={() => setEdgeFilter('candidate-related')}
           />
           Candidate-related
         </label>
-        <label className={edgeFilter === 'all' ? 'is-active' : undefined}>
+        <label
+          className={
+            edgeFilter === 'all' ? filterLabelActiveClass : filterLabelIdleClass
+          }
+        >
           <input
             type="radio"
             name="gc-edge-filter"
             value="all"
+            className="sr-only"
             checked={edgeFilter === 'all'}
             aria-label="All visited edges"
             onChange={() => setEdgeFilter('all')}
@@ -759,12 +949,12 @@ function VisitedHeapEdges({ report }: { report: GcCollectionReport }) {
 export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
   if (state.status === 'idle') {
     return (
-      <div className="gc-empty-state">
-        <h2>Cycle collector</h2>
-        <p>
+      <div className={emptyStateClass}>
+        <h2 className={stateHeadingClass}>Cycle collector</h2>
+        <p className={stateTextClass}>
           Run the current source to collect unreachable Monkey object cycles.
         </p>
-        <p className="gc-muted">
+        <p className={`${stateTextClass} ${mutedClass}`}>
           Editing never executes the program automatically.
         </p>
       </div>
@@ -773,19 +963,21 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
 
   if (state.status === 'running') {
     return (
-      <output className="gc-empty-state" aria-live="polite">
-        <h2>Running GC…</h2>
-        <p>The program is executing with a fixed instruction budget.</p>
+      <output className={emptyStateClass} aria-live="polite">
+        <h2 className={stateHeadingClass}>Running GC…</h2>
+        <p className={stateTextClass}>
+          The program is executing with a fixed instruction budget.
+        </p>
       </output>
     )
   }
 
   if (state.status === 'invalid') {
     return (
-      <section className="gc-error" role="alert">
-        <span className="gc-stage">response error</span>
-        <h2>Invalid GC response</h2>
-        <pre>{state.message}</pre>
+      <section className={errorCardClass} role="alert">
+        <span className={errorStageClass}>response error</span>
+        <h2 className={stateHeadingClass}>Invalid GC response</h2>
+        <pre className="whitespace-pre-wrap wrap-anywhere">{state.message}</pre>
       </section>
     )
   }
@@ -793,21 +985,21 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
   if (state.status === 'error') {
     const { span } = state
     return (
-      <section className="gc-error" role="alert">
-        <span className="gc-stage">{state.stage} error</span>
-        <h2>Program could not be collected</h2>
-        <pre>{state.message}</pre>
+      <section className={errorCardClass} role="alert">
+        <span className={errorStageClass}>{state.stage} error</span>
+        <h2 className={stateHeadingClass}>Program could not be collected</h2>
+        <pre className="whitespace-pre-wrap wrap-anywhere">{state.message}</pre>
         {span !== null ? (
           onErrorSpanSelect ? (
             <button
               type="button"
-              className="gc-span-button"
+              className={spanButtonClass}
               onClick={() => onErrorSpanSelect?.(span)}
             >
               Show in editor ({span.start}–{span.end})
             </button>
           ) : (
-            <p className="gc-muted">
+            <p className={`${stateTextClass} ${mutedClass}`}>
               Source span: {span.start}–{span.end}
             </p>
           )
@@ -827,23 +1019,28 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
   )
 
   return (
-    <div className="gc-report">
-      <section className="gc-card gc-result-card">
-        <span className="gc-eyebrow">Program result</span>
-        <code>{state.result}</code>
+    <div className="mx-auto flex max-w-[920px] flex-col gap-3.5">
+      <section className={`${cardClass} flex items-center justify-between gap-4`}>
+        <span className={eyebrowClass}>Program result</span>
+        <code className="overflow-hidden text-sm text-ellipsis whitespace-nowrap text-(--green-11)">
+          {state.result}
+        </code>
       </section>
 
       <section
-        className="gc-cycle-highlight"
+        className="flex items-end justify-between gap-5 rounded-[10px] border border-(--green-a7) bg-[linear-gradient(120deg,var(--green-a3),var(--color-panel-solid))] p-4.5 shadow-[0_1px_2px_var(--black-a3)] max-[640px]:flex-col max-[640px]:items-start"
         aria-label="Cycle collection summary"
       >
         <div>
-          <span className="gc-eyebrow">Heap objects</span>
-          <strong aria-label="Heap object count before and after collection">
+          <span className={`${eyebrowClass} mb-1.5`}>Heap objects</span>
+          <strong
+            className="block text-[28px] leading-none text-(--green-11)"
+            aria-label="Heap object count before and after collection"
+          >
             {report.before.objectCount} → {report.after.objectCount}
           </strong>
         </div>
-        <p>
+        <p className="m-0 text-right text-(--gray-11) max-[640px]:text-left">
           Collected by cycle GC:{' '}
           <strong aria-label="Collected object count">
             {collectedObjects}
@@ -851,7 +1048,7 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
         </p>
       </section>
 
-      <div className="gc-snapshot-grid">
+      <div className="grid grid-cols-2 gap-3.5 max-[640px]:grid-cols-1">
         <SnapshotCard
           title="Before"
           snapshot={report.before}
@@ -863,23 +1060,23 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
           kinds={snapshotValueKinds}
         />
       </div>
-      <p className="gc-footnote">
+      <p className={footnoteClass}>
         Heap snapshots include source values, compiled functions, constants, and
         VM bookkeeping values. Only kinds present before or after this
         collection are listed.
       </p>
 
-      <section className="gc-section" aria-label="Collector phase statistics">
-        <h2>Collector phases</h2>
-        <div className="gc-phase-grid">
-          <article className="gc-card">
-            <span className="gc-phase-index">1</span>
-            <h3>Trial deletion</h3>
-            <dl className="gc-summary-list">
+      <section aria-label="Collector phase statistics">
+        <h2 className={sectionHeadingClass}>Collector phases</h2>
+        <div className="grid grid-cols-3 gap-3.5 max-[780px]:grid-cols-1">
+          <article className={cardClass}>
+            <span className={phaseIndexClass}>1</span>
+            <h3 className={cardSubheadingClass}>Trial deletion</h3>
+            <dl className={phaseSummaryListClass}>
               <div>
                 <dt>
                   Edges visited
-                  <span className="gc-helper-text">
+                  <span className={helperTextClass}>
                     Heap-to-heap references temporarily subtracted
                   </span>
                 </dt>
@@ -895,7 +1092,7 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
               <div>
                 <dt>
                   Candidates
-                  <span className="gc-helper-text">
+                  <span className={helperTextClass}>
                     Trial reference count reached zero
                   </span>
                 </dt>
@@ -910,10 +1107,10 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
               </div>
             </dl>
           </article>
-          <article className="gc-card">
-            <span className="gc-phase-index">2</span>
-            <h3>Scan</h3>
-            <dl className="gc-summary-list">
+          <article className={cardClass}>
+            <span className={phaseIndexClass}>2</span>
+            <h3 className={cardSubheadingClass}>Scan</h3>
+            <dl className={phaseSummaryListClass}>
               <div>
                 <dt>Restored</dt>
                 <dd>{report.phases.scan.restored}</dd>
@@ -924,10 +1121,10 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
               </div>
             </dl>
           </article>
-          <article className="gc-card">
-            <span className="gc-phase-index">3</span>
-            <h3>Free cycles</h3>
-            <dl className="gc-summary-list">
+          <article className={cardClass}>
+            <span className={phaseIndexClass}>3</span>
+            <h3 className={cardSubheadingClass}>Free cycles</h3>
+            <dl className={phaseSummaryListClass}>
               <div>
                 <dt>Objects freed</dt>
                 <dd>{report.phases.freeCycles.freed}</dd>
@@ -941,10 +1138,10 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
       <ObjectDecisionWalkthrough report={report} />
       <VisitedHeapEdges report={report} />
 
-      <section className="gc-card gc-collected-card">
-        <h2>Collected by value kind</h2>
+      <section className={cardClass}>
+        <h2 className={sectionHeadingClass}>Collected by value kind</h2>
         {collectedValueKinds.length > 0 ? (
-          <dl className="gc-kind-list">
+          <dl className={kindListClass}>
             {collectedValueKinds.map((kind) => (
               <div key={kind}>
                 <dt>{valueKindLabels[kind]}</dt>
@@ -953,11 +1150,11 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
             ))}
           </dl>
         ) : (
-          <p className="gc-muted">No heap values were collected.</p>
+          <p className={mutedClass}>No heap values were collected.</p>
         )}
       </section>
 
-      <p className="gc-footnote">
+      <p className={footnoteClass}>
         Tracked bytes are collector accounting, not browser memory. Collection
         reclaims Monkey heap objects; WebAssembly linear memory may stay
         allocated.

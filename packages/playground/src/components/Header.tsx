@@ -1,4 +1,4 @@
-import { Flex, Heading } from '@radix-ui/themes'
+import { Heading } from '@radix-ui/themes'
 
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -18,36 +18,38 @@ function GitHubIcon() {
 
 export function Header() {
   return (
-    <header className="playground-header">
-      <Flex align="center" justify="between" px="4" py="3" className="playground-header-inner">
-        <Flex align="center" gap="3">
+    <header className="shrink-0 border-b border-(--gray-a5) bg-(--color-background)">
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
           <img
             src="/monkey.png"
             alt="Monkey logo"
             width={25}
             height={28}
-            className="playground-logo"
+            className="block h-7 w-auto"
           />
-          <Heading as="h1" size="4" className="playground-title">
+          <Heading
+            as="h1"
+            size="4"
+            className="overflow-hidden text-ellipsis whitespace-nowrap"
+          >
             Monkey Playground
           </Heading>
-        </Flex>
+        </div>
 
-        <Flex align="center" gap="2">
+        <div className="flex items-center gap-2">
           <ThemeToggle />
           <a
             href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="github-link"
+            className="flex items-center gap-2 text-(--gray-12) no-underline hover:text-(--accent-11)"
           >
-            <Flex align="center" gap="2">
-              <GitHubIcon />
-              <span className="github-link-text">GitHub</span>
-            </Flex>
+            <GitHubIcon />
+            <span className="max-[640px]:hidden">GitHub</span>
           </a>
-        </Flex>
-      </Flex>
+        </div>
+      </div>
     </header>
   )
 }
