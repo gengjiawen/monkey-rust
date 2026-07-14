@@ -49,6 +49,8 @@ async function createWasmBindings(): Promise<MonkeyWasm> {
     compile_detail: bindings.compile_detail,
     compile_with_debug: bindings.compile_with_debug,
     run_gc_with_report: bindings.run_gc_with_report,
+    compile_to_snapshot: bindings.compile_to_snapshot,
+    run_snapshot: bindings.run_snapshot,
   }
 }
 
