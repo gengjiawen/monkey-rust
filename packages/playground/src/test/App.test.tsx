@@ -491,7 +491,7 @@ describe('GC playground', () => {
       status: 'error',
       stage: 'runtime',
       message: "property 'next' does not exist on Node",
-      span: { start: 120, end: 126 },
+      span: { start: 0, end: 5 },
     } satisfies GcRunEnvelope)
     renderApp()
 
@@ -500,13 +500,13 @@ describe('GC playground', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('runtime error')
     expect(alert).toHaveTextContent("property 'next' does not exist on Node")
-    expect(highlightRangeMock).toHaveBeenCalledWith(120, 126)
+    expect(highlightRangeMock).toHaveBeenCalledWith(0, 5)
 
     highlightRangeMock.mockClear()
     await user.click(
-      screen.getByRole('button', { name: 'Show in editor (120–126)' })
+      screen.getByRole('button', { name: 'Show in editor (0–5)' })
     )
-    expect(highlightRangeMock).toHaveBeenCalledWith(120, 126)
+    expect(highlightRangeMock).toHaveBeenCalledWith(0, 5)
 
     clearHighlightMock.mockClear()
     await user.type(screen.getByLabelText('Source editor'), 'x')
@@ -553,6 +553,15 @@ describe('GC playground', () => {
 })
 
 describe('Snapshot playground', () => {
+  it('does not compile snapshots while the snapshot tab is hidden', async () => {
+    renderApp()
+
+    await waitFor(() => {
+      expect(parseMock).toHaveBeenCalled()
+    })
+    expect(buildSnapshotMock).not.toHaveBeenCalled()
+  })
+
   it('builds the snapshot automatically and runs the bytes on demand', async () => {
     const user = userEvent.setup()
     runSnapshotMock.mockResolvedValue({
@@ -585,6 +594,31 @@ describe('Snapshot playground', () => {
     ])
   })
 
+  it('immediately invalidates stale bytes when the source changes', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    expect(runButton).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Download .mbc' })).toBeEnabled()
+    const buildCount = buildSnapshotMock.mock.calls.length
+
+    await user.type(screen.getByLabelText('Source editor'), 'x')
+
+    expect(screen.getByText('Compiling snapshot…')).toBeInTheDocument()
+    expect(runButton).toBeDisabled()
+    expect(
+      screen.queryByRole('button', { name: 'Download .mbc' })
+    ).not.toBeInTheDocument()
+    expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount)
+
+    expect(await screen.findByLabelText('Snapshot size')).toHaveTextContent(
+      '4 bytes'
+    )
+    expect(runButton).toBeEnabled()
+  })
+
   it('highlights the span for snapshot runtime errors until the source changes', async () => {
     const user = userEvent.setup()
     runSnapshotMock.mockResolvedValue({
@@ -610,6 +644,36 @@ describe('Snapshot playground', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('converts UTF-8 runtime spans before highlighting Unicode source', async () => {
+    const user = userEvent.setup()
+    const source = '"é"; let not_callable = 5; not_callable()'
+    runSnapshotMock.mockResolvedValue({
+      status: 'error',
+      stage: 'runtime',
+      message: 'not a function: Integer',
+      span: { start: 28, end: 42 },
+    } satisfies SnapshotRunEnvelope)
+    renderApp()
+
+    const sourceEditor = screen.getByLabelText('Source editor')
+    await user.clear(sourceEditor)
+    await user.type(sourceEditor, source)
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    highlightRangeMock.mockClear()
+    await user.click(runButton)
+
+    await screen.findByRole('alert')
+    expect(highlightRangeMock).toHaveBeenCalledWith(27, 41)
+
+    highlightRangeMock.mockClear()
+    await user.click(
+      screen.getByRole('button', { name: 'Show in editor (28–42)' })
+    )
+    expect(highlightRangeMock).toHaveBeenCalledWith(27, 41)
+  })
+
   it('rebuilds the snapshot when the strip toggle changes', async () => {
     const user = userEvent.setup()
     buildSnapshotMock.mockImplementation(
@@ -631,8 +695,17 @@ describe('Snapshot playground', () => {
       expect.any(String),
       false
     )
+    const runButton = screen.getByRole('button', { name: 'Run snapshot' })
+    const buildCount = buildSnapshotMock.mock.calls.length
 
     await user.click(screen.getByRole('radio', { name: 'Stripped' }))
+
+    expect(screen.getByText('Compiling snapshot…')).toBeInTheDocument()
+    expect(runButton).toBeDisabled()
+    expect(
+      screen.queryByRole('button', { name: 'Download .mbc' })
+    ).not.toBeInTheDocument()
+    expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount)
 
     await waitFor(() => {
       expect(buildSnapshotMock).toHaveBeenLastCalledWith(
@@ -666,6 +739,9 @@ describe('Snapshot playground', () => {
     })
 
     expect(screen.queryByText('stale')).not.toBeInTheDocument()
+    expect(screen.getByText('Compiling snapshot…')).toBeInTheDocument()
+
+    await screen.findByLabelText('Snapshot size')
     expect(
       screen.getByText(/executes the bytes above on the GC VM/)
     ).toBeInTheDocument()

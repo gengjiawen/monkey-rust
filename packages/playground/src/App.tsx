@@ -14,6 +14,7 @@ import { Editor, type EditorHandle } from './Editor'
 import { GcReportView, type GcPanelState } from './GcReportView'
 import type { SourceSpan } from './gcReport'
 import { runGc } from './gcRunner'
+import { utf16OffsetToUtf8Byte, utf8ByteSpanToUtf16 } from './sourceSpan'
 import {
   SnapshotView,
   type SnapshotBuildState,
@@ -106,7 +107,11 @@ const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
 
 const toolbarClass =
-  'flex shrink-0 items-center justify-between gap-3 border-b border-(--gray-a5) bg-(--color-background) px-3 py-2'
+  'flex shrink-0 items-center gap-3 border-b border-(--gray-a5) bg-(--color-background) px-3 py-2'
+
+const editorToolbarClass = `${toolbarClass} justify-between`
+
+const outputToolbarClass = `${toolbarClass} flex-wrap`
 
 const editorFrameClass =
   'flex min-h-0 flex-1 flex-col overflow-hidden bg-(--color-background)'
@@ -144,33 +149,50 @@ function App() {
   const snapshotRunRequestId = useRef(0)
   const editorRef = useRef<EditorHandle>(null)
 
-  const compileCode = useCallback(
-    (source: string) => {
-      try {
-        const astJson = parse(source)
-        const ast = JSON.parse(astJson) as unknown
-        setAstData(ast)
-        setAstOutput(JSON.stringify(ast, null, 2))
-      } catch (error) {
-        const message = getErrorMessage(error)
-        setAstData(null)
-        setAstOutput(message)
-      }
+  const astSelection = useMemo(
+    () =>
+      selection === null
+        ? null
+        : {
+            from: utf16OffsetToUtf8Byte(code, selection.from),
+            to: utf16OffsetToUtf8Byte(code, selection.to),
+          },
+    [code, selection]
+  )
 
-      try {
-        const debugJson = compile_with_debug(source)
-        const view = JSON.parse(debugJson) as BytecodeDebugView
-        setBytecodeDebugView(view)
-        setCompilerOutput(view.detail)
-      } catch (error) {
-        setBytecodeDebugView(null)
-        setCompilerOutput(getErrorMessage(error))
-      }
+  const invalidateSnapshot = useCallback(() => {
+    snapshotRunRequestId.current += 1
+    setSnapshotRun({ status: 'idle' })
+    setSnapshotBuild({ status: 'idle' })
+  }, [])
 
-      snapshotRunRequestId.current += 1
-      setSnapshotRun({ status: 'idle' })
+  const compileCode = useCallback((source: string) => {
+    try {
+      const astJson = parse(source)
+      const ast = JSON.parse(astJson) as unknown
+      setAstData(ast)
+      setAstOutput(JSON.stringify(ast, null, 2))
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setAstData(null)
+      setAstOutput(message)
+    }
+
+    try {
+      const debugJson = compile_with_debug(source)
+      const view = JSON.parse(debugJson) as BytecodeDebugView
+      setBytecodeDebugView(view)
+      setCompilerOutput(view.detail)
+    } catch (error) {
+      setBytecodeDebugView(null)
+      setCompilerOutput(getErrorMessage(error))
+    }
+  }, [])
+
+  const compileSnapshot = useCallback(
+    (source: string, shouldStripDebug: boolean) => {
       try {
-        setSnapshotBuild(buildSnapshot(source, stripDebug))
+        setSnapshotBuild(buildSnapshot(source, shouldStripDebug))
       } catch (error) {
         setSnapshotBuild({
           status: 'invalid',
@@ -178,7 +200,7 @@ function App() {
         })
       }
     },
-    [stripDebug]
+    []
   )
 
   const debouncedCompile = useMemo(
@@ -186,13 +208,31 @@ function App() {
     [compileCode]
   )
 
-  const editorOnChange = useCallback((value: string) => {
-    setCode(value)
-    gcRequestId.current += 1
-    setGcState({ status: 'idle' })
-    snapshotRunRequestId.current += 1
-    setSnapshotRun({ status: 'idle' })
-  }, [])
+  const debouncedSnapshotCompile = useMemo(
+    () => debounce(compileSnapshot, 200),
+    [compileSnapshot]
+  )
+
+  const editorOnChange = useCallback(
+    (value: string) => {
+      setCode(value)
+      gcRequestId.current += 1
+      setGcState({ status: 'idle' })
+      invalidateSnapshot()
+    },
+    [invalidateSnapshot]
+  )
+
+  const handleStripDebugChange = useCallback(
+    (nextStripDebug: boolean) => {
+      if (nextStripDebug === stripDebug) {
+        return
+      }
+      invalidateSnapshot()
+      setStripDebug(nextStripDebug)
+    },
+    [invalidateSnapshot, stripDebug]
+  )
 
   const formatCode = useCallback(async () => {
     setIsFormatting(true)
@@ -206,6 +246,9 @@ function App() {
         plugins: [monkeyPlugin.default as unknown as Plugin],
       })
       setCode(formatted)
+      if (formatted !== code) {
+        invalidateSnapshot()
+      }
       setSelection(null)
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
@@ -218,13 +261,23 @@ function App() {
     } finally {
       setIsFormatting(false)
     }
-  }, [code, compileCode])
+  }, [code, compileCode, invalidateSnapshot])
 
   useEffect(() => {
     debouncedCompile(code)
   }, [code, debouncedCompile])
 
   useEffect(() => () => debouncedCompile.cancel(), [debouncedCompile])
+
+  useEffect(() => {
+    if (outputView !== 'snapshot') {
+      debouncedSnapshotCompile.cancel()
+      return
+    }
+
+    debouncedSnapshotCompile(code, stripDebug)
+    return () => debouncedSnapshotCompile.cancel()
+  }, [code, debouncedSnapshotCompile, outputView, stripDebug])
 
   useEffect(() => {
     const index = Math.min(Math.max(snippetIndex, 0), snippets.length - 1)
@@ -234,8 +287,9 @@ function App() {
     setSelection(null)
     gcRequestId.current += 1
     setGcState({ status: 'idle' })
+    invalidateSnapshot()
     setCode(snippets[index].code)
-  }, [snippetIndex, setSnippetIndex])
+  }, [invalidateSnapshot, snippetIndex, setSnippetIndex])
 
   useEffect(
     () => () => {
@@ -287,13 +341,22 @@ function App() {
     }
   }, [snapshotBuild])
 
-  const handleNodeSelect = useCallback((start: number, end: number) => {
-    editorRef.current?.highlightRange(start, end)
-  }, [])
+  const highlightSourceSpan = useCallback(
+    (span: SourceSpan) => {
+      const converted = utf8ByteSpanToUtf16(code, span)
+      editorRef.current?.highlightRange(converted.start, converted.end)
+    },
+    [code]
+  )
 
-  const handleErrorSpanSelect = useCallback((span: SourceSpan) => {
-    editorRef.current?.highlightRange(span.start, span.end)
-  }, [])
+  const handleNodeSelect = useCallback(
+    (start: number, end: number) => {
+      highlightSourceSpan({ start, end })
+    },
+    [highlightSourceSpan]
+  )
+
+  const handleErrorSpanSelect = highlightSourceSpan
 
   const handleBytecodeSelection = useCallback(
     (selection: { from: number; to: number }) => {
@@ -308,9 +371,9 @@ function App() {
         return
       }
 
-      editorRef.current?.highlightRange(span.start, span.end)
+      highlightSourceSpan(span)
     },
-    [bytecodeDebugView]
+    [bytecodeDebugView, highlightSourceSpan]
   )
 
   useEffect(() => {
@@ -329,11 +392,11 @@ function App() {
     }
     const { span } = gcState
     const editor = editorRef.current
-    editor?.highlightRange(span.start, span.end)
+    highlightSourceSpan(span)
     return () => {
       editor?.clearHighlight()
     }
-  }, [gcState, outputView])
+  }, [gcState, highlightSourceSpan, outputView])
 
   useEffect(() => {
     if (
@@ -345,18 +408,18 @@ function App() {
     }
     const { span } = snapshotRun
     const editor = editorRef.current
-    editor?.highlightRange(span.start, span.end)
+    highlightSourceSpan(span)
     return () => {
       editor?.clearHighlight()
     }
-  }, [snapshotRun, outputView])
+  }, [highlightSourceSpan, snapshotRun, outputView])
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden max-[780px]:grid-cols-1 max-[780px]:grid-rows-2">
       <div
         className={`${panelClass} border-r border-(--gray-a5) max-[780px]:border-r-0 max-[780px]:border-b`}
       >
-        <div className={toolbarClass}>
+        <div className={editorToolbarClass}>
           <div className="flex items-center gap-3">
             <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
@@ -398,8 +461,9 @@ function App() {
       </div>
 
       <div className={panelClass}>
-        <div className={toolbarClass}>
+        <div className={outputToolbarClass}>
           <SegmentedControl.Root
+            className="max-w-full min-w-0!"
             size="2"
             value={outputView}
             onValueChange={(value) => setOutputView(value as OutputView)}
@@ -438,7 +502,7 @@ function App() {
             <div className="min-h-0 flex-1 overflow-auto bg-(--color-background) px-2.5 pt-2 pb-4">
               <AstTreeView
                 data={astData}
-                selection={selection}
+                selection={astSelection}
                 onNodeSelect={handleNodeSelect}
               />
             </div>
@@ -457,7 +521,7 @@ function App() {
                 build={snapshotBuild}
                 run={snapshotRun}
                 stripDebug={stripDebug}
-                onStripDebugChange={setStripDebug}
+                onStripDebugChange={handleStripDebugChange}
                 onErrorSpanSelect={handleErrorSpanSelect}
               />
             </div>
