@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-compiler"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "byteorder",
  "insta",
@@ -247,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-gc"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "byteorder",
  "insta",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-interpreter"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "monkey-object",
  "monkey-parser",
@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-lexer"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "insta",
  "serde",
@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-object"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "insta",
  "lazy_static",
@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-parser"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "insta",
  "monkey-lexer",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "monkey-wasm"
-version = "0.15.1"
+version = "1.0.0"
 dependencies = [
  "console_error_panic_hook",
  "monkey-compiler",

@@ -48,7 +48,7 @@ importers:
         specifier: ^6.43.1
         version: 6.43.1
       '@gengjiawen/monkey-wasm':
-        specifier: workspace:^0.15.1
+        specifier: workspace:^1.0.0
         version: link:../../wasm/pkg
       '@radix-ui/themes':
         specifier: ^3.3.0
@@ -133,8 +133,8 @@ importers:
   packages/prettier-plugin-monkey:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^0.15.1
-        version: 0.15.1
+        specifier: ^1.0.0
+        version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -544,9 +544,6 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
-
-  '@gengjiawen/monkey-wasm@0.15.1':
-    resolution: {integrity: sha512-avlJ03Z6xQAR2uPzA/W0CWQjDlxE5MAPeIzhzsI+D0qZz7+CK/NRiI4A/GTuJhzr3JVaCZuEBML6d3fuaCSJ9w==}
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -4583,8 +4580,6 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
 
   '@floating-ui/utils@0.2.11': {}
-
-  '@gengjiawen/monkey-wasm@0.15.1': {}
 
   '@iconify/types@2.0.0': {}
 
