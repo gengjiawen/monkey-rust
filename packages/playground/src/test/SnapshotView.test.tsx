@@ -91,6 +91,7 @@ function okBuild(hasDebugInfo = true): SnapshotBuildState {
 function renderView({
   build = okBuild(),
   run = { status: 'idle' } as SnapshotRunState,
+  stale = false,
   stripDebug = false,
   onStripDebugChange = vi.fn(),
   onErrorSpanSelect = vi.fn(),
@@ -100,6 +101,7 @@ function renderView({
       <SnapshotView
         build={build}
         run={run}
+        stale={stale}
         stripDebug={stripDebug}
         onStripDebugChange={onStripDebugChange}
         onErrorSpanSelect={onErrorSpanSelect}
@@ -214,6 +216,24 @@ describe('SnapshotView', () => {
     expect(
       screen.queryByRole('button', { name: /Show in editor/ })
     ).not.toBeInTheDocument()
+  })
+
+  it('keeps stale builds mounted with an announced rebuild notice', () => {
+    renderView({ stale: true })
+
+    expect(screen.getByRole('status')).toHaveTextContent('Rebuilding snapshot…')
+    expect(screen.getByLabelText('Snapshot size')).toHaveTextContent('13 bytes')
+    expect(screen.getByText('4d 42 43 00')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Download .mbc' })
+    ).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Stripped' })).toBeEnabled()
+  })
+
+  it('announces the initial compile placeholder to assistive tech', () => {
+    renderView({ build: { status: 'idle' } })
+
+    expect(screen.getByRole('status')).toHaveTextContent('Compiling snapshot…')
   })
 
   it('renders idle hints, run results, and build failures', () => {

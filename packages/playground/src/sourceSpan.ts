@@ -82,13 +82,3 @@ export function utf16OffsetToUtf8Byte(
 
   return bytes
 }
-
-export function utf16SpanToUtf8Byte(
-  source: string,
-  span: SourceSpanLike
-): SourceSpanLike {
-  return {
-    start: utf16OffsetToUtf8Byte(source, span.start),
-    end: utf16OffsetToUtf8Byte(source, span.end),
-  }
-}

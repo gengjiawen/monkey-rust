@@ -29,6 +29,7 @@ export type SnapshotRunState =
 interface SnapshotViewProps {
   build: SnapshotBuildState
   run: SnapshotRunState
+  stale: boolean
   stripDebug: boolean
   onStripDebugChange: (stripDebug: boolean) => void
   onErrorSpanSelect?: (span: SourceSpan) => void
@@ -75,10 +76,12 @@ function downloadSnapshot(bytes: Uint8Array<ArrayBuffer>) {
 
 function SnapshotSummary({
   build,
+  stale,
   stripDebug,
   onStripDebugChange,
 }: {
   build: SnapshotBuildSuccess
+  stale: boolean
   stripDebug: boolean
   onStripDebugChange: (stripDebug: boolean) => void
 }) {
@@ -126,7 +129,7 @@ function SnapshotSummary({
             Stripped
           </SegmentedControl.Item>
         </SegmentedControl.Root>
-        <Button size="1" variant="soft" onClick={handleDownload}>
+        <Button size="1" variant="soft" onClick={handleDownload} disabled={stale}>
           Download .mbc
         </Button>
       </div>
@@ -257,37 +260,54 @@ function SnapshotRunResult({
 export function SnapshotView({
   build,
   run,
+  stale,
   stripDebug,
   onStripDebugChange,
   onErrorSpanSelect,
 }: SnapshotViewProps) {
   if (build.status === 'idle') {
-    return <p className={`${mutedClass} m-0`}>Compiling snapshot…</p>
+    return (
+      <output className={`${mutedClass} block`}>Compiling snapshot…</output>
+    )
   }
+
+  // The previous result stays mounted while a rebuild is pending so scroll
+  // position and focus survive; the live region announces the swap for
+  // assistive tech, mirroring the alert roles on the error branches.
+  const staleNotice = stale ? (
+    <output className={`${mutedClass} block`}>Rebuilding snapshot…</output>
+  ) : null
 
   if (build.status === 'error' || build.status === 'invalid') {
     const heading =
       build.status === 'error' ? `${build.stage} error` : 'unexpected response'
     return (
-      <p role="alert" className={alertClass}>
-        {heading}: {build.message}
-      </p>
+      <div className="grid gap-4">
+        {staleNotice}
+        <p role="alert" className={alertClass}>
+          {heading}: {build.message}
+        </p>
+      </div>
     )
   }
 
   return (
     <div className="grid gap-4">
-      <SnapshotSummary
-        build={build}
-        stripDebug={stripDebug}
-        onStripDebugChange={onStripDebugChange}
-      />
-      <SnapshotRunResult
-        build={build}
-        run={run}
-        onErrorSpanSelect={onErrorSpanSelect}
-      />
-      <SnapshotHexdump build={build} />
+      {staleNotice}
+      <div className={`grid gap-4 ${stale ? 'opacity-60' : ''}`}>
+        <SnapshotSummary
+          build={build}
+          stale={stale}
+          stripDebug={stripDebug}
+          onStripDebugChange={onStripDebugChange}
+        />
+        <SnapshotRunResult
+          build={build}
+          run={run}
+          onErrorSpanSelect={onErrorSpanSelect}
+        />
+        <SnapshotHexdump build={build} />
+      </div>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Provider } from 'jotai'
 import {
   forwardRef,
   useImperativeHandle,
@@ -27,9 +28,11 @@ const {
   runSnapshotMock,
   highlightRangeMock,
   clearHighlightMock,
+  formatMock,
+  sourceEditorHooks,
 } = vi.hoisted(() => ({
   runGcMock: vi.fn(),
-  parseMock: vi.fn(() => '{"Program":{"type":"Program","body":[]}}'),
+  parseMock: vi.fn(),
   compileMock: vi.fn(() =>
     JSON.stringify({
       detail: '',
@@ -42,7 +45,17 @@ const {
   runSnapshotMock: vi.fn(),
   highlightRangeMock: vi.fn(),
   clearHighlightMock: vi.fn(),
+  formatMock: vi.fn(),
+  // The mock editor below is a plain <textarea>, which cannot reproduce every
+  // CodeMirror callback: change events whose text equals the current document,
+  // or cursor movements. Tests drive those callbacks through these hooks.
+  sourceEditorHooks: {} as {
+    onChange?: (value: string) => void
+    onSelectionChange?: (selection: { from: number; to: number }) => void
+  },
 }))
+
+const defaultAstJson = '{"Program":{"type":"Program","body":[]}}'
 
 vi.mock('@gengjiawen/monkey-wasm', () => ({
   parse: parseMock,
@@ -58,21 +71,35 @@ vi.mock('../snapshotRunner', () => ({
   runSnapshot: runSnapshotMock,
 }))
 
+vi.mock('prettier/standalone', () => ({
+  format: formatMock,
+}))
+
+vi.mock('../../../prettier-plugin-monkey/src/index', () => ({
+  default: {},
+}))
+
 interface MockEditorProps {
   code?: string
   onChange?: (value: string) => void
+  onSelectionChange?: (selection: { from: number; to: number }) => void
   extra?: { readOnly?: boolean }
 }
 
 vi.mock('../Editor', () => ({
   Editor: forwardRef(function MockEditor(
-    { code = '', onChange, extra }: MockEditorProps,
+    { code = '', onChange, onSelectionChange, extra }: MockEditorProps,
     ref: Ref<{ highlightRange(): void; clearHighlight(): void }>
   ) {
     useImperativeHandle(ref, () => ({
       highlightRange: highlightRangeMock,
       clearHighlight: clearHighlightMock,
     }))
+
+    if (!extra?.readOnly) {
+      sourceEditorHooks.onChange = onChange
+      sourceEditorHooks.onSelectionChange = onSelectionChange
+    }
 
     const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
       onChange?.(event.target.value)
@@ -305,10 +332,14 @@ function snapshotEnvelope(): SnapshotBuildSuccess {
 }
 
 function renderApp() {
+  // A fresh jotai Provider per render keeps atom state (the persisted snippet
+  // index) from leaking between tests through the module-level default store.
   return render(
-    <Theme>
-      <App />
-    </Theme>
+    <Provider>
+      <Theme>
+        <App />
+      </Theme>
+    </Provider>
   )
 }
 
@@ -327,13 +358,18 @@ afterEach(cleanup)
 beforeEach(() => {
   localStorage.clear()
   runGcMock.mockReset()
-  parseMock.mockClear()
+  parseMock.mockReset()
+  parseMock.mockImplementation(() => defaultAstJson)
   compileMock.mockClear()
   buildSnapshotMock.mockReset()
   buildSnapshotMock.mockImplementation(() => snapshotEnvelope())
   runSnapshotMock.mockReset()
+  formatMock.mockReset()
+  formatMock.mockImplementation(async (source: string) => source)
   highlightRangeMock.mockClear()
   clearHighlightMock.mockClear()
+  sourceEditorHooks.onChange = undefined
+  sourceEditorHooks.onSelectionChange = undefined
 })
 
 describe('GC playground', () => {
@@ -514,6 +550,35 @@ describe('GC playground', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('converts UTF-8 GC error spans before highlighting Unicode source', async () => {
+    const user = userEvent.setup()
+    // 中 is three UTF-8 bytes but one UTF-16 unit, so the byte span {7, 11}
+    // reported by the lexer lands on UTF-16 positions {5, 9}.
+    runGcMock.mockResolvedValue({
+      status: 'error',
+      stage: 'runtime',
+      message: 'identifier not found: boom',
+      span: { start: 7, end: 11 },
+    } satisfies GcRunEnvelope)
+    renderApp()
+
+    const sourceEditor = screen.getByLabelText('Source editor')
+    await user.clear(sourceEditor)
+    await user.type(sourceEditor, '"中"; boom;')
+
+    highlightRangeMock.mockClear()
+    await user.click(await openGcTab(user))
+
+    await screen.findByRole('alert')
+    expect(highlightRangeMock).toHaveBeenCalledWith(5, 9)
+
+    highlightRangeMock.mockClear()
+    await user.click(
+      screen.getByRole('button', { name: 'Show in editor (7–11)' })
+    )
+    expect(highlightRangeMock).toHaveBeenCalledWith(5, 9)
+  })
+
   it('ignores a stale run after the source changes and a newer run finishes', async () => {
     const user = userEvent.setup()
     const firstRun = deferred<GcRunEnvelope>()
@@ -601,22 +666,81 @@ describe('Snapshot playground', () => {
     const runButton = await openSnapshotTab(user)
     await screen.findByLabelText('Snapshot size')
     expect(runButton).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Download .mbc' })).toBeEnabled()
+    const downloadButton = screen.getByRole('button', {
+      name: 'Download .mbc',
+    })
+    expect(downloadButton).toBeEnabled()
     const buildCount = buildSnapshotMock.mock.calls.length
 
     await user.type(screen.getByLabelText('Source editor'), 'x')
 
-    expect(screen.getByText('Compiling snapshot…')).toBeInTheDocument()
+    // The previous build stays mounted while the rebuild is announced; only
+    // the actions that would hand out stale bytes lock up.
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Rebuilding snapshot…'
+    )
+    expect(screen.getByLabelText('Snapshot size')).toBeInTheDocument()
     expect(runButton).toBeDisabled()
-    expect(
-      screen.queryByRole('button', { name: 'Download .mbc' })
-    ).not.toBeInTheDocument()
+    expect(downloadButton).toBeDisabled()
     expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount)
 
-    expect(await screen.findByLabelText('Snapshot size')).toHaveTextContent(
-      '4 bytes'
-    )
+    await waitFor(() => expect(runButton).toBeEnabled())
+    expect(screen.queryByText('Rebuilding snapshot…')).not.toBeInTheDocument()
+    expect(downloadButton).toBeEnabled()
+    expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount + 1)
+  })
+
+  it('keeps a fresh build when an edit reports identical text', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
     expect(runButton).toBeEnabled()
+    const buildCount = buildSnapshotMock.mock.calls.length
+    const sourceEditor =
+      screen.getByLabelText<HTMLTextAreaElement>('Source editor')
+
+    // CodeMirror reports a document change even when the replacement text is
+    // identical, e.g. typing over a selection with the same character.
+    act(() => {
+      sourceEditorHooks.onChange?.(sourceEditor.value)
+    })
+
+    expect(screen.queryByText('Rebuilding snapshot…')).not.toBeInTheDocument()
+    expect(runButton).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Download .mbc' })).toBeEnabled()
+    expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount)
+  })
+
+  it('invalidates and rebuilds the snapshot when switching snippets', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    expect(runButton).toBeEnabled()
+    const buildCount = buildSnapshotMock.mock.calls.length
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Functions' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Rebuilding snapshot…'
+    )
+    expect(runButton).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Download .mbc' })
+    ).toBeDisabled()
+
+    await waitFor(() => {
+      expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount + 1)
+    })
+    expect(buildSnapshotMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('let add = fn(a, b) { a + b };'),
+      false
+    )
+    await waitFor(() => expect(runButton).toBeEnabled())
   })
 
   it('highlights the span for snapshot runtime errors until the source changes', async () => {
@@ -698,13 +822,16 @@ describe('Snapshot playground', () => {
     const runButton = screen.getByRole('button', { name: 'Run snapshot' })
     const buildCount = buildSnapshotMock.mock.calls.length
 
-    await user.click(screen.getByRole('radio', { name: 'Stripped' }))
+    const strippedToggle = screen.getByRole('radio', { name: 'Stripped' })
+    await user.click(strippedToggle)
 
-    expect(screen.getByText('Compiling snapshot…')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Rebuilding snapshot…'
+    )
     expect(runButton).toBeDisabled()
-    expect(
-      screen.queryByRole('button', { name: 'Download .mbc' })
-    ).not.toBeInTheDocument()
+    // The toggle survives the rebuild without losing keyboard focus because
+    // the panel is never unmounted.
+    expect(strippedToggle).toHaveFocus()
     expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount)
 
     await waitFor(() => {
@@ -718,6 +845,7 @@ describe('Snapshot playground', () => {
         'stripped'
       )
     })
+    expect(strippedToggle).toHaveFocus()
   })
 
   it('ignores a snapshot run that resolves after the source changes', async () => {
@@ -739,11 +867,159 @@ describe('Snapshot playground', () => {
     })
 
     expect(screen.queryByText('stale')).not.toBeInTheDocument()
-    expect(screen.getByText('Compiling snapshot…')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Rebuilding snapshot…'
+    )
 
-    await screen.findByLabelText('Snapshot size')
+    await waitFor(() => expect(runButton).toBeEnabled())
     expect(
       screen.getByText(/executes the bytes above on the GC VM/)
     ).toBeInTheDocument()
+    expect(screen.queryByText('stale')).not.toBeInTheDocument()
+  })
+})
+
+describe('Format', () => {
+  it('keeps the GC report when formatting is a no-op', async () => {
+    const user = userEvent.setup()
+    runGcMock.mockResolvedValue(successEnvelope())
+    renderApp()
+
+    await user.click(await openGcTab(user))
+    await screen.findByLabelText(
+      'Heap object count before and after collection'
+    )
+
+    const formatButton = screen.getByRole('button', { name: 'Format' })
+    await user.click(formatButton)
+    await waitFor(() => expect(formatButton).toBeEnabled())
+
+    expect(
+      screen.getByLabelText('Heap object count before and after collection')
+    ).toHaveTextContent('20 → 18')
+  })
+
+  it('keeps the snapshot when formatting is a no-op', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    expect(runButton).toBeEnabled()
+    const buildCount = buildSnapshotMock.mock.calls.length
+
+    const formatButton = screen.getByRole('button', { name: 'Format' })
+    await user.click(formatButton)
+    await waitFor(() => expect(formatButton).toBeEnabled())
+
+    expect(screen.queryByText('Rebuilding snapshot…')).not.toBeInTheDocument()
+    expect(runButton).toBeEnabled()
+    expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount)
+  })
+
+  it('rebuilds the snapshot after formatting changes the source', async () => {
+    const user = userEvent.setup()
+    formatMock.mockResolvedValue('let formatted = 1;\n')
+    renderApp()
+
+    const runButton = await openSnapshotTab(user)
+    await screen.findByLabelText('Snapshot size')
+    const sourceEditor = screen.getByLabelText('Source editor')
+
+    await user.click(screen.getByRole('button', { name: 'Format' }))
+
+    await waitFor(() =>
+      expect(sourceEditor).toHaveValue('let formatted = 1;\n')
+    )
+    await waitFor(() => {
+      expect(buildSnapshotMock).toHaveBeenLastCalledWith(
+        'let formatted = 1;\n',
+        false
+      )
+    })
+    await waitFor(() => expect(runButton).toBeEnabled())
+  })
+
+  it('discards a format result that resolves after further edits', async () => {
+    const user = userEvent.setup()
+    const pendingFormat = deferred<string>()
+    formatMock.mockReturnValueOnce(pendingFormat.promise)
+    renderApp()
+
+    const sourceEditor =
+      screen.getByLabelText<HTMLTextAreaElement>('Source editor')
+    const formatButton = screen.getByRole('button', { name: 'Format' })
+    await user.click(formatButton)
+    await waitFor(() => expect(formatMock).toHaveBeenCalledTimes(1))
+
+    await user.type(sourceEditor, 'x')
+    const edited = sourceEditor.value
+    expect(edited).toContain('x')
+
+    await act(async () => {
+      pendingFormat.resolve('let clobbered = 1;')
+      await pendingFormat.promise
+    })
+    await waitFor(() => expect(formatButton).toBeEnabled())
+
+    // Applying the late result would silently revert the edit.
+    expect(sourceEditor).toHaveValue(edited)
+  })
+})
+
+describe('AST selection sync', () => {
+  it('maps editor selections to AST nodes across multi-byte characters', async () => {
+    const user = userEvent.setup()
+    const unicodeSource = '"中"; boom;'
+    // boom occupies bytes {7, 11} but UTF-16 positions {5, 9}.
+    const unicodeAst = JSON.stringify({
+      Program: {
+        type: 'Program',
+        span: { start: 0, end: 12 },
+        body: [
+          {
+            type: 'ExpressionStatement',
+            span: { start: 0, end: 6 },
+            expression: {
+              type: 'StringLiteral',
+              span: { start: 0, end: 5 },
+              value: '中',
+            },
+          },
+          {
+            type: 'ExpressionStatement',
+            span: { start: 7, end: 12 },
+            expression: {
+              type: 'Identifier',
+              span: { start: 7, end: 11 },
+              name: 'boom',
+            },
+          },
+        ],
+      },
+    })
+    parseMock.mockImplementation((source: string) =>
+      source === unicodeSource ? unicodeAst : defaultAstJson
+    )
+    renderApp()
+
+    const sourceEditor = screen.getByLabelText('Source editor')
+    await user.clear(sourceEditor)
+    await user.type(sourceEditor, unicodeSource)
+    await screen.findByText('Identifier')
+
+    act(() => {
+      sourceEditorHooks.onSelectionChange?.({ from: 5, to: 9 })
+    })
+
+    const identifierSummary = screen.getByText('Identifier').closest('summary')
+    expect(identifierSummary).not.toBeNull()
+    expect(identifierSummary).toHaveClass(
+      'shadow-[inset_2px_0_0_var(--accent-9)]'
+    )
+
+    highlightRangeMock.mockClear()
+    await user.click(identifierSummary!)
+    expect(highlightRangeMock).toHaveBeenCalledWith(5, 9)
   })
 })

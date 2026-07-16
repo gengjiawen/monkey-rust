@@ -146,8 +146,14 @@ function App() {
   const [snapshotRun, setSnapshotRun] = useState<SnapshotRunState>({
     status: 'idle',
   })
+  const [snapshotStale, setSnapshotStale] = useState(false)
   const snapshotRunRequestId = useRef(0)
   const editorRef = useRef<EditorHandle>(null)
+  const latestCode = useRef(code)
+
+  useEffect(() => {
+    latestCode.current = code
+  }, [code])
 
   const astSelection = useMemo(
     () =>
@@ -160,10 +166,13 @@ function App() {
     [code, selection]
   )
 
+  // Keep the last build mounted and flag it stale instead of unmounting the
+  // panel: unmounting would reset the output scroll position and drop keyboard
+  // focus from the strip toggle on every rebuild.
   const invalidateSnapshot = useCallback(() => {
     snapshotRunRequestId.current += 1
     setSnapshotRun({ status: 'idle' })
-    setSnapshotBuild({ status: 'idle' })
+    setSnapshotStale(true)
   }, [])
 
   const compileCode = useCallback((source: string) => {
@@ -199,6 +208,7 @@ function App() {
           message: getErrorMessage(error),
         })
       }
+      setSnapshotStale(false)
     },
     []
   )
@@ -215,12 +225,19 @@ function App() {
 
   const editorOnChange = useCallback(
     (value: string) => {
+      // CodeMirror reports a document change even when the replacement text is
+      // identical (e.g. typing over a selection with the same character);
+      // setCode would bail on the equal string, so invalidating here would
+      // strand the snapshot as stale with no rebuild ever scheduled.
+      if (value === code) {
+        return
+      }
       setCode(value)
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
       invalidateSnapshot()
     },
-    [invalidateSnapshot]
+    [code, invalidateSnapshot]
   )
 
   const handleStripDebugChange = useCallback(
@@ -245,13 +262,19 @@ function App() {
         parser: 'monkey',
         plugins: [monkeyPlugin.default as unknown as Plugin],
       })
-      setCode(formatted)
-      if (formatted !== code) {
-        invalidateSnapshot()
+      if (latestCode.current !== code) {
+        // The source was edited while prettier was loading; applying this
+        // result would silently revert those edits.
+        return
       }
+      if (formatted === code) {
+        return
+      }
+      setCode(formatted)
       setSelection(null)
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
+      invalidateSnapshot()
       compileCode(formatted)
     } catch (error) {
       const message = getErrorMessage(error)
@@ -319,7 +342,7 @@ function App() {
   }, [code])
 
   const runSnapshotBytes = useCallback(async () => {
-    if (snapshotBuild.status !== 'ok') {
+    if (snapshotBuild.status !== 'ok' || snapshotStale) {
       return
     }
     const requestId = snapshotRunRequestId.current + 1
@@ -339,7 +362,7 @@ function App() {
         })
       }
     }
-  }, [snapshotBuild])
+  }, [snapshotBuild, snapshotStale])
 
   const highlightSourceSpan = useCallback(
     (span: SourceSpan) => {
@@ -490,7 +513,7 @@ function App() {
             <Button
               size="2"
               onClick={runSnapshotBytes}
-              disabled={snapshotBuild.status !== 'ok'}
+              disabled={snapshotBuild.status !== 'ok' || snapshotStale}
               loading={snapshotRun.status === 'running'}
             >
               Run snapshot
@@ -520,6 +543,7 @@ function App() {
               <SnapshotView
                 build={snapshotBuild}
                 run={snapshotRun}
+                stale={snapshotStale}
                 stripDebug={stripDebug}
                 onStripDebugChange={handleStripDebugChange}
                 onErrorSpanSelect={handleErrorSpanSelect}
