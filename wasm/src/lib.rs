@@ -2,6 +2,8 @@ mod utils;
 
 use crate::utils::set_panic_hook;
 use compiler::compiler::Compiler;
+use compiler::snapshot::{read_bytecode, write_bytecode};
+use compiler::snapshot_layout::describe_bytecode;
 use parser::parse as parser_pase;
 use parser::parse_ast_json_string;
 use wasm_bindgen::prelude::*;
@@ -95,4 +97,94 @@ pub fn run_gc_with_report(input: &str) -> String {
     };
 
     serde_json::to_string(&envelope).expect("GC run envelope serialization should not fail")
+}
+
+/// Compile Monkey source into a `.mbc` snapshot and return a tagged JSON envelope
+/// with the raw bytes (lowercase hex) plus a byte-range annotation of the container
+/// layout for the playground inspector.
+///
+/// User parse and compile failures are data in the envelope, not JavaScript
+/// exceptions, mirroring [`run_gc_with_report`].
+#[wasm_bindgen]
+pub fn compile_to_snapshot(input: &str, strip_debug: bool) -> String {
+    set_panic_hook();
+
+    let envelope = match snapshot_envelope(input, strip_debug) {
+        Ok(envelope) => envelope,
+        Err((stage, message)) => serde_json::json!({
+            "status": "error",
+            "stage": stage,
+            "message": message,
+        }),
+    };
+    serde_json::to_string(&envelope).expect("snapshot envelope serialization should not fail")
+}
+
+fn snapshot_envelope(
+    input: &str,
+    strip_debug: bool,
+) -> Result<serde_json::Value, (&'static str, String)> {
+    let program = parser_pase(input).map_err(|errors| {
+        let message = errors
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "unknown parse error".to_string());
+        ("parse", message)
+    })?;
+    let mut compiler = Compiler::new();
+    let bytecode = compiler
+        .compile(&program)
+        .map_err(|message| ("compile", message))?;
+    let bytes = write_bytecode(&bytecode, strip_debug)
+        .map_err(|error| ("snapshot", format!("{:?}", error)))?;
+    let layout = describe_bytecode(&bytes).map_err(|error| ("snapshot", format!("{:?}", error)))?;
+    Ok(serde_json::json!({
+        "status": "ok",
+        "bytesHex": hex_encode(&bytes),
+        "layout": layout,
+    }))
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    use std::fmt::Write;
+
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(out, "{:02x}", byte).expect("writing to a String cannot fail");
+    }
+    out
+}
+
+/// Execute `.mbc` snapshot bytes on the cycle-collecting VM — the browser twin of
+/// `monkey-gc run foo.mbc`, sharing its execution path (`gc::run_bytecode`).
+///
+/// The buffer is untrusted input: it goes through the validating snapshot reader
+/// before the VM. Failures are data in the envelope — stage `snapshot` when the
+/// bytes are rejected, `runtime` when the VM errors (the span is only present
+/// when the snapshot kept its debug info).
+#[wasm_bindgen]
+pub fn run_snapshot(bytes: &[u8]) -> String {
+    set_panic_hook();
+
+    let envelope = match read_bytecode(bytes) {
+        Ok(bytecode) => match gc::run_bytecode(bytecode, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
+            Ok(result) => serde_json::json!({
+                "status": "ok",
+                "result": result,
+            }),
+            Err(error) => serde_json::json!({
+                "status": "error",
+                "stage": "runtime",
+                "message": error.message,
+                "span": error.span,
+            }),
+        },
+        Err(error) => serde_json::json!({
+            "status": "error",
+            "stage": "snapshot",
+            "message": format!("{:?}", error),
+            "span": null,
+        }),
+    };
+    serde_json::to_string(&envelope).expect("snapshot run envelope serialization should not fail")
 }

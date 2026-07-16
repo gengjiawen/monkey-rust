@@ -14,6 +14,13 @@ import { Editor, type EditorHandle } from './Editor'
 import { GcReportView, type GcPanelState } from './GcReportView'
 import type { SourceSpan } from './gcReport'
 import { runGc } from './gcRunner'
+import { utf16OffsetToUtf8Byte, utf8ByteSpanToUtf16 } from './sourceSpan'
+import {
+  SnapshotView,
+  type SnapshotBuildState,
+  type SnapshotRunState,
+} from './SnapshotView'
+import { buildSnapshot, runSnapshot } from './snapshotRunner'
 
 interface Snippet {
   label: string
@@ -94,13 +101,17 @@ makeCycle();
   },
 ]
 
-type OutputView = 'ast' | 'bytecode' | 'gc'
+type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot'
 
 const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
 
 const toolbarClass =
-  'flex shrink-0 items-center justify-between gap-3 border-b border-(--gray-a5) bg-(--color-background) px-3 py-2'
+  'flex shrink-0 items-center gap-3 border-b border-(--gray-a5) bg-(--color-background) px-3 py-2'
+
+const editorToolbarClass = `${toolbarClass} justify-between`
+
+const outputToolbarClass = `${toolbarClass} flex-wrap`
 
 const editorFrameClass =
   'flex min-h-0 flex-1 flex-col overflow-hidden bg-(--color-background)'
@@ -128,7 +139,41 @@ function App() {
   const [isFormatting, setIsFormatting] = useState(false)
   const [gcState, setGcState] = useState<GcPanelState>({ status: 'idle' })
   const gcRequestId = useRef(0)
+  const [stripDebug, setStripDebug] = useState(false)
+  const [snapshotBuild, setSnapshotBuild] = useState<SnapshotBuildState>({
+    status: 'idle',
+  })
+  const [snapshotRun, setSnapshotRun] = useState<SnapshotRunState>({
+    status: 'idle',
+  })
+  const [snapshotStale, setSnapshotStale] = useState(false)
+  const snapshotRunRequestId = useRef(0)
   const editorRef = useRef<EditorHandle>(null)
+  const latestCode = useRef(code)
+
+  useEffect(() => {
+    latestCode.current = code
+  }, [code])
+
+  const astSelection = useMemo(
+    () =>
+      selection === null
+        ? null
+        : {
+            from: utf16OffsetToUtf8Byte(code, selection.from),
+            to: utf16OffsetToUtf8Byte(code, selection.to),
+          },
+    [code, selection]
+  )
+
+  // Keep the last build mounted and flag it stale instead of unmounting the
+  // panel: unmounting would reset the output scroll position and drop keyboard
+  // focus from the strip toggle on every rebuild.
+  const invalidateSnapshot = useCallback(() => {
+    snapshotRunRequestId.current += 1
+    setSnapshotRun({ status: 'idle' })
+    setSnapshotStale(true)
+  }, [])
 
   const compileCode = useCallback((source: string) => {
     try {
@@ -153,16 +198,58 @@ function App() {
     }
   }, [])
 
+  const compileSnapshot = useCallback(
+    (source: string, shouldStripDebug: boolean) => {
+      try {
+        setSnapshotBuild(buildSnapshot(source, shouldStripDebug))
+      } catch (error) {
+        setSnapshotBuild({
+          status: 'invalid',
+          message: getErrorMessage(error),
+        })
+      }
+      setSnapshotStale(false)
+    },
+    []
+  )
+
   const debouncedCompile = useMemo(
     () => debounce(compileCode, 200),
     [compileCode]
   )
 
-  const editorOnChange = useCallback((value: string) => {
-    setCode(value)
-    gcRequestId.current += 1
-    setGcState({ status: 'idle' })
-  }, [])
+  const debouncedSnapshotCompile = useMemo(
+    () => debounce(compileSnapshot, 200),
+    [compileSnapshot]
+  )
+
+  const editorOnChange = useCallback(
+    (value: string) => {
+      // CodeMirror reports a document change even when the replacement text is
+      // identical (e.g. typing over a selection with the same character);
+      // setCode would bail on the equal string, so invalidating here would
+      // strand the snapshot as stale with no rebuild ever scheduled.
+      if (value === code) {
+        return
+      }
+      setCode(value)
+      gcRequestId.current += 1
+      setGcState({ status: 'idle' })
+      invalidateSnapshot()
+    },
+    [code, invalidateSnapshot]
+  )
+
+  const handleStripDebugChange = useCallback(
+    (nextStripDebug: boolean) => {
+      if (nextStripDebug === stripDebug) {
+        return
+      }
+      invalidateSnapshot()
+      setStripDebug(nextStripDebug)
+    },
+    [invalidateSnapshot, stripDebug]
+  )
 
   const formatCode = useCallback(async () => {
     setIsFormatting(true)
@@ -175,10 +262,19 @@ function App() {
         parser: 'monkey',
         plugins: [monkeyPlugin.default as unknown as Plugin],
       })
+      if (latestCode.current !== code) {
+        // The source was edited while prettier was loading; applying this
+        // result would silently revert those edits.
+        return
+      }
+      if (formatted === code) {
+        return
+      }
       setCode(formatted)
       setSelection(null)
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
+      invalidateSnapshot()
       compileCode(formatted)
     } catch (error) {
       const message = getErrorMessage(error)
@@ -188,13 +284,23 @@ function App() {
     } finally {
       setIsFormatting(false)
     }
-  }, [code, compileCode])
+  }, [code, compileCode, invalidateSnapshot])
 
   useEffect(() => {
     debouncedCompile(code)
   }, [code, debouncedCompile])
 
   useEffect(() => () => debouncedCompile.cancel(), [debouncedCompile])
+
+  useEffect(() => {
+    if (outputView !== 'snapshot') {
+      debouncedSnapshotCompile.cancel()
+      return
+    }
+
+    debouncedSnapshotCompile(code, stripDebug)
+    return () => debouncedSnapshotCompile.cancel()
+  }, [code, debouncedSnapshotCompile, outputView, stripDebug])
 
   useEffect(() => {
     const index = Math.min(Math.max(snippetIndex, 0), snippets.length - 1)
@@ -204,8 +310,9 @@ function App() {
     setSelection(null)
     gcRequestId.current += 1
     setGcState({ status: 'idle' })
+    invalidateSnapshot()
     setCode(snippets[index].code)
-  }, [snippetIndex, setSnippetIndex])
+  }, [invalidateSnapshot, snippetIndex, setSnippetIndex])
 
   useEffect(
     () => () => {
@@ -234,13 +341,45 @@ function App() {
     }
   }, [code])
 
-  const handleNodeSelect = useCallback((start: number, end: number) => {
-    editorRef.current?.highlightRange(start, end)
-  }, [])
+  const runSnapshotBytes = useCallback(async () => {
+    if (snapshotBuild.status !== 'ok' || snapshotStale) {
+      return
+    }
+    const requestId = snapshotRunRequestId.current + 1
+    snapshotRunRequestId.current = requestId
+    setSnapshotRun({ status: 'running' })
 
-  const handleGcErrorSpanSelect = useCallback((span: SourceSpan) => {
-    editorRef.current?.highlightRange(span.start, span.end)
-  }, [])
+    try {
+      const result = await runSnapshot(snapshotBuild.bytes)
+      if (snapshotRunRequestId.current === requestId) {
+        setSnapshotRun(result)
+      }
+    } catch (error) {
+      if (snapshotRunRequestId.current === requestId) {
+        setSnapshotRun({
+          status: 'invalid',
+          message: getErrorMessage(error),
+        })
+      }
+    }
+  }, [snapshotBuild, snapshotStale])
+
+  const highlightSourceSpan = useCallback(
+    (span: SourceSpan) => {
+      const converted = utf8ByteSpanToUtf16(code, span)
+      editorRef.current?.highlightRange(converted.start, converted.end)
+    },
+    [code]
+  )
+
+  const handleNodeSelect = useCallback(
+    (start: number, end: number) => {
+      highlightSourceSpan({ start, end })
+    },
+    [highlightSourceSpan]
+  )
+
+  const handleErrorSpanSelect = highlightSourceSpan
 
   const handleBytecodeSelection = useCallback(
     (selection: { from: number; to: number }) => {
@@ -255,9 +394,9 @@ function App() {
         return
       }
 
-      editorRef.current?.highlightRange(span.start, span.end)
+      highlightSourceSpan(span)
     },
-    [bytecodeDebugView]
+    [bytecodeDebugView, highlightSourceSpan]
   )
 
   useEffect(() => {
@@ -276,18 +415,34 @@ function App() {
     }
     const { span } = gcState
     const editor = editorRef.current
-    editor?.highlightRange(span.start, span.end)
+    highlightSourceSpan(span)
     return () => {
       editor?.clearHighlight()
     }
-  }, [gcState, outputView])
+  }, [gcState, highlightSourceSpan, outputView])
+
+  useEffect(() => {
+    if (
+      outputView !== 'snapshot' ||
+      snapshotRun.status !== 'error' ||
+      snapshotRun.span === null
+    ) {
+      return
+    }
+    const { span } = snapshotRun
+    const editor = editorRef.current
+    highlightSourceSpan(span)
+    return () => {
+      editor?.clearHighlight()
+    }
+  }, [highlightSourceSpan, snapshotRun, outputView])
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden max-[780px]:grid-cols-1 max-[780px]:grid-rows-2">
       <div
         className={`${panelClass} border-r border-(--gray-a5) max-[780px]:border-r-0 max-[780px]:border-b`}
       >
-        <div className={toolbarClass}>
+        <div className={editorToolbarClass}>
           <div className="flex items-center gap-3">
             <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
@@ -329,8 +484,9 @@ function App() {
       </div>
 
       <div className={panelClass}>
-        <div className={toolbarClass}>
+        <div className={outputToolbarClass}>
           <SegmentedControl.Root
+            className="max-w-full min-w-0!"
             size="2"
             value={outputView}
             onValueChange={(value) => setOutputView(value as OutputView)}
@@ -340,6 +496,9 @@ function App() {
               Bytecode
             </SegmentedControl.Item>
             <SegmentedControl.Item value="gc">GC</SegmentedControl.Item>
+            <SegmentedControl.Item value="snapshot">
+              Snapshot
+            </SegmentedControl.Item>
           </SegmentedControl.Root>
           {outputView === 'gc' ? (
             <Button
@@ -350,13 +509,23 @@ function App() {
               Run GC
             </Button>
           ) : null}
+          {outputView === 'snapshot' ? (
+            <Button
+              size="2"
+              onClick={runSnapshotBytes}
+              disabled={snapshotBuild.status !== 'ok' || snapshotStale}
+              loading={snapshotRun.status === 'running'}
+            >
+              Run snapshot
+            </Button>
+          ) : null}
         </div>
         <div className={editorFrameClass}>
           {outputView === 'ast' && astData !== null ? (
             <div className="min-h-0 flex-1 overflow-auto bg-(--color-background) px-2.5 pt-2 pb-4">
               <AstTreeView
                 data={astData}
-                selection={selection}
+                selection={astSelection}
                 onNodeSelect={handleNodeSelect}
               />
             </div>
@@ -365,7 +534,19 @@ function App() {
             <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) bg-[image:radial-gradient(circle_at_top_right,var(--accent-a3),transparent_34%)] p-4.5">
               <GcReportView
                 state={gcState}
-                onErrorSpanSelect={handleGcErrorSpanSelect}
+                onErrorSpanSelect={handleErrorSpanSelect}
+              />
+            </div>
+          ) : null}
+          {outputView === 'snapshot' ? (
+            <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) p-4.5">
+              <SnapshotView
+                build={snapshotBuild}
+                run={snapshotRun}
+                stale={snapshotStale}
+                stripDebug={stripDebug}
+                onStripDebugChange={handleStripDebugChange}
+                onErrorSpanSelect={handleErrorSpanSelect}
               />
             </div>
           ) : null}
