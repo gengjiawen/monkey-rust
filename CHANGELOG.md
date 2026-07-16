@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.0.0](https://github.com/gengjiawen/monkey-rust/compare/v0.15.2...v1.0.0) (2026-07-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **lexer:** make EOF span zero-width ([#278](https://github.com/gengjiawen/monkey-rust/issues/278))
+* add class to monkey ([#267](https://github.com/gengjiawen/monkey-rust/issues/267))
+
+### Features
+
+* add class to monkey ([#267](https://github.com/gengjiawen/monkey-rust/issues/267)) ([ef436eb](https://github.com/gengjiawen/monkey-rust/commit/ef436ebc0fd53ec8edbec2ab5856b87140fb9a59))
+* **gc:** export monkey-gc REPL binary ([#279](https://github.com/gengjiawen/monkey-rust/issues/279)) ([34073c0](https://github.com/gengjiawen/monkey-rust/commit/34073c084ed4df73e604ce2bfa55f109900811e8))
+* **gc:** trial deletion teaching telemetry and playground walkthrough ([#274](https://github.com/gengjiawen/monkey-rust/issues/274)) ([76f40d9](https://github.com/gengjiawen/monkey-rust/commit/76f40d9d7ca5f4c3de15d6df81cf6df13e8d790a))
+* **playground:** showcase .mbc bytecode snapshots with inspector, download, and run ([#288](https://github.com/gengjiawen/monkey-rust/issues/288)) ([799b69f](https://github.com/gengjiawen/monkey-rust/commit/799b69f31be362e250d94ad443e12bd5788b1a0f))
+* QuickJS-style bytecode snapshots (.mbc) with compile/run CLI ([#287](https://github.com/gengjiawen/monkey-rust/issues/287)) ([054b014](https://github.com/gengjiawen/monkey-rust/commit/054b0142470b10a8d129c6b5167ac662e498f1af))
+
+
+### Bug Fixes
+
+* **ci:** stop prepare-dist from auto-committing on every new branch ([#275](https://github.com/gengjiawen/monkey-rust/issues/275)) ([b753ba6](https://github.com/gengjiawen/monkey-rust/commit/b753ba6c0fdd87fe6d44994cf127726a8243a021))
+* **lexer:** make EOF span zero-width ([#278](https://github.com/gengjiawen/monkey-rust/issues/278)) ([9d3cffc](https://github.com/gengjiawen/monkey-rust/commit/9d3cffcb79732c9137ae4e63566adfa899fa849a))
+* **playground:** polish theme toggle control ([#271](https://github.com/gengjiawen/monkey-rust/issues/271)) ([f7a59c3](https://github.com/gengjiawen/monkey-rust/commit/f7a59c3e21a166dbea1851ed84e2ee4ae700ff62))
+
+
+### Performance Improvements
+
+* **gc:** trim hot-path slot lookups and make per-edge asserts debug-only ([#283](https://github.com/gengjiawen/monkey-rust/issues/283)) ([e4eafa7](https://github.com/gengjiawen/monkey-rust/commit/e4eafa7c93dd65fc75feb8d5474eb46a7d39f1e5))
+
 ## [0.15.2](https://github.com/gengjiawen/monkey-rust/compare/v0.15.1...v0.15.2) (2026-07-10)
 
 
