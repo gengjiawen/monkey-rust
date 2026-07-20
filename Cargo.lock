@@ -232,6 +232,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "monkey-asm"
+version = "1.0.0"
+dependencies = [
+ "insta",
+ "monkey-compiler",
+ "monkey-lexer",
+ "monkey-object",
+ "monkey-parser",
+]
+
+[[package]]
 name = "monkey-compiler"
 version = "1.0.0"
 dependencies = [

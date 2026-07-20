@@ -6,5 +6,6 @@ members = [
   "object",
   "interpreter",
   "compiler",
+  "asm",
   "wasm"
 ]
