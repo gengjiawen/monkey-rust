@@ -357,7 +357,8 @@ fn select_visited_edges(
     let kept = all_edges
         .iter()
         .enumerate()
-        .filter_map(|(index, edge)| selected_indices.contains(&index).then(|| edge.clone()))
+        .filter(|&(index, _edge)| selected_indices.contains(&index))
+        .map(|(_index, edge)| edge.clone())
         .collect::<Vec<_>>();
     let omitted = all_edges.len().saturating_sub(kept.len());
     (kept, omitted)
@@ -394,6 +395,7 @@ fn witness_chain_ids(
     Some(ids)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn select_object_decisions(
     live_ids: &[GcId],
     candidates: &HashSet<GcId>,

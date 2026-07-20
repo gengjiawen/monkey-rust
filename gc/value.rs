@@ -212,7 +212,7 @@ impl Value {
             }
             Value::Hash(map) => {
                 let mut entries = map.iter().collect::<Vec<_>>();
-                entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+                entries.sort_by_key(|(left, _)| *left);
                 for (key, value) in entries {
                     visit(
                         EdgeRelation::HashValue {
@@ -239,7 +239,7 @@ impl Value {
                     visit(EdgeRelation::ClassConstructor, constructor);
                 }
                 let mut methods = class.methods.iter().collect::<Vec<_>>();
-                methods.sort_by(|(left, _), (right, _)| left.cmp(right));
+                methods.sort_by_key(|(left, _)| *left);
                 for (name, method) in methods {
                     visit(
                         EdgeRelation::ClassMethod {
@@ -252,7 +252,7 @@ impl Value {
             Value::Instance(instance) => {
                 visit(EdgeRelation::InstanceClass, instance.class);
                 let mut fields = instance.fields.iter().collect::<Vec<_>>();
-                fields.sort_by(|(left, _), (right, _)| left.cmp(right));
+                fields.sort_by_key(|(left, _)| *left);
                 for (name, value) in fields {
                     visit(
                         EdgeRelation::InstanceField {
@@ -570,6 +570,9 @@ pub fn try_export_object(heap: &GcHeap, reference: GcRef) -> Result<Object, Stri
             Ok(Object::Array(exported))
         }
         Value::Hash(map) => {
+            // Object's Hash impl only covers Integer/Boolean/String, which have no
+            // interior mutability, so the keys are effectively immutable.
+            #[allow(clippy::mutable_key_type)]
             let mut exported = HashMap::with_capacity(map.len());
             for (key, value) in map {
                 exported

@@ -5,21 +5,11 @@ pub const DEFAULT_GC_THRESHOLD: usize = 256 * 1024;
 pub const MALLOC_OVERHEAD: usize = 8;
 
 /// Tracked heap usage, matching QuickJS `JSMallocState`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MallocState {
     pub malloc_count: usize,
     pub malloc_size: usize,
     pub malloc_limit: usize,
-}
-
-impl Default for MallocState {
-    fn default() -> Self {
-        MallocState {
-            malloc_count: 0,
-            malloc_size: 0,
-            malloc_limit: 0,
-        }
-    }
 }
 
 impl MallocState {

@@ -7,7 +7,7 @@ mod tests {
         for (input, expected) in test_cases {
             let ast = parse(input).unwrap();
             let parsed = ast.to_string();
-            assert_eq!(&format!("{}", parsed), expected);
+            assert_eq!(&parsed.to_string(), expected);
         }
     }
 

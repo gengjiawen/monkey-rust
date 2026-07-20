@@ -216,5 +216,5 @@ fn is_letter(c: char) -> bool {
 }
 
 fn is_digit(c: char) -> bool {
-    c >= '0' && c <= '9'
+    c.is_ascii_digit()
 }

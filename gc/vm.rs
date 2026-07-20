@@ -281,7 +281,7 @@ impl GcVM {
         };
         let span = debug_info.and_then(|debug_info| {
             (frame.ip >= 0)
-                .then(|| frame.ip as usize)
+                .then_some(frame.ip as usize)
                 .and_then(|pc| debug_info.span_for_pc(pc).cloned())
         });
         GcRuntimeError {

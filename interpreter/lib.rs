@@ -153,7 +153,7 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
         Expression::IDENTIFIER(IDENTIFIER {
             name: id,
             ..
-        }) => eval_identifier(&id, env),
+        }) => eval_identifier(id, env),
         Expression::FUNCTION(FunctionDeclaration {
             params,
             body,
@@ -263,7 +263,7 @@ fn eval_index_expression(left: &Rc<Object>, index: &Rc<Object>) -> Result<Rc<Obj
         },
         (Object::Hash(map), key) => {
             if !(key.is_hashable()) {
-                return Err(format!("not a valid hash key"));
+                return Err("not a valid hash key".to_string());
             }
 
             match map.get(key) {
@@ -275,7 +275,7 @@ fn eval_index_expression(left: &Rc<Object>, index: &Rc<Object>) -> Result<Rc<Obj
     }
 }
 
-fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Object>, EvalError> {
+fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Result<Rc<Object>, EvalError> {
     match &**function {
         Object::Function(params, body, env) => {
             if params.len() != args.len() {
@@ -285,7 +285,7 @@ fn apply_function(function: &Rc<Object>, args: &Vec<Rc<Object>>) -> Result<Rc<Ob
                     args.len()
                 ));
             }
-            let mut env = Environment::new_enclosed_environment(&env);
+            let mut env = Environment::new_enclosed_environment(env);
 
             params.iter().enumerate().for_each(|(i, param)| {
                 env.set(param.name.clone(), args[i].clone());
@@ -334,7 +334,7 @@ fn apply_method(
 
 fn unwrap_return(obj: Rc<Object>) -> Result<Rc<Object>, EvalError> {
     if let Object::ReturnValue(val) = &*obj {
-        Ok(Rc::clone(&val))
+        Ok(Rc::clone(val))
     } else {
         Ok(obj)
     }
@@ -464,6 +464,9 @@ fn eval_literal(literal: &Literal, env: &Env) -> Result<Rc<Object>, EvalError> {
             elements: map,
             ..
         }) => {
+            // Object's Hash impl only covers Integer/Boolean/String, which have no
+            // interior mutability; keys are checked with is_hashable() before insert.
+            #[allow(clippy::mutable_key_type)]
             let mut hash_map = HashMap::new();
 
             for (k, v) in map {

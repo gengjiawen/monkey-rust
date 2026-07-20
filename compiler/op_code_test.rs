@@ -80,12 +80,12 @@ mod tests {
 
     #[test]
     fn test_instructions_string() {
-        let ins = vec![
-            make_instructions(OpAdd, &vec![]),
-            make_instructions(OpGetLocal, &vec![1]),
-            make_instructions(OpConst, &vec![2]),
-            make_instructions(OpConst, &vec![65535]),
-            make_instructions(OpClosure, &vec![65535, 255]),
+        let ins = [
+            make_instructions(OpAdd, &[]),
+            make_instructions(OpGetLocal, &[1]),
+            make_instructions(OpConst, &[2]),
+            make_instructions(OpConst, &[65535]),
+            make_instructions(OpClosure, &[65535, 255]),
         ];
 
         let expected = "0000 OpAdd\n\

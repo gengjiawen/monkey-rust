@@ -13,7 +13,8 @@ fn main() {
     println!("Welcome to monkey compiler by gengjiawen");
     let mut constants = vec![];
     let mut symbol_table = SymbolTable::new();
-    let mut globals = vec![Rc::new(Object::Null); compiler::vm::GLOBAL_SIZE];
+    let null = Rc::new(Object::Null);
+    let mut globals = vec![null; compiler::vm::GLOBAL_SIZE];
     loop {
         print!("> ");
         io::stdout().flush().unwrap();

@@ -497,14 +497,12 @@ fn validate_instruction_stream(
                     ));
                 }
             }
-            Opcode::OpHash => {
-                if operands[0] % 2 != 0 {
-                    return Err(invalid(
-                        stream,
-                        offset,
-                        format!("OpHash needs an even element count, got {}", operands[0]),
-                    ));
-                }
+            Opcode::OpHash if operands[0] % 2 != 0 => {
+                return Err(invalid(
+                    stream,
+                    offset,
+                    format!("OpHash needs an even element count, got {}", operands[0]),
+                ));
             }
             _ => {}
         }

@@ -534,7 +534,7 @@ impl Emitter {
         observe: bool,
     ) -> Assembly {
         debug_assert!(self.open_functions.is_empty(), "unfinished function buffer");
-        let main_body = std::mem::replace(&mut self.main_body, vec![]);
+        let main_body = std::mem::take(&mut self.main_body);
 
         let prologue = self.capture(|emitter| {
             emitter.ins("stp x29, x30, [sp, #-16]!");
@@ -574,7 +574,7 @@ impl Emitter {
         lines.extend(prologue);
         lines.extend(main_body);
         lines.extend(epilogue);
-        for function in std::mem::replace(&mut self.functions, vec![]) {
+        for function in std::mem::take(&mut self.functions) {
             lines.push(Line {
                 text: String::new(),
                 span: None,

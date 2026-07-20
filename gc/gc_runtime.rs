@@ -436,7 +436,7 @@ impl GcRuntime {
         self.objects
             .get(id)
             .and_then(|o| o.as_ref())
-            .map_or(false, |e| !e.header.free_mark)
+            .is_some_and(|e| !e.header.free_mark)
     }
 
     pub fn ref_count(&self, id: GcId) -> i32 {

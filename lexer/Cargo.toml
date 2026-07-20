@@ -24,3 +24,6 @@ serde_json = "1.0"
 
 [dev-dependencies]
 insta = "1.42.2"
+
+[lints]
+workspace = true

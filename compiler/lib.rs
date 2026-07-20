@@ -3,6 +3,7 @@ extern crate lazy_static;
 
 pub mod compiler;
 mod compiler_function_test;
+#[cfg(test)]
 mod compiler_test;
 mod frame;
 pub mod op_code;
@@ -15,4 +16,5 @@ pub mod symbol_table;
 mod symbol_table_test;
 pub mod vm;
 mod vm_function_test;
+#[cfg(test)]
 mod vm_test;

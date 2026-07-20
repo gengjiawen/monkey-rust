@@ -17,10 +17,10 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpConst, &vec![1]),
-                            make_instructions(OpAdd, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpConst, &[1]),
+                            make_instructions(OpAdd, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -28,8 +28,8 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![2, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[2, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -40,10 +40,10 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpConst, &vec![1]),
-                            make_instructions(OpAdd, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpConst, &[1]),
+                            make_instructions(OpAdd, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -51,8 +51,8 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![2, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[2, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -63,10 +63,10 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpPop, &vec![0]),
-                            make_instructions(OpConst, &vec![1]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpPop, &[0]),
+                            make_instructions(OpConst, &[1]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -74,8 +74,8 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![2, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[2, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
         ];
@@ -89,15 +89,15 @@ mod tests {
             expected_constants: vec![Object::CompiledFunction(Rc::from(
                 object::CompiledFunction {
                     name: String::new(),
-                    instructions: concat_instructions(&vec![make_instructions(OpReturn, &vec![0])])
+                    instructions: concat_instructions(&vec![make_instructions(OpReturn, &[0])])
                         .data,
                     num_locals: 0,
                     num_parameters: 0,
                 },
             ))],
             expected_instructions: vec![
-                make_instructions(OpClosure, &vec![0, 0]),
-                make_instructions(OpPop, &vec![0]),
+                make_instructions(OpClosure, &[0, 0]),
+                make_instructions(OpPop, &[0]),
             ],
         }];
         run_compiler_test(tests);
@@ -113,8 +113,8 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -122,9 +122,9 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![1, 0]),
-                    make_instructions(OpCall, &vec![0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpCall, &[0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -134,8 +134,8 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: "noArg".to_string(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -143,11 +143,11 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![1, 0]),
-                    make_instructions(OpSetGlobal, &vec![0]),
-                    make_instructions(OpGetGlobal, &vec![0]),
-                    make_instructions(OpCall, &vec![0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpGetGlobal, &[0]),
+                    make_instructions(OpCall, &[0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -156,8 +156,8 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: "oneArg".to_string(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpGetLocal, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpGetLocal, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 1,
@@ -166,12 +166,12 @@ mod tests {
                     Object::Integer(24),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![0, 0]),
-                    make_instructions(OpSetGlobal, &vec![0]),
-                    make_instructions(OpGetGlobal, &vec![0]),
-                    make_instructions(OpConst, &vec![1]),
-                    make_instructions(OpCall, &vec![1]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[0, 0]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpGetGlobal, &[0]),
+                    make_instructions(OpConst, &[1]),
+                    make_instructions(OpCall, &[1]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -180,12 +180,12 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: "manyArg".to_string(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpGetLocal, &vec![0]),
-                            make_instructions(OpPop, &vec![0]),
-                            make_instructions(OpGetLocal, &vec![1]),
-                            make_instructions(OpPop, &vec![0]),
-                            make_instructions(OpGetLocal, &vec![2]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpGetLocal, &[0]),
+                            make_instructions(OpPop, &[0]),
+                            make_instructions(OpGetLocal, &[1]),
+                            make_instructions(OpPop, &[0]),
+                            make_instructions(OpGetLocal, &[2]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 3,
@@ -196,14 +196,14 @@ mod tests {
                     Object::Integer(26),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![0, 0]),
-                    make_instructions(OpSetGlobal, &vec![0]),
-                    make_instructions(OpGetGlobal, &vec![0]),
-                    make_instructions(OpConst, &vec![1]),
-                    make_instructions(OpConst, &vec![2]),
-                    make_instructions(OpConst, &vec![3]),
-                    make_instructions(OpCall, &vec![3]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[0, 0]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpGetGlobal, &[0]),
+                    make_instructions(OpConst, &[1]),
+                    make_instructions(OpConst, &[2]),
+                    make_instructions(OpConst, &[3]),
+                    make_instructions(OpCall, &[3]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
         ];
@@ -221,8 +221,8 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpGetGlobal, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpGetGlobal, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -230,10 +230,10 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpConst, &vec![0]),
-                    make_instructions(OpSetGlobal, &vec![0]),
-                    make_instructions(OpClosure, &vec![1, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -243,10 +243,10 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpSetLocal, &vec![0]),
-                            make_instructions(OpGetLocal, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpSetLocal, &[0]),
+                            make_instructions(OpGetLocal, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 1,
@@ -254,8 +254,8 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![1, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -266,14 +266,14 @@ mod tests {
                     Object::CompiledFunction(Rc::from(object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpConst, &vec![0]),
-                            make_instructions(OpSetLocal, &vec![0]),
-                            make_instructions(OpConst, &vec![1]),
-                            make_instructions(OpSetLocal, &vec![1]),
-                            make_instructions(OpGetLocal, &vec![0]),
-                            make_instructions(OpGetLocal, &vec![1]),
-                            make_instructions(OpAdd, &vec![0]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpSetLocal, &[0]),
+                            make_instructions(OpConst, &[1]),
+                            make_instructions(OpSetLocal, &[1]),
+                            make_instructions(OpGetLocal, &[0]),
+                            make_instructions(OpGetLocal, &[1]),
+                            make_instructions(OpAdd, &[0]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 2,
@@ -281,8 +281,8 @@ mod tests {
                     })),
                 ],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![2, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[2, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
         ];
@@ -296,15 +296,15 @@ mod tests {
                 input: "len([]); push([], 1);",
                 expected_constants: vec![Object::Integer(1)],
                 expected_instructions: vec![
-                    make_instructions(OpGetBuiltin, &vec![0]),
-                    make_instructions(OpArray, &vec![0]),
-                    make_instructions(OpCall, &vec![1]),
-                    make_instructions(OpPop, &vec![0]),
-                    make_instructions(OpGetBuiltin, &vec![5]),
-                    make_instructions(OpArray, &vec![0]),
-                    make_instructions(OpConst, &vec![0]),
-                    make_instructions(OpCall, &vec![2]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpGetBuiltin, &[0]),
+                    make_instructions(OpArray, &[0]),
+                    make_instructions(OpCall, &[1]),
+                    make_instructions(OpPop, &[0]),
+                    make_instructions(OpGetBuiltin, &[5]),
+                    make_instructions(OpArray, &[0]),
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpCall, &[2]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
             CompilerTestCase {
@@ -313,10 +313,10 @@ mod tests {
                     object::CompiledFunction {
                         name: String::new(),
                         instructions: concat_instructions(&vec![
-                            make_instructions(OpGetBuiltin, &vec![0]),
-                            make_instructions(OpArray, &vec![0]),
-                            make_instructions(OpCall, &vec![1]),
-                            make_instructions(OpReturnValue, &vec![0]),
+                            make_instructions(OpGetBuiltin, &[0]),
+                            make_instructions(OpArray, &[0]),
+                            make_instructions(OpCall, &[1]),
+                            make_instructions(OpReturnValue, &[0]),
                         ])
                         .data,
                         num_locals: 0,
@@ -324,8 +324,8 @@ mod tests {
                     },
                 ))],
                 expected_instructions: vec![
-                    make_instructions(OpClosure, &vec![0, 0]),
-                    make_instructions(OpPop, &vec![0]),
+                    make_instructions(OpClosure, &[0, 0]),
+                    make_instructions(OpPop, &[0]),
                 ],
             },
         ];
