@@ -3,7 +3,7 @@
 #![cfg(target_arch = "wasm32")]
 
 extern crate wasm_bindgen_test;
-use monkey_wasm::{compile_to_snapshot, parse, run_gc_with_report, run_snapshot};
+use monkey_wasm::{compile_to_arm64, compile_to_snapshot, parse, run_gc_with_report, run_snapshot};
 use serde_json::Value;
 use wasm_bindgen_test::*;
 
@@ -277,4 +277,64 @@ fn snapshot_parse_and_compile_failures_are_envelope_data() {
     let compile_error = build_snapshot("this;", false);
     assert_eq!(compile_error["status"], "error");
     assert_eq!(compile_error["stage"], "compile");
+}
+
+fn build_arm64(source: &str) -> Value {
+    serde_json::from_str(&compile_to_arm64(source)).expect("valid arm64 envelope JSON")
+}
+
+#[wasm_bindgen_test]
+fn arm64_envelope_lines_carry_kinds_and_spans() {
+    let source = "let answer = 1 + 2; answer";
+    let envelope = build_arm64(source);
+    assert_eq!(envelope["status"], "ok");
+
+    let lines = envelope["lines"].as_array().expect("lines array");
+    let has = |kind: &str, needle: &str| {
+        lines.iter().any(|line| {
+            line["kind"] == kind && line["text"].as_str().unwrap_or("").contains(needle)
+        })
+    };
+    assert!(has("label", "main:"));
+    assert!(has("directive", ".globl main"));
+    assert!(has("comment", "// let answer = 1 + 2;"));
+    assert!(has("code", "bl rt_globals_init"));
+    assert!(lines
+        .iter()
+        .any(|line| line["kind"] == "blank" && line["text"] == ""));
+
+    // Every span stays inside the source and is well-formed; at least one code
+    // line maps back to the `1 + 2` initializer for the godbolt linkage.
+    for line in lines {
+        if line["span"].is_null() {
+            continue;
+        }
+        let start = line["span"]["start"].as_u64().expect("span start");
+        let end = line["span"]["end"].as_u64().expect("span end");
+        assert!(start <= end && end <= source.len() as u64);
+    }
+    let initializer = (
+        source.find("1 + 2").unwrap() as u64,
+        source.find("1 + 2").unwrap() as u64 + "1 + 2".len() as u64,
+    );
+    assert!(lines.iter().any(|line| {
+        line["kind"] == "code"
+            && line["span"]["start"] == initializer.0
+            && line["span"]["end"] == initializer.1
+    }));
+}
+
+#[wasm_bindgen_test]
+fn arm64_parse_and_lowering_failures_are_envelope_data() {
+    let parse_error = build_arm64("let =");
+    assert_eq!(parse_error["status"], "error");
+    assert_eq!(parse_error["stage"], "parse");
+    assert!(parse_error["span"].is_null());
+
+    let compile_error = build_arm64("missing;");
+    assert_eq!(compile_error["status"], "error");
+    assert_eq!(compile_error["stage"], "compile");
+    assert_eq!(compile_error["message"], "undefined variable 'missing'");
+    assert_eq!(compile_error["span"]["start"], 0);
+    assert_eq!(compile_error["span"]["end"], 7);
 }

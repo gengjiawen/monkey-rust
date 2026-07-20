@@ -309,6 +309,7 @@ name = "monkey-wasm"
 version = "1.0.0"
 dependencies = [
  "console_error_panic_hook",
+ "monkey-asm",
  "monkey-compiler",
  "monkey-gc",
  "monkey-parser",

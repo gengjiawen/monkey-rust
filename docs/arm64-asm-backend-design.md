@@ -4,7 +4,8 @@
 > 已吸收设计评审：修正调用栈布局、拆分普通调用与构造、
 > 冻结 checked `i64` 语义、闭合 native/模拟器两套运行时适配、修正帧寻址与 span 传播、
 > 并把差分测试改为独立通道上的规范化结构化协议。
-> 尚未实施的部分：wasm 模拟器与 playground 集成（§12）、GC 接入（§14）。
+> playground 集成（§12 V1，godbolt 式 ARM64 tab）也已实施。
+> 尚未实施的部分：wasm 单步模拟器（§12 V2）、GC 接入（§14）。
 >
 > 核心结论：仿照《Compiling to Assembly from Scratch》（Keleshev）的路线，从 AST 单遍 lower 并延迟拼装
 > **arm64（AArch64）汇编文本**，交给交叉工具链汇编链接成可执行文件——AOT，不做 JIT。
@@ -615,7 +616,7 @@ array 为 `[a, b]`、hash 为 `{k: v}` 且使用上面的稳定键顺序；closu
 复用现有基建：`sourceSpan.ts`、tagged JSON envelope（`status/stage/span`）、
 执行预算先例（`PLAYGROUND_GC_INSTRUCTION_BUDGET`）。
 
-### V1：Godbolt 式双栏视图（随第 1 章上线）
+### V1：Godbolt 式双栏视图（已实施）
 
 - wasm 新导出 `compile_to_arm64(input)`，envelope 返回逐行汇编与 span：
 

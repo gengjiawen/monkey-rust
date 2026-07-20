@@ -9,9 +9,9 @@ stack.
 
 ## One crate, built twice
 
-| Build | Command | Product |
-| --- | --- | --- |
-| host | `cargo build -p monkey-asm` | `monkey-asm` CLI (parse + lower to `.s`) |
+| Build         | Command                                                                        | Product                                                         |
+| ------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| host          | `cargo build -p monkey-asm`                                                    | `monkey-asm` CLI (parse + lower to `.s`)                        |
 | aarch64 cross | `cargo build -p monkey-asm --lib --release --target aarch64-unknown-linux-gnu` | `libmonkey_asm.a`, the runtime the generated `.s` links against |
 
 The generated `.s` file is the only interface between the two: the CLI never
@@ -45,6 +45,15 @@ Environment overrides: `MONKEY_ASM_CC` (default `aarch64-linux-gnu-gcc`),
 canonical result record (u64 big-endian length + JSON) to fd 3 at exit, while
 stdout stays the untouched `puts` byte stream; `run --observe` decodes the
 record to stderr.
+
+## Playground
+
+The [compiler playground](https://monkey-lang-playground-jw.vercel.app/) has an
+**ARM64** tab — a godbolt-style source ↔ assembly view with bidirectional span
+highlighting and a Download `.s` button, backed by the `compile_to_arm64` wasm
+export (which reuses `lower` in the browser). Nothing executes arm64 there; the
+tab renders the exact text `monkey-asm emit` writes, and the downloaded `.s`
+cross-assembles with the command above.
 
 ## Layout
 
