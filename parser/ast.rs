@@ -222,7 +222,7 @@ pub struct IDENTIFIER {
 
 impl fmt::Display for IDENTIFIER {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", &self.name)
+        write!(f, "{}", self.name)
     }
 }
 
