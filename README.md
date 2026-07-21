@@ -32,6 +32,7 @@ Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **inf
 - bytecode viewer from source
 - **GC** ([`monkey-gc`](gc/README.md)): alternate bytecode VM with QuickJS-style refcounting and three-phase cycle collection (`gc_decref` → `gc_scan` → `gc_free_cycles`) on a `GcHeap`, so cyclic object graphs can be reclaimed without changing `object` or the default `Rc` VM.
 - **Bytecode snapshots** (`.mbc`): QuickJS-style ahead-of-time compilation, mirroring `qjsc` — `monkey-gc compile foo.monkey` serializes the compiled bytecode to a `.mbc` file and `monkey-gc run foo.mbc` executes it without the parser/compiler, treating the file as untrusted input behind a three-layer validation model ([design doc](docs/bytecode-snapshot-design.md)).
+- **ASM** ([`monkey-asm`](asm/README.md)): AOT arm64 (AArch64) assembly backend — single-pass lowering from the AST to AArch64 assembly text, assembled and linked against a cross-built Rust runtime into a native executable, in Linux/ELF and macOS/Mach-O flavors (the Linux flavor runs on any host via `qemu-aarch64`); the playground's **ARM64** tab shows the same assembly godbolt-style ([design doc](docs/arm64-asm-backend-design.md)).
 
 ## Resources
 Official site is: https://monkeylang.org/. It's has various implementation languages :).
