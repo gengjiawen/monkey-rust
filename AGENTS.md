@@ -2,8 +2,8 @@
 
 ## Project Structure & Module Organization
 
-- Rust workspace (`Cargo.toml`) with crates: `lexer/`, `parser/`, `object/`, `interpreter/`, `compiler/`, `wasm/`.
-- JS/TS packages under `packages/`: `prettier-plugin-monkey/` (Prettier plugin) and `playground/` (web demo). Workspace managed by `pnpm` (`pnpm-workspace.yaml`).
+- Rust workspace (`Cargo.toml`) with crates: `lexer/`, `parser/`, `object/`, `interpreter/`, `compiler/`, `gc/`, `asm/`, `wasm/`.
+- JS/TS packages under `packages/`: `prettier-plugin-monkey/` (Prettier plugin), `monkey-minifier/` (source minifier), `playground/` (web demo), and `vscode-extension/`. Workspace managed by `pnpm` (`pnpm-workspace.yaml`).
 - Examples in `examples/`; CI in `.github/workflows/`.
 - Crates use flat files (no `src/`); primary files live at crate root (for example `parser/lib.rs`, `compiler/vm.rs`). Tests are colocated as `*_test.rs` plus `insta` snapshots in `snapshots/`.
 
@@ -15,6 +15,7 @@
 - Note: the playground consumes `wasm/pkg/` (the wasm-pack output), not the Rust sources directly. After changes to lexer/parser/compiler, rebuild the wasm package first, otherwise the playground runs stale bytecode. `cargo test` passing does not imply the wasm is up to date.
 - JS workspace: `pnpm i` then
   - Playground: `pnpm -C packages/playground dev` (local server) or `pnpm build`.
+  - Minifier: `pnpm -C packages/monkey-minifier test` and `pnpm -C packages/monkey-minifier build`.
   - Prettier plugin: `pnpm -C packages/prettier-plugin-monkey test` and `pnpm -C packages/prettier-plugin-monkey build`.
 
 ## Coding Style & Naming Conventions

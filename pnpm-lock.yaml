@@ -27,6 +27,31 @@ importers:
         specifier: ^5.0.4
         version: 5.0.4
 
+  packages/monkey-minifier:
+    dependencies:
+      '@gengjiawen/monkey-wasm':
+        specifier: ^1.1.0
+        version: link:../../wasm/pkg
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.24
+      esbuild:
+        specifier: ^0.28.0
+        version: 0.28.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.0.4
+      vite:
+        specifier: ^8.1.4
+        version: 8.1.4(@types/node@20.19.24)(esbuild@0.28.0)(jiti@2.7.0)
+      vite-plugin-wasm:
+        specifier: ^3.6.0
+        version: 3.6.0(vite@8.1.4(@types/node@20.19.24)(esbuild@0.28.0)(jiti@2.7.0))
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@20.19.24)(jsdom@29.1.1)(vite@8.1.4(@types/node@20.19.24)(esbuild@0.28.0)(jiti@2.7.0))
+
   packages/playground:
     dependencies:
       '@codemirror/commands':
@@ -47,6 +72,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.1
         version: 6.43.1
+      '@gengjiawen/monkey-minifier':
+        specifier: workspace:^1.1.0
+        version: link:../monkey-minifier
       '@gengjiawen/monkey-wasm':
         specifier: workspace:^1.1.0
         version: link:../../wasm/pkg

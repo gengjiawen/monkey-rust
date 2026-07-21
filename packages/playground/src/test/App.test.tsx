@@ -32,6 +32,7 @@ const {
   highlightRangesMock,
   clearHighlightMock,
   formatMock,
+  minifyMock,
   sourceEditorHooks,
   outputEditorHooks,
 } = vi.hoisted(() => ({
@@ -52,6 +53,7 @@ const {
   highlightRangesMock: vi.fn(),
   clearHighlightMock: vi.fn(),
   formatMock: vi.fn(),
+  minifyMock: vi.fn(),
   // The mock editor below is a plain <textarea>, which cannot reproduce every
   // CodeMirror callback: change events whose text equals the current document,
   // or cursor movements. Tests drive those callbacks through these hooks.
@@ -91,6 +93,10 @@ vi.mock('prettier/standalone', () => ({
 
 vi.mock('../../../prettier-plugin-monkey/src/index', () => ({
   default: {},
+}))
+
+vi.mock('../../../monkey-minifier/src/index', () => ({
+  minify: minifyMock,
 }))
 
 interface MockEditorProps {
@@ -411,6 +417,8 @@ beforeEach(() => {
   buildArm64Mock.mockImplementation(() => arm64Envelope())
   formatMock.mockReset()
   formatMock.mockImplementation(async (source: string) => source)
+  minifyMock.mockReset()
+  minifyMock.mockImplementation(() => ({ code: '1;' }))
   highlightRangeMock.mockClear()
   highlightRangesMock.mockClear()
   clearHighlightMock.mockClear()
@@ -1249,5 +1257,61 @@ describe('ARM64 view', () => {
       { from: 6, to: 18 },
       { from: 25, to: 30 },
     ])
+  })
+})
+
+describe('Minify view', () => {
+  it('minifies only while active, reports UTF-8 bytes, and toggles mangling', async () => {
+    const user = userEvent.setup()
+    minifyMock.mockImplementation(() => ({ code: '中;' }))
+    renderApp()
+
+    expect(minifyMock).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('radio', { name: 'Minify' }))
+
+    await waitFor(() => expect(minifyMock).toHaveBeenCalledTimes(1))
+    expect(screen.getByLabelText('Minified byte statistics')).toHaveTextContent(
+      '→ 4 UTF-8 bytes'
+    )
+    expect(screen.getByLabelText('Output editor')).toHaveValue('中;')
+
+    await user.click(screen.getByRole('switch', { name: 'Mangle names' }))
+    await waitFor(() =>
+      expect(minifyMock).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ mangle: false })
+      )
+    )
+
+    const calls = minifyMock.mock.calls.length
+    await user.click(screen.getByRole('radio', { name: 'AST' }))
+    await user.type(screen.getByLabelText('Source editor'), 'x')
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(minifyMock).toHaveBeenCalledTimes(calls)
+  })
+
+  it('keeps only the latest debounced source and displays errors', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(screen.getByRole('radio', { name: 'Minify' }))
+    await waitFor(() => expect(minifyMock).toHaveBeenCalled())
+
+    minifyMock.mockClear()
+    const editor = screen.getByLabelText('Source editor')
+    await user.clear(editor)
+    await user.type(editor, '1 + 2')
+    await waitFor(() => expect(minifyMock).toHaveBeenCalledTimes(1))
+    expect(minifyMock).toHaveBeenLastCalledWith(
+      '1 + 2',
+      expect.objectContaining({ mangle: true })
+    )
+
+    minifyMock.mockImplementationOnce(() => {
+      throw new SyntaxError('bad Monkey source')
+    })
+    await user.type(editor, ';')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'bad Monkey source'
+    )
   })
 })

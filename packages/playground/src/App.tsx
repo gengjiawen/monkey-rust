@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, SegmentedControl, Select } from '@radix-ui/themes'
+import { Button, SegmentedControl, Select, Switch } from '@radix-ui/themes'
 import { compile_with_debug, parse } from '@gengjiawen/monkey-wasm'
 import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
@@ -17,6 +17,7 @@ import { Editor, type EditorHandle } from './Editor'
 import { GcReportView, type GcPanelState } from './GcReportView'
 import type { SourceSpan } from './gcReport'
 import { runGc } from './gcRunner'
+import { MinifyView, type MinifyState, utf8Bytes } from './MinifyView'
 import { utf16OffsetToUtf8Byte, utf8ByteSpanToUtf16 } from './sourceSpan'
 import {
   SnapshotView,
@@ -103,7 +104,7 @@ makeCycle();
   },
 ]
 
-type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot' | 'arm64'
+type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot' | 'arm64' | 'minify'
 
 const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
@@ -153,6 +154,12 @@ function App() {
   const [arm64Build, setArm64Build] = useState<Arm64BuildState>({
     status: 'idle',
   })
+  const [minifyState, setMinifyState] = useState<MinifyState>({
+    status: 'idle',
+  })
+  const [mangleNames, setMangleNames] = useState(true)
+  const minifyRequestId = useRef(0)
+  const minifyActive = useRef(false)
   const editorRef = useRef<EditorHandle>(null)
   const arm64EditorRef = useRef<EditorHandle>(null)
   const latestCode = useRef(code)
@@ -245,6 +252,42 @@ function App() {
     [compileArm64]
   )
 
+  const minifyCode = useCallback(
+    async (source: string, shouldMangle: boolean, requestId: number) => {
+      try {
+        const { minify } = await import('../../monkey-minifier/src/index')
+        const result = minify(source, { mangle: shouldMangle })
+        if (
+          minifyRequestId.current !== requestId ||
+          latestCode.current !== source ||
+          !minifyActive.current
+        ) {
+          return
+        }
+        setMinifyState({
+          status: 'ok',
+          code: result.code,
+          originalBytes: utf8Bytes(source),
+          minifiedBytes: utf8Bytes(result.code),
+        })
+      } catch (error) {
+        if (
+          minifyRequestId.current === requestId &&
+          latestCode.current === source &&
+          minifyActive.current
+        ) {
+          setMinifyState({
+            status: 'invalid',
+            message: getErrorMessage(error),
+          })
+        }
+      }
+    },
+    []
+  )
+
+  const debouncedMinify = useMemo(() => debounce(minifyCode, 200), [minifyCode])
+
   const editorOnChange = useCallback(
     (value: string) => {
       // CodeMirror reports a document change even when the replacement text is
@@ -255,12 +298,27 @@ function App() {
         return
       }
       setCode(value)
+      minifyRequestId.current += 1
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
       invalidateSnapshot()
     },
     [code, invalidateSnapshot]
   )
+
+  const handleOutputViewChange = useCallback((value: string) => {
+    const nextView = value as OutputView
+    if (nextView !== 'minify') {
+      minifyActive.current = false
+      minifyRequestId.current += 1
+    }
+    setOutputView(nextView)
+  }, [])
+
+  const handleMangleChange = useCallback((checked: boolean) => {
+    minifyRequestId.current += 1
+    setMangleNames(checked)
+  }, [])
 
   const handleStripDebugChange = useCallback(
     (nextStripDebug: boolean) => {
@@ -293,6 +351,7 @@ function App() {
         return
       }
       setCode(formatted)
+      minifyRequestId.current += 1
       setSelection(null)
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
@@ -335,6 +394,20 @@ function App() {
   }, [code, debouncedArm64Compile, outputView])
 
   useEffect(() => {
+    minifyActive.current = outputView === 'minify'
+    minifyRequestId.current += 1
+    const requestId = minifyRequestId.current
+    if (outputView !== 'minify') {
+      debouncedMinify.cancel()
+      return
+    }
+
+    setMinifyState({ status: 'idle' })
+    debouncedMinify(code, mangleNames, requestId)
+    return () => debouncedMinify.cancel()
+  }, [code, debouncedMinify, mangleNames, outputView])
+
+  useEffect(() => {
     const index = Math.min(Math.max(snippetIndex, 0), snippets.length - 1)
     if (index !== snippetIndex) {
       setSnippetIndex(index)
@@ -343,12 +416,15 @@ function App() {
     gcRequestId.current += 1
     setGcState({ status: 'idle' })
     invalidateSnapshot()
+    minifyRequestId.current += 1
     setCode(snippets[index].code)
   }, [invalidateSnapshot, snippetIndex, setSnippetIndex])
 
   useEffect(
     () => () => {
       gcRequestId.current += 1
+      minifyActive.current = false
+      minifyRequestId.current += 1
     },
     []
   )
@@ -561,7 +637,7 @@ function App() {
             className="max-w-full min-w-0!"
             size="2"
             value={outputView}
-            onValueChange={(value) => setOutputView(value as OutputView)}
+            onValueChange={handleOutputViewChange}
           >
             <SegmentedControl.Item value="ast">AST</SegmentedControl.Item>
             <SegmentedControl.Item value="bytecode">
@@ -572,6 +648,7 @@ function App() {
               Snapshot
             </SegmentedControl.Item>
             <SegmentedControl.Item value="arm64">ARM64</SegmentedControl.Item>
+            <SegmentedControl.Item value="minify">Minify</SegmentedControl.Item>
           </SegmentedControl.Root>
           {outputView === 'gc' ? (
             <Button
@@ -591,6 +668,20 @@ function App() {
             >
               Run snapshot
             </Button>
+          ) : null}
+          {outputView === 'minify' ? (
+            <label
+              htmlFor="mangle-names"
+              className="flex items-center gap-2 text-xs text-(--gray-11)"
+            >
+              <Switch
+                id="mangle-names"
+                size="1"
+                checked={mangleNames}
+                onCheckedChange={handleMangleChange}
+              />
+              Mangle names
+            </label>
           ) : null}
         </div>
         <div className={editorFrameClass}>
@@ -631,6 +722,7 @@ function App() {
               onErrorSpanSelect={handleErrorSpanSelect}
             />
           ) : null}
+          {outputView === 'minify' ? <MinifyView state={minifyState} /> : null}
           {outputView === 'bytecode' ||
           (outputView === 'ast' && astData === null) ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
