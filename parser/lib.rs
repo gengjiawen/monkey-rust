@@ -794,10 +794,8 @@ pub fn parse(input: &str) -> Result<Node, ParseErrors> {
 }
 
 pub fn parse_ast_json_string(input: &str) -> Result<String, ParseErrors> {
-    let ast = match parse(input) {
-        Ok(node) => serde_json::to_string_pretty(&node).unwrap(),
-        Err(e) => return Err(e),
-    };
+    let node = parse(input)?;
+    let ast = serde_json::to_string_pretty(&node).unwrap();
 
     return Ok(ast);
 }
