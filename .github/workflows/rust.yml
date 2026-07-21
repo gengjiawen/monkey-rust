@@ -8,6 +8,13 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -47,8 +54,6 @@ jobs:
           rustup target add aarch64-unknown-linux-gnu
       - name: Run Linux AArch64 end-to-end tests
         run: MONKEY_ASM_E2E_REQUIRED=1 cargo test -p monkey-asm -- --ignored --test-threads=1
-      - name: Lint ARM64 backend
-        run: cargo clippy -p monkey-asm --all-targets --no-deps
 
   arm64-e2e-macos:
     # Apple Silicon runner: the e2e suite exercises the Mach-O flavor natively.
