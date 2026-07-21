@@ -27,7 +27,7 @@
     "prettier": "^3.0.0"
   },
   "dependencies": {
-    "@gengjiawen/monkey-wasm": "^1.1.0"
+    "@gengjiawen/monkey-wasm": "workspace:^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

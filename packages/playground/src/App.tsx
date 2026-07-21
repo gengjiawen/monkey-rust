@@ -34,9 +34,8 @@ const snippets: Snippet[] = [
   {
     label: 'Intro',
     code: `
-1 + 1;
-if (true) { 10 }; 3333;
-let a = [1, 2, 3];
+let a = 1 + 1;
+print(a)
 `.trimStart(),
   },
   {

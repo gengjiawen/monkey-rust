@@ -419,6 +419,16 @@ beforeEach(() => {
   outputEditorHooks.onSelectionChange = undefined
 })
 
+describe('Examples', () => {
+  it('starts with the concise Intro program', () => {
+    renderApp()
+
+    expect(screen.getByLabelText('Source editor')).toHaveValue(
+      'let a = 1 + 1;\nprint(a)\n'
+    )
+  })
+})
+
 describe('GC playground', () => {
   it('runs only on demand and renders the collection report', async () => {
     const user = userEvent.setup()
@@ -786,13 +796,18 @@ describe('Snapshot playground', () => {
 
   it('highlights the span for snapshot runtime errors until the source changes', async () => {
     const user = userEvent.setup()
+    renderApp()
+
+    const sourceEditor =
+      screen.getByLabelText<HTMLTextAreaElement>('Source editor')
+    const start = sourceEditor.value.indexOf('print')
+    const end = start + 'print(a)'.length
     runSnapshotMock.mockResolvedValue({
       status: 'error',
       stage: 'runtime',
       message: 'not a function: Integer',
-      span: { start: 22, end: 36 },
+      span: { start, end },
     } satisfies SnapshotRunEnvelope)
-    renderApp()
 
     const runButton = await openSnapshotTab(user)
     await screen.findByLabelText('Snapshot size')
@@ -801,10 +816,10 @@ describe('Snapshot playground', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('runtime error')
     expect(alert).toHaveTextContent('not a function: Integer')
-    expect(highlightRangeMock).toHaveBeenCalledWith(22, 36)
+    expect(highlightRangeMock).toHaveBeenCalledWith(start, end)
 
     clearHighlightMock.mockClear()
-    await user.type(screen.getByLabelText('Source editor'), 'x')
+    await user.type(sourceEditor, 'x')
     expect(clearHighlightMock).toHaveBeenCalled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
@@ -1084,6 +1099,54 @@ describe('ARM64 view', () => {
       expect(buildArm64Mock.mock.calls.length).toBeGreaterThan(calls)
     )
     expect(buildArm64Mock).toHaveBeenLastCalledWith(sourceEditor.value)
+  })
+
+  it('starts the download help collapsed at the mobile breakpoint', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await openArm64Tab(user)
+
+    const disclosure = screen.getByRole('button', {
+      name: 'Download .s and build help',
+    })
+    const help = document.getElementById('arm64-build-help')
+    expect(help).not.toBeNull()
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+    expect(help).toHaveClass('max-[780px]:hidden')
+
+    await user.click(disclosure)
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+    expect(help).not.toHaveClass('max-[780px]:hidden')
+    expect(help).toHaveClass('max-[780px]:flex')
+  })
+
+  it('collapses the reading guide until the summary is opened', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await openArm64Tab(user)
+
+    const summary = screen.getByText('How to read this assembly')
+    const taggedValues = screen.getByText('Tagged values.')
+    expect(taggedValues).not.toBeVisible()
+
+    await user.click(summary)
+    expect(taggedValues).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'backend design doc' })
+    ).toHaveAttribute(
+      'href',
+      'https://github.com/gengjiawen/monkey-rust/blob/main/docs/arm64-asm-backend-design.md'
+    )
+    expect(taggedValues.closest('li')).toHaveTextContent(
+      'builtins use (id << 3) | 0b101 (len is #0x5)'
+    )
+    expect(
+      screen.getByText('Function frames.').closest('li')
+    ).toHaveTextContent(
+      'Ordinary calls enter them through rt_call; new uses rt_construct'
+    )
   })
 
   it('renders lowering failures with a span jump button', async () => {
