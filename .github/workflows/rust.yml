@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # Corepack is unmaintained, so CI installs pnpm directly. Node stays on
+      # 20.19: the oldest version whose synchronous require(esm) the minifier's
+      # Node entrypoint supports.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.15.1
       - uses: actions/setup-node@v6
         with:
           node-version: '20.19'
@@ -37,7 +43,6 @@ jobs:
         run: cd wasm && wasm-pack test --node
       - name: Build and test minifier
         run: |
-          corepack enable
           pnpm install --filter @gengjiawen/monkey-minifier... --frozen-lockfile
           pnpm --filter @gengjiawen/monkey-minifier build
           pnpm --filter @gengjiawen/monkey-minifier test:browser
@@ -45,12 +50,10 @@ jobs:
           pnpm --filter @gengjiawen/monkey-minifier test
       - name: Run playground tests
         run: |
-          corepack enable
           pnpm install --filter monkey-playground... --frozen-lockfile
           pnpm --filter monkey-playground test
       - name: Build VS Code extension
         run: |
-          corepack enable
           pnpm install --filter monkey-extension... --frozen-lockfile
           pnpm --filter monkey-extension run build
 
