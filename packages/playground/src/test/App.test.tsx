@@ -1086,6 +1086,26 @@ describe('ARM64 view', () => {
     expect(buildArm64Mock).toHaveBeenLastCalledWith(sourceEditor.value)
   })
 
+  it('collapses the reading guide until the summary is opened', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await openArm64Tab(user)
+
+    const summary = screen.getByText('How to read this assembly')
+    const taggedValues = screen.getByText('Tagged values.')
+    expect(taggedValues).not.toBeVisible()
+
+    await user.click(summary)
+    expect(taggedValues).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'backend design doc' })
+    ).toHaveAttribute(
+      'href',
+      'https://github.com/gengjiawen/monkey-rust/blob/main/docs/arm64-asm-backend-design.md'
+    )
+  })
+
   it('renders lowering failures with a span jump button', async () => {
     const user = userEvent.setup()
     buildArm64Mock.mockImplementation(
