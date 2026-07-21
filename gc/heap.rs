@@ -84,6 +84,7 @@ impl GcHeap {
         self.rt.mark_children(reference.0, mark_func);
     }
 
+    #[cfg(test)]
     pub(crate) fn header_mut(&mut self, reference: GcRef) -> &mut crate::header::GcObjectHeader {
         self.rt.header_mut(reference.0)
     }

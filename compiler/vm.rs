@@ -58,11 +58,12 @@ impl VM {
         let mut frames = vec![empty_frame; MAX_FRAMES];
         frames[0] = main_frame;
 
+        let null = Rc::new(Object::Null);
         return VM {
             constants: bytecode.constants,
-            stack: vec![Rc::new(Object::Null); STACK_SIZE],
+            stack: vec![Rc::clone(&null); STACK_SIZE],
             sp: 0,
-            globals: vec![Rc::new(Object::Null); GLOBAL_SIZE],
+            globals: vec![null; GLOBAL_SIZE],
             frames,
             frame_index: 1,
         };
@@ -75,7 +76,7 @@ impl VM {
     }
 
     pub fn run(&mut self) {
-        let mut ip = 0;
+        let mut ip: usize;
         let mut ins: Vec<u8>;
         while self.current_frame().ip
             < self.current_frame().instructions().data.clone().len() as i32 - 1
@@ -146,14 +147,15 @@ impl VM {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
                     let elements = self.build_array(self.sp - count, self.sp);
-                    self.sp = self.sp - count;
+                    self.sp -= count;
                     self.push(Rc::new(Object::Array(elements)));
                 }
                 Opcode::OpHash => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
+                    #[allow(clippy::mutable_key_type)]
                     let elements = self.build_hash(self.sp - count, self.sp);
-                    self.sp = self.sp - count;
+                    self.sp -= count;
                     self.push(Rc::new(Object::Hash(elements)));
                 }
                 Opcode::OpIndex => {
@@ -383,6 +385,9 @@ impl VM {
         return elements;
     }
 
+    // Object's Hash impl only covers Integer/Boolean/String, which have no
+    // interior mutability, so the keys are effectively immutable.
+    #[allow(clippy::mutable_key_type)]
     fn build_hash(&self, start: usize, end: usize) -> HashMap<Rc<Object>, Rc<Object>> {
         let mut elements = HashMap::new();
         for i in (start..end).step_by(2) {
@@ -407,7 +412,7 @@ impl VM {
         }
     }
 
-    fn execute_array_index(&mut self, array: &Vec<Rc<Object>>, index: i64) {
+    fn execute_array_index(&mut self, array: &[Rc<Object>], index: i64) {
         if index < array.len() as i64 && index >= 0 {
             self.push(Rc::clone(&array[index as usize]));
         } else {
@@ -415,6 +420,7 @@ impl VM {
         }
     }
 
+    #[allow(clippy::mutable_key_type)]
     fn execute_hash_index(&mut self, hash: &HashMap<Rc<Object>, Rc<Object>>, index: Rc<Object>) {
         match &*index {
             Object::Integer(_) | Object::Boolean(_) | Object::String(_) => match hash.get(&index) {
@@ -452,7 +458,7 @@ impl VM {
                 self.call_closure(cf.clone(), num_args);
             }
             Object::Builtin(bt) => {
-                self.call_builtin(bt.clone(), num_args);
+                self.call_builtin(*bt, num_args);
             }
             Object::BoundMethod(bound) => {
                 self.call_bound_method(bound.clone(), num_args);
@@ -490,7 +496,7 @@ impl VM {
                     let f = self.stack[self.sp - num_free + i].clone();
                     free.push(f);
                 }
-                self.sp = self.sp - num_free;
+                self.sp -= num_free;
                 let closure = ClosureObj(Closure {
                     func: f.clone(),
                     free,

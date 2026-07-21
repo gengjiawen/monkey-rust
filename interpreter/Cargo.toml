@@ -21,3 +21,6 @@ path = "main.rs"
 [dependencies]
 monkey-parser = { path = "../parser", version = "1.0.0" }
 monkey-object = { path = "../object", version = "1.0.0" }
+
+[lints]
+workspace = true

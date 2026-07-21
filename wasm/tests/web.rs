@@ -76,9 +76,7 @@ makeCycle();
         .filter_map(|root| root["name"].as_str())
         .collect();
     assert_eq!(root_names, vec!["Node", "makeCycle"]);
-    assert!(global_roots
-        .iter()
-        .all(|root| root["objectId"].is_number()));
+    assert!(global_roots.iter().all(|root| root["objectId"].is_number()));
     assert!(envelope["report"]["phases"]["trialDeletion"]["objectDecisions"].is_array());
     assert!(envelope["report"]["phases"]["trialDeletion"]["visitedEdges"].is_array());
     assert!(envelope["report"]["phases"]["scan"]["restorationWitnesses"].is_array());

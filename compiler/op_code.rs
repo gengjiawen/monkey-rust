@@ -327,12 +327,12 @@ lazy_static! {
     };
 }
 
-pub fn make_instructions(op: Opcode, operands: &Vec<usize>) -> Instructions {
+pub fn make_instructions(op: Opcode, operands: &[usize]) -> Instructions {
     let mut instructions = Vec::new();
     instructions.push(op as u8);
     let widths = &DEFINITIONS.get(&op).unwrap().operand_width;
 
-    for (o, w) in operands.into_iter().zip(widths) {
+    for (o, w) in operands.iter().zip(widths) {
         match w {
             2 => {
                 instructions.write_u16::<BigEndian>(*o as u16).unwrap();
@@ -359,11 +359,11 @@ pub fn read_operands(def: &OpcodeDefinition, ins: &[u8]) -> (Vec<usize>, usize) 
         match w {
             2 => {
                 operands.push(BigEndian::read_u16(&ins[offset..offset + 2]) as usize);
-                offset = offset + 2;
+                offset += 2;
             }
             1 => {
                 operands.push(ins[offset] as usize);
-                offset = offset + 1;
+                offset += 1;
             }
             0 => {}
             _ => {
@@ -414,11 +414,11 @@ impl Instructions {
         return ret;
     }
 
-    fn fmt_instructions(def: &OpcodeDefinition, operands: &Vec<usize>) -> String {
+    fn fmt_instructions(def: &OpcodeDefinition, operands: &[usize]) -> String {
         match def.operand_width.len() {
             2 => format!("{} {} {}", def.name, operands[0], operands[1]),
             1 => format!("{} {}", def.name, operands[0]),
-            0 => format!("{}", def.name),
+            0 => def.name.to_string(),
             _ => {
                 panic!("unsupported operand width {}", def.operand_width.len());
             }
@@ -426,7 +426,7 @@ impl Instructions {
     }
 
     pub fn merge_instructions(&self, other: &Instructions) -> Instructions {
-        let ins = vec![self, other];
+        let ins = [self, other];
         // Maybe extend_from_slice, but I have not make it work
         // https://stackoverflow.com/a/69578632/1713757
         return Instructions {

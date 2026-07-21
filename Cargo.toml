@@ -9,3 +9,7 @@ members = [
   "asm",
   "wasm"
 ]
+
+[workspace.lints.clippy]
+# Explicit `return` is the preferred style in this codebase.
+needless_return = "allow"

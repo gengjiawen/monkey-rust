@@ -241,6 +241,12 @@ enum CallableKind {
     Constructor,
 }
 
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Compiler {
     pub fn new() -> Compiler {
         let main_scope = CompilationScope {
@@ -316,17 +322,9 @@ impl Compiler {
                     .symbol_table
                     .define(let_statement.identifier.kind.to_string());
                 if symbol.scope == SymbolScope::Global {
-                    self.emit_with_span(
-                        Opcode::OpSetGlobal,
-                        &vec![symbol.index],
-                        &let_statement.span,
-                    );
+                    self.emit_with_span(Opcode::OpSetGlobal, &[symbol.index], &let_statement.span);
                 } else {
-                    self.emit_with_span(
-                        Opcode::OpSetLocal,
-                        &vec![symbol.index],
-                        &let_statement.span,
-                    );
+                    self.emit_with_span(Opcode::OpSetLocal, &[symbol.index], &let_statement.span);
                 }
                 return Ok(());
             }
@@ -335,18 +333,18 @@ impl Compiler {
                     return Err("constructor cannot return a value".to_string());
                 }
                 self.compile_expr(&r.argument)?;
-                self.emit_with_span(Opcode::OpReturnValue, &vec![], &r.span);
+                self.emit_with_span(Opcode::OpReturnValue, &[], &r.span);
                 return Ok(());
             }
             Statement::Expr(e) => {
                 self.compile_expr(e)?;
-                self.emit_with_span(OpPop, &vec![], e.span());
+                self.emit_with_span(OpPop, &[], e.span());
                 return Ok(());
             }
             Statement::Class(class) => {
                 let symbol = self.symbol_table.define(class.name.name.clone());
                 let class_name = self.add_constant(Object::String(class.name.name.clone()));
-                self.emit_with_span(OpClass, &vec![class_name], &class.span);
+                self.emit_with_span(OpClass, &[class_name], &class.span);
 
                 for method in &class.methods {
                     self.compile_method(&class.name.name, method)?;
@@ -355,21 +353,21 @@ impl Compiler {
                         MethodKind::Method => 0,
                         MethodKind::Constructor => 1,
                     };
-                    self.emit_with_span(OpMethod, &vec![method_name, kind], &method.span);
+                    self.emit_with_span(OpMethod, &[method_name, kind], &method.span);
                 }
 
-                self.emit_with_span(OpSetGlobal, &vec![symbol.index], &class.span);
-                self.emit_with_span(OpNull, &vec![], &class.span);
-                self.emit_with_span(OpPop, &vec![], &class.span);
+                self.emit_with_span(OpSetGlobal, &[symbol.index], &class.span);
+                self.emit_with_span(OpNull, &[], &class.span);
+                self.emit_with_span(OpPop, &[], &class.span);
                 Ok(())
             }
             Statement::SetProperty(statement) => {
                 self.compile_expr(&statement.object)?;
                 self.compile_expr(&statement.value)?;
                 let property = self.add_constant(Object::String(statement.property.name.clone()));
-                self.emit_with_span(OpSetProperty, &vec![property], &statement.span);
-                self.emit_with_span(OpNull, &vec![], &statement.span);
-                self.emit_with_span(OpPop, &vec![], &statement.span);
+                self.emit_with_span(OpSetProperty, &[property], &statement.span);
+                self.emit_with_span(OpNull, &[], &statement.span);
+                self.emit_with_span(OpPop, &[], &statement.span);
                 Ok(())
             }
         }
@@ -396,9 +394,9 @@ impl Compiler {
                 }
                 Literal::Boolean(i) => {
                     if i.raw {
-                        self.emit_with_span(OpTrue, &vec![], &i.span);
+                        self.emit_with_span(OpTrue, &[], &i.span);
                     } else {
-                        self.emit_with_span(OpFalse, &vec![], &i.span);
+                        self.emit_with_span(OpFalse, &[], &i.span);
                     }
                 }
                 Literal::String(s) => {
@@ -410,24 +408,24 @@ impl Compiler {
                     for element in array.elements.iter() {
                         self.compile_expr(element)?;
                     }
-                    self.emit_with_span(OpArray, &vec![array.elements.len()], &array.span);
+                    self.emit_with_span(OpArray, &[array.elements.len()], &array.span);
                 }
                 Literal::Hash(hash) => {
                     for (key, value) in hash.elements.iter() {
-                        self.compile_expr(&key)?;
-                        self.compile_expr(&value)?;
+                        self.compile_expr(key)?;
+                        self.compile_expr(value)?;
                     }
-                    self.emit_with_span(OpHash, &vec![hash.elements.len() * 2], &hash.span);
+                    self.emit_with_span(OpHash, &[hash.elements.len() * 2], &hash.span);
                 }
             },
             Expression::PREFIX(prefix) => {
                 self.compile_expr(&prefix.operand)?;
                 match prefix.op.kind {
                     TokenKind::MINUS => {
-                        self.emit_with_span(OpMinus, &vec![], &prefix.span);
+                        self.emit_with_span(OpMinus, &[], &prefix.span);
                     }
                     TokenKind::BANG => {
-                        self.emit_with_span(OpBang, &vec![], &prefix.span);
+                        self.emit_with_span(OpBang, &[], &prefix.span);
                     }
                     _ => {
                         return Err(format!("unexpected prefix op: {}", prefix.op));
@@ -439,28 +437,28 @@ impl Compiler {
                 self.compile_expr(&infix.right)?;
                 match infix.op.kind {
                     TokenKind::PLUS => {
-                        self.emit_with_span(OpAdd, &vec![], &infix.span);
+                        self.emit_with_span(OpAdd, &[], &infix.span);
                     }
                     TokenKind::MINUS => {
-                        self.emit_with_span(OpSub, &vec![], &infix.span);
+                        self.emit_with_span(OpSub, &[], &infix.span);
                     }
                     TokenKind::ASTERISK => {
-                        self.emit_with_span(OpMul, &vec![], &infix.span);
+                        self.emit_with_span(OpMul, &[], &infix.span);
                     }
                     TokenKind::SLASH => {
-                        self.emit_with_span(OpDiv, &vec![], &infix.span);
+                        self.emit_with_span(OpDiv, &[], &infix.span);
                     }
                     TokenKind::GT => {
-                        self.emit_with_span(Opcode::OpGreaterThan, &vec![], &infix.span);
+                        self.emit_with_span(Opcode::OpGreaterThan, &[], &infix.span);
                     }
                     TokenKind::LT => {
-                        self.emit_with_span(Opcode::OpLessThan, &vec![], &infix.span);
+                        self.emit_with_span(Opcode::OpLessThan, &[], &infix.span);
                     }
                     TokenKind::EQ => {
-                        self.emit_with_span(Opcode::OpEqual, &vec![], &infix.span);
+                        self.emit_with_span(Opcode::OpEqual, &[], &infix.span);
                     }
                     TokenKind::NotEq => {
-                        self.emit_with_span(Opcode::OpNotEqual, &vec![], &infix.span);
+                        self.emit_with_span(Opcode::OpNotEqual, &[], &infix.span);
                     }
                     _ => {
                         return Err(format!("unexpected infix op: {}", infix.op));
@@ -469,20 +467,19 @@ impl Compiler {
             }
             Expression::IF(if_node) => {
                 self.compile_expr(&if_node.condition)?;
-                let jump_not_truthy =
-                    self.emit_with_span(OpJumpNotTruthy, &vec![9527], &if_node.span);
+                let jump_not_truthy = self.emit_with_span(OpJumpNotTruthy, &[9527], &if_node.span);
                 self.compile_block_statement(&if_node.consequent)?;
                 if self.last_instruction_is(OpPop) {
                     self.remove_last_pop();
                 }
 
-                let jump_pos = self.emit_with_span(OpJump, &vec![9527], &if_node.span);
+                let jump_pos = self.emit_with_span(OpJump, &[9527], &if_node.span);
 
                 let after_consequence_location = self.current_instruction().data.len();
                 self.change_operand(jump_not_truthy, after_consequence_location);
 
                 if if_node.alternate.is_none() {
-                    self.emit_with_span(OpNull, &vec![], &if_node.span);
+                    self.emit_with_span(OpNull, &[], &if_node.span);
                 } else {
                     self.compile_block_statement(&if_node.clone().alternate.unwrap())?;
                     if self.last_instruction_is(OpPop) {
@@ -495,7 +492,7 @@ impl Compiler {
             Expression::Index(index) => {
                 self.compile_expr(&index.object)?;
                 self.compile_expr(&index.index)?;
-                self.emit_with_span(OpIndex, &vec![], &index.span);
+                self.emit_with_span(OpIndex, &[], &index.span);
             }
             Expression::FUNCTION(f) => {
                 let function_span = f.span.clone();
@@ -512,7 +509,7 @@ impl Compiler {
                     self.replace_last_pop_with_return();
                 }
                 if !(self.last_instruction_is(OpReturnValue)) {
-                    self.emit_with_span(OpReturn, &vec![], &function_span);
+                    self.emit_with_span(OpReturn, &[], &function_span);
                 }
                 let num_locals = self.symbol_table.num_definitions;
                 let free_symbols = self.symbol_table.free_symbols.clone();
@@ -540,7 +537,7 @@ impl Compiler {
                 for arg in fc.arguments.iter() {
                     self.compile_expr(arg)?;
                 }
-                self.emit_with_span(OpCall, &vec![fc.arguments.len()], &fc.span);
+                self.emit_with_span(OpCall, &[fc.arguments.len()], &fc.span);
             }
             Expression::This(this) => {
                 let symbol = self
@@ -552,7 +549,7 @@ impl Compiler {
             Expression::Property(property) => {
                 self.compile_expr(&property.object)?;
                 let name = self.add_constant(Object::String(property.property.name.clone()));
-                self.emit_with_span(OpGetProperty, &vec![name], &property.span);
+                self.emit_with_span(OpGetProperty, &[name], &property.span);
             }
             Expression::New(new_expression) => {
                 let symbol = self
@@ -565,11 +562,7 @@ impl Compiler {
                 for argument in &new_expression.arguments {
                     self.compile_expr(argument)?;
                 }
-                self.emit_with_span(
-                    OpNew,
-                    &vec![new_expression.arguments.len()],
-                    &new_expression.span,
-                );
+                self.emit_with_span(OpNew, &[new_expression.arguments.len()], &new_expression.span);
             }
         }
 
@@ -579,19 +572,19 @@ impl Compiler {
     fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) {
         match symbol.scope {
             SymbolScope::Global => {
-                self.emit_with_span(OpGetGlobal, &vec![symbol.index], span);
+                self.emit_with_span(OpGetGlobal, &[symbol.index], span);
             }
             SymbolScope::LOCAL => {
-                self.emit_with_span(OpGetLocal, &vec![symbol.index], span);
+                self.emit_with_span(OpGetLocal, &[symbol.index], span);
             }
             SymbolScope::Builtin => {
-                self.emit_with_span(OpGetBuiltin, &vec![symbol.index], span);
+                self.emit_with_span(OpGetBuiltin, &[symbol.index], span);
             }
             SymbolScope::Free => {
-                self.emit_with_span(OpGetFree, &vec![symbol.index], span);
+                self.emit_with_span(OpGetFree, &[symbol.index], span);
             }
             SymbolScope::Function => {
-                self.emit_with_span(OpCurrentClosure, &vec![], span);
+                self.emit_with_span(OpCurrentClosure, &[], span);
             }
         }
     }
@@ -610,7 +603,7 @@ impl Compiler {
         return self.constants.len() - 1;
     }
 
-    pub fn emit(&mut self, op: Opcode, operands: &Vec<usize>) -> usize {
+    pub fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
         let ins = make_instructions(op, operands);
         let pos = self.add_instructions(&ins);
         self.set_last_instruction(op, pos);
@@ -618,7 +611,7 @@ impl Compiler {
         return pos;
     }
 
-    pub fn emit_with_span(&mut self, op: Opcode, operands: &Vec<usize>, span: &Span) -> usize {
+    pub fn emit_with_span(&mut self, op: Opcode, operands: &[usize], span: &Span) -> usize {
         let pos = self.emit(op, operands);
         self.add_pc_span(pos, span);
         pos
@@ -655,15 +648,15 @@ impl Compiler {
 
         match method.kind {
             MethodKind::Constructor => {
-                self.emit_with_span(OpGetLocal, &vec![0], &method_span);
-                self.emit_with_span(OpReturnValue, &vec![], &method_span);
+                self.emit_with_span(OpGetLocal, &[0], &method_span);
+                self.emit_with_span(OpReturnValue, &[], &method_span);
             }
             MethodKind::Method => {
                 if self.last_instruction_is(OpPop) {
                     self.replace_last_pop_with_return();
                 }
                 if !self.last_instruction_is(OpReturnValue) {
-                    self.emit_with_span(OpReturn, &vec![], &method_span);
+                    self.emit_with_span(OpReturn, &[], &method_span);
                 }
             }
         }
@@ -685,7 +678,7 @@ impl Compiler {
         let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
         self.function_debug_info_mut()
             .insert(constant_index, scoped_instructions.debug_info);
-        self.emit_with_span(OpClosure, &vec![constant_index, free_symbols.len()], &method_span);
+        self.emit_with_span(OpClosure, &[constant_index, free_symbols.len()], &method_span);
         Ok(())
     }
 
@@ -709,7 +702,7 @@ impl Compiler {
     }
 
     fn last_instruction_is(&self, op: Opcode) -> bool {
-        if self.current_instruction().data.len() == 0 {
+        if self.current_instruction().data.is_empty() {
             return false;
         }
         return self.scopes[self.scope_index].last_instruction.opcode == op;
@@ -738,14 +731,14 @@ impl Compiler {
 
     fn replace_last_pop_with_return(&mut self) {
         let last_pos = self.scopes[self.scope_index].last_instruction.position;
-        self.replace_instruction(last_pos, &make_instructions(OpReturnValue, &vec![]));
+        self.replace_instruction(last_pos, &make_instructions(OpReturnValue, &[]));
         self.scopes[self.scope_index].last_instruction.opcode = OpReturnValue;
     }
 
     fn change_operand(&mut self, pos: usize, operand: usize) {
         let op = Opcode::from_repr(self.current_instruction().data[pos])
             .expect("compiler emitted an unknown opcode");
-        let ins = make_instructions(op, &vec![operand]);
+        let ins = make_instructions(op, &[operand]);
         self.replace_instruction(pos, &ins);
     }
 

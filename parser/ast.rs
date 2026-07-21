@@ -29,6 +29,12 @@ pub struct Program {
     pub span: Span,
 }
 
+impl Default for Program {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Program {
     pub fn new() -> Self {
         Program {
@@ -466,7 +472,7 @@ impl fmt::Display for Literal {
     }
 }
 
-fn format_statements(statements: &Vec<Statement>) -> String {
+fn format_statements(statements: &[Statement]) -> String {
     return statements
         .iter()
         .map(|stmt| stmt.to_string())
@@ -474,7 +480,7 @@ fn format_statements(statements: &Vec<Statement>) -> String {
         .join("");
 }
 
-fn format_expressions(exprs: &Vec<Expression>) -> String {
+fn format_expressions(exprs: &[Expression]) -> String {
     return exprs
         .iter()
         .map(|stmt| stmt.to_string())

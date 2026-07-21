@@ -647,7 +647,11 @@ mod tests {
                 .find(|decision| decision.object_id == root.object_id)
                 .is_none_or(|decision| decision.final_fate == FinalFate::Retained));
         }
-        let named_ids: Vec<_> = report.global_roots.iter().map(|root| root.object_id).collect();
+        let named_ids: Vec<_> = report
+            .global_roots
+            .iter()
+            .map(|root| root.object_id)
+            .collect();
         let freed_instances = report
             .phases
             .trial_deletion

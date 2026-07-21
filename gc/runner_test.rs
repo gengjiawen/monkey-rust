@@ -80,7 +80,7 @@ fn hostile_bytecode(instructions: Vec<u8>, constants: Vec<Rc<Object>>) -> Byteco
 /// L3 checks must turn it into runtime errors, never panics.
 #[test]
 fn structurally_valid_hostile_bytecode_errors_instead_of_panicking() {
-    let cases: Vec<(&str, Vec<u8>, Vec<Rc<Object>>)> = vec![
+    let cases = vec![
         ("lone OpPop underflows the stack", vec![Opcode::OpPop as u8], vec![]),
         ("OpGetFree reads outside the closure", vec![Opcode::OpGetFree as u8, 0], vec![]),
         (

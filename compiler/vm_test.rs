@@ -19,7 +19,7 @@ pub fn run_vm_tests(tests: Vec<VmTestCase>) {
         vm.run();
         let got = vm.last_popped_stack_elm().unwrap();
         let expected_argument = t.expected;
-        test_constants(&vec![expected_argument], &vec![got]);
+        test_constants(&[expected_argument], &vec![got]);
     }
 }
 
@@ -365,6 +365,7 @@ mod tests {
 
     #[test]
     fn test_hash() {
+        #[allow(clippy::mutable_key_type)]
         fn map_vec_to_object(vec: Vec<(i64, i64)>) -> Object {
             let hash = vec.iter().fold(HashMap::new(), |mut acc, (k, v)| {
                 acc.insert(Rc::new(Object::Integer(*k)), Rc::new(Object::Integer(*v)));

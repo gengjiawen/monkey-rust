@@ -113,15 +113,12 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::ASSIGN)?;
         self.next_token();
 
-        let mut value = self.parse_expression(Precedence::LOWEST)?.0;
+        let mut value = self.parse_expression(Precedence::Lowest)?.0;
         if self.peek_token_is(&TokenKind::ASSIGN) {
             return Err("property assignment is only allowed as a statement".to_string());
         }
-        match value {
-            Expression::FUNCTION(ref mut f) => {
-                f.name = identifier_name;
-            }
-            _ => {}
+        if let Expression::FUNCTION(ref mut f) = value {
+            f.name = identifier_name;
         }
 
         if self.peek_token_is(&TokenKind::SEMICOLON) {
@@ -144,7 +141,7 @@ impl<'a> Parser<'a> {
         let start = self.current_token.span.start;
         self.next_token();
 
-        let value = self.parse_expression(Precedence::LOWEST)?.0;
+        let value = self.parse_expression(Precedence::Lowest)?.0;
 
         if self.peek_token_is(&TokenKind::ASSIGN) {
             return Err("property assignment is only allowed as a statement".to_string());
@@ -165,7 +162,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
-        let (expr, cover_span) = self.parse_expression(Precedence::LOWEST)?;
+        let (expr, cover_span) = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token_is(&TokenKind::ASSIGN) {
             let property_expression = match expr {
@@ -175,7 +172,7 @@ impl<'a> Parser<'a> {
 
             self.next_token();
             self.next_token();
-            let (value, value_span) = self.parse_expression(Precedence::LOWEST)?;
+            let (value, value_span) = self.parse_expression(Precedence::Lowest)?;
             if self.peek_token_is(&TokenKind::ASSIGN) {
                 return Err("chained property assignment is not supported".to_string());
             }
@@ -274,7 +271,7 @@ impl<'a> Parser<'a> {
                 let start = self.current_token.span.start;
                 let prefix_op = self.current_token.clone();
                 self.next_token();
-                let (expr, span) = self.parse_expression(Precedence::PREFIX)?;
+                let (expr, span) = self.parse_expression(Precedence::Prefix)?;
                 let expression_span = Span {
                     start,
                     end: span.end,
@@ -291,7 +288,7 @@ impl<'a> Parser<'a> {
             TokenKind::LPAREN => {
                 let start = self.current_token.span.start;
                 self.next_token();
-                let expr = self.parse_expression(Precedence::LOWEST)?.0;
+                let expr = self.parse_expression(Precedence::Lowest)?.0;
                 self.expect_peek(&TokenKind::RPAREN)?;
                 let span = Span {
                     start,
@@ -400,7 +397,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::LPAREN)?;
         self.next_token();
 
-        let condition = self.parse_expression(Precedence::LOWEST)?.0;
+        let condition = self.parse_expression(Precedence::Lowest)?.0;
         self.expect_peek(&TokenKind::RPAREN)?;
         self.expect_peek(&TokenKind::LBRACE)?;
 
@@ -574,12 +571,12 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        expr_list.push(self.parse_expression(Precedence::LOWEST)?.0);
+        expr_list.push(self.parse_expression(Precedence::Lowest)?.0);
 
         while self.peek_token_is(&TokenKind::COMMA) {
             self.next_token();
             self.next_token();
-            expr_list.push(self.parse_expression(Precedence::LOWEST)?.0);
+            expr_list.push(self.parse_expression(Precedence::Lowest)?.0);
         }
 
         self.expect_peek(end)?;
@@ -600,7 +597,7 @@ impl<'a> Parser<'a> {
         start: usize,
     ) -> Result<(Expression, Span), ParseError> {
         self.next_token();
-        let index = self.parse_expression(Precedence::LOWEST)?.0;
+        let index = self.parse_expression(Precedence::Lowest)?.0;
 
         self.expect_peek(&TokenKind::RBRACKET)?;
 
@@ -761,12 +758,12 @@ impl<'a> Parser<'a> {
         while !self.peek_token_is(&TokenKind::RBRACE) {
             self.next_token();
 
-            let key = self.parse_expression(Precedence::LOWEST)?.0;
+            let key = self.parse_expression(Precedence::Lowest)?.0;
 
             self.expect_peek(&TokenKind::COLON)?;
 
             self.next_token();
-            let value = self.parse_expression(Precedence::LOWEST)?.0;
+            let value = self.parse_expression(Precedence::Lowest)?.0;
 
             map.push((key, value));
 

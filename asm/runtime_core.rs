@@ -618,7 +618,7 @@ pub fn bang(value: Value) -> Value {
 }
 
 /// Hash entries in canonical order: `(key type rank, canonical key bytes)`.
-fn sorted_hash_entries<'a>(entries: &'a HashMap<HashKey, Value>) -> Vec<(&'a HashKey, Value)> {
+fn sorted_hash_entries(entries: &HashMap<HashKey, Value>) -> Vec<(&HashKey, Value)> {
     let mut sorted: Vec<(&HashKey, Value)> =
         entries.iter().map(|(key, value)| (key, *value)).collect();
     sorted.sort_by(|(a, _), (b, _)| {
@@ -782,6 +782,12 @@ pub trait OutputSink {
 /// Test/simulator sink collecting raw stdout bytes.
 pub struct BufferSink {
     pub bytes: Vec<u8>,
+}
+
+impl Default for BufferSink {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BufferSink {
