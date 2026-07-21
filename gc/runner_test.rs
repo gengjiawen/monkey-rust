@@ -6,7 +6,7 @@ use compiler::op_code::{Instructions, Opcode};
 use compiler::snapshot::{read_bytecode, write_bytecode};
 use object::Object;
 
-use crate::runner::{compile_source, run_bytecode};
+use crate::runner::{compile_source, run_bytecode, run_bytecode_with_output};
 
 /// Representative programs for direct-vs-snapshot equivalence (design doc
 /// §8): closure capture, recursion, class/instance, array/hash plus
@@ -62,6 +62,14 @@ fn instruction_budget_is_enforced() {
     let source = "let fib = fn(n) { if (n < 2) { n } else { fib(n - 1) + fib(n - 2) } }; fib(30)";
     let error = run_bytecode(compile_source(source).unwrap(), 10).unwrap_err();
     assert!(error.message.contains("instruction limit exceeded"), "got: {}", error.message);
+}
+
+#[test]
+fn captured_output_survives_a_later_runtime_error() {
+    let bytecode = compile_source(r#"puts("one", 2); 1 / 0"#).unwrap();
+    let (result, stdout) = run_bytecode_with_output(bytecode, usize::MAX);
+    assert_eq!(stdout, "one\n2\n");
+    assert_eq!(result.unwrap_err().kind.as_str(), "arithmetic");
 }
 
 fn hostile_bytecode(instructions: Vec<u8>, constants: Vec<Rc<Object>>) -> Bytecode {

@@ -612,7 +612,13 @@ pub fn export_object(heap: &GcHeap, reference: GcRef) -> Object {
     try_export_object(heap, reference).expect("value cannot be exported")
 }
 
-pub fn call_builtin(heap: &mut GcHeap, builtin: BuiltinId, args: &[GcRef], null: GcRef) -> GcRef {
+pub fn call_builtin(
+    heap: &mut GcHeap,
+    builtin: BuiltinId,
+    args: &[GcRef],
+    null: GcRef,
+    mut output: Option<&mut String>,
+) -> GcRef {
     match builtin {
         BuiltinId::Len => {
             if args.len() != 1 {
@@ -635,7 +641,12 @@ pub fn call_builtin(heap: &mut GcHeap, builtin: BuiltinId, args: &[GcRef], null:
         }
         BuiltinId::Puts => {
             for argument in args {
-                println!("{}", value_to_string(heap, *argument));
+                let rendered = value_to_string(heap, *argument);
+                if let Some(output) = output.as_deref_mut() {
+                    writeln!(output, "{}", rendered).expect("writing to a String cannot fail");
+                } else {
+                    println!("{}", rendered);
+                }
             }
             heap.dup(null)
         }

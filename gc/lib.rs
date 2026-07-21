@@ -32,12 +32,12 @@ pub use report::{
     GcStatsBundle, GlobalRoot, HashKeyKind, HeapSnapshot, ObjectDecision, RestorationWitness,
     ScanStats, TrialDecision, TrialDeletionStats, ValueKindCounts, VisitedEdge,
 };
-pub use runner::{compile_source, run_bytecode};
+pub use runner::{compile_source, run_bytecode, run_bytecode_with_output};
 pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{
     export_object, import_object, try_export_object, value_to_string, GcClosure, Value, ValueKind,
 };
-pub use vm::{GcRuntimeError, GcVM, DEFAULT_INSTRUCTION_BUDGET};
+pub use vm::{GcRuntimeError, GcRuntimeErrorKind, GcVM, DEFAULT_INSTRUCTION_BUDGET};
 
 use compiler::compiler::{Bytecode, Compiler};
 use object::Object;
@@ -64,6 +64,7 @@ pub struct GcRunSuccess {
 #[serde(rename_all = "camelCase")]
 pub struct GcRunError {
     pub stage: GcRunStage,
+    pub kind: String,
     pub message: String,
     pub span: Option<Span>,
 }
@@ -96,6 +97,7 @@ pub fn run_source_with_report(
 ) -> Result<GcRunSuccess, GcRunError> {
     let program = parser::parse(source).map_err(|errors| GcRunError {
         stage: GcRunStage::Parse,
+        kind: "syntax".to_string(),
         message: errors
             .first()
             .cloned()
@@ -105,6 +107,7 @@ pub fn run_source_with_report(
     let mut compiler = Compiler::new();
     let bytecode = compiler.compile(&program).map_err(|message| GcRunError {
         stage: GcRunStage::Compile,
+        kind: "compile".to_string(),
         message,
         span: None,
     })?;
@@ -115,6 +118,7 @@ pub fn run_source_with_report(
     vm.run_with_budget(instruction_budget)
         .map_err(|error| GcRunError {
             stage: GcRunStage::Runtime,
+            kind: error.kind.as_str().to_string(),
             message: error.message,
             span: error.span,
         })?;

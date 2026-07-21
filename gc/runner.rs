@@ -33,3 +33,18 @@ pub fn run_bytecode(
     vm.run_with_budget(instruction_budget)?;
     Ok(vm.last_result_string())
 }
+
+/// Execute bytecode on a fresh VM while capturing all `puts`/`print` output.
+/// The output is returned even when execution fails after producing it.
+pub fn run_bytecode_with_output(
+    bytecode: Bytecode,
+    instruction_budget: usize,
+) -> (Result<String, GcRuntimeError>, String) {
+    let mut vm = GcVM::new(bytecode);
+    vm.set_capture_output(true);
+    let result = vm
+        .run_with_budget(instruction_budget)
+        .map(|()| vm.last_result_string());
+    let output = vm.take_output();
+    (result, output)
+}

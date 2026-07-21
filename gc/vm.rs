@@ -28,8 +28,89 @@ pub const DEFAULT_INSTRUCTION_BUDGET: usize = 100_000;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcRuntimeError {
+    pub kind: GcRuntimeErrorKind,
     pub message: String,
     pub span: Option<Span>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GcRuntimeErrorKind {
+    Arithmetic,
+    Call,
+    ExecutionLimit,
+    Index,
+    Property,
+    Stack,
+    Type,
+    InvalidBytecode,
+    Runtime,
+}
+
+impl GcRuntimeErrorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Arithmetic => "arithmetic",
+            Self::Call => "call",
+            Self::ExecutionLimit => "executionLimit",
+            Self::Index => "index",
+            Self::Property => "property",
+            Self::Stack => "stack",
+            Self::Type => "type",
+            Self::InvalidBytecode => "invalidBytecode",
+            Self::Runtime => "runtime",
+        }
+    }
+}
+
+fn classify_runtime_error(message: &str) -> GcRuntimeErrorKind {
+    if message.starts_with("instruction limit exceeded") {
+        GcRuntimeErrorKind::ExecutionLimit
+    } else if matches!(message, "division by zero" | "integer overflow in division") {
+        GcRuntimeErrorKind::Arithmetic
+    } else if matches!(message, "stack underflow" | "stack limit exceeded" | "frame limit exceeded")
+    {
+        GcRuntimeErrorKind::Stack
+    } else if message.starts_with("unknown opcode")
+        || message.starts_with("builtin index")
+        || message.starts_with("local index")
+        || message.starts_with("free variable index")
+        || message.starts_with("constant index")
+        || message.starts_with("closure without")
+        || message.starts_with("cannot build closure over")
+        || message.starts_with("expected string constant")
+        || message.starts_with("cannot install method on")
+        || message == "instance has invalid class"
+        || message == "constructor is not a closure"
+        || message == "constructor closure has invalid function"
+        || message == "bound method is not a closure"
+        || message == "method closure has invalid function"
+    {
+        GcRuntimeErrorKind::InvalidBytecode
+    } else if message.starts_with("unsupported index operation")
+        || message.starts_with("unsupported hash index key")
+        || message.starts_with("hash key must be hashable")
+    {
+        GcRuntimeErrorKind::Index
+    } else if message.starts_with("cannot read property")
+        || message.starts_with("cannot set property")
+        || message.starts_with("property '")
+    {
+        GcRuntimeErrorKind::Property
+    } else if message.starts_with("cannot call")
+        || message.starts_with("cannot construct")
+        || message.starts_with("wrong number of arguments")
+        || (message.starts_with("class ") && message.ends_with("must be constructed with new"))
+    {
+        GcRuntimeErrorKind::Call
+    } else if message.starts_with("unsupported binary operation")
+        || message.starts_with("unsupported comparison")
+        || message.starts_with("unsupported type for negation")
+    {
+        GcRuntimeErrorKind::Type
+    } else {
+        GcRuntimeErrorKind::Runtime
+    }
 }
 
 enum CalleeKind {
@@ -53,6 +134,7 @@ pub struct GcVM {
     last_popped: GcRef,
     main_debug_info: DebugInfo,
     function_debug_info: HashMap<GcRef, DebugInfo>,
+    output: Option<String>,
 }
 
 impl GcVM {
@@ -129,6 +211,7 @@ impl GcVM {
             last_popped,
             main_debug_info,
             function_debug_info,
+            output: None,
         }
     }
 
@@ -215,6 +298,15 @@ impl GcVM {
         &mut self.heap
     }
 
+    /// Capture `puts`/`print` output in-memory instead of writing to stdout.
+    pub fn set_capture_output(&mut self, capture: bool) {
+        self.output = capture.then(String::new);
+    }
+
+    pub fn take_output(&mut self) -> String {
+        self.output.take().unwrap_or_default()
+    }
+
     /// Record which global slot each source-level global name refers to, so
     /// reports can state the named root set (see `GlobalRoot`).
     pub fn set_global_names(&mut self, names: Vec<(String, usize)>) {
@@ -273,6 +365,7 @@ impl GcVM {
     }
 
     fn runtime_error(&self, message: impl Into<String>) -> GcRuntimeError {
+        let message = message.into();
         let frame = &self.frames[self.frame_index - 1];
         let debug_info = if self.frame_index == 1 {
             Some(&self.main_debug_info)
@@ -285,7 +378,8 @@ impl GcVM {
                 .and_then(|pc| debug_info.span_for_pc(pc).cloned())
         });
         GcRuntimeError {
-            message: message.into(),
+            kind: classify_runtime_error(&message),
+            message,
             span,
         }
     }
@@ -638,9 +732,9 @@ impl GcVM {
         let right_value = get_value(&self.heap, right).clone();
         let result = match (&left_value, &right_value) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
-                Opcode::OpAdd => Ok(Value::Integer(l + r)),
-                Opcode::OpSub => Ok(Value::Integer(l - r)),
-                Opcode::OpMul => Ok(Value::Integer(l * r)),
+                Opcode::OpAdd => Ok(Value::Integer(l.wrapping_add(*r))),
+                Opcode::OpSub => Ok(Value::Integer(l.wrapping_sub(*r))),
+                Opcode::OpMul => Ok(Value::Integer(l.wrapping_mul(*r))),
                 Opcode::OpDiv if *r != 0 => l
                     .checked_div(*r)
                     .map(Value::Integer)
@@ -720,7 +814,7 @@ impl GcVM {
     fn execute_minus_operation(&mut self) -> Result<(), GcRuntimeError> {
         let operand = self.pop_owned()?;
         let negated = match get_value(&self.heap, operand) {
-            Value::Integer(value) => Some(-value),
+            Value::Integer(value) => Some(value.wrapping_neg()),
             _ => None,
         };
         let message = negated.is_none().then(|| {
@@ -865,7 +959,7 @@ impl GcVM {
     fn call_builtin(&mut self, builtin: BuiltinId, num_args: usize) -> Result<(), GcRuntimeError> {
         let base = self.sp - num_args - 1;
         let args = self.stack[self.sp - num_args..self.sp].to_vec();
-        let result = call_builtin(&mut self.heap, builtin, &args, self.null);
+        let result = call_builtin(&mut self.heap, builtin, &args, self.null, self.output.as_mut());
         self.clear_stack_range(base, self.sp);
         self.sp = base;
         self.push_raw(result)

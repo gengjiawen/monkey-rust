@@ -79,6 +79,22 @@ mod tests {
                 expected: Object::Integer(60),
             },
             VmTestCase {
+                input: "9223372036854775807 + 1",
+                expected: Object::Integer(i64::MIN),
+            },
+            VmTestCase {
+                input: "(0 - 9223372036854775807 - 1) - 1",
+                expected: Object::Integer(i64::MAX),
+            },
+            VmTestCase {
+                input: "9223372036854775807 * 2",
+                expected: Object::Integer(-2),
+            },
+            VmTestCase {
+                input: "-(0 - 9223372036854775807 - 1)",
+                expected: Object::Integer(i64::MIN),
+            },
+            VmTestCase {
                 input: "5 + 5 + 5 + 5 - 10",
                 expected: Object::Integer(10),
             },
@@ -965,6 +981,7 @@ mod tests {
 
         let runtime_error = crate::run_source_with_report("1.value;", 100).unwrap_err();
         assert_eq!(runtime_error.stage, crate::GcRunStage::Runtime);
+        assert_eq!(runtime_error.kind, "property");
         assert!(runtime_error
             .message
             .contains("cannot read property 'value'"));
@@ -980,7 +997,11 @@ mod tests {
             crate::run_source_with_report("let forever = fn() { forever(); }; forever();", 10)
                 .unwrap_err();
         assert_eq!(limit_error.stage, crate::GcRunStage::Runtime);
+        assert_eq!(limit_error.kind, "executionLimit");
         assert!(limit_error.message.contains("instruction limit exceeded"));
+
+        let type_error = crate::run_source_with_report(r#""division" - 1;"#, 100).unwrap_err();
+        assert_eq!(type_error.kind, "type");
     }
 
     #[test]
