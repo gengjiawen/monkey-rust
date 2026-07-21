@@ -37,7 +37,7 @@ export function Header() {
           </Heading>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <ThemeToggle />
           <a
             href={GITHUB_URL}
