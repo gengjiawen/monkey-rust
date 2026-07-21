@@ -31,6 +31,14 @@ const programs = [
   'let make = fn(longArg) { longArg }; make;',
   // Pins that a removed top-level trailing let never contributed to the result.
   '42; let tail = 5;',
+  // Constant propagation folds this to `print(2);` without observable change.
+  'let a = 1 + 1;\nlet b= a + 1;\nprint(a)',
+  // A conditional let's slot may stay unset; propagation must leave it alone.
+  'let v = 1; if (1 > 2) { let v = 2; }; puts(v);',
+  // A closure keeps observing the pre-redeclaration slot.
+  'let v = 1; let g = fn() { v }; let v = 2; puts(g()); v;',
+  // `new` requires its callee to stay an identifier reference.
+  'let a = 1; let b = new a(); b;',
 ]
 
 describe('GC VM differential semantics', () => {

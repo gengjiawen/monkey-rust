@@ -1,6 +1,7 @@
 import { eliminateDeadLets, foldConstants } from './fold'
 import { mangle, type MangleOptions } from './mangle'
 import { printProgram } from './printer'
+import { propagateConstants } from './propagate'
 import type { Program } from './types'
 
 export interface MinifyOptions {
@@ -21,7 +22,12 @@ export function minifyWithParser(
 ): MinifyResult {
   const program = parseProgramWithParser(parseLossless, source)
   if (options.fold !== false) {
+    // Each propagation replaces at least one identifier with a literal and
+    // never introduces new identifiers, so the loop terminates.
     foldConstants(program)
+    while (propagateConstants(program)) {
+      foldConstants(program)
+    }
     eliminateDeadLets(program)
   }
   if (options.mangle !== false) {

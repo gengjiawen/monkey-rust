@@ -29,6 +29,10 @@ export interface Binding {
   kind: BindingKind
   originalName: string
   preserve: boolean
+  // True when the binding's `let` sits inside an `if` arm: its slot is
+  // written only on executions that take the branch, so a later reference
+  // may still observe the unset slot.
+  conditional: boolean
   references: Identifier[]
   identifiers: Identifier[]
   lets: LetStatement[]
@@ -53,6 +57,7 @@ interface Scope {
 interface Context {
   callable: 'constructor' | 'function' | 'method' | null
   receiverAvailable: boolean
+  conditional: boolean
 }
 
 export function analyzeScopes(program: Program): ScopeAnalysis {
@@ -72,6 +77,7 @@ export function analyzeScopes(program: Program): ScopeAnalysis {
   analyzeStatements(program.body, root, analysis, {
     callable: null,
     receiverAvailable: false,
+    conditional: false,
   })
   return analysis
 }
@@ -87,6 +93,7 @@ function createBinding(
     kind,
     originalName: name,
     preserve,
+    conditional: false,
     references: [],
     identifiers: [],
     lets: [],
@@ -143,6 +150,7 @@ function analyzeStatement(
         'let',
         false
       )
+      binding.conditional = context.conditional
       binding.lets.push(statement)
       analysis.letBindings.set(statement, binding)
       analyzeExpression(statement.expr, scope, analysis, context, binding)
@@ -199,6 +207,7 @@ function analyzeMethod(
   analyzeStatements(method.body.body, scope, analysis, {
     callable: method.kind === 'Constructor' ? 'constructor' : 'method',
     receiverAvailable: true,
+    conditional: false,
   })
 }
 
@@ -221,9 +230,12 @@ function analyzeFunction(
     binding.identifiers.push(parameter)
     define(scope, binding)
   }
+  // A body's own top-level `let`s run on every call, so conditionality does
+  // not carry across the callable boundary.
   analyzeStatements(declaration.body.body, scope, analysis, {
     callable: 'function',
     receiverAvailable: context.receiverAvailable,
+    conditional: false,
   })
 }
 
@@ -276,15 +288,17 @@ function analyzeExpression(
       analyzeExpression(expression.left, scope, analysis, context)
       analyzeExpression(expression.right, scope, analysis, context)
       return
-    case 'IF':
+    case 'IF': {
       // Branches intentionally share this symbol table and are visited in the
       // compiler's source order.
       analyzeExpression(expression.condition, scope, analysis, context)
-      analyzeStatements(expression.consequent.body, scope, analysis, context)
+      const branch = { ...context, conditional: true }
+      analyzeStatements(expression.consequent.body, scope, analysis, branch)
       if (expression.alternate) {
-        analyzeStatements(expression.alternate.body, scope, analysis, context)
+        analyzeStatements(expression.alternate.body, scope, analysis, branch)
       }
       return
+    }
     case 'FunctionDeclaration':
       analyzeFunction(expression, scope, analysis, context, directLetBinding)
       return

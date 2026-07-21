@@ -8,7 +8,7 @@ compact Monkey source.
 import { minify } from '@gengjiawen/monkey-minifier'
 
 const { code } = minify('let longName = 40 + 2; longName;')
-// let a=42;a;
+// 42;
 ```
 
 `mangle` and `fold` default to `true`. Disable either pass when only compact

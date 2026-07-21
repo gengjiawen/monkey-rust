@@ -81,3 +81,42 @@ describe('constant folding and conservative DCE', () => {
     expect(optimize('let value = [][0];')).toBe('let value=[][0];')
   })
 })
+
+describe('constant propagation', () => {
+  const optimize = (source: string) =>
+    minify(source, { fold: true, mangle: false }).code
+
+  it('inlines literal bindings through folding to a fixed point', () => {
+    expect(optimize('let a = 1 + 1;\nlet b= a + 1;\nprint(a)')).toBe(
+      'print(2);'
+    )
+    expect(minify('let a = 1 + 1;\nlet b= a + 1;\nprint(a)').code).toBe(
+      'print(2);'
+    )
+    expect(optimize('let a = 2; let b = a; let c = b; c;')).toBe('2;')
+  })
+
+  it('propagates every literal shape', () => {
+    expect(optimize('let n = 0 - 5; n;')).toBe('-5;')
+    expect(optimize('let t = true; t == false;')).toBe('false;')
+    expect(optimize('let s = "hello"; puts(s);')).toBe('puts("hello");')
+  })
+
+  it('keeps a binding when inlined copies would outweigh it', () => {
+    expect(optimize('let s = "hello"; puts(s); puts(s); puts(s);')).toBe(
+      'let s="hello";puts(s);puts(s);puts(s);'
+    )
+  })
+
+  it('leaves conditional lets alone: their slot may never be written', () => {
+    expect(optimize('let v = 1; if (1 > 2) { let v = 2; }; puts(v);')).toBe(
+      'if(false){let v=2;};puts(v);'
+    )
+  })
+
+  it('propagates across a redeclaration: each slot is written once', () => {
+    expect(optimize('let v = 1; let g = fn() { v }; let v = 2; g() + v;')).toBe(
+      'let g=fn(){1;};g()+2;'
+    )
+  })
+})
