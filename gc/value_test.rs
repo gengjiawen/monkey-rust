@@ -7,8 +7,8 @@ mod tests {
     use object::{CompiledFunction, Object};
 
     use crate::value::{
-        alloc_value, export_object, get_value, get_value_mut, import_object, GcClass, GcInstance,
-        HashKey, Value, ValueCell, ValueKind,
+        alloc_value, call_builtin, export_object, get_value, get_value_mut, import_object, GcClass,
+        GcInstance, HashKey, Value, ValueCell, ValueKind,
     };
     use crate::GcHeap;
 
@@ -43,6 +43,16 @@ mod tests {
         let original = Object::Integer(42);
         let reference = import_object(&mut heap, &original);
         assert_eq!(export_object(&heap, reference), original);
+    }
+
+    #[test]
+    fn legacy_call_builtin_signature_still_works() {
+        let mut heap = GcHeap::new();
+        let null = alloc_value(&mut heap, Value::Null);
+        let string = alloc_value(&mut heap, Value::String("monkey".to_string()));
+        let result = call_builtin(&mut heap, BuiltinId::Len, &[string], null);
+
+        assert_eq!(get_value(&heap, result), &Value::Integer(6));
     }
 
     #[test]

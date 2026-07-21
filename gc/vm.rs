@@ -14,7 +14,7 @@ use crate::report::{
     GlobalRoot,
 };
 use crate::value::{
-    alloc_value, call_builtin, export_object, get_value, get_value_mut, import_object,
+    alloc_value, call_builtin_with_output, export_object, get_value, get_value_mut, import_object,
     try_export_object, value_to_string, GcBoundMethod, GcClass, GcClosure, GcInstance, HashKey,
     Value,
 };
@@ -25,11 +25,58 @@ pub const GLOBAL_SIZE: usize = 65536;
 const MAX_FRAMES: usize = 1024;
 pub const DEFAULT_INSTRUCTION_BUDGET: usize = 100_000;
 
+/// Runtime failure returned by the established VM and runner APIs.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcRuntimeError {
     pub message: String,
     pub span: Option<Span>,
+}
+
+/// Runtime failure with a stable, machine-readable category.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GcClassifiedRuntimeError {
+    pub kind: GcRuntimeErrorKind,
+    pub message: String,
+    pub span: Option<Span>,
+}
+
+impl From<GcClassifiedRuntimeError> for GcRuntimeError {
+    fn from(error: GcClassifiedRuntimeError) -> Self {
+        Self {
+            message: error.message,
+            span: error.span,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GcRuntimeErrorKind {
+    Arithmetic,
+    Call,
+    ExecutionLimit,
+    Index,
+    Property,
+    Stack,
+    Type,
+    InvalidBytecode,
+}
+
+impl GcRuntimeErrorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Arithmetic => "arithmetic",
+            Self::Call => "call",
+            Self::ExecutionLimit => "executionLimit",
+            Self::Index => "index",
+            Self::Property => "property",
+            Self::Stack => "stack",
+            Self::Type => "type",
+            Self::InvalidBytecode => "invalidBytecode",
+        }
+    }
 }
 
 enum CalleeKind {
@@ -53,6 +100,7 @@ pub struct GcVM {
     last_popped: GcRef,
     main_debug_info: DebugInfo,
     function_debug_info: HashMap<GcRef, DebugInfo>,
+    output: Option<String>,
 }
 
 impl GcVM {
@@ -129,6 +177,7 @@ impl GcVM {
             last_popped,
             main_debug_info,
             function_debug_info,
+            output: None,
         }
     }
 
@@ -215,6 +264,16 @@ impl GcVM {
         &mut self.heap
     }
 
+    /// Capture `puts`/`print` output in-memory instead of writing to stdout.
+    pub fn set_capture_output(&mut self, capture: bool) {
+        self.output = capture.then(String::new);
+    }
+
+    /// Drain captured output while leaving capture enabled.
+    pub fn take_output(&mut self) -> String {
+        self.output.as_mut().map(std::mem::take).unwrap_or_default()
+    }
+
     /// Record which global slot each source-level global name refers to, so
     /// reports can state the named root set (see `GlobalRoot`).
     pub fn set_global_names(&mut self, names: Vec<(String, usize)>) {
@@ -272,7 +331,13 @@ impl GcVM {
         }
     }
 
-    fn runtime_error(&self, message: impl Into<String>) -> GcRuntimeError {
+    /// Every raise site names its error category directly; a message is never
+    /// parsed to recover one.
+    fn runtime_error(
+        &self,
+        kind: GcRuntimeErrorKind,
+        message: impl Into<String>,
+    ) -> GcClassifiedRuntimeError {
         let frame = &self.frames[self.frame_index - 1];
         let debug_info = if self.frame_index == 1 {
             Some(&self.main_debug_info)
@@ -284,7 +349,8 @@ impl GcVM {
                 .then_some(frame.ip as usize)
                 .and_then(|pc| debug_info.span_for_pc(pc).cloned())
         });
-        GcRuntimeError {
+        GcClassifiedRuntimeError {
+            kind,
             message: message.into(),
             span,
         }
@@ -296,21 +362,34 @@ impl GcVM {
     }
 
     pub fn run_with_budget(&mut self, instruction_budget: usize) -> Result<(), GcRuntimeError> {
+        self.run_with_budget_classified(instruction_budget)
+            .map_err(Into::into)
+    }
+
+    /// Execute with a budget and retain the category assigned at the raise site.
+    pub fn run_with_budget_classified(
+        &mut self,
+        instruction_budget: usize,
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let mut executed = 0;
         while self.current_frame().ip < self.current_frame().instructions.len() as i32 - 1 {
             self.current_frame().ip += 1;
             let ip = self.current_frame().ip as usize;
             if executed >= instruction_budget {
-                return Err(self.runtime_error(format!(
-                    "instruction limit exceeded (budget: {})",
-                    instruction_budget
-                )));
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::ExecutionLimit,
+                    format!("instruction limit exceeded (budget: {})", instruction_budget),
+                ));
             }
             executed += 1;
             let ins = self.current_frame().instructions.clone();
             let op = *ins.get(ip).unwrap();
-            let opcode = Opcode::from_repr(op)
-                .ok_or_else(|| self.runtime_error(format!("unknown opcode 0x{:02x}", op)))?;
+            let opcode = Opcode::from_repr(op).ok_or_else(|| {
+                self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    format!("unknown opcode 0x{:02x}", op),
+                )
+            })?;
 
             match opcode {
                 Opcode::OpConst => {
@@ -454,7 +533,10 @@ impl GcVM {
                     let built_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let definition = BuiltIns.get(built_index).ok_or_else(|| {
-                        self.runtime_error(format!("builtin index {} out of range", built_index))
+                        self.runtime_error(
+                            GcRuntimeErrorKind::InvalidBytecode,
+                            format!("builtin index {} out of range", built_index),
+                        )
                     })?;
                     self.alloc_and_push(Value::Builtin(definition.id))?;
                 }
@@ -469,10 +551,10 @@ impl GcVM {
                     self.current_frame().ip += 1;
                     let free_var = self.current_frame().cl.free.get(free_index).copied();
                     let free_var = free_var.ok_or_else(|| {
-                        self.runtime_error(format!(
-                            "free variable index {} out of range",
-                            free_index
-                        ))
+                        self.runtime_error(
+                            GcRuntimeErrorKind::InvalidBytecode,
+                            format!("free variable index {} out of range", free_index),
+                        )
                     })?;
                     self.dup_and_push(free_var)?;
                 }
@@ -498,7 +580,9 @@ impl GcVM {
                     let method = self.pop_owned()?;
                     if self.sp == 0 {
                         self.heap.free(method);
-                        return Err(self.runtime_error("stack underflow"));
+                        return Err(
+                            self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow")
+                        );
                     }
                     let class = self.stack[self.sp - 1];
                     let result = self.install_method(class, name, method, kind == 1);
@@ -551,19 +635,19 @@ impl GcVM {
         value_to_string(&self.heap, self.last_popped)
     }
 
-    fn alloc_and_push(&mut self, value: Value) -> Result<(), GcRuntimeError> {
+    fn alloc_and_push(&mut self, value: Value) -> Result<(), GcClassifiedRuntimeError> {
         let reference = alloc_value(&mut self.heap, value);
         self.push_raw(reference)
     }
 
-    fn dup_and_push(&mut self, reference: GcRef) -> Result<(), GcRuntimeError> {
+    fn dup_and_push(&mut self, reference: GcRef) -> Result<(), GcClassifiedRuntimeError> {
         let duplicated = self.heap.dup(reference);
         self.push_raw(duplicated)
     }
 
-    fn push_raw(&mut self, value: GcRef) -> Result<(), GcRuntimeError> {
+    fn push_raw(&mut self, value: GcRef) -> Result<(), GcClassifiedRuntimeError> {
         if self.sp >= STACK_SIZE {
-            let error = self.runtime_error("stack limit exceeded");
+            let error = self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded");
             self.heap.free(value);
             return Err(error);
         }
@@ -578,9 +662,9 @@ impl GcVM {
     ///
     /// The caller must either free the returned ref or store it in another
     /// owning location. The vacated stack slot is reset to a null ref.
-    fn pop_owned(&mut self) -> Result<GcRef, GcRuntimeError> {
+    fn pop_owned(&mut self) -> Result<GcRef, GcClassifiedRuntimeError> {
         if self.sp == 0 {
-            return Err(self.runtime_error("stack underflow"));
+            return Err(self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow"));
         }
         self.sp -= 1;
         let value = self.stack[self.sp];
@@ -588,7 +672,7 @@ impl GcVM {
         Ok(value)
     }
 
-    fn pop_discard(&mut self) -> Result<(), GcRuntimeError> {
+    fn pop_discard(&mut self) -> Result<(), GcClassifiedRuntimeError> {
         let value = self.pop_owned()?;
         self.heap.free(self.last_popped);
         self.last_popped = value;
@@ -597,7 +681,7 @@ impl GcVM {
 
     /// Pop the top two owned references (top first). On underflow neither
     /// reference leaks.
-    fn pop_owned_pair(&mut self) -> Result<(GcRef, GcRef), GcRuntimeError> {
+    fn pop_owned_pair(&mut self) -> Result<(GcRef, GcRef), GcClassifiedRuntimeError> {
         let top = self.pop_owned()?;
         match self.pop_owned() {
             Ok(below) => Ok((top, below)),
@@ -610,16 +694,23 @@ impl GcVM {
 
     /// Bounds-checked `sp - count` for opcodes that consume `count` stack
     /// slots.
-    fn stack_base_for(&self, count: usize) -> Result<usize, GcRuntimeError> {
+    fn stack_base_for(&self, count: usize) -> Result<usize, GcClassifiedRuntimeError> {
         self.sp
             .checked_sub(count)
-            .ok_or_else(|| self.runtime_error("stack underflow"))
+            .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow"))
     }
 
-    fn local_slot(&self, base: usize, local_index: usize) -> Result<usize, GcRuntimeError> {
+    fn local_slot(
+        &self,
+        base: usize,
+        local_index: usize,
+    ) -> Result<usize, GcClassifiedRuntimeError> {
         let slot = base + local_index;
         if slot >= STACK_SIZE {
-            return Err(self.runtime_error(format!("local index {} out of range", local_index)));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("local index {} out of range", local_index),
+            ));
         }
         Ok(slot)
     }
@@ -632,40 +723,46 @@ impl GcVM {
         }
     }
 
-    fn execute_binary_operation(&mut self, opcode: Opcode) -> Result<(), GcRuntimeError> {
+    fn execute_binary_operation(&mut self, opcode: Opcode) -> Result<(), GcClassifiedRuntimeError> {
         let (right, left) = self.pop_owned_pair()?;
         let left_value = get_value(&self.heap, left).clone();
         let right_value = get_value(&self.heap, right).clone();
         let result = match (&left_value, &right_value) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
-                Opcode::OpAdd => Ok(Value::Integer(l + r)),
-                Opcode::OpSub => Ok(Value::Integer(l - r)),
-                Opcode::OpMul => Ok(Value::Integer(l * r)),
-                Opcode::OpDiv if *r != 0 => l
-                    .checked_div(*r)
-                    .map(Value::Integer)
-                    .ok_or_else(|| "integer overflow in division".to_string()),
-                Opcode::OpDiv => Err("division by zero".to_string()),
+                Opcode::OpAdd => Ok(Value::Integer(l.wrapping_add(*r))),
+                Opcode::OpSub => Ok(Value::Integer(l.wrapping_sub(*r))),
+                Opcode::OpMul => Ok(Value::Integer(l.wrapping_mul(*r))),
+                Opcode::OpDiv if *r != 0 => {
+                    l.checked_div(*r).map(Value::Integer).ok_or_else(|| {
+                        (GcRuntimeErrorKind::Arithmetic, "integer overflow in division".to_string())
+                    })
+                }
+                Opcode::OpDiv => {
+                    Err((GcRuntimeErrorKind::Arithmetic, "division by zero".to_string()))
+                }
                 _ => unreachable!(),
             },
             (Value::String(l), Value::String(r)) if opcode == Opcode::OpAdd => {
                 Ok(Value::String(l.to_string() + r))
             }
-            _ => Err(format!(
-                "unsupported binary operation for {} and {}",
-                value_to_string(&self.heap, left),
-                value_to_string(&self.heap, right)
+            _ => Err((
+                GcRuntimeErrorKind::Type,
+                format!(
+                    "unsupported binary operation for {} and {}",
+                    value_to_string(&self.heap, left),
+                    value_to_string(&self.heap, right)
+                ),
             )),
         };
         self.heap.free(left);
         self.heap.free(right);
         match result {
             Ok(value) => self.alloc_and_push(value),
-            Err(message) => Err(self.runtime_error(message)),
+            Err((kind, message)) => Err(self.runtime_error(kind, message)),
         }
     }
 
-    fn execute_comparison(&mut self, opcode: Opcode) -> Result<(), GcRuntimeError> {
+    fn execute_comparison(&mut self, opcode: Opcode) -> Result<(), GcClassifiedRuntimeError> {
         let (right, left) = self.pop_owned_pair()?;
         let result = match (get_value(&self.heap, left), get_value(&self.heap, right)) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
@@ -713,14 +810,14 @@ impl GcVM {
         if let Some(result) = result {
             self.alloc_and_push(Value::Boolean(result))
         } else {
-            Err(self.runtime_error(message.unwrap()))
+            Err(self.runtime_error(GcRuntimeErrorKind::Type, message.unwrap()))
         }
     }
 
-    fn execute_minus_operation(&mut self) -> Result<(), GcRuntimeError> {
+    fn execute_minus_operation(&mut self) -> Result<(), GcClassifiedRuntimeError> {
         let operand = self.pop_owned()?;
         let negated = match get_value(&self.heap, operand) {
-            Value::Integer(value) => Some(-value),
+            Value::Integer(value) => Some(value.wrapping_neg()),
             _ => None,
         };
         let message = negated.is_none().then(|| {
@@ -730,11 +827,11 @@ impl GcVM {
         if let Some(negated) = negated {
             self.alloc_and_push(Value::Integer(negated))
         } else {
-            Err(self.runtime_error(message.unwrap()))
+            Err(self.runtime_error(GcRuntimeErrorKind::Type, message.unwrap()))
         }
     }
 
-    fn execute_bang_operation(&mut self) -> Result<(), GcRuntimeError> {
+    fn execute_bang_operation(&mut self) -> Result<(), GcClassifiedRuntimeError> {
         let operand = self.pop_owned()?;
         let result = match get_value(&self.heap, operand) {
             Value::Boolean(l) => !l,
@@ -756,36 +853,50 @@ impl GcVM {
         &mut self,
         start: usize,
         end: usize,
-    ) -> Result<HashMap<HashKey, GcRef>, GcRuntimeError> {
+    ) -> Result<HashMap<HashKey, GcRef>, GcClassifiedRuntimeError> {
         let mut elements = HashMap::new();
         for i in (start..end).step_by(2) {
             let key_ref = self.stack[i];
             let key = HashKey::from_value(get_value(&self.heap, key_ref)).ok_or_else(|| {
-                self.runtime_error(format!(
-                    "hash key must be hashable, got {}",
-                    value_to_string(&self.heap, key_ref)
-                ))
+                self.runtime_error(
+                    GcRuntimeErrorKind::Index,
+                    format!(
+                        "hash key must be hashable, got {}",
+                        value_to_string(&self.heap, key_ref)
+                    ),
+                )
             })?;
             elements.insert(key, self.stack[i + 1]);
         }
         Ok(elements)
     }
 
-    fn execute_index_operation(&mut self, left: GcRef, index: GcRef) -> Result<(), GcRuntimeError> {
+    fn execute_index_operation(
+        &mut self,
+        left: GcRef,
+        index: GcRef,
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let left_value = get_value(&self.heap, left).clone();
         let index_value = get_value(&self.heap, index).clone();
         match (&left_value, &index_value) {
             (Value::Array(array), Value::Integer(i)) => self.execute_array_index(array, *i),
             (Value::Hash(hash), _) => self.execute_hash_index(hash, &index_value),
-            _ => Err(self.runtime_error(format!(
-                "unsupported index operation for {} and {}",
-                value_to_string(&self.heap, left),
-                value_to_string(&self.heap, index)
-            ))),
+            _ => Err(self.runtime_error(
+                GcRuntimeErrorKind::Index,
+                format!(
+                    "unsupported index operation for {} and {}",
+                    value_to_string(&self.heap, left),
+                    value_to_string(&self.heap, index)
+                ),
+            )),
         }
     }
 
-    fn execute_array_index(&mut self, array: &[GcRef], index: i64) -> Result<(), GcRuntimeError> {
+    fn execute_array_index(
+        &mut self,
+        array: &[GcRef],
+        index: i64,
+    ) -> Result<(), GcClassifiedRuntimeError> {
         if index < array.len() as i64 && index >= 0 {
             self.dup_and_push(array[index as usize])
         } else {
@@ -797,9 +908,10 @@ impl GcVM {
         &mut self,
         hash: &HashMap<HashKey, GcRef>,
         index: &Value,
-    ) -> Result<(), GcRuntimeError> {
-        let key = HashKey::from_value(index)
-            .ok_or_else(|| self.runtime_error("unsupported hash index key"))?;
+    ) -> Result<(), GcClassifiedRuntimeError> {
+        let key = HashKey::from_value(index).ok_or_else(|| {
+            self.runtime_error(GcRuntimeErrorKind::Index, "unsupported hash index key")
+        })?;
         match hash.get(&key) {
             Some(value) => self.dup_and_push(*value),
             None => self.dup_and_push(self.null),
@@ -810,9 +922,9 @@ impl GcVM {
         &mut self.frames[self.frame_index - 1]
     }
 
-    fn push_frame(&mut self, frame: Frame) -> Result<(), GcRuntimeError> {
+    fn push_frame(&mut self, frame: Frame) -> Result<(), GcClassifiedRuntimeError> {
         if self.frame_index >= MAX_FRAMES {
-            return Err(self.runtime_error("frame limit exceeded"));
+            return Err(self.runtime_error(GcRuntimeErrorKind::Stack, "frame limit exceeded"));
         }
         self.frames[self.frame_index] = frame;
         self.frame_index += 1;
@@ -824,30 +936,45 @@ impl GcVM {
         self.frames[self.frame_index].clone()
     }
 
-    fn execute_call(&mut self, num_args: usize) -> Result<(), GcRuntimeError> {
+    fn execute_call(&mut self, num_args: usize) -> Result<(), GcClassifiedRuntimeError> {
         let callee_slot = self.stack_base_for(num_args + 1)?;
         let callee = self.stack[callee_slot];
         match callee_kind(&self.heap, callee) {
             CalleeKind::Closure(closure) => self.call_closure(closure, num_args),
             CalleeKind::Builtin(builtin) => self.call_builtin(builtin, num_args),
             CalleeKind::BoundMethod(bound) => self.call_bound_method(bound, num_args),
-            CalleeKind::Class(name) => {
-                Err(self.runtime_error(format!("class {} must be constructed with new", name)))
+            CalleeKind::Class(name) => Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!("class {} must be constructed with new", name),
+            )),
+            CalleeKind::Other(value) => {
+                Err(self.runtime_error(GcRuntimeErrorKind::Call, format!("cannot call {}", value)))
             }
-            CalleeKind::Other(value) => Err(self.runtime_error(format!("cannot call {}", value))),
         }
     }
 
-    fn call_closure(&mut self, closure: GcClosure, num_args: usize) -> Result<(), GcRuntimeError> {
+    fn call_closure(
+        &mut self,
+        closure: GcClosure,
+        num_args: usize,
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let compiled = match get_value(&self.heap, closure.func) {
             Value::CompiledFunction(f) => f.clone(),
-            _ => return Err(self.runtime_error("closure without compiled function")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "closure without compiled function",
+                ))
+            }
         };
         if compiled.num_parameters != num_args {
-            return Err(self.runtime_error(format!(
-                "wrong number of arguments: want={}, got={}",
-                compiled.num_parameters, num_args
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!(
+                    "wrong number of arguments: want={}, got={}",
+                    compiled.num_parameters, num_args
+                ),
+            ));
         }
 
         let frame = Frame::new(closure, compiled.instructions, self.sp - num_args);
@@ -857,27 +984,41 @@ impl GcVM {
             .base_pointer
             .checked_add(compiled.num_locals)
             .filter(|next_sp| *next_sp <= STACK_SIZE)
-            .ok_or_else(|| self.runtime_error("stack limit exceeded"))?;
+            .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded"))?;
         self.sp = next_sp;
         self.push_frame(frame)
     }
 
-    fn call_builtin(&mut self, builtin: BuiltinId, num_args: usize) -> Result<(), GcRuntimeError> {
+    fn call_builtin(
+        &mut self,
+        builtin: BuiltinId,
+        num_args: usize,
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let base = self.sp - num_args - 1;
         let args = self.stack[self.sp - num_args..self.sp].to_vec();
-        let result = call_builtin(&mut self.heap, builtin, &args, self.null);
+        let result = call_builtin_with_output(
+            &mut self.heap,
+            builtin,
+            &args,
+            self.null,
+            self.output.as_mut(),
+        );
         self.clear_stack_range(base, self.sp);
         self.sp = base;
         self.push_raw(result)
     }
 
-    fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), GcRuntimeError> {
+    fn push_closure(
+        &mut self,
+        const_index: usize,
+        num_free: usize,
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let func = self.constant(const_index)?;
         if !matches!(get_value(&self.heap, func), Value::CompiledFunction(_)) {
-            return Err(self.runtime_error(format!(
-                "cannot build closure over {}",
-                value_to_string(&self.heap, func)
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("cannot build closure over {}", value_to_string(&self.heap, func)),
+            ));
         }
         let start = self.stack_base_for(num_free)?;
         let mut free = Vec::with_capacity(num_free);
@@ -896,18 +1037,23 @@ impl GcVM {
         self.push_raw(closure)
     }
 
-    fn constant(&self, index: usize) -> Result<GcRef, GcRuntimeError> {
-        self.constants
-            .get(index)
-            .copied()
-            .ok_or_else(|| self.runtime_error(format!("constant index {} out of range", index)))
+    fn constant(&self, index: usize) -> Result<GcRef, GcClassifiedRuntimeError> {
+        self.constants.get(index).copied().ok_or_else(|| {
+            self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("constant index {} out of range", index),
+            )
+        })
     }
 
-    fn constant_string(&self, index: usize) -> Result<String, GcRuntimeError> {
+    fn constant_string(&self, index: usize) -> Result<String, GcClassifiedRuntimeError> {
         let constant = self.constant(index)?;
         match get_value(&self.heap, constant) {
             Value::String(value) => Ok(value.clone()),
-            value => Err(self.runtime_error(format!("expected string constant, got {}", value))),
+            value => Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("expected string constant, got {}", value),
+            )),
         }
     }
 
@@ -917,12 +1063,12 @@ impl GcVM {
         name: String,
         method: GcRef,
         constructor: bool,
-    ) -> Result<(), GcRuntimeError> {
+    ) -> Result<(), GcClassifiedRuntimeError> {
         if !matches!(get_value(&self.heap, class), Value::Class(_)) {
-            return Err(self.runtime_error(format!(
-                "cannot install method on {}",
-                value_to_string(&self.heap, class)
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("cannot install method on {}", value_to_string(&self.heap, class)),
+            ));
         }
         let owned_method = self.heap.dup(method);
         let old_method = match get_value_mut(&mut self.heap, class) {
@@ -941,15 +1087,22 @@ impl GcVM {
         Ok(())
     }
 
-    fn get_property(&mut self, receiver: GcRef, name: &str) -> Result<GcRef, GcRuntimeError> {
+    fn get_property(
+        &mut self,
+        receiver: GcRef,
+        name: &str,
+    ) -> Result<GcRef, GcClassifiedRuntimeError> {
         let (class, field) = match get_value(&self.heap, receiver) {
             Value::Instance(instance) => (instance.class, instance.fields.get(name).copied()),
             _ => {
-                return Err(self.runtime_error(format!(
-                    "cannot read property '{}' of {}",
-                    name,
-                    value_to_string(&self.heap, receiver)
-                )))
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::Property,
+                    format!(
+                        "cannot read property '{}' of {}",
+                        name,
+                        value_to_string(&self.heap, receiver)
+                    ),
+                ))
             }
         };
         if let Some(field) = field {
@@ -958,7 +1111,12 @@ impl GcVM {
 
         let (class_name, method) = match get_value(&self.heap, class) {
             Value::Class(class) => (class.name.clone(), class.methods.get(name).copied()),
-            _ => return Err(self.runtime_error("instance has invalid class")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "instance has invalid class",
+                ))
+            }
         };
         match method {
             Some(method) => Ok(alloc_value(
@@ -969,10 +1127,10 @@ impl GcVM {
                     name: name.to_string(),
                 }),
             )),
-            None => {
-                Err(self
-                    .runtime_error(format!("property '{}' does not exist on {}", name, class_name)))
-            }
+            None => Err(self.runtime_error(
+                GcRuntimeErrorKind::Property,
+                format!("property '{}' does not exist on {}", name, class_name),
+            )),
         }
     }
 
@@ -981,13 +1139,16 @@ impl GcVM {
         receiver: GcRef,
         name: String,
         value: GcRef,
-    ) -> Result<(), GcRuntimeError> {
+    ) -> Result<(), GcClassifiedRuntimeError> {
         if !matches!(get_value(&self.heap, receiver), Value::Instance(_)) {
-            return Err(self.runtime_error(format!(
-                "cannot set property '{}' of {}",
-                name,
-                value_to_string(&self.heap, receiver)
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Property,
+                format!(
+                    "cannot set property '{}' of {}",
+                    name,
+                    value_to_string(&self.heap, receiver)
+                ),
+            ));
         }
         let owned_value = self.heap.dup(value);
         let old_value = match get_value_mut(&mut self.heap, receiver) {
@@ -1000,25 +1161,28 @@ impl GcVM {
         Ok(())
     }
 
-    fn execute_new(&mut self, num_args: usize) -> Result<(), GcRuntimeError> {
+    fn execute_new(&mut self, num_args: usize) -> Result<(), GcClassifiedRuntimeError> {
         let base = self.stack_base_for(num_args + 1)?;
         let class_reference = self.stack[base];
         let (class_name, constructor) = match get_value(&self.heap, class_reference) {
             Value::Class(class) => (class.name.clone(), class.constructor),
             _ => {
-                return Err(self.runtime_error(format!(
-                    "cannot construct {}",
-                    value_to_string(&self.heap, class_reference)
-                )))
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::Call,
+                    format!("cannot construct {}", value_to_string(&self.heap, class_reference)),
+                ))
             }
         };
 
         let Some(constructor) = constructor else {
             if num_args != 0 {
-                return Err(self.runtime_error(format!(
-                    "wrong number of arguments for {}.constructor: want=0, got={}",
-                    class_name, num_args
-                )));
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::Call,
+                    format!(
+                        "wrong number of arguments for {}.constructor: want=0, got={}",
+                        class_name, num_args
+                    ),
+                ));
             }
             let instance = alloc_value(
                 &mut self.heap,
@@ -1034,18 +1198,31 @@ impl GcVM {
 
         let closure = match get_value(&self.heap, constructor) {
             Value::Closure(closure) => closure.clone(),
-            _ => return Err(self.runtime_error("constructor is not a closure")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "constructor is not a closure",
+                ))
+            }
         };
         let compiled = match get_value(&self.heap, closure.func) {
             Value::CompiledFunction(function) => function.clone(),
-            _ => return Err(self.runtime_error("constructor closure has invalid function")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "constructor closure has invalid function",
+                ))
+            }
         };
         let expected = compiled.num_parameters.saturating_sub(1);
         if expected != num_args {
-            return Err(self.runtime_error(format!(
-                "wrong number of arguments for {}.constructor: want={}, got={}",
-                class_name, expected, num_args
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!(
+                    "wrong number of arguments for {}.constructor: want={}, got={}",
+                    class_name, expected, num_args
+                ),
+            ));
         }
 
         let instance = alloc_value(
@@ -1063,14 +1240,24 @@ impl GcVM {
         &mut self,
         bound: GcBoundMethod,
         num_args: usize,
-    ) -> Result<(), GcRuntimeError> {
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let closure = match get_value(&self.heap, bound.method) {
             Value::Closure(closure) => closure.clone(),
-            _ => return Err(self.runtime_error("bound method is not a closure")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "bound method is not a closure",
+                ))
+            }
         };
         let compiled = match get_value(&self.heap, closure.func) {
             Value::CompiledFunction(function) => function.clone(),
-            _ => return Err(self.runtime_error("method closure has invalid function")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "method closure has invalid function",
+                ))
+            }
         };
         let expected = compiled.num_parameters.saturating_sub(1);
         if expected != num_args {
@@ -1081,10 +1268,13 @@ impl GcVM {
                 },
                 _ => "<invalid receiver>".to_string(),
             };
-            return Err(self.runtime_error(format!(
-                "wrong number of arguments for {}.{}: want={}, got={}",
-                class_name, bound.name, expected, num_args
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!(
+                    "wrong number of arguments for {}.{}: want={}, got={}",
+                    class_name, bound.name, expected, num_args
+                ),
+            ));
         }
         let receiver = self.heap.dup(bound.receiver);
         self.rewrite_receiver_call(bound.method, receiver, num_args)?;
@@ -1098,10 +1288,10 @@ impl GcVM {
         callable: GcRef,
         receiver: GcRef,
         num_args: usize,
-    ) -> Result<(), GcRuntimeError> {
+    ) -> Result<(), GcClassifiedRuntimeError> {
         let base = self.sp - num_args - 1;
         if base + num_args + 2 > STACK_SIZE {
-            let error = self.runtime_error("stack limit exceeded");
+            let error = self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded");
             self.heap.free(receiver);
             return Err(error);
         }

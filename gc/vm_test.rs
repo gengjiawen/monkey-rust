@@ -79,6 +79,22 @@ mod tests {
                 expected: Object::Integer(60),
             },
             VmTestCase {
+                input: "9223372036854775807 + 1",
+                expected: Object::Integer(i64::MIN),
+            },
+            VmTestCase {
+                input: "(0 - 9223372036854775807 - 1) - 1",
+                expected: Object::Integer(i64::MAX),
+            },
+            VmTestCase {
+                input: "9223372036854775807 * 2",
+                expected: Object::Integer(-2),
+            },
+            VmTestCase {
+                input: "-(0 - 9223372036854775807 - 1)",
+                expected: Object::Integer(i64::MIN),
+            },
+            VmTestCase {
                 input: "5 + 5 + 5 + 5 - 10",
                 expected: Object::Integer(10),
             },
@@ -981,6 +997,29 @@ mod tests {
                 .unwrap_err();
         assert_eq!(limit_error.stage, crate::GcRunStage::Runtime);
         assert!(limit_error.message.contains("instruction limit exceeded"));
+    }
+
+    #[test]
+    fn classified_run_api_reports_error_kinds() {
+        let parse_error = crate::run_source_with_report_classified("let =", 100).unwrap_err();
+        assert_eq!(parse_error.kind, "syntax");
+
+        let compile_error = crate::run_source_with_report_classified("this;", 100).unwrap_err();
+        assert_eq!(compile_error.kind, "compile");
+
+        let property_error = crate::run_source_with_report_classified("1.value;", 100).unwrap_err();
+        assert_eq!(property_error.kind, "property");
+
+        let limit_error = crate::run_source_with_report_classified(
+            "let forever = fn() { forever(); }; forever();",
+            10,
+        )
+        .unwrap_err();
+        assert_eq!(limit_error.kind, "executionLimit");
+
+        let type_error =
+            crate::run_source_with_report_classified(r#""division" - 1;"#, 100).unwrap_err();
+        assert_eq!(type_error.kind, "type");
     }
 
     #[test]

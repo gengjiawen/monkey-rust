@@ -8,7 +8,7 @@
 
 use compiler::compiler::{Bytecode, Compiler};
 
-use crate::vm::{GcRuntimeError, GcVM};
+use crate::vm::{GcClassifiedRuntimeError, GcRuntimeError, GcVM};
 
 /// Parse and compile Monkey source, reporting the first error as a string.
 pub fn compile_source(source: &str) -> Result<Bytecode, String> {
@@ -32,4 +32,19 @@ pub fn run_bytecode(
     let mut vm = GcVM::new(bytecode);
     vm.run_with_budget(instruction_budget)?;
     Ok(vm.last_result_string())
+}
+
+/// Execute bytecode on a fresh VM while capturing all `puts`/`print` output.
+/// The output is returned even when execution fails after producing it.
+pub fn run_bytecode_with_output(
+    bytecode: Bytecode,
+    instruction_budget: usize,
+) -> (Result<String, GcClassifiedRuntimeError>, String) {
+    let mut vm = GcVM::new(bytecode);
+    vm.set_capture_output(true);
+    let result = vm
+        .run_with_budget_classified(instruction_budget)
+        .map(|()| vm.last_result_string());
+    let output = vm.take_output();
+    (result, output)
 }
