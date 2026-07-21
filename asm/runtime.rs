@@ -6,13 +6,13 @@
 //! initialized, stderr message, `exit(1)`). Panics never cross the FFI
 //! boundary: shells run under `catch_unwind` and report `InternalError`.
 //!
-//! There is no global runtime object. `PointerStore` is stateless (heap
-//! objects live in leaked cells addressed by the tagged values themselves),
-//! so each shell builds a fresh store; the only process-level state is the
-//! observer fd and the registered globals area, both atomics.
+//! Heap objects are owned by one process-wide `PointerStore`. A mutex keeps
+//! its safe reference API exclusive across FFI entries and threads; generated
+//! function calls happen only after the guard has been released.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 use crate::runtime_backend::{CodeHandle, PointerStore};
 use crate::runtime_core::{
@@ -26,6 +26,11 @@ static OBSERVER_FD: AtomicI64 = AtomicI64::new(-1);
 /// Globals area registered by `rt_globals_init` (future GC root scanning).
 static GLOBALS_BASE: AtomicU64 = AtomicU64::new(0);
 static GLOBALS_COUNT: AtomicU64 = AtomicU64::new(0);
+
+fn native_store() -> &'static Mutex<PointerStore> {
+    static STORE: OnceLock<Mutex<PointerStore>> = OnceLock::new();
+    STORE.get_or_init(|| Mutex::new(PointerStore::new()))
+}
 
 struct StdoutSink;
 
@@ -77,7 +82,9 @@ fn fatal(kind: RuntimeErrorKind, message: &str) -> ! {
 /// becomes `rt_fatal` semantics. Only `Ok` values return to generated code.
 fn ffi_shell<T>(body: impl FnOnce(&mut PointerStore) -> RuntimeResult<T>) -> T {
     let outcome = catch_unwind(AssertUnwindSafe(|| {
-        let mut store = PointerStore;
+        let mut store = native_store()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         body(&mut store)
     }));
     match outcome {
@@ -175,7 +182,10 @@ fn complete_dispatch(dispatch: CallDispatch) -> Value {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_globals_init(base: *mut Value, count: u64) {
+/// # Safety
+/// `base` must be writable for `count` consecutive, properly aligned values
+/// and remain live for the generated program's execution.
+pub unsafe extern "C" fn rt_globals_init(base: *mut Value, count: u64) {
     ffi_shell(|_store| {
         for index in 0..count as usize {
             unsafe {
@@ -189,7 +199,9 @@ pub extern "C" fn rt_globals_init(base: *mut Value, count: u64) {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_string_from_bytes(ptr: *const u8, len: u64) -> Value {
+/// # Safety
+/// For nonzero `len`, `ptr` must reference `len` readable bytes.
+pub unsafe extern "C" fn rt_string_from_bytes(ptr: *const u8, len: u64) -> Value {
     ffi_shell(|store| {
         let bytes = unsafe { byte_slice(ptr, len) };
         runtime_core::string_from_utf8(store, bytes)
@@ -202,7 +214,9 @@ pub extern "C" fn rt_box_int(raw: i64) -> Value {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_array(argv: *const Value, len: u64) -> Value {
+/// # Safety
+/// For nonzero `len`, `argv` must reference `len` readable values.
+pub unsafe extern "C" fn rt_array(argv: *const Value, len: u64) -> Value {
     ffi_shell(|store| {
         let values = unsafe { value_slice(argv, len) };
         Ok(runtime_core::array_from_values(store, values))
@@ -210,7 +224,10 @@ pub extern "C" fn rt_array(argv: *const Value, len: u64) -> Value {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_hash(argv: *const Value, pairs: u64) -> Value {
+/// # Safety
+/// `argv` must reference `pairs * 2` readable values, and that multiplication
+/// must fit in `u64`.
+pub unsafe extern "C" fn rt_hash(argv: *const Value, pairs: u64) -> Value {
     ffi_shell(|store| {
         let values = unsafe { value_slice(argv, pairs * 2) };
         runtime_core::hash_from_pairs(store, values)
@@ -218,7 +235,10 @@ pub extern "C" fn rt_hash(argv: *const Value, pairs: u64) -> Value {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_closure(
+/// # Safety
+/// `code` must be a generated function entry with the runtime calling
+/// convention. For nonzero `num_free`, `free` must reference that many values.
+pub unsafe extern "C" fn rt_closure(
     code: *const u8,
     num_parameters: u64,
     free: *const Value,
@@ -236,7 +256,9 @@ pub extern "C" fn rt_get_free(closure: Value, index: u64) -> Value {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_class(name: *const u8, len: u64) -> Value {
+/// # Safety
+/// For nonzero `len`, `name` must reference `len` readable bytes.
+pub unsafe extern "C" fn rt_class(name: *const u8, len: u64) -> Value {
     ffi_shell(|store| {
         let bytes = unsafe { byte_slice(name, len) };
         let class_name = name_from_bytes(bytes)?;
@@ -245,7 +267,9 @@ pub extern "C" fn rt_class(name: *const u8, len: u64) -> Value {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_class_add_method(
+/// # Safety
+/// For nonzero `len`, `name` must reference `len` readable bytes.
+pub unsafe extern "C" fn rt_class_add_method(
     class: Value,
     name: *const u8,
     len: u64,
@@ -260,7 +284,9 @@ pub extern "C" fn rt_class_add_method(
 }
 
 #[no_mangle]
-pub extern "C" fn rt_get_property(obj: Value, name: *const u8, len: u64) -> Value {
+/// # Safety
+/// For nonzero `len`, `name` must reference `len` readable bytes.
+pub unsafe extern "C" fn rt_get_property(obj: Value, name: *const u8, len: u64) -> Value {
     ffi_shell(|store| {
         let bytes = unsafe { byte_slice(name, len) };
         let property = name_from_bytes(bytes)?;
@@ -269,7 +295,9 @@ pub extern "C" fn rt_get_property(obj: Value, name: *const u8, len: u64) -> Valu
 }
 
 #[no_mangle]
-pub extern "C" fn rt_set_property(obj: Value, name: *const u8, len: u64, v: Value) {
+/// # Safety
+/// For nonzero `len`, `name` must reference `len` readable bytes.
+pub unsafe extern "C" fn rt_set_property(obj: Value, name: *const u8, len: u64, v: Value) {
     ffi_shell(|store| {
         let bytes = unsafe { byte_slice(name, len) };
         let property = name_from_bytes(bytes)?;
@@ -335,7 +363,10 @@ pub extern "C" fn rt_truthy(v: Value) -> u64 {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_call(callee: Value, argc: u64, argv: *const Value) -> Value {
+/// # Safety
+/// For nonzero `argc`, `argv` must reference `argc` readable values. Any
+/// closure reached through `callee` must contain a valid generated code entry.
+pub unsafe extern "C" fn rt_call(callee: Value, argc: u64, argv: *const Value) -> Value {
     let dispatch = ffi_shell(|store| {
         let args = unsafe { value_slice(argv, argc) };
         runtime_core::dispatch_call(store, &mut StdoutSink, callee, args)
@@ -344,7 +375,10 @@ pub extern "C" fn rt_call(callee: Value, argc: u64, argv: *const Value) -> Value
 }
 
 #[no_mangle]
-pub extern "C" fn rt_construct(callee: Value, argc: u64, argv: *const Value) -> Value {
+/// # Safety
+/// For nonzero `argc`, `argv` must reference `argc` readable values. Any
+/// constructor reached through `callee` must contain a valid code entry.
+pub unsafe extern "C" fn rt_construct(callee: Value, argc: u64, argv: *const Value) -> Value {
     let dispatch = ffi_shell(|store| {
         let args = unsafe { value_slice(argv, argc) };
         runtime_core::dispatch_construct(store, callee, args)
@@ -353,7 +387,10 @@ pub extern "C" fn rt_construct(callee: Value, argc: u64, argv: *const Value) -> 
 }
 
 #[no_mangle]
-pub extern "C" fn rt_observer_init(fd: u64) {
+/// # Safety
+/// `fd` must be a valid writable Unix file descriptor owned by the harness
+/// for as long as observer output can be emitted.
+pub unsafe extern "C" fn rt_observer_init(fd: u64) {
     OBSERVER_FD.store(fd as i64, Ordering::SeqCst);
 }
 
@@ -367,7 +404,9 @@ pub extern "C" fn rt_observe_result(v: Value) {
 }
 
 #[no_mangle]
-pub extern "C" fn rt_fatal(kind: u64, msg: *const u8, len: u64) -> ! {
+/// # Safety
+/// For nonzero `len`, `msg` must reference `len` readable bytes.
+pub unsafe extern "C" fn rt_fatal(kind: u64, msg: *const u8, len: u64) -> ! {
     let outcome = catch_unwind(|| {
         let kind = RuntimeErrorKind::from_u64(kind).unwrap_or(RuntimeErrorKind::InternalError);
         let bytes = unsafe { byte_slice(msg, len) };

@@ -1,5 +1,5 @@
 //! End-to-end tests (design §10): cross-assemble with the real aarch64
-//! toolchain, run under qemu (or natively on arm64), and check observable
+//! toolchain, run under qemu (or natively on Linux arm64), and check observable
 //! behavior — plus the handwritten ABI probes in `testdata/` that freeze the
 //! `.s` ↔ runtime contract independently of the lowering pass.
 //!
@@ -12,6 +12,8 @@
 //! ```
 //!
 //! When a requirement is missing the test prints why and passes vacuously.
+//! Set `MONKEY_ASM_E2E_REQUIRED=1` to turn every such skip into a failure (as
+//! CI does).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -22,7 +24,7 @@ const FALLBACK_NATIVE_LIBS: &[&str] = &["-lpthread", "-ldl", "-lm", "-lrt", "-lu
 
 struct Toolchain {
     cc: String,
-    /// `None` when the host itself is arm64.
+    /// `None` when the host itself can execute Linux AArch64 ELF binaries.
     qemu: Option<String>,
     runtime: PathBuf,
     cli: PathBuf,
@@ -35,7 +37,8 @@ fn tool_exists(program: &str) -> bool {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .is_ok()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 fn workspace_root() -> &'static Path {
@@ -47,11 +50,27 @@ fn workspace_root() -> &'static Path {
 fn cargo_build(extra: &[&str]) -> Output {
     Command::new(env!("CARGO"))
         .arg("build")
-        .args(&["-p", "monkey-asm"])
+        .args(["-p", "monkey-asm"])
         .args(extra)
         .current_dir(workspace_root())
         .output()
         .expect("cargo is runnable")
+}
+
+fn target_directory() -> PathBuf {
+    match std::env::var_os("CARGO_TARGET_DIR") {
+        Some(path) if Path::new(&path).is_absolute() => PathBuf::from(path),
+        Some(path) => workspace_root().join(path),
+        None => workspace_root().join("target"),
+    }
+}
+
+fn unavailable(message: String) -> Option<Toolchain> {
+    if std::env::var("MONKEY_ASM_E2E_REQUIRED").as_deref() == Ok("1") {
+        panic!("e2e requirement missing: {}", message);
+    }
+    eprintln!("skipping e2e: {}", message);
+    None
 }
 
 /// Locates the tools and builds both halves of the crate (aarch64 runtime
@@ -59,16 +78,14 @@ fn cargo_build(extra: &[&str]) -> Output {
 fn toolchain() -> Option<Toolchain> {
     let cc = std::env::var("MONKEY_ASM_CC").unwrap_or_else(|_| "aarch64-linux-gnu-gcc".to_string());
     if !tool_exists(&cc) {
-        eprintln!("skipping e2e: {} not found (install gcc-aarch64-linux-gnu)", cc);
-        return None;
+        return unavailable(format!("{} not found (install gcc-aarch64-linux-gnu)", cc));
     }
-    let qemu = if cfg!(target_arch = "aarch64") {
+    let qemu = if cfg!(all(target_arch = "aarch64", target_os = "linux")) {
         None
     } else {
         let qemu = std::env::var("MONKEY_ASM_QEMU").unwrap_or_else(|_| "qemu-aarch64".to_string());
         if !tool_exists(&qemu) {
-            eprintln!("skipping e2e: {} not found (install qemu-user)", qemu);
-            return None;
+            return unavailable(format!("{} not found (install qemu-user)", qemu));
         }
         Some(qemu)
     };
@@ -80,13 +97,14 @@ fn toolchain() -> Option<Toolchain> {
         let stderr = String::from_utf8_lossy(&cross.stderr).into_owned();
         if stderr.contains("may not be installed") || stderr.contains("can't find crate for `core`")
         {
-            eprintln!("skipping e2e: rust target missing (rustup target add {})", CROSS_TARGET);
-            return None;
+            return unavailable(format!(
+                "rust target missing (rustup target add {})",
+                CROSS_TARGET
+            ));
         }
         panic!("aarch64 runtime build failed:\n{}", stderr);
     }
-    let runtime = workspace_root()
-        .join("target")
+    let runtime = target_directory()
         .join(CROSS_TARGET)
         .join("release")
         .join("libmonkey_asm.a");
@@ -98,10 +116,7 @@ fn toolchain() -> Option<Toolchain> {
         "host CLI build failed:\n{}",
         String::from_utf8_lossy(&host.stderr)
     );
-    let cli = workspace_root()
-        .join("target")
-        .join("debug")
-        .join("monkey-asm");
+    let cli = target_directory().join("debug").join("monkey-asm");
     assert!(cli.exists(), "missing {}", cli.display());
 
     let scratch = std::env::temp_dir().join(format!("monkey-asm-e2e-{}", std::process::id()));
@@ -148,15 +163,22 @@ impl Toolchain {
                 command
             }
             (None, None) => Command::new(program),
-            (qemu, Some(record)) => {
-                let runner = match qemu {
-                    Some(qemu) => format!("exec {} \"$1\" 3>\"$2\"", qemu),
-                    None => "exec \"$1\" 3>\"$2\"".to_string(),
-                };
+            (Some(qemu), Some(record)) => {
                 let mut command = Command::new("sh");
                 command
                     .arg("-c")
-                    .arg(runner)
+                    .arg("exec \"$1\" \"$2\" 3>\"$3\"")
+                    .arg("sh")
+                    .arg(qemu)
+                    .arg(program)
+                    .arg(record);
+                command
+            }
+            (None, Some(record)) => {
+                let mut command = Command::new("sh");
+                command
+                    .arg("-c")
+                    .arg("exec \"$1\" 3>\"$2\"")
                     .arg("sh")
                     .arg(program)
                     .arg(record);
@@ -171,7 +193,11 @@ impl Toolchain {
         let path = self.scratch.join(format!("{}.monkey", name));
         std::fs::write(&path, source).expect("write monkey source");
         let mut command = Command::new(&self.cli);
-        command.arg("run").arg(&path).current_dir(workspace_root());
+        command
+            .arg("run")
+            .arg(&path)
+            .env("MONKEY_ASM_RUNTIME", &self.runtime)
+            .current_dir(workspace_root());
         if observe {
             command.arg("--observe");
         }
@@ -252,6 +278,16 @@ fn e2e_programs_behave_like_the_interpreter() {
             "puts(9223372036854775807 - 1);\nputs(0 - 9223372036854775807);\nputs(4611686018427387903 + 1);",
             "9223372036854775806\n-9223372036854775807\n4611686018427387904\n",
         ),
+        (
+            "rebinding",
+            "let x = 1;\nlet x = x + 2;\nputs(x);",
+            "3\n",
+        ),
+        (
+            "less_than_order",
+            "let f = fn(x) { puts(x); x };\nputs(f(1) < f(2));",
+            "1\n2\ntrue\n",
+        ),
     ];
     for (name, source, expected) in corpus {
         let output = toolchain.cli_run(name, source, false);
@@ -327,6 +363,7 @@ fn e2e_observer_record_framing_and_content() {
         .arg("-o")
         .arg(&program)
         .arg("--observe")
+        .env("MONKEY_ASM_RUNTIME", &toolchain.runtime)
         .current_dir(workspace_root())
         .output()
         .expect("run monkey-asm build");

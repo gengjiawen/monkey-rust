@@ -12,12 +12,26 @@ use crate::runtime_core::*;
 fn on_both_backends<T: PartialEq + std::fmt::Debug>(
     scenario: impl Fn(&mut dyn DynStore) -> T,
 ) -> T {
-    let mut pointer_store = PointerStore;
+    let mut pointer_store = PointerStore::new();
     let mut handle_store = HandleStore::new();
     let from_pointers = scenario(&mut pointer_store);
     let from_handles = scenario(&mut handle_store);
     assert_eq!(from_pointers, from_handles, "PointerStore and HandleStore disagree");
     from_pointers
+}
+
+#[test]
+fn pointer_store_rejects_forged_and_foreign_addresses() {
+    let mut owner = PointerStore::new();
+    assert!(owner.try_get(0x1001).is_none());
+    assert!(owner.try_get_mut(!0b110).is_none());
+
+    let value = owner.alloc(HeapObject::BoxedInt(7));
+    assert!(matches!(owner.try_get(value), Some(HeapObject::BoxedInt(7))));
+
+    let mut other = PointerStore::new();
+    assert!(other.try_get(value).is_none());
+    assert!(other.try_get_mut(value).is_none());
 }
 
 /// Object-safe wrapper so the corpus can be written once; `runtime_core`
