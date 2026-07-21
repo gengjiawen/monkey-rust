@@ -44,7 +44,6 @@ pub enum GcRuntimeErrorKind {
     Stack,
     Type,
     InvalidBytecode,
-    Runtime,
 }
 
 impl GcRuntimeErrorKind {
@@ -58,58 +57,7 @@ impl GcRuntimeErrorKind {
             Self::Stack => "stack",
             Self::Type => "type",
             Self::InvalidBytecode => "invalidBytecode",
-            Self::Runtime => "runtime",
         }
-    }
-}
-
-fn classify_runtime_error(message: &str) -> GcRuntimeErrorKind {
-    if message.starts_with("instruction limit exceeded") {
-        GcRuntimeErrorKind::ExecutionLimit
-    } else if matches!(message, "division by zero" | "integer overflow in division") {
-        GcRuntimeErrorKind::Arithmetic
-    } else if matches!(message, "stack underflow" | "stack limit exceeded" | "frame limit exceeded")
-    {
-        GcRuntimeErrorKind::Stack
-    } else if message.starts_with("unknown opcode")
-        || message.starts_with("builtin index")
-        || message.starts_with("local index")
-        || message.starts_with("free variable index")
-        || message.starts_with("constant index")
-        || message.starts_with("closure without")
-        || message.starts_with("cannot build closure over")
-        || message.starts_with("expected string constant")
-        || message.starts_with("cannot install method on")
-        || message == "instance has invalid class"
-        || message == "constructor is not a closure"
-        || message == "constructor closure has invalid function"
-        || message == "bound method is not a closure"
-        || message == "method closure has invalid function"
-    {
-        GcRuntimeErrorKind::InvalidBytecode
-    } else if message.starts_with("unsupported index operation")
-        || message.starts_with("unsupported hash index key")
-        || message.starts_with("hash key must be hashable")
-    {
-        GcRuntimeErrorKind::Index
-    } else if message.starts_with("cannot read property")
-        || message.starts_with("cannot set property")
-        || message.starts_with("property '")
-    {
-        GcRuntimeErrorKind::Property
-    } else if message.starts_with("cannot call")
-        || message.starts_with("cannot construct")
-        || message.starts_with("wrong number of arguments")
-        || (message.starts_with("class ") && message.ends_with("must be constructed with new"))
-    {
-        GcRuntimeErrorKind::Call
-    } else if message.starts_with("unsupported binary operation")
-        || message.starts_with("unsupported comparison")
-        || message.starts_with("unsupported type for negation")
-    {
-        GcRuntimeErrorKind::Type
-    } else {
-        GcRuntimeErrorKind::Runtime
     }
 }
 
@@ -364,8 +312,13 @@ impl GcVM {
         }
     }
 
-    fn runtime_error(&self, message: impl Into<String>) -> GcRuntimeError {
-        let message = message.into();
+    /// Every raise site names its error category directly; a message is never
+    /// parsed to recover one.
+    fn runtime_error(
+        &self,
+        kind: GcRuntimeErrorKind,
+        message: impl Into<String>,
+    ) -> GcRuntimeError {
         let frame = &self.frames[self.frame_index - 1];
         let debug_info = if self.frame_index == 1 {
             Some(&self.main_debug_info)
@@ -378,8 +331,8 @@ impl GcVM {
                 .and_then(|pc| debug_info.span_for_pc(pc).cloned())
         });
         GcRuntimeError {
-            kind: classify_runtime_error(&message),
-            message,
+            kind,
+            message: message.into(),
             span,
         }
     }
@@ -395,16 +348,20 @@ impl GcVM {
             self.current_frame().ip += 1;
             let ip = self.current_frame().ip as usize;
             if executed >= instruction_budget {
-                return Err(self.runtime_error(format!(
-                    "instruction limit exceeded (budget: {})",
-                    instruction_budget
-                )));
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::ExecutionLimit,
+                    format!("instruction limit exceeded (budget: {})", instruction_budget),
+                ));
             }
             executed += 1;
             let ins = self.current_frame().instructions.clone();
             let op = *ins.get(ip).unwrap();
-            let opcode = Opcode::from_repr(op)
-                .ok_or_else(|| self.runtime_error(format!("unknown opcode 0x{:02x}", op)))?;
+            let opcode = Opcode::from_repr(op).ok_or_else(|| {
+                self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    format!("unknown opcode 0x{:02x}", op),
+                )
+            })?;
 
             match opcode {
                 Opcode::OpConst => {
@@ -548,7 +505,10 @@ impl GcVM {
                     let built_index = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     let definition = BuiltIns.get(built_index).ok_or_else(|| {
-                        self.runtime_error(format!("builtin index {} out of range", built_index))
+                        self.runtime_error(
+                            GcRuntimeErrorKind::InvalidBytecode,
+                            format!("builtin index {} out of range", built_index),
+                        )
                     })?;
                     self.alloc_and_push(Value::Builtin(definition.id))?;
                 }
@@ -563,10 +523,10 @@ impl GcVM {
                     self.current_frame().ip += 1;
                     let free_var = self.current_frame().cl.free.get(free_index).copied();
                     let free_var = free_var.ok_or_else(|| {
-                        self.runtime_error(format!(
-                            "free variable index {} out of range",
-                            free_index
-                        ))
+                        self.runtime_error(
+                            GcRuntimeErrorKind::InvalidBytecode,
+                            format!("free variable index {} out of range", free_index),
+                        )
                     })?;
                     self.dup_and_push(free_var)?;
                 }
@@ -592,7 +552,9 @@ impl GcVM {
                     let method = self.pop_owned()?;
                     if self.sp == 0 {
                         self.heap.free(method);
-                        return Err(self.runtime_error("stack underflow"));
+                        return Err(
+                            self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow")
+                        );
                     }
                     let class = self.stack[self.sp - 1];
                     let result = self.install_method(class, name, method, kind == 1);
@@ -657,7 +619,7 @@ impl GcVM {
 
     fn push_raw(&mut self, value: GcRef) -> Result<(), GcRuntimeError> {
         if self.sp >= STACK_SIZE {
-            let error = self.runtime_error("stack limit exceeded");
+            let error = self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded");
             self.heap.free(value);
             return Err(error);
         }
@@ -674,7 +636,7 @@ impl GcVM {
     /// owning location. The vacated stack slot is reset to a null ref.
     fn pop_owned(&mut self) -> Result<GcRef, GcRuntimeError> {
         if self.sp == 0 {
-            return Err(self.runtime_error("stack underflow"));
+            return Err(self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow"));
         }
         self.sp -= 1;
         let value = self.stack[self.sp];
@@ -707,13 +669,16 @@ impl GcVM {
     fn stack_base_for(&self, count: usize) -> Result<usize, GcRuntimeError> {
         self.sp
             .checked_sub(count)
-            .ok_or_else(|| self.runtime_error("stack underflow"))
+            .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow"))
     }
 
     fn local_slot(&self, base: usize, local_index: usize) -> Result<usize, GcRuntimeError> {
         let slot = base + local_index;
         if slot >= STACK_SIZE {
-            return Err(self.runtime_error(format!("local index {} out of range", local_index)));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("local index {} out of range", local_index),
+            ));
         }
         Ok(slot)
     }
@@ -735,27 +700,33 @@ impl GcVM {
                 Opcode::OpAdd => Ok(Value::Integer(l.wrapping_add(*r))),
                 Opcode::OpSub => Ok(Value::Integer(l.wrapping_sub(*r))),
                 Opcode::OpMul => Ok(Value::Integer(l.wrapping_mul(*r))),
-                Opcode::OpDiv if *r != 0 => l
-                    .checked_div(*r)
-                    .map(Value::Integer)
-                    .ok_or_else(|| "integer overflow in division".to_string()),
-                Opcode::OpDiv => Err("division by zero".to_string()),
+                Opcode::OpDiv if *r != 0 => {
+                    l.checked_div(*r).map(Value::Integer).ok_or_else(|| {
+                        (GcRuntimeErrorKind::Arithmetic, "integer overflow in division".to_string())
+                    })
+                }
+                Opcode::OpDiv => {
+                    Err((GcRuntimeErrorKind::Arithmetic, "division by zero".to_string()))
+                }
                 _ => unreachable!(),
             },
             (Value::String(l), Value::String(r)) if opcode == Opcode::OpAdd => {
                 Ok(Value::String(l.to_string() + r))
             }
-            _ => Err(format!(
-                "unsupported binary operation for {} and {}",
-                value_to_string(&self.heap, left),
-                value_to_string(&self.heap, right)
+            _ => Err((
+                GcRuntimeErrorKind::Type,
+                format!(
+                    "unsupported binary operation for {} and {}",
+                    value_to_string(&self.heap, left),
+                    value_to_string(&self.heap, right)
+                ),
             )),
         };
         self.heap.free(left);
         self.heap.free(right);
         match result {
             Ok(value) => self.alloc_and_push(value),
-            Err(message) => Err(self.runtime_error(message)),
+            Err((kind, message)) => Err(self.runtime_error(kind, message)),
         }
     }
 
@@ -807,7 +778,7 @@ impl GcVM {
         if let Some(result) = result {
             self.alloc_and_push(Value::Boolean(result))
         } else {
-            Err(self.runtime_error(message.unwrap()))
+            Err(self.runtime_error(GcRuntimeErrorKind::Type, message.unwrap()))
         }
     }
 
@@ -824,7 +795,7 @@ impl GcVM {
         if let Some(negated) = negated {
             self.alloc_and_push(Value::Integer(negated))
         } else {
-            Err(self.runtime_error(message.unwrap()))
+            Err(self.runtime_error(GcRuntimeErrorKind::Type, message.unwrap()))
         }
     }
 
@@ -855,10 +826,13 @@ impl GcVM {
         for i in (start..end).step_by(2) {
             let key_ref = self.stack[i];
             let key = HashKey::from_value(get_value(&self.heap, key_ref)).ok_or_else(|| {
-                self.runtime_error(format!(
-                    "hash key must be hashable, got {}",
-                    value_to_string(&self.heap, key_ref)
-                ))
+                self.runtime_error(
+                    GcRuntimeErrorKind::Index,
+                    format!(
+                        "hash key must be hashable, got {}",
+                        value_to_string(&self.heap, key_ref)
+                    ),
+                )
             })?;
             elements.insert(key, self.stack[i + 1]);
         }
@@ -871,11 +845,14 @@ impl GcVM {
         match (&left_value, &index_value) {
             (Value::Array(array), Value::Integer(i)) => self.execute_array_index(array, *i),
             (Value::Hash(hash), _) => self.execute_hash_index(hash, &index_value),
-            _ => Err(self.runtime_error(format!(
-                "unsupported index operation for {} and {}",
-                value_to_string(&self.heap, left),
-                value_to_string(&self.heap, index)
-            ))),
+            _ => Err(self.runtime_error(
+                GcRuntimeErrorKind::Index,
+                format!(
+                    "unsupported index operation for {} and {}",
+                    value_to_string(&self.heap, left),
+                    value_to_string(&self.heap, index)
+                ),
+            )),
         }
     }
 
@@ -892,8 +869,9 @@ impl GcVM {
         hash: &HashMap<HashKey, GcRef>,
         index: &Value,
     ) -> Result<(), GcRuntimeError> {
-        let key = HashKey::from_value(index)
-            .ok_or_else(|| self.runtime_error("unsupported hash index key"))?;
+        let key = HashKey::from_value(index).ok_or_else(|| {
+            self.runtime_error(GcRuntimeErrorKind::Index, "unsupported hash index key")
+        })?;
         match hash.get(&key) {
             Some(value) => self.dup_and_push(*value),
             None => self.dup_and_push(self.null),
@@ -906,7 +884,7 @@ impl GcVM {
 
     fn push_frame(&mut self, frame: Frame) -> Result<(), GcRuntimeError> {
         if self.frame_index >= MAX_FRAMES {
-            return Err(self.runtime_error("frame limit exceeded"));
+            return Err(self.runtime_error(GcRuntimeErrorKind::Stack, "frame limit exceeded"));
         }
         self.frames[self.frame_index] = frame;
         self.frame_index += 1;
@@ -925,23 +903,34 @@ impl GcVM {
             CalleeKind::Closure(closure) => self.call_closure(closure, num_args),
             CalleeKind::Builtin(builtin) => self.call_builtin(builtin, num_args),
             CalleeKind::BoundMethod(bound) => self.call_bound_method(bound, num_args),
-            CalleeKind::Class(name) => {
-                Err(self.runtime_error(format!("class {} must be constructed with new", name)))
+            CalleeKind::Class(name) => Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!("class {} must be constructed with new", name),
+            )),
+            CalleeKind::Other(value) => {
+                Err(self.runtime_error(GcRuntimeErrorKind::Call, format!("cannot call {}", value)))
             }
-            CalleeKind::Other(value) => Err(self.runtime_error(format!("cannot call {}", value))),
         }
     }
 
     fn call_closure(&mut self, closure: GcClosure, num_args: usize) -> Result<(), GcRuntimeError> {
         let compiled = match get_value(&self.heap, closure.func) {
             Value::CompiledFunction(f) => f.clone(),
-            _ => return Err(self.runtime_error("closure without compiled function")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "closure without compiled function",
+                ))
+            }
         };
         if compiled.num_parameters != num_args {
-            return Err(self.runtime_error(format!(
-                "wrong number of arguments: want={}, got={}",
-                compiled.num_parameters, num_args
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!(
+                    "wrong number of arguments: want={}, got={}",
+                    compiled.num_parameters, num_args
+                ),
+            ));
         }
 
         let frame = Frame::new(closure, compiled.instructions, self.sp - num_args);
@@ -951,7 +940,7 @@ impl GcVM {
             .base_pointer
             .checked_add(compiled.num_locals)
             .filter(|next_sp| *next_sp <= STACK_SIZE)
-            .ok_or_else(|| self.runtime_error("stack limit exceeded"))?;
+            .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded"))?;
         self.sp = next_sp;
         self.push_frame(frame)
     }
@@ -968,10 +957,10 @@ impl GcVM {
     fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), GcRuntimeError> {
         let func = self.constant(const_index)?;
         if !matches!(get_value(&self.heap, func), Value::CompiledFunction(_)) {
-            return Err(self.runtime_error(format!(
-                "cannot build closure over {}",
-                value_to_string(&self.heap, func)
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("cannot build closure over {}", value_to_string(&self.heap, func)),
+            ));
         }
         let start = self.stack_base_for(num_free)?;
         let mut free = Vec::with_capacity(num_free);
@@ -991,17 +980,22 @@ impl GcVM {
     }
 
     fn constant(&self, index: usize) -> Result<GcRef, GcRuntimeError> {
-        self.constants
-            .get(index)
-            .copied()
-            .ok_or_else(|| self.runtime_error(format!("constant index {} out of range", index)))
+        self.constants.get(index).copied().ok_or_else(|| {
+            self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("constant index {} out of range", index),
+            )
+        })
     }
 
     fn constant_string(&self, index: usize) -> Result<String, GcRuntimeError> {
         let constant = self.constant(index)?;
         match get_value(&self.heap, constant) {
             Value::String(value) => Ok(value.clone()),
-            value => Err(self.runtime_error(format!("expected string constant, got {}", value))),
+            value => Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("expected string constant, got {}", value),
+            )),
         }
     }
 
@@ -1013,10 +1007,10 @@ impl GcVM {
         constructor: bool,
     ) -> Result<(), GcRuntimeError> {
         if !matches!(get_value(&self.heap, class), Value::Class(_)) {
-            return Err(self.runtime_error(format!(
-                "cannot install method on {}",
-                value_to_string(&self.heap, class)
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::InvalidBytecode,
+                format!("cannot install method on {}", value_to_string(&self.heap, class)),
+            ));
         }
         let owned_method = self.heap.dup(method);
         let old_method = match get_value_mut(&mut self.heap, class) {
@@ -1039,11 +1033,14 @@ impl GcVM {
         let (class, field) = match get_value(&self.heap, receiver) {
             Value::Instance(instance) => (instance.class, instance.fields.get(name).copied()),
             _ => {
-                return Err(self.runtime_error(format!(
-                    "cannot read property '{}' of {}",
-                    name,
-                    value_to_string(&self.heap, receiver)
-                )))
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::Property,
+                    format!(
+                        "cannot read property '{}' of {}",
+                        name,
+                        value_to_string(&self.heap, receiver)
+                    ),
+                ))
             }
         };
         if let Some(field) = field {
@@ -1052,7 +1049,12 @@ impl GcVM {
 
         let (class_name, method) = match get_value(&self.heap, class) {
             Value::Class(class) => (class.name.clone(), class.methods.get(name).copied()),
-            _ => return Err(self.runtime_error("instance has invalid class")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "instance has invalid class",
+                ))
+            }
         };
         match method {
             Some(method) => Ok(alloc_value(
@@ -1063,10 +1065,10 @@ impl GcVM {
                     name: name.to_string(),
                 }),
             )),
-            None => {
-                Err(self
-                    .runtime_error(format!("property '{}' does not exist on {}", name, class_name)))
-            }
+            None => Err(self.runtime_error(
+                GcRuntimeErrorKind::Property,
+                format!("property '{}' does not exist on {}", name, class_name),
+            )),
         }
     }
 
@@ -1077,11 +1079,14 @@ impl GcVM {
         value: GcRef,
     ) -> Result<(), GcRuntimeError> {
         if !matches!(get_value(&self.heap, receiver), Value::Instance(_)) {
-            return Err(self.runtime_error(format!(
-                "cannot set property '{}' of {}",
-                name,
-                value_to_string(&self.heap, receiver)
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Property,
+                format!(
+                    "cannot set property '{}' of {}",
+                    name,
+                    value_to_string(&self.heap, receiver)
+                ),
+            ));
         }
         let owned_value = self.heap.dup(value);
         let old_value = match get_value_mut(&mut self.heap, receiver) {
@@ -1100,19 +1105,22 @@ impl GcVM {
         let (class_name, constructor) = match get_value(&self.heap, class_reference) {
             Value::Class(class) => (class.name.clone(), class.constructor),
             _ => {
-                return Err(self.runtime_error(format!(
-                    "cannot construct {}",
-                    value_to_string(&self.heap, class_reference)
-                )))
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::Call,
+                    format!("cannot construct {}", value_to_string(&self.heap, class_reference)),
+                ))
             }
         };
 
         let Some(constructor) = constructor else {
             if num_args != 0 {
-                return Err(self.runtime_error(format!(
-                    "wrong number of arguments for {}.constructor: want=0, got={}",
-                    class_name, num_args
-                )));
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::Call,
+                    format!(
+                        "wrong number of arguments for {}.constructor: want=0, got={}",
+                        class_name, num_args
+                    ),
+                ));
             }
             let instance = alloc_value(
                 &mut self.heap,
@@ -1128,18 +1136,31 @@ impl GcVM {
 
         let closure = match get_value(&self.heap, constructor) {
             Value::Closure(closure) => closure.clone(),
-            _ => return Err(self.runtime_error("constructor is not a closure")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "constructor is not a closure",
+                ))
+            }
         };
         let compiled = match get_value(&self.heap, closure.func) {
             Value::CompiledFunction(function) => function.clone(),
-            _ => return Err(self.runtime_error("constructor closure has invalid function")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "constructor closure has invalid function",
+                ))
+            }
         };
         let expected = compiled.num_parameters.saturating_sub(1);
         if expected != num_args {
-            return Err(self.runtime_error(format!(
-                "wrong number of arguments for {}.constructor: want={}, got={}",
-                class_name, expected, num_args
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!(
+                    "wrong number of arguments for {}.constructor: want={}, got={}",
+                    class_name, expected, num_args
+                ),
+            ));
         }
 
         let instance = alloc_value(
@@ -1160,11 +1181,21 @@ impl GcVM {
     ) -> Result<(), GcRuntimeError> {
         let closure = match get_value(&self.heap, bound.method) {
             Value::Closure(closure) => closure.clone(),
-            _ => return Err(self.runtime_error("bound method is not a closure")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "bound method is not a closure",
+                ))
+            }
         };
         let compiled = match get_value(&self.heap, closure.func) {
             Value::CompiledFunction(function) => function.clone(),
-            _ => return Err(self.runtime_error("method closure has invalid function")),
+            _ => {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    "method closure has invalid function",
+                ))
+            }
         };
         let expected = compiled.num_parameters.saturating_sub(1);
         if expected != num_args {
@@ -1175,10 +1206,13 @@ impl GcVM {
                 },
                 _ => "<invalid receiver>".to_string(),
             };
-            return Err(self.runtime_error(format!(
-                "wrong number of arguments for {}.{}: want={}, got={}",
-                class_name, bound.name, expected, num_args
-            )));
+            return Err(self.runtime_error(
+                GcRuntimeErrorKind::Call,
+                format!(
+                    "wrong number of arguments for {}.{}: want={}, got={}",
+                    class_name, bound.name, expected, num_args
+                ),
+            ));
         }
         let receiver = self.heap.dup(bound.receiver);
         self.rewrite_receiver_call(bound.method, receiver, num_args)?;
@@ -1195,7 +1229,7 @@ impl GcVM {
     ) -> Result<(), GcRuntimeError> {
         let base = self.sp - num_args - 1;
         if base + num_args + 2 > STACK_SIZE {
-            let error = self.runtime_error("stack limit exceeded");
+            let error = self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded");
             self.heap.free(receiver);
             return Err(error);
         }
