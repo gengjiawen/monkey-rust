@@ -32,6 +32,7 @@
 ## Commit & Pull Request Guidelines
 
 - Follow conventional commit style seen in history: `feat:`, `fix:`, `chore(deps):`, `docs:`, `refactor:`, `test:`. Keep scope clear (e.g., `fix(parser): ...`).
+- Commits created by Codex must include a `Co-authored-by` trailer with the exact runtime model identifier, not only the model family; for example: `Co-authored-by: Codex (gpt-5.6-sol) <noreply@openai.com>`.
 - PRs should include: concise description, affected crates/packages, rationale, and, if UI/behavior changes, examples or screenshots. Ensure CI passes (`cargo build/test`) and update snapshots/docs as needed.
 - Do not include version bumps or publish steps in regular PRs (maintainers handle releases).
 - Version syncing is handled by `scripts/bump_cargo_packages.ts`; when release versions need to change, update through this script instead of manually editing package versions.

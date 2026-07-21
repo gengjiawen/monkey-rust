@@ -409,7 +409,7 @@ const LABEL_PATTERNS: LabelPattern[] = [
     doc: (token) => ({
       title: `${token} — compiled Monkey function`,
       detail:
-        'Entry point of a compiled Monkey function — the trailing comment names it. Reached through rt_call, which checks the callee and arity first.',
+        'Entry point of a compiled Monkey function — the trailing comment names it. Ordinary calls dispatch through rt_call; constructors dispatch through rt_construct after instance allocation.',
     }),
   },
   {
@@ -480,14 +480,19 @@ export function arm64TokenDoc(token: string): Arm64TokenDoc | null {
 const TOKEN_CHAR = /[A-Za-z0-9_.]/
 
 /**
- * The hoverable token at `column` in `lineText`: the maximal run of word
- * characters (letters, digits, `_`, `.`) containing the position, so `.L0`,
- * `rt_add`, and `lo12` (between its colons) each come out whole.
+ * The hoverable non-comment token at `column` in `lineText`: the maximal run
+ * of word characters (letters, digits, `_`, `.`) containing the position, so
+ * `.L0`, `rt_add`, and `lo12` (between its colons) each come out whole.
  */
 export function arm64TokenAt(
   lineText: string,
   column: number
 ): { from: number; to: number; text: string } | null {
+  const commentStart = lineText.indexOf('//')
+  if (commentStart !== -1 && column >= commentStart) {
+    return null
+  }
+
   let anchor = column
   if (anchor >= lineText.length || !TOKEN_CHAR.test(lineText[anchor])) {
     anchor -= 1

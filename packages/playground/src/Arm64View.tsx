@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@radix-ui/themes'
-import { useCallback, type Ref } from 'react'
+import { useCallback, useState, type Ref } from 'react'
 
 import type { Arm64BuildEnvelope } from './arm64'
 import { arm64EditorExtensions } from './arm64Language'
@@ -46,12 +46,14 @@ function ReadingGuide() {
       </summary>
       <ul className="m-0 mt-1.5 flex list-none flex-col gap-1.5 p-0 pb-1">
         <li>
-          <strong>Tagged values.</strong> Every Monkey value is one 64-bit
-          word. Integers are stored shifted left one bit — <code>3</code>{' '}
-          appears as <code>#0x6</code> — while words with bit 0 set are heap
-          pointers or the constants <code>#0x3</code> (false),{' '}
-          <code>#0x7</code> (true), and <code>#0xb</code> (null). The{' '}
-          <code>//</code> comments show the original source value.
+          <strong>Tagged values.</strong> Every Monkey value is one 64-bit word.
+          Integers are stored shifted left one bit — <code>3</code> appears as{' '}
+          <code>#0x6</code>. Odd words use distinct tags: heap references end in{' '}
+          <code>001</code>, builtins use <code>(id &lt;&lt; 3) | 0b101</code> (
+          <code>len</code> is <code>#0x5</code>), and singleton constants are{' '}
+          <code>#0x3</code> (false), <code>#0x7</code> (true), and{' '}
+          <code>#0xb</code> (null). The <code>//</code> comments show the
+          original source value.
         </li>
         <li>
           <strong>x0 is the accumulator.</strong> Every expression leaves its
@@ -73,8 +75,9 @@ function ReadingGuide() {
           open a frame, with parameters and locals in 16-byte slots below{' '}
           <code>x29</code>; <code>mov sp, x29</code> + <code>ldp</code> +{' '}
           <code>ret</code> close it. Compiled Monkey functions are the{' '}
-          <code>.Lfn</code> labels, always entered through <code>rt_call</code>
-          .
+          <code>.Lfn</code> labels. Ordinary calls enter them through{' '}
+          <code>rt_call</code>; <code>new</code> uses <code>rt_construct</code>,
+          which allocates the instance before invoking a constructor.
         </li>
         <li>
           Hover any instruction, register, label, or <code>rt_*</code> symbol
@@ -91,6 +94,54 @@ function ReadingGuide() {
         </li>
       </ul>
     </details>
+  )
+}
+
+interface AssemblyActionsProps {
+  onDownload: () => void
+}
+
+/**
+ * Keep the build/download explanation available on phones without letting it
+ * consume most of the output pane: desktop shows it inline, while the mobile
+ * breakpoint starts collapsed behind a compact disclosure button.
+ */
+function AssemblyActions({ onDownload }: AssemblyActionsProps) {
+  const [mobileExpanded, setMobileExpanded] = useState(false)
+
+  return (
+    <section className="shrink-0 border-b border-(--gray-a5) bg-(--color-background)">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-3 py-2 text-left text-xs font-medium text-(--gray-12) hover:bg-(--gray-a3) min-[781px]:hidden"
+        aria-expanded={mobileExpanded}
+        aria-controls="arm64-build-help"
+        onClick={() => setMobileExpanded((expanded) => !expanded)}
+      >
+        <span aria-hidden="true">{mobileExpanded ? '▾' : '▸'}</span>
+        Download .s and build help
+      </button>
+      <div
+        id="arm64-build-help"
+        className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 ${
+          mobileExpanded ? 'max-[780px]:flex' : 'max-[780px]:hidden'
+        }`}
+      >
+        <Button size="1" variant="soft" onClick={onDownload}>
+          Download .s
+        </Button>
+        <p className={`${mutedClass} m-0 min-w-0 flex-1 basis-52`}>
+          The exact text <code>monkey-asm emit</code> writes — nothing executes
+          arm64 in the browser. Select an instruction to highlight its source
+          (and vice versa); hover a token for its meaning. Cross-assemble the
+          download against the runtime library (see <code>asm/README.md</code>
+          ):{' '}
+          <code className="break-all text-(--gray-12)">
+            {crossAssembleCommand}
+          </code>
+        </p>
+      </div>
+    </section>
   )
 }
 
@@ -155,21 +206,7 @@ export function Arm64View({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-(--gray-a5) bg-(--color-background) px-3 py-2">
-        <Button size="1" variant="soft" onClick={handleDownload}>
-          Download .s
-        </Button>
-        <p className={`${mutedClass} m-0 min-w-0 flex-1 basis-52`}>
-          The exact text <code>monkey-asm emit</code> writes — nothing executes
-          arm64 in the browser. Select an instruction to highlight its source
-          (and vice versa); hover a token for its meaning. Cross-assemble the
-          download against the runtime library (see <code>asm/README.md</code>
-          ):{' '}
-          <code className="break-all text-(--gray-12)">
-            {crossAssembleCommand}
-          </code>
-        </p>
-      </div>
+      <AssemblyActions onDownload={handleDownload} />
       <ReadingGuide />
       <Editor
         ref={editorRef}

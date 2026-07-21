@@ -156,4 +156,11 @@ describe('arm64TokenAt', () => {
     expect(arm64TokenAt('    b .L0', 7)).toEqual({ from: 6, to: 9, text: '.L0' })
     expect(arm64TokenAt('main:', 0)).toEqual({ from: 0, to: 4, text: 'main' })
   })
+
+  it('does not expose instruction-like words inside comments', () => {
+    const trailing = '    movz x0, #0x2              // let add = 1'
+    expect(arm64TokenAt(trailing, trailing.lastIndexOf('add'))).toBeNull()
+    expect(arm64TokenAt('// bl rt_call', 3)).toBeNull()
+    expect(arm64TokenAt(trailing, trailing.indexOf('movz'))?.text).toBe('movz')
+  })
 })
