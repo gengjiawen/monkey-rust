@@ -52,7 +52,7 @@ jobs:
 
   arm64-e2e-macos:
     # Apple Silicon runner: the e2e suite exercises the Mach-O flavor natively.
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
