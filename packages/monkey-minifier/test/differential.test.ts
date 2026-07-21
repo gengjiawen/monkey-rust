@@ -27,6 +27,10 @@ const programs = [
   'if (true) { 42; let unused = 1; };',
   'if (true) { 1 } else { missing };',
   'let value = 1; let value = if (true) { fn() { value } } else { fn() { 0 } }; value();',
+  // Pins that closures render without their (mangled) parameter names.
+  'let make = fn(longArg) { longArg }; make;',
+  // Pins that a removed top-level trailing let never contributed to the result.
+  '42; let tail = 5;',
 ]
 
 describe('GC VM differential semantics', () => {
