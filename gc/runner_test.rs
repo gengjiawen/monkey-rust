@@ -7,6 +7,7 @@ use compiler::snapshot::{read_bytecode, write_bytecode};
 use object::Object;
 
 use crate::runner::{compile_source, run_bytecode, run_bytecode_with_output};
+use crate::{GcRunError, GcRunStage, GcRuntimeError, GcVM};
 
 /// Representative programs for direct-vs-snapshot equivalence (design doc
 /// §8): closure capture, recursion, class/instance, array/hash plus
@@ -70,6 +71,33 @@ fn captured_output_survives_a_later_runtime_error() {
     let (result, stdout) = run_bytecode_with_output(bytecode, usize::MAX);
     assert_eq!(stdout, "one\n2\n");
     assert_eq!(result.unwrap_err().kind.as_str(), "arithmetic");
+}
+
+#[test]
+fn taking_output_keeps_capture_enabled() {
+    let mut vm = GcVM::new(compile_source(r#"puts("one")"#).unwrap());
+    vm.set_capture_output(true);
+    vm.run_with_budget(usize::MAX).unwrap();
+    assert_eq!(vm.take_output(), "one\n");
+
+    vm.load_bytecode(compile_source(r#"puts("two")"#).unwrap());
+    vm.run_with_budget(usize::MAX).unwrap();
+    assert_eq!(vm.take_output(), "two\n");
+}
+
+#[test]
+fn legacy_error_structs_remain_constructible() {
+    let runtime_error = GcRuntimeError {
+        message: "runtime".to_string(),
+        span: None,
+    };
+    let run_error = GcRunError {
+        stage: GcRunStage::Runtime,
+        message: runtime_error.message,
+        span: runtime_error.span,
+    };
+
+    assert_eq!(run_error.message, "runtime");
 }
 
 fn hostile_bytecode(instructions: Vec<u8>, constants: Vec<Rc<Object>>) -> Bytecode {

@@ -612,7 +612,12 @@ pub fn export_object(heap: &GcHeap, reference: GcRef) -> Object {
     try_export_object(heap, reference).expect("value cannot be exported")
 }
 
-pub fn call_builtin(
+pub fn call_builtin(heap: &mut GcHeap, builtin: BuiltinId, args: &[GcRef], null: GcRef) -> GcRef {
+    call_builtin_with_output(heap, builtin, args, null, None)
+}
+
+/// Invoke a builtin and optionally append its user-visible output to a buffer.
+pub fn call_builtin_with_output(
     heap: &mut GcHeap,
     builtin: BuiltinId,
     args: &[GcRef],

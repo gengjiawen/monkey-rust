@@ -37,7 +37,9 @@ pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{
     export_object, import_object, try_export_object, value_to_string, GcClosure, Value, ValueKind,
 };
-pub use vm::{GcRuntimeError, GcRuntimeErrorKind, GcVM, DEFAULT_INSTRUCTION_BUDGET};
+pub use vm::{
+    GcClassifiedRuntimeError, GcRuntimeError, GcRuntimeErrorKind, GcVM, DEFAULT_INSTRUCTION_BUDGET,
+};
 
 use compiler::compiler::{Bytecode, Compiler};
 use object::Object;
@@ -60,13 +62,33 @@ pub struct GcRunSuccess {
     pub report: GcCollectionReport,
 }
 
+/// Parse, compile, or runtime failure returned by the established report API.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GcRunError {
     pub stage: GcRunStage,
+    pub message: String,
+    pub span: Option<Span>,
+}
+
+/// Report failure with a stable, machine-readable error category.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GcClassifiedRunError {
+    pub stage: GcRunStage,
     pub kind: String,
     pub message: String,
     pub span: Option<Span>,
+}
+
+impl From<GcClassifiedRunError> for GcRunError {
+    fn from(error: GcClassifiedRunError) -> Self {
+        Self {
+            stage: error.stage,
+            message: error.message,
+            span: error.span,
+        }
+    }
 }
 
 /// Compile Monkey source using the existing bytecode compiler.
@@ -95,7 +117,16 @@ pub fn run_source_with_report(
     source: &str,
     instruction_budget: usize,
 ) -> Result<GcRunSuccess, GcRunError> {
-    let program = parser::parse(source).map_err(|errors| GcRunError {
+    run_source_with_report_classified(source, instruction_budget).map_err(Into::into)
+}
+
+/// Parse, compile, and execute Monkey source while classifying failures at
+/// their raise sites.
+pub fn run_source_with_report_classified(
+    source: &str,
+    instruction_budget: usize,
+) -> Result<GcRunSuccess, GcClassifiedRunError> {
+    let program = parser::parse(source).map_err(|errors| GcClassifiedRunError {
         stage: GcRunStage::Parse,
         kind: "syntax".to_string(),
         message: errors
@@ -105,18 +136,20 @@ pub fn run_source_with_report(
         span: None,
     })?;
     let mut compiler = Compiler::new();
-    let bytecode = compiler.compile(&program).map_err(|message| GcRunError {
-        stage: GcRunStage::Compile,
-        kind: "compile".to_string(),
-        message,
-        span: None,
-    })?;
+    let bytecode = compiler
+        .compile(&program)
+        .map_err(|message| GcClassifiedRunError {
+            stage: GcRunStage::Compile,
+            kind: "compile".to_string(),
+            message,
+            span: None,
+        })?;
     let global_names = compiler.symbol_table.global_symbols();
     let mut vm = GcVM::new(bytecode);
     vm.set_global_names(global_names);
     vm.heap_mut().set_gc_threshold(usize::MAX);
-    vm.run_with_budget(instruction_budget)
-        .map_err(|error| GcRunError {
+    vm.run_with_budget_classified(instruction_budget)
+        .map_err(|error| GcClassifiedRunError {
             stage: GcRunStage::Runtime,
             kind: error.kind.as_str().to_string(),
             message: error.message,
