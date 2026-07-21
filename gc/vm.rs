@@ -331,7 +331,10 @@ impl GcVM {
                 Opcode::OpFalse => {
                     self.alloc_and_push(Value::Boolean(false))?;
                 }
-                Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
+                Opcode::OpEqual
+                | Opcode::OpNotEqual
+                | Opcode::OpGreaterThan
+                | Opcode::OpLessThan => {
                     self.execute_comparison(opcode)?;
                 }
                 Opcode::OpMinus => {
@@ -669,6 +672,7 @@ impl GcVM {
                 Opcode::OpEqual => Some(l == r),
                 Opcode::OpNotEqual => Some(l != r),
                 Opcode::OpGreaterThan => Some(l > r),
+                Opcode::OpLessThan => Some(l < r),
                 _ => unreachable!(),
             },
             (Value::Boolean(l), Value::Boolean(r)) => match opcode {

@@ -201,10 +201,11 @@ impl<'a> Lowerer<'a> {
         let name = let_statement.identifier.kind.to_string();
         let comment = self.snippet(&let_statement.span);
         self.emitter.comment(&comment);
-        // Define before lowering the value so `let f = fn() { f() }` works at
-        // the global scope, matching the bytecode compiler.
-        let symbol = self.symbols.define(name.clone());
+        // The right-hand side sees the previous binding, if any. Named
+        // recursion does not depend on predeclaring this slot: function
+        // bodies resolve their parser-provided name through Function scope.
         self.lower_expression(&let_statement.expr)?;
+        let symbol = self.symbols.define(name.clone());
         let span = let_statement.span.clone();
         self.emitter.with_span(&span, |emitter| match symbol.scope {
             SymbolScope::Global => {
@@ -531,27 +532,21 @@ impl<'a> Lowerer<'a> {
 
     fn lower_infix(&mut self, infix: &parser::ast::BinaryExpression) -> Result<(), LowerError> {
         let comment = self.snippet(&infix.span);
-        // `a < b` evaluates right then left and reuses rt_gt, mirroring the
-        // bytecode compiler's operand swap.
-        if infix.op.kind == TokenKind::LT {
-            self.lower_expression(&infix.right)?;
-            self.emitter.with_span(&infix.span.clone(), |emitter| {
-                emitter.push_acc("right operand (swapped <)");
-            });
-            self.lower_expression(&infix.left)?;
-            self.emitter.with_span(&infix.span.clone(), |emitter| {
-                emitter.ins_cmt("mov x1, x0", "left operand");
-                emitter.pop("x0", "right operand");
-                emitter.ins_cmt("bl rt_gt", &comment);
-            });
-            return Ok(());
-        }
-
         self.lower_expression(&infix.left)?;
         self.emitter.with_span(&infix.span.clone(), |emitter| {
             emitter.push_acc("left operand");
         });
         self.lower_expression(&infix.right)?;
+
+        // Preserve left-to-right evaluation. There is no rt_lt entry point,
+        // so compare `right > left` after evaluating both source operands.
+        if infix.op.kind == TokenKind::LT {
+            self.emitter.with_span(&infix.span.clone(), |emitter| {
+                emitter.pop("x1", "left operand");
+                emitter.ins_cmt("bl rt_gt", &comment);
+            });
+            return Ok(());
+        }
 
         let runtime_call = match infix.op.kind {
             TokenKind::PLUS => "bl rt_add",

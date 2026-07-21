@@ -299,6 +299,18 @@ mod tests {
                 input: "let one = 1; let two = one + one; one + two",
                 expected: Object::Integer(3),
             },
+            VmTestCase {
+                input: "let x = 1; let x = x + 2; x",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "let wrapper = fn() { let count = fn(n) { if (n > 0) { count(n - 1) } else { 7 } }; count(2) }; wrapper()",
+                expected: Object::Integer(7),
+            },
+            VmTestCase {
+                input: "class Counter { constructor() { this.value = 0; } next() { this.value = this.value + 1; this.value } } let counter = new Counter(); counter.next() < counter.next()",
+                expected: Object::Boolean(true),
+            },
         ];
 
         run_vm_tests(tests);

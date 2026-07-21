@@ -21,7 +21,7 @@ main:
     // let x = x + 2;
     adrp x8, g_globals              // x
     add x8, x8, :lo12:g_globals
-    ldr x0, [x8, #8]
+    ldr x0, [x8]
     str x0, [sp, #-16]!             // left operand
     movz x0, #0x4                   // 2
     mov x1, x0                      // right operand

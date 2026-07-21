@@ -308,10 +308,13 @@ impl Compiler {
     fn compile_stmt(&mut self, s: &Statement) -> Result<(), CompileError> {
         match s {
             Statement::Let(let_statement) => {
+                // A rebinding's RHS resolves against the preceding lexical
+                // environment. Named recursion is provided by Function scope
+                // inside the function body, not by an uninitialized slot.
+                self.compile_expr(&let_statement.expr)?;
                 let symbol = self
                     .symbol_table
                     .define(let_statement.identifier.kind.to_string());
-                self.compile_expr(&let_statement.expr)?;
                 if symbol.scope == SymbolScope::Global {
                     self.emit_with_span(
                         Opcode::OpSetGlobal,
@@ -432,12 +435,6 @@ impl Compiler {
                 }
             }
             Expression::INFIX(infix) => {
-                if infix.op.kind == TokenKind::LT {
-                    self.compile_expr(&infix.right)?;
-                    self.compile_expr(&infix.left)?;
-                    self.emit_with_span(Opcode::OpGreaterThan, &vec![], &infix.span);
-                    return Ok(());
-                }
                 self.compile_expr(&infix.left)?;
                 self.compile_expr(&infix.right)?;
                 match infix.op.kind {
@@ -455,6 +452,9 @@ impl Compiler {
                     }
                     TokenKind::GT => {
                         self.emit_with_span(Opcode::OpGreaterThan, &vec![], &infix.span);
+                    }
+                    TokenKind::LT => {
+                        self.emit_with_span(Opcode::OpLessThan, &vec![], &infix.span);
                     }
                     TokenKind::EQ => {
                         self.emit_with_span(Opcode::OpEqual, &vec![], &infix.span);
@@ -501,6 +501,9 @@ impl Compiler {
                 let function_span = f.span.clone();
                 self.enter_scope();
                 self.callable_kinds.push(CallableKind::Function);
+                if !f.name.is_empty() {
+                    self.symbol_table.define_function_name(f.name.clone());
+                }
                 for param in f.params.iter() {
                     self.symbol_table.define(param.name.clone());
                 }

@@ -13,11 +13,10 @@ main:
     add x0, x0, :lo12:g_globals
     movz x1, #0                     // global slot count
     bl rt_globals_init
-    movz x0, #0x4                   // 2
-    str x0, [sp, #-16]!             // right operand (swapped <)
     movz x0, #0x2                   // 1
-    mov x1, x0                      // left operand
-    ldr x0, [sp], #16               // right operand
+    str x0, [sp, #-16]!             // left operand
+    movz x0, #0x4                   // 2
+    ldr x1, [sp], #16               // left operand
     bl rt_gt                        // 1 < 2
     bl rt_truthy                    // if (1 < 2)
     cbz x0, .L0

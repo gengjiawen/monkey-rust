@@ -48,11 +48,10 @@ main:
     sub sp, sp, #32
     stur x0, [x29, #-16]            // closure (hidden argument)
     stur x1, [x29, #-32]            // n
-    movz x0, #0x4                   // 2
-    str x0, [sp, #-16]!             // right operand (swapped <)
     ldur x0, [x29, #-32]            // n
-    mov x1, x0                      // left operand
-    ldr x0, [sp], #16               // right operand
+    str x0, [sp, #-16]!             // left operand
+    movz x0, #0x4                   // 2
+    ldr x1, [sp], #16               // left operand
     bl rt_gt                        // n < 2
     bl rt_truthy                    // if (n < 2)
     cbz x0, .L0
