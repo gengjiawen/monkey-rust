@@ -19,15 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      # Corepack is unmaintained, so CI installs pnpm directly. Node stays on
-      # 20.19: the oldest version whose synchronous require(esm) the minifier's
-      # Node entrypoint supports.
+      # Corepack is unmaintained, so CI installs pnpm directly.
       - uses: pnpm/action-setup@v6
         with:
           version: 11.15.1
       - uses: actions/setup-node@v6
         with:
-          node-version: '20.19'
+          node-version: '24'
       - run: npx envinfo
       - name: Build
         run: cargo build
@@ -56,6 +54,15 @@ jobs:
         run: |
           pnpm install --filter monkey-extension... --frozen-lockfile
           pnpm --filter monkey-extension run build
+      # pnpm 11 itself needs Node >= 22.13, so the minifier's supported floor
+      # is exercised with plain node: 20.19 is the oldest version whose
+      # synchronous require(esm) the Node entrypoint relies on.
+      - name: Switch to the minifier's minimum supported Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.19'
+      - name: Smoke test the Node entrypoint on Node 20.19
+        run: node packages/monkey-minifier/test/node-smoke.cjs
 
   arm64-e2e:
     runs-on: ubuntu-latest
