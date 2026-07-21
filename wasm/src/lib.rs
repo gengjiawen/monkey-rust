@@ -95,20 +95,21 @@ pub fn compile_with_debug(input: &str) -> String {
 pub fn run_gc_with_report(input: &str) -> String {
     set_panic_hook();
 
-    let envelope = match gc::run_source_with_report(input, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
-        Ok(success) => serde_json::json!({
-            "status": "ok",
-            "result": success.result,
-            "report": success.report,
-        }),
-        Err(error) => serde_json::json!({
-            "status": "error",
-            "stage": error.stage,
-            "kind": error.kind,
-            "message": error.message,
-            "span": error.span,
-        }),
-    };
+    let envelope =
+        match gc::run_source_with_report_classified(input, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
+            Ok(success) => serde_json::json!({
+                "status": "ok",
+                "result": success.result,
+                "report": success.report,
+            }),
+            Err(error) => serde_json::json!({
+                "status": "error",
+                "stage": error.stage,
+                "kind": error.kind,
+                "message": error.message,
+                "span": error.span,
+            }),
+        };
 
     serde_json::to_string(&envelope).expect("GC run envelope serialization should not fail")
 }
@@ -248,7 +249,8 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 /// Execute `.mbc` snapshot bytes on the cycle-collecting VM — the browser twin of
-/// `monkey-gc run foo.mbc`, sharing its execution path (`gc::run_bytecode`).
+/// `monkey-gc run foo.mbc`, running the same VM with raise-site error
+/// classification so the envelope can carry a stable `kind`.
 ///
 /// The buffer is untrusted input: it goes through the validating snapshot reader
 /// before the VM. Failures are data in the envelope — stage `snapshot` when the
@@ -259,19 +261,25 @@ pub fn run_snapshot(bytes: &[u8]) -> String {
     set_panic_hook();
 
     let envelope = match read_bytecode(bytes) {
-        Ok(bytecode) => match gc::run_bytecode(bytecode, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
-            Ok(result) => serde_json::json!({
-                "status": "ok",
-                "result": result,
-            }),
-            Err(error) => serde_json::json!({
-                "status": "error",
-                "stage": "runtime",
-                "kind": error.kind,
-                "message": error.message,
-                "span": error.span,
-            }),
-        },
+        Ok(bytecode) => {
+            let mut vm = gc::GcVM::new(bytecode);
+            match vm
+                .run_with_budget_classified(PLAYGROUND_GC_INSTRUCTION_BUDGET)
+                .map(|()| vm.last_result_string())
+            {
+                Ok(result) => serde_json::json!({
+                    "status": "ok",
+                    "result": result,
+                }),
+                Err(error) => serde_json::json!({
+                    "status": "error",
+                    "stage": "runtime",
+                    "kind": error.kind,
+                    "message": error.message,
+                    "span": error.span,
+                }),
+            }
+        }
         Err(error) => serde_json::json!({
             "status": "error",
             "stage": "snapshot",
