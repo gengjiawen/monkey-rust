@@ -9,6 +9,15 @@ stack. One instruction stream, two output flavors selected with
 `--platform linux|macos` (default: the host): Linux/ELF (GNU as spelling)
 and macOS/Mach-O (Apple Silicon, `_`-prefixed symbols, `@PAGE` relocations).
 
+## Playground
+
+The [compiler playground](https://monkey-lang-playground-jw.vercel.app/) has an
+**ARM64** tab — a godbolt-style source ↔ assembly view with bidirectional span
+highlighting and a Download `.s` button, backed by the `compile_to_arm64` wasm
+export (which reuses `lower` in the browser). Nothing executes arm64 there; the
+tab renders the exact text `monkey-asm emit` writes, and the downloaded `.s`
+cross-assembles with the commands in [Usage](#usage) below.
+
 ## One crate, built twice
 
 | Build         | Command                                                                        | Product                                                         |
@@ -68,15 +77,6 @@ host.
 canonical result record (u64 big-endian length + JSON) to fd 3 at exit, while
 stdout stays the untouched `puts` byte stream; `run --observe` decodes the
 record to stderr.
-
-## Playground
-
-The [compiler playground](https://monkey-lang-playground-jw.vercel.app/) has an
-**ARM64** tab — a godbolt-style source ↔ assembly view with bidirectional span
-highlighting and a Download `.s` button, backed by the `compile_to_arm64` wasm
-export (which reuses `lower` in the browser). Nothing executes arm64 there; the
-tab renders the exact text `monkey-asm emit` writes, and the downloaded `.s`
-cross-assembles with the command above.
 
 ## Layout
 
