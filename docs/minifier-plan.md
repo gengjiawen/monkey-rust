@@ -7,7 +7,7 @@ workspace 新包，并在 playground 里提供在线演示视图。
 
 ```
 源码 ──wasm parse_lossless──▶ JSON AST ──(变换 pass)──▶ AST ──紧凑 printer──▶ 压缩后源码
-                                         mangle / 常量折叠 / 死代码消除
+                                         mangle / 常量折叠 / 常量传播 / 死代码消除
 ```
 
 Parser 不重新实现。minifier 消费 `@gengjiawen/monkey-wasm` 新增的
@@ -23,8 +23,8 @@ Parser 不重新实现。minifier 消费 `@gengjiawen/monkey-wasm` 新增的
     等价由**全新 `Compiler` + GC VM** 的 `status/result/stdout` 判定。
     interpreter 在重绑定闭包等场景与 compiler 已有不同语义，因此只作补充兼容
     检查，不是优化的语义权威。
-- v0 做空白/注释剥离 + 冗余括号消除；v1 做标识符改名（mangle）；v2 做常量折叠
-  与死 `let` 消除（可选增量）。
+- v0 做空白/注释剥离 + 冗余括号消除；v1 做标识符改名（mangle）；v2 做常量
+  折叠、常量传播与死 `let` 消除（可选增量）。
 - 发布为 npm 包，API 小而稳定：`minify(source, options)`。
 - Playground 演示：新增 `Minify` 输出视图，实时展示压缩结果和字节数统计。
 
@@ -56,6 +56,7 @@ packages/monkey-minifier/
     scope.ts            # 作用域分析（Phase 3）
     mangle.ts           # 标识符改名（Phase 3）
     fold.ts             # 常量折叠 / 死代码消除（Phase 4）
+    propagate.ts        # 常量传播（Phase 4）
   test/
     printer.test.ts
     roundtrip.test.ts
@@ -262,10 +263,11 @@ printer 仍只输出 `fn(`，重新 parse 会根据新 let 名回填同样的 me
 
 ## Phase 4 — 压缩 pass（v2，可选）
 
-每个都是自包含的 AST→AST pass，但集成顺序固定为：常量折叠 → 重建 binding/effect
-分析 → 死 `let` 消除到不动点 → 再分析 → mangle → printer。不能宣称任意顺序；
-折叠会暴露死绑定，删除又会改变引用频率和后续 slot 编号。任一分析不确定时保留
-原节点。
+每个都是自包含的 AST→AST pass，但集成顺序固定为：常量折叠与常量传播交替到
+不动点 → 重建 binding/effect 分析 → 死 `let` 消除到不动点 → 再分析 →
+mangle → printer。不能宣称任意顺序；折叠为传播制造 literal 初始化式，传播为
+折叠解锁卡在 identifier 上的表达式，两者共同暴露死绑定，删除又会改变引用
+频率和后续 slot 编号。任一分析不确定时保留原节点。
 
 ### 常量折叠
 
@@ -298,6 +300,44 @@ printer 仍只输出 `fn(`，重新 parse 会根据新 let 名回填同样的 me
 还有一个 parser 元数据边界：`let f=fn(){...}` 会给函数体注入递归 self binding，
 而 `let f=if(true){fn(){...}}` 里的嵌套函数是匿名的。即使 condition 是常量，也
 不能把后者折叠成直接 RHS 函数字面量，否则打印后重新 parse 会改变闭包捕获。
+
+### 常量传播
+
+折叠只处理“表达式内部全是常量”的情况；`let a=1+1; let b=a+1; print(a)` 里
+`b` 的 RHS 和 `print` 的实参都卡在 identifier 上，折叠自身永远打不开。传播
+pass 把“初始化式在折叠后已是 literal”的 binding 的每处引用替换成该 literal
+的深拷贝（后续 pass 原地改写节点，多处共享同一节点会被重复改写），从而让
+上面的程序最终压成 `print(2);`，对齐 terser 在等价 JavaScript 上的输出。
+传播自己不删语句：引用清零的 binding 交给死 `let` 消除按它的规则处理。
+
+安全论证建立在 compiler 的 slot 语义上：每条 `let` 都分配新 slot（重绑定
+不是赋值），slot 恰好写入一次，因此解析到某 binding 的引用读到的值恒等于
+该 binding 初始化式的值——闭包也一样，`let v=1; let g=fn(){v}; let v=2;`
+中 `g()` 返回 1，已用探针在真实 GC VM 上验证。唯一反例是 `if` arm 里的
+`let`：两个 branch 共用符号表（Phase 3 规则 5），`let` 之后的引用会解析到
+它，但 arm 未执行时 slot 从未写入，引用处读到 null——
+`let v=1; if(1>2){let v=2;}; puts(v);` 输出 `null`。scope 分析给这类
+binding 打 `conditional` 标记，传播一律跳过；函数/方法体是新的执行边界，
+body 顶层 `let` 每次调用都执行，标记在 callable 边界重置。
+
+其余护栏：
+
+- 只传播四种折叠后形态：integer/boolean/string literal 与
+  `UnaryExpression(-, Integer)`。array/hash 字面量每次求值分配新值，复制到
+  多个位置会改变别名关系，直接排除。
+- `new` 的 callee 语法上必须是 identifier，不可替换；该引用保留后 binding
+  自然存活。
+- 体积护栏：保留 binding 的成本是 `let x=<lit>;` 的 7 个固定字符加每处引用
+  1 字符（mangle 后），内联成本是每处 `width` 字符；
+  `refs × (width−1) > 7 + width` 时放弃，例如 `"hello"` 引用三次就保留
+  绑定。
+
+传播与折叠互相解锁——传播把 literal 塞进卡在 identifier 上的表达式，折叠
+再把它算成新的 literal 初始化式——所以两者交替运行到不动点，之后才进入死
+`let` 消除。终止性：每轮成功传播至少替换掉一个 identifier 节点，而两个
+pass 都不会新建 identifier，identifier 总数严格递减、有下界。三个危险案例
+（conditional `let`、重绑定 + 闭包捕获、`new` callee）各有 differential
+fixture 钉住。
 
 ### 死 `let` 消除（去掉无用变量）
 
@@ -376,9 +416,11 @@ compiler 也接受时才进入语义语料；两者结果冲突时以 compiler +
    闭包捕获、builtin shadow、if 两分支污染、`this`、未解析名、class/属性各写
    fixture，全部过 structural + differential 套件；另断言 class/instance 的
    可见名称没有变化。
-6. **Fold/DCE 安全性**（Phase 4 起）：覆盖 i64 边界、除零、
-   `i64::MIN / -1`、不可表示的 if，以及“无调用但会报错”的 initializer（错误
-   operand 类型、property/index）。每次删除前后都跑 output-aware differential。
+6. **Fold/Propagate/DCE 安全性**（Phase 4 起）：覆盖 i64 边界、除零、
+   `i64::MIN / -1`、不可表示的 if、传播的三个危险案例（conditional `let`、
+   重绑定 + 闭包捕获、`new` callee），以及“无调用但会报错”的 initializer
+   （错误 operand 类型、property/index）。每次删除前后都跑 output-aware
+   differential。
 
 全语料的压缩率在测试输出里打印成报告，不做断言，这样改进 printer 永远不会
 "挂"在一个过期数字上。
@@ -401,7 +443,7 @@ compiler 也接受时才进入语义语料；两者结果冲突时以 compiler +
 | 1   | lossless AST 导出 + 脚手架 + printer + structural/output differential | 2 天     |
 | 2   | Playground `Minify` 视图 + UTF-8 字节统计 + stale request guard       | 0.5–1 天 |
 | 3   | compiler-order binding 分析 + mangler（+ playground 开关）            | 2–3 天   |
-| 4   | 明确 i64 VM 语义 + 常量/受限 `if` 折叠 + 保守死 `let` 消除            | 2–3 天   |
+| 4   | 明确 i64 VM 语义 + 常量/受限 `if` 折叠 + 常量传播 + 保守死 `let` 消除 | 2–3 天   |
 | 5   | CLI `bin` + 发布接线 + 文档                                           | 0.5 天   |
 
 PR 1+2 合起来交付可见的 demo；之后全是增量。
