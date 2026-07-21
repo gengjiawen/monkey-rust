@@ -232,6 +232,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "monkey-asm"
+version = "1.0.0"
+dependencies = [
+ "insta",
+ "monkey-compiler",
+ "monkey-lexer",
+ "monkey-object",
+ "monkey-parser",
+ "serde_json",
+]
+
+[[package]]
 name = "monkey-compiler"
 version = "1.0.0"
 dependencies = [
@@ -298,6 +310,7 @@ name = "monkey-wasm"
 version = "1.0.0"
 dependencies = [
  "console_error_panic_hook",
+ "monkey-asm",
  "monkey-compiler",
  "monkey-gc",
  "monkey-parser",

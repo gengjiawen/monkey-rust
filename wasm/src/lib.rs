@@ -4,6 +4,8 @@ use crate::utils::set_panic_hook;
 use compiler::compiler::Compiler;
 use compiler::snapshot::{read_bytecode, write_bytecode};
 use compiler::snapshot_layout::describe_bytecode;
+use monkey_asm::emitter::AsmDialect;
+use monkey_asm::lower::lower_node;
 use parser::parse as parser_pase;
 use parser::parse_ast_json_string;
 use wasm_bindgen::prelude::*;
@@ -97,6 +99,82 @@ pub fn run_gc_with_report(input: &str) -> String {
     };
 
     serde_json::to_string(&envelope).expect("GC run envelope serialization should not fail")
+}
+
+/// Compile Monkey source to AArch64 assembly and return a tagged JSON envelope
+/// of per-line `text`/`kind`/`span` records for the playground's godbolt-style
+/// ARM64 view (arm64 backend design §12 V1).
+///
+/// The browser only renders the text `monkey-asm emit` would produce — nothing
+/// executes arm64 here. Parse and lowering failures are data in the envelope,
+/// not JavaScript exceptions, mirroring [`run_gc_with_report`].
+#[wasm_bindgen]
+pub fn compile_to_arm64(input: &str) -> String {
+    set_panic_hook();
+
+    let envelope = match arm64_envelope(input) {
+        Ok(envelope) => envelope,
+        Err((stage, message, span)) => serde_json::json!({
+            "status": "error",
+            "stage": stage,
+            "message": message,
+            "span": span.map(|(start, end)| serde_json::json!({ "start": start, "end": end })),
+        }),
+    };
+    serde_json::to_string(&envelope).expect("arm64 envelope serialization should not fail")
+}
+
+type Arm64Failure = (&'static str, String, Option<(usize, usize)>);
+
+fn arm64_envelope(input: &str) -> Result<serde_json::Value, Arm64Failure> {
+    let node = parser_pase(input).map_err(|errors| {
+        let message = errors
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "unknown parse error".to_string());
+        ("parse", message, None)
+    })?;
+    // The playground always shows the Linux/ELF spelling (design §12).
+    let assembly = lower_node(input, &node, AsmDialect::LinuxElf, false)
+        .map_err(|error| ("compile", error.message, error.span))?;
+
+    // `Assembly` guarantees one `line_spans` entry per `\n`-terminated line.
+    let lines: Vec<serde_json::Value> = assembly
+        .text
+        .lines()
+        .zip(assembly.line_spans.iter())
+        .map(|(text, span)| {
+            serde_json::json!({
+                "text": text,
+                "kind": arm64_line_kind(text),
+                "span": span.map(|(start, end)| serde_json::json!({ "start": start, "end": end })),
+            })
+        })
+        .collect();
+    Ok(serde_json::json!({ "status": "ok", "lines": lines }))
+}
+
+/// Presentation-level line class for the playground: the emitter only ever
+/// writes `//` comments, so everything before the first `//` is the code part.
+fn arm64_line_kind(text: &str) -> &'static str {
+    let code = match text.find("//") {
+        Some(index) => &text[..index],
+        None => text,
+    };
+    let trimmed = code.trim();
+    if trimmed.is_empty() {
+        if text.trim().is_empty() {
+            "blank"
+        } else {
+            "comment"
+        }
+    } else if trimmed.ends_with(':') {
+        "label"
+    } else if trimmed.starts_with('.') {
+        "directive"
+    } else {
+        "code"
+    }
 }
 
 /// Compile Monkey source into a `.mbc` snapshot and return a tagged JSON envelope

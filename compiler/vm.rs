@@ -105,7 +105,10 @@ impl VM {
                 Opcode::OpFalse => {
                     self.push(Rc::new(Object::Boolean(false)));
                 }
-                Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
+                Opcode::OpEqual
+                | Opcode::OpNotEqual
+                | Opcode::OpGreaterThan
+                | Opcode::OpLessThan => {
                     self.execute_comparison(opcode);
                 }
                 Opcode::OpMinus => {
@@ -314,6 +317,7 @@ impl VM {
             (Object::Integer(l), Object::Integer(r)) => {
                 let result = match opcode {
                     Opcode::OpGreaterThan => l > r,
+                    Opcode::OpLessThan => l < r,
                     _ => panic!("Unknown opcode for comparing int"),
                 };
                 self.push(Rc::from(Object::Boolean(result)));

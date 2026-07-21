@@ -325,11 +325,11 @@ mod tests {
             },
             CompilerTestCase {
                 input: "1 < 2",
-                expected_constants: vec![Object::Integer(2), Object::Integer(1)],
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make_instructions(OpConst, &vec![0]),
                     make_instructions(OpConst, &vec![1]),
-                    make_instructions(OpGreaterThan, &vec![0]),
+                    make_instructions(OpLessThan, &vec![0]),
                     make_instructions(OpPop, &vec![0]),
                 ],
             },

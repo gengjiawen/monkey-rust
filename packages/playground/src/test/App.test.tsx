@@ -17,6 +17,7 @@ import {
 } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { Arm64BuildEnvelope } from '../arm64'
 import type { GcRunEnvelope, ValueKindCounts } from '../gcReport'
 import type { SnapshotBuildSuccess, SnapshotRunEnvelope } from '../snapshot'
 
@@ -26,10 +27,13 @@ const {
   compileMock,
   buildSnapshotMock,
   runSnapshotMock,
+  buildArm64Mock,
   highlightRangeMock,
+  highlightRangesMock,
   clearHighlightMock,
   formatMock,
   sourceEditorHooks,
+  outputEditorHooks,
 } = vi.hoisted(() => ({
   runGcMock: vi.fn(),
   parseMock: vi.fn(),
@@ -43,7 +47,9 @@ const {
   ),
   buildSnapshotMock: vi.fn(),
   runSnapshotMock: vi.fn(),
+  buildArm64Mock: vi.fn(),
   highlightRangeMock: vi.fn(),
+  highlightRangesMock: vi.fn(),
   clearHighlightMock: vi.fn(),
   formatMock: vi.fn(),
   // The mock editor below is a plain <textarea>, which cannot reproduce every
@@ -51,6 +57,10 @@ const {
   // or cursor movements. Tests drive those callbacks through these hooks.
   sourceEditorHooks: {} as {
     onChange?: (value: string) => void
+    onSelectionChange?: (selection: { from: number; to: number }) => void
+  },
+  // Same for the read-only output pane (bytecode / arm64 assembly).
+  outputEditorHooks: {} as {
     onSelectionChange?: (selection: { from: number; to: number }) => void
   },
 }))
@@ -71,6 +81,10 @@ vi.mock('../snapshotRunner', () => ({
   runSnapshot: runSnapshotMock,
 }))
 
+vi.mock('../arm64Runner', () => ({
+  buildArm64: buildArm64Mock,
+}))
+
 vi.mock('prettier/standalone', () => ({
   format: formatMock,
 }))
@@ -89,16 +103,23 @@ interface MockEditorProps {
 vi.mock('../Editor', () => ({
   Editor: forwardRef(function MockEditor(
     { code = '', onChange, onSelectionChange, extra }: MockEditorProps,
-    ref: Ref<{ highlightRange(): void; clearHighlight(): void }>
+    ref: Ref<{
+      highlightRange(): void
+      highlightRanges(): void
+      clearHighlight(): void
+    }>
   ) {
     useImperativeHandle(ref, () => ({
       highlightRange: highlightRangeMock,
+      highlightRanges: highlightRangesMock,
       clearHighlight: clearHighlightMock,
     }))
 
     if (!extra?.readOnly) {
       sourceEditorHooks.onChange = onChange
       sourceEditorHooks.onSelectionChange = onSelectionChange
+    } else {
+      outputEditorHooks.onSelectionChange = onSelectionChange
     }
 
     const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -331,6 +352,21 @@ function snapshotEnvelope(): SnapshotBuildSuccess {
   }
 }
 
+// Assembly text offsets: 'main:' = {0,5}, ' mov x0, #7' line = {6,18},
+// ' ret' line = {19,24}; the two code lines share source span {0,1}.
+function arm64Envelope(): Arm64BuildEnvelope {
+  const lines = [
+    { text: 'main:', kind: 'label' as const, span: null },
+    { text: '  mov x0, #7', kind: 'code' as const, span: { start: 0, end: 1 } },
+    { text: '  ret', kind: 'code' as const, span: { start: 0, end: 1 } },
+  ]
+  return {
+    status: 'ok',
+    lines,
+    text: lines.map((line) => line.text).join('\n'),
+  }
+}
+
 function renderApp() {
   // A fresh jotai Provider per render keeps atom state (the persisted snippet
   // index) from leaking between tests through the module-level default store.
@@ -353,6 +389,13 @@ async function openSnapshotTab(user: ReturnType<typeof userEvent.setup>) {
   return screen.getByRole('button', { name: 'Run snapshot' })
 }
 
+async function openArm64Tab(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('radio', { name: 'ARM64' }))
+  // The build lands after the 200ms debounce; the download button only
+  // renders on a successful build.
+  return screen.findByRole('button', { name: 'Download .s' })
+}
+
 afterEach(cleanup)
 
 beforeEach(() => {
@@ -364,12 +407,16 @@ beforeEach(() => {
   buildSnapshotMock.mockReset()
   buildSnapshotMock.mockImplementation(() => snapshotEnvelope())
   runSnapshotMock.mockReset()
+  buildArm64Mock.mockReset()
+  buildArm64Mock.mockImplementation(() => arm64Envelope())
   formatMock.mockReset()
   formatMock.mockImplementation(async (source: string) => source)
   highlightRangeMock.mockClear()
+  highlightRangesMock.mockClear()
   clearHighlightMock.mockClear()
   sourceEditorHooks.onChange = undefined
   sourceEditorHooks.onSelectionChange = undefined
+  outputEditorHooks.onSelectionChange = undefined
 })
 
 describe('GC playground', () => {
@@ -676,9 +723,7 @@ describe('Snapshot playground', () => {
 
     // The previous build stays mounted while the rebuild is announced; only
     // the actions that would hand out stale bytes lock up.
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Rebuilding snapshot…'
-    )
+    expect(screen.getByRole('status')).toHaveTextContent('Rebuilding snapshot…')
     expect(screen.getByLabelText('Snapshot size')).toBeInTheDocument()
     expect(runButton).toBeDisabled()
     expect(downloadButton).toBeDisabled()
@@ -725,13 +770,9 @@ describe('Snapshot playground', () => {
     await user.click(screen.getByRole('combobox'))
     await user.click(await screen.findByRole('option', { name: 'Functions' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Rebuilding snapshot…'
-    )
+    expect(screen.getByRole('status')).toHaveTextContent('Rebuilding snapshot…')
     expect(runButton).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Download .mbc' })
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Download .mbc' })).toBeDisabled()
 
     await waitFor(() => {
       expect(buildSnapshotMock).toHaveBeenCalledTimes(buildCount + 1)
@@ -825,9 +866,7 @@ describe('Snapshot playground', () => {
     const strippedToggle = screen.getByRole('radio', { name: 'Stripped' })
     await user.click(strippedToggle)
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Rebuilding snapshot…'
-    )
+    expect(screen.getByRole('status')).toHaveTextContent('Rebuilding snapshot…')
     expect(runButton).toBeDisabled()
     // The toggle survives the rebuild without losing keyboard focus because
     // the panel is never unmounted.
@@ -867,9 +906,7 @@ describe('Snapshot playground', () => {
     })
 
     expect(screen.queryByText('stale')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Rebuilding snapshot…'
-    )
+    expect(screen.getByRole('status')).toHaveTextContent('Rebuilding snapshot…')
 
     await waitFor(() => expect(runButton).toBeEnabled())
     expect(
@@ -1021,5 +1058,133 @@ describe('AST selection sync', () => {
     highlightRangeMock.mockClear()
     await user.click(identifierSummary!)
     expect(highlightRangeMock).toHaveBeenCalledWith(5, 9)
+  })
+})
+
+describe('ARM64 view', () => {
+  it('lowers only while the tab is active and renders the assembly', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    expect(buildArm64Mock).not.toHaveBeenCalled()
+
+    await openArm64Tab(user)
+
+    const sourceEditor =
+      screen.getByLabelText<HTMLTextAreaElement>('Source editor')
+    expect(buildArm64Mock).toHaveBeenCalledWith(sourceEditor.value)
+    expect(
+      screen.getByLabelText<HTMLTextAreaElement>('Output editor')
+    ).toHaveValue('main:\n  mov x0, #7\n  ret')
+    expect(screen.getByText(/aarch64-linux-gnu-gcc/)).toBeInTheDocument()
+
+    const calls = buildArm64Mock.mock.calls.length
+    await user.type(sourceEditor, 'x')
+    await waitFor(() =>
+      expect(buildArm64Mock.mock.calls.length).toBeGreaterThan(calls)
+    )
+    expect(buildArm64Mock).toHaveBeenLastCalledWith(sourceEditor.value)
+  })
+
+  it('renders lowering failures with a span jump button', async () => {
+    const user = userEvent.setup()
+    buildArm64Mock.mockImplementation(
+      (): Arm64BuildEnvelope => ({
+        status: 'error',
+        stage: 'compile',
+        message: "undefined variable 'missing'",
+        span: { start: 0, end: 7 },
+      })
+    )
+    renderApp()
+
+    await user.click(screen.getByRole('radio', { name: 'ARM64' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      "compile error: undefined variable 'missing'"
+    )
+
+    highlightRangeMock.mockClear()
+    await user.click(
+      screen.getByRole('button', { name: 'Show in editor (0–7)' })
+    )
+    expect(highlightRangeMock).toHaveBeenCalledWith(0, 7)
+  })
+
+  it('maps assembly cursor movements back to the source span', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await openArm64Tab(user)
+
+    highlightRangeMock.mockClear()
+    act(() => {
+      outputEditorHooks.onSelectionChange?.({ from: 7, to: 7 })
+    })
+    expect(highlightRangeMock).toHaveBeenCalledWith(0, 1)
+
+    // The label line carries no span, so the source highlight clears.
+    clearHighlightMock.mockClear()
+    act(() => {
+      outputEditorHooks.onSelectionChange?.({ from: 0, to: 0 })
+    })
+    expect(clearHighlightMock).toHaveBeenCalled()
+  })
+
+  it('maps source cursor movements to the lowered assembly lines', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await openArm64Tab(user)
+
+    highlightRangesMock.mockClear()
+    act(() => {
+      sourceEditorHooks.onSelectionChange?.({ from: 0, to: 0 })
+    })
+    // Both code lines share span {0,1}; being adjacent they merge into one
+    // assembly range spanning `  mov x0, #7\n  ret`.
+    expect(highlightRangesMock).toHaveBeenCalledWith([{ from: 6, to: 24 }])
+
+    clearHighlightMock.mockClear()
+    act(() => {
+      sourceEditorHooks.onSelectionChange?.({ from: 99, to: 99 })
+    })
+    expect(clearHighlightMock).toHaveBeenCalled()
+  })
+
+  it('highlights every non-contiguous assembly range for a source span', async () => {
+    const user = userEvent.setup()
+    const lines = [
+      { text: 'main:', kind: 'label' as const, span: null },
+      {
+        text: '  mov x0, #7',
+        kind: 'code' as const,
+        span: { start: 0, end: 1 },
+      },
+      { text: '  nop', kind: 'code' as const, span: null },
+      {
+        text: '  ret',
+        kind: 'code' as const,
+        span: { start: 0, end: 1 },
+      },
+    ]
+    buildArm64Mock.mockImplementation(() => ({
+      status: 'ok',
+      lines,
+      text: lines.map((line) => line.text).join('\n'),
+    }))
+    renderApp()
+
+    await openArm64Tab(user)
+
+    highlightRangesMock.mockClear()
+    act(() => {
+      sourceEditorHooks.onSelectionChange?.({ from: 0, to: 0 })
+    })
+    expect(highlightRangesMock).toHaveBeenCalledWith([
+      { from: 6, to: 18 },
+      { from: 25, to: 30 },
+    ])
   })
 })

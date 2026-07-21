@@ -1,0 +1,31 @@
+[package]
+name = "monkey-asm"
+version = "1.0.0"
+description = "AOT AArch64 assembly backend for monkeylang (Linux ELF and macOS Mach-O)"
+homepage = "https://github.com/gengjiawen/monkey-rust"
+repository = "https://github.com/gengjiawen/monkey-rust"
+authors = ["gengjiawen <technicalcute@gmail.com>"]
+edition = "2018"
+license = "MIT"
+
+# The same crate is built twice (see docs/arm64-asm-backend-design.md §4):
+#  - host build → the monkey-asm compiler CLI (rlib + bin)
+#  - aarch64 cross build → the runtime static library linked with generated .s
+[lib]
+name = "monkey_asm"
+path = "lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[[bin]]
+name = "monkey-asm"
+path = "main.rs"
+
+[dependencies]
+monkey-lexer = { path = "../lexer", version = "1.0.0" }
+monkey-parser = { path = "../parser", version = "1.0.0" }
+monkey-compiler = { path = "../compiler", version = "1.0.0" }
+monkey-object = { path = "../object", version = "1.0.0" }
+serde_json = "1.0"
+
+[dev-dependencies]
+insta = "1.42.2"

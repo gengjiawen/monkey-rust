@@ -8,6 +8,9 @@ import debounce from 'lodash.debounce'
 import type { Plugin } from 'prettier'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { arm64RangesForSourceOffset, spanForArm64Cursor } from './arm64'
+import { buildArm64 } from './arm64Runner'
+import { Arm64View, type Arm64BuildState } from './Arm64View'
 import { AstTreeView } from './AstTreeView'
 import { type BytecodeDebugView, spanForBytecodeCursor } from './bytecodeDebug'
 import { Editor, type EditorHandle } from './Editor'
@@ -101,7 +104,7 @@ makeCycle();
   },
 ]
 
-type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot'
+type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot' | 'arm64'
 
 const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
@@ -148,7 +151,11 @@ function App() {
   })
   const [snapshotStale, setSnapshotStale] = useState(false)
   const snapshotRunRequestId = useRef(0)
+  const [arm64Build, setArm64Build] = useState<Arm64BuildState>({
+    status: 'idle',
+  })
   const editorRef = useRef<EditorHandle>(null)
+  const arm64EditorRef = useRef<EditorHandle>(null)
   const latestCode = useRef(code)
 
   useEffect(() => {
@@ -221,6 +228,22 @@ function App() {
   const debouncedSnapshotCompile = useMemo(
     () => debounce(compileSnapshot, 200),
     [compileSnapshot]
+  )
+
+  const compileArm64 = useCallback((source: string) => {
+    try {
+      setArm64Build(buildArm64(source))
+    } catch (error) {
+      setArm64Build({
+        status: 'invalid',
+        message: getErrorMessage(error),
+      })
+    }
+  }, [])
+
+  const debouncedArm64Compile = useMemo(
+    () => debounce(compileArm64, 200),
+    [compileArm64]
   )
 
   const editorOnChange = useCallback(
@@ -301,6 +324,16 @@ function App() {
     debouncedSnapshotCompile(code, stripDebug)
     return () => debouncedSnapshotCompile.cancel()
   }, [code, debouncedSnapshotCompile, outputView, stripDebug])
+
+  useEffect(() => {
+    if (outputView !== 'arm64') {
+      debouncedArm64Compile.cancel()
+      return
+    }
+
+    debouncedArm64Compile(code)
+    return () => debouncedArm64Compile.cancel()
+  }, [code, debouncedArm64Compile, outputView])
 
   useEffect(() => {
     const index = Math.min(Math.max(snippetIndex, 0), snippets.length - 1)
@@ -398,6 +431,46 @@ function App() {
     },
     [bytecodeDebugView, highlightSourceSpan]
   )
+
+  const handleArm64Selection = useCallback(
+    (selection: { from: number; to: number }) => {
+      if (arm64Build.status !== 'ok') {
+        editorRef.current?.clearHighlight()
+        return
+      }
+
+      const span = spanForArm64Cursor(arm64Build, selection.from)
+      if (span == null) {
+        editorRef.current?.clearHighlight()
+        return
+      }
+
+      highlightSourceSpan(span)
+    },
+    [arm64Build, highlightSourceSpan]
+  )
+
+  // Source → assembly half of the arm64 linkage: light up the lines lowered
+  // from the narrowest span around the source cursor.
+  useEffect(() => {
+    if (outputView !== 'arm64' || arm64Build.status !== 'ok') {
+      return
+    }
+
+    if (selection === null) {
+      arm64EditorRef.current?.clearHighlight()
+      return
+    }
+
+    const byteOffset = utf16OffsetToUtf8Byte(code, selection.from)
+    const ranges = arm64RangesForSourceOffset(arm64Build, byteOffset)
+    if (ranges.length === 0) {
+      arm64EditorRef.current?.clearHighlight()
+      return
+    }
+
+    arm64EditorRef.current?.highlightRanges(ranges)
+  }, [arm64Build, code, outputView, selection])
 
   useEffect(() => {
     if (outputView !== 'bytecode') {
@@ -499,6 +572,7 @@ function App() {
             <SegmentedControl.Item value="snapshot">
               Snapshot
             </SegmentedControl.Item>
+            <SegmentedControl.Item value="arm64">ARM64</SegmentedControl.Item>
           </SegmentedControl.Root>
           {outputView === 'gc' ? (
             <Button
@@ -549,6 +623,14 @@ function App() {
                 onErrorSpanSelect={handleErrorSpanSelect}
               />
             </div>
+          ) : null}
+          {outputView === 'arm64' ? (
+            <Arm64View
+              build={arm64Build}
+              editorRef={arm64EditorRef}
+              onSelectionChange={handleArm64Selection}
+              onErrorSpanSelect={handleErrorSpanSelect}
+            />
           ) : null}
           {outputView === 'bytecode' ||
           (outputView === 'ast' && astData === null) ? (

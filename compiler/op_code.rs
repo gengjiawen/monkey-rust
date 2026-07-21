@@ -64,6 +64,8 @@ pub enum Opcode {
     OpGetProperty,
     OpSetProperty,
     OpNew,
+    // Appended to preserve the byte values of all existing opcodes.
+    OpLessThan,
 }
 
 lazy_static! {
@@ -143,6 +145,13 @@ lazy_static! {
             Opcode::OpGreaterThan,
             OpcodeDefinition {
                 name: "OpGreatThan",
+                operand_width: vec![],
+            },
+        );
+        m.insert(
+            Opcode::OpLessThan,
+            OpcodeDefinition {
+                name: "OpLessThan",
                 operand_width: vec![],
             },
         );

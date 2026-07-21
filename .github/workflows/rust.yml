@@ -35,3 +35,32 @@ jobs:
           corepack enable
           pnpm install --filter monkey-extension... --frozen-lockfile
           pnpm --filter monkey-extension run build
+
+  arm64-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install AArch64 toolchain and QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc-aarch64-linux-gnu qemu-user
+          rustup target add aarch64-unknown-linux-gnu
+      - name: Run Linux AArch64 end-to-end tests
+        run: MONKEY_ASM_E2E_REQUIRED=1 cargo test -p monkey-asm -- --ignored --test-threads=1
+      - name: Lint ARM64 backend
+        run: cargo clippy -p monkey-asm --all-targets --no-deps
+
+  arm64-e2e-macos:
+    # Apple Silicon runner: the e2e suite exercises the Mach-O flavor natively.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: |
+          if ! command -v rustup >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --default-toolchain stable --profile minimal
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Run macOS AArch64 end-to-end tests
+        run: MONKEY_ASM_E2E_REQUIRED=1 cargo test -p monkey-asm -- --ignored --test-threads=1
