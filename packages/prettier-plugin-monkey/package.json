@@ -1,6 +1,6 @@
 {
   "name": "prettier-plugin-monkey",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Prettier plugin for Monkey programming language",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,7 +27,7 @@
     "prettier": "^3.0.0"
   },
   "dependencies": {
-    "@gengjiawen/monkey-wasm": "^1.0.0"
+    "@gengjiawen/monkey-wasm": "^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
