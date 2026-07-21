@@ -122,11 +122,11 @@ const utf8Bytes = (text: string) => new TextEncoder().encode(text).byteLength
 ```
 
 `@gengjiawen/monkey-wasm` 是 wasm-pack 的 bundler target，入口会静态 import
-`.wasm`；这适合 Vite/Next.js，但 Node 20 不能直接执行。npm 包因此用条件明确的双
+`.wasm`；这适合 Vite/Next.js，但 Node 不能直接执行。npm 包因此用条件明确的双
 入口：`browser` 指向真正的 ESM bundle（不能把带异步 Wasm 初始化的依赖降成
 CommonJS `require`），Node 主入口加载生成的 `*_bg.js` glue，再通过
 `WebAssembly.Module`/`WebAssembly.Instance` 同步实例化同一份 Wasm。CLI 复用
-Node 入口，从而保持 `minify()` 同步 API；Node 最低版本是 20.19。
+Node 入口，从而保持 `minify()` 同步 API；Node 最低版本是 24。
 
 ## Phase 1 — 紧凑 printer（v0）
 
@@ -386,7 +386,7 @@ compiler 也接受时才进入语义语料；两者结果冲突时以 compiler +
 ## CI、发布、文档接线
 
 - CI：`.github/workflows/rust.yml` 已有 playground 测试；给 scoped 包加 build、
-  Vitest、Node 发布入口和 Vite browser 入口冒烟，并在声明的最低 Node 20.19 上
+  Vitest、Node 发布入口和 Vite browser 入口冒烟，并在声明的最低 Node 24 上
   运行。playground 的测试步骤顺带覆盖 `MinifyView`。
 - 版本：按 `AGENTS.md`，功能 PR 不带版本号变更。留给维护者的后续接线：
   `scripts/bump_cargo_packages.ts` 加上新包；要发 npm 时补 release-please /

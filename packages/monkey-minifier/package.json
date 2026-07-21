@@ -24,7 +24,7 @@
   "author": "gengjiawen <technicalcute@gmail.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=20.19"
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

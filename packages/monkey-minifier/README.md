@@ -19,7 +19,7 @@ minify(source, { mangle: false, fold: false })
 ```
 
 Browser bundlers use the package's browser entry. The Node API and CLI require
-Node 20.19 or newer and load the same Wasm parser through Node's WebAssembly
+Node 24 or newer and load the same Wasm parser through Node's WebAssembly
 API.
 
 The CLI reads files or stdin:

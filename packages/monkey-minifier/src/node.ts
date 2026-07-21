@@ -15,10 +15,10 @@ interface MonkeyWasmGlue extends WebAssembly.ModuleImports {
 }
 
 function loadNodeParser(): ParseLossless {
-  // wasm-pack's bundler target statically imports `.wasm`, which Node 20
-  // cannot execute directly. Load the generated glue without its bundler
-  // entrypoint and instantiate the same module through Node's WebAssembly API.
-  // Node 20.19+ can synchronously require this dependency's ESM glue module.
+  // wasm-pack's bundler target statically imports `.wasm`, which Node cannot
+  // execute directly. Load the generated glue without its bundler entrypoint
+  // and instantiate the same module through Node's WebAssembly API.
+  // Node 24 can synchronously require this dependency's ESM glue module.
   const glue =
     require('@gengjiawen/monkey-wasm/monkey_wasm_bg.js') as MonkeyWasmGlue
   const wasmPath = require.resolve(
