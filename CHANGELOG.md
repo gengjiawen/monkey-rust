@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/gengjiawen/monkey-rust/compare/v1.0.0...v1.1.0) (2026-07-21)
+
+
+### Features
+
+* **asm:** AOT arm64 assembly backend with cross-built Rust runtime ([#289](https://github.com/gengjiawen/monkey-rust/issues/289)) ([fef1c63](https://github.com/gengjiawen/monkey-rust/commit/fef1c63bfff3ac422a35c79f30942813f2d21564))
+
 ## [1.0.0](https://github.com/gengjiawen/monkey-rust/compare/v0.15.2...v1.0.0) (2026-07-16)
 
 

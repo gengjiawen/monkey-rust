@@ -1,6 +1,6 @@
 [package]
 name = "monkey-asm"
-version = "1.0.0"
+version = "1.1.0"
 description = "AOT AArch64 assembly backend for monkeylang (Linux ELF and macOS Mach-O)"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"

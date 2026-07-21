@@ -1,6 +1,6 @@
 [package]
 name = "monkey-gc"
-version = "1.0.0"
+version = "1.1.0"
 description = "QuickJS-style GC runtime for Monkey (bytecode VM with cycle collector)"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
