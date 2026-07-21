@@ -40,15 +40,6 @@ print(a)
 `.trimStart(),
   },
   {
-    // The Minify view folds this whole program down to `print(2);`.
-    label: 'Constant folding',
-    code: `
-let a = 1 + 1;
-let b = a + 1;
-print(a)
-`.trimStart(),
-  },
-  {
     label: 'Functions',
     code: `
 let add = fn(a, b) { a + b };
@@ -109,6 +100,15 @@ let makeCycle = fn() {
 };
 
 makeCycle();
+`.trimStart(),
+  },
+  {
+    // The Minify view folds this whole program down to `print(2);`.
+    label: 'Constant folding',
+    code: `
+let a = 1 + 1;
+let b = a + 1;
+print(a)
 `.trimStart(),
   },
 ]
