@@ -151,7 +151,7 @@ export function arm64RangesForSourceOffset(
 ): Array<{ from: number; to: number }> {
   let best: SourceSpan | null = null
   for (const { span } of build.lines) {
-    if (span === null || byteOffset < span.start || byteOffset > span.end) {
+    if (span === null || byteOffset < span.start || byteOffset >= span.end) {
       continue
     }
     if (best === null || span.end - span.start < best.end - best.start) {

@@ -469,7 +469,7 @@ function App() {
       return
     }
 
-    arm64EditorRef.current?.highlightRange(ranges[0].from, ranges[0].to)
+    arm64EditorRef.current?.highlightRanges(ranges)
   }, [arm64Build, code, outputView, selection])
 
   useEffect(() => {

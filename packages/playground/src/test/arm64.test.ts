@@ -130,6 +130,13 @@ describe('arm64RangesForSourceOffset', () => {
     ])
   })
 
+  it('treats source spans as half-open at their end offset', () => {
+    // Offset 1 is outside {0,1}, but still inside the enclosing {0,5} span.
+    expect(arm64RangesForSourceOffset(okBuild(), 1)).toEqual([
+      { from: 38, to: 60 },
+    ])
+  })
+
   it('returns no ranges when nothing encloses the offset', () => {
     expect(arm64RangesForSourceOffset(okBuild(), 99)).toEqual([])
   })

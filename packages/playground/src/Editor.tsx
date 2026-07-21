@@ -17,7 +17,12 @@ import {
   useRef,
 } from 'react'
 
-const setHighlight = StateEffect.define<{ from: number; to: number } | null>()
+interface HighlightRange {
+  from: number
+  to: number
+}
+
+const setHighlight = StateEffect.define<HighlightRange[] | null>()
 
 // CodeMirror injects its own unlayered styles at runtime, so the contested
 // declarations (height, scroller font) carry `!` to keep winning over them.
@@ -70,10 +75,10 @@ const highlightField = StateField.define<DecorationSet>({
   update(decorations, transaction) {
     for (const effect of transaction.effects) {
       if (effect.is(setHighlight)) {
-        if (effect.value) {
-          return Decoration.set([
-            highlightMark.range(effect.value.from, effect.value.to),
-          ])
+        if (effect.value !== null) {
+          return Decoration.set(
+            effect.value.map(({ from, to }) => highlightMark.range(from, to))
+          )
         }
         return Decoration.none
       }
@@ -90,7 +95,41 @@ const highlightField = StateField.define<DecorationSet>({
 
 export interface EditorHandle {
   highlightRange: (from: number, to: number) => void
+  highlightRanges: (ranges: HighlightRange[]) => void
   clearHighlight: () => void
+}
+
+function showHighlightRanges(view: EditorView, ranges: HighlightRange[]) {
+  const docLength = view.state.doc.length
+  const normalized = ranges
+    .map(({ from, to }) => {
+      const start = Math.max(0, Math.min(Math.min(from, to), docLength))
+      const end = Math.max(start, Math.min(Math.max(from, to), docLength))
+      return { from: start, to: end }
+    })
+    .filter(({ from, to }) => from < to)
+    .sort((left, right) => left.from - right.from || left.to - right.to)
+
+  const merged: HighlightRange[] = []
+  for (const range of normalized) {
+    const previous = merged[merged.length - 1]
+    if (previous !== undefined && range.from <= previous.to) {
+      previous.to = Math.max(previous.to, range.to)
+    } else {
+      merged.push({ ...range })
+    }
+  }
+
+  if (merged.length === 0) {
+    view.dispatch({ effects: setHighlight.of(null) })
+    return
+  }
+  view.dispatch({
+    effects: [
+      setHighlight.of(merged),
+      EditorView.scrollIntoView(merged[0].from, { y: 'nearest' }),
+    ],
+  })
 }
 
 interface EditorProps {
@@ -111,7 +150,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     vimMode = true,
     fill = false,
   },
-  ref,
+  ref
 ) {
   const viewRef = useRef<EditorView | null>(null)
   const {
@@ -127,23 +166,18 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       highlightRange(from: number, to: number) {
         const view = viewRef.current
         if (!view) return
-
-        const docLength = view.state.doc.length
-        const start = Math.max(0, Math.min(Math.min(from, to), docLength))
-        const end = Math.max(start, Math.min(Math.max(from, to), docLength))
-
-        view.dispatch({
-          effects: [
-            setHighlight.of(start === end ? null : { from: start, to: end }),
-            EditorView.scrollIntoView(start, { y: 'nearest' }),
-          ],
-        })
+        showHighlightRanges(view, [{ from, to }])
+      },
+      highlightRanges(ranges: HighlightRange[]) {
+        const view = viewRef.current
+        if (!view) return
+        showHighlightRanges(view, ranges)
       },
       clearHighlight() {
         viewRef.current?.dispatch({ effects: setHighlight.of(null) })
       },
     }),
-    [],
+    []
   )
 
   const extensions = useMemo(() => {
@@ -160,12 +194,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const handleCreateEditor = useCallback(
     (
       view: EditorView,
-      state: Parameters<NonNullable<ReactCodeMirrorProps['onCreateEditor']>>[1],
+      state: Parameters<NonNullable<ReactCodeMirrorProps['onCreateEditor']>>[1]
     ) => {
       viewRef.current = view
       extraOnCreateEditor?.(view, state)
     },
-    [extraOnCreateEditor],
+    [extraOnCreateEditor]
   )
 
   const handleUpdate = useCallback(
@@ -176,7 +210,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         onSelectionChange?.({ from, to })
       }
     },
-    [extraOnUpdate, onSelectionChange],
+    [extraOnUpdate, onSelectionChange]
   )
 
   return (

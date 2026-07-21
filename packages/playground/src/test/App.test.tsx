@@ -29,6 +29,7 @@ const {
   runSnapshotMock,
   buildArm64Mock,
   highlightRangeMock,
+  highlightRangesMock,
   clearHighlightMock,
   formatMock,
   sourceEditorHooks,
@@ -48,6 +49,7 @@ const {
   runSnapshotMock: vi.fn(),
   buildArm64Mock: vi.fn(),
   highlightRangeMock: vi.fn(),
+  highlightRangesMock: vi.fn(),
   clearHighlightMock: vi.fn(),
   formatMock: vi.fn(),
   // The mock editor below is a plain <textarea>, which cannot reproduce every
@@ -101,10 +103,15 @@ interface MockEditorProps {
 vi.mock('../Editor', () => ({
   Editor: forwardRef(function MockEditor(
     { code = '', onChange, onSelectionChange, extra }: MockEditorProps,
-    ref: Ref<{ highlightRange(): void; clearHighlight(): void }>
+    ref: Ref<{
+      highlightRange(): void
+      highlightRanges(): void
+      clearHighlight(): void
+    }>
   ) {
     useImperativeHandle(ref, () => ({
       highlightRange: highlightRangeMock,
+      highlightRanges: highlightRangesMock,
       clearHighlight: clearHighlightMock,
     }))
 
@@ -405,6 +412,7 @@ beforeEach(() => {
   formatMock.mockReset()
   formatMock.mockImplementation(async (source: string) => source)
   highlightRangeMock.mockClear()
+  highlightRangesMock.mockClear()
   clearHighlightMock.mockClear()
   sourceEditorHooks.onChange = undefined
   sourceEditorHooks.onSelectionChange = undefined
@@ -1130,18 +1138,53 @@ describe('ARM64 view', () => {
 
     await openArm64Tab(user)
 
-    highlightRangeMock.mockClear()
+    highlightRangesMock.mockClear()
     act(() => {
       sourceEditorHooks.onSelectionChange?.({ from: 0, to: 0 })
     })
     // Both code lines share span {0,1}; being adjacent they merge into one
     // assembly range spanning `  mov x0, #7\n  ret`.
-    expect(highlightRangeMock).toHaveBeenCalledWith(6, 24)
+    expect(highlightRangesMock).toHaveBeenCalledWith([{ from: 6, to: 24 }])
 
     clearHighlightMock.mockClear()
     act(() => {
       sourceEditorHooks.onSelectionChange?.({ from: 99, to: 99 })
     })
     expect(clearHighlightMock).toHaveBeenCalled()
+  })
+
+  it('highlights every non-contiguous assembly range for a source span', async () => {
+    const user = userEvent.setup()
+    const lines = [
+      { text: 'main:', kind: 'label' as const, span: null },
+      {
+        text: '  mov x0, #7',
+        kind: 'code' as const,
+        span: { start: 0, end: 1 },
+      },
+      { text: '  nop', kind: 'code' as const, span: null },
+      {
+        text: '  ret',
+        kind: 'code' as const,
+        span: { start: 0, end: 1 },
+      },
+    ]
+    buildArm64Mock.mockImplementation(() => ({
+      status: 'ok',
+      lines,
+      text: lines.map((line) => line.text).join('\n'),
+    }))
+    renderApp()
+
+    await openArm64Tab(user)
+
+    highlightRangesMock.mockClear()
+    act(() => {
+      sourceEditorHooks.onSelectionChange?.({ from: 0, to: 0 })
+    })
+    expect(highlightRangesMock).toHaveBeenCalledWith([
+      { from: 6, to: 18 },
+      { from: 25, to: 30 },
+    ])
   })
 })
