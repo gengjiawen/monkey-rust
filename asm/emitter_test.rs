@@ -58,7 +58,7 @@ fn layout_math() {
 
 #[test]
 fn load_imm64_skips_zero_halfwords() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     emitter.load_imm64("x0", 0, "");
     emitter.load_imm64("x1", 5, "");
     emitter.load_imm64("x2", 0x0123_4567_89ab_cdef, "");
@@ -84,7 +84,7 @@ fn load_imm64_skips_zero_halfwords() {
 
 #[test]
 fn sp_adjustment_tiers() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     emitter.sp_sub(0); // no code
     emitter.sp_sub(16);
     emitter.sp_sub(4080); // largest 16-multiple within #4095
@@ -107,7 +107,7 @@ fn sp_adjustment_tiers() {
 
 #[test]
 fn frame_access_materializes_large_offsets() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     emitter.frame_store("x0", 256, ""); // largest stur offset
     emitter.frame_store("x0", slot_offset(15), ""); // 272: beyond stur
     emitter.frame_load("x0", 16, "");
@@ -129,7 +129,7 @@ fn frame_access_materializes_large_offsets() {
 
 #[test]
 fn sp_store_and_globals_respect_scaled_limits() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     emitter.sp_store("x0", 0, "");
     emitter.sp_store("x0", 32760, ""); // largest scaled offset
     emitter.sp_store("x0", 32768, ""); // via x8
@@ -160,7 +160,7 @@ fn sp_store_and_globals_respect_scaled_limits() {
 
 #[test]
 fn span_stack_maps_lines_to_source() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     let span = Span {
         start: 5,
         end: 9,
@@ -198,7 +198,7 @@ fn span_stack_maps_lines_to_source() {
 
 #[test]
 fn intern_string_deduplicates() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     let (label_a, len_a) = emitter.intern_string(b"hello");
     let (label_b, len_b) = emitter.intern_string(b"hello");
     let (label_c, _) = emitter.intern_string("héllo".as_bytes());
@@ -215,7 +215,7 @@ fn intern_string_deduplicates() {
 
 #[test]
 fn labels_are_unique_per_kind() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     assert_eq!(emitter.new_label(), ".L0");
     assert_eq!(emitter.new_label(), ".L1");
     assert_eq!(emitter.new_function_label(), ".Lfn0");
@@ -225,7 +225,7 @@ fn labels_are_unique_per_kind() {
 
 #[test]
 fn end_function_splices_prologue_and_epilogue() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     emitter.begin_function();
     emitter.ins("mov x0, x1");
     emitter.end_function(FunctionFrame {
@@ -273,7 +273,7 @@ fn end_function_splices_prologue_and_epilogue() {
 
 #[test]
 fn big_frames_still_reach_every_slot() {
-    let mut emitter = Emitter::new();
+    let mut emitter = Emitter::new(AsmDialect::LinuxElf);
     emitter.begin_function();
     emitter.ins("nop");
     emitter.end_function(FunctionFrame {
@@ -292,7 +292,7 @@ fn big_frames_still_reach_every_slot() {
 
 #[test]
 fn finish_emits_fixed_exit_and_bss() {
-    let assembly = Emitter::new().finish(3, ".Lmain_exit", false);
+    let assembly = Emitter::new(AsmDialect::LinuxElf).finish(3, ".Lmain_exit", false);
     let text = assembly.text;
     assert!(text.contains(".globl main"));
     assert!(text.contains("main:"));
@@ -308,7 +308,9 @@ fn finish_emits_fixed_exit_and_bss() {
 
 #[test]
 fn finish_with_observe_wires_the_channel() {
-    let text = Emitter::new().finish(0, ".Lmain_exit", true).text;
+    let text = Emitter::new(AsmDialect::LinuxElf)
+        .finish(0, ".Lmain_exit", true)
+        .text;
     let observer_init = text.find("bl rt_observer_init").unwrap();
     let globals_init = text.find("bl rt_globals_init").unwrap();
     let observe_result = text.find("bl rt_observe_result").unwrap();
@@ -318,4 +320,40 @@ fn finish_with_observe_wires_the_channel() {
     assert!(observe_result < exit);
     // fd 3 goes to rt_observer_init.
     assert!(text.contains("movz x0, #0x3"));
+}
+
+#[test]
+fn macho_dialect_spells_symbols_labels_and_sections() {
+    let mut emitter = Emitter::new(AsmDialect::MachO);
+    assert_eq!(emitter.new_label(), "L0");
+    assert_eq!(emitter.new_function_label(), "Lfn0");
+    let (string_label, _) = emitter.intern_string(b"hi");
+    assert_eq!(string_label, "Lstr0");
+    emitter.global_load("x0", 0, "");
+    emitter.call_runtime("rt_add", "");
+    let text = emitter.finish(3, "Lmain_exit", false).text;
+    assert!(text.contains(".globl _main"));
+    assert!(text.contains("_main:"));
+    assert!(!text.contains("\nmain:"));
+    // Every C-ABI call gets the underscore; g_globals is module-internal
+    // and uses @PAGE/@PAGEOFF instead of :lo12:.
+    assert!(text.contains("bl _rt_globals_init"));
+    assert!(text.contains("bl _rt_add"));
+    assert!(text.contains("adrp x8, g_globals@PAGE"));
+    assert!(text.contains("add x8, x8, g_globals@PAGEOFF"));
+    assert!(!text.contains(":lo12:"));
+    assert!(text.contains(".section __TEXT,__const"));
+    assert!(!text.contains(".section .rodata"));
+    assert!(text.contains(".zerofill __DATA,__bss,g_globals,24,3"));
+    assert!(!text.contains(".bss\n"));
+    assert!(!text.contains(".skip"));
+}
+
+#[test]
+fn macho_zerofill_reserves_at_least_one_slot() {
+    // Zero globals still gets an 8-byte symbol: no zero-size .zerofill.
+    let text = Emitter::new(AsmDialect::MachO)
+        .finish(0, "Lmain_exit", false)
+        .text;
+    assert!(text.contains(".zerofill __DATA,__bss,g_globals,8,3"));
 }

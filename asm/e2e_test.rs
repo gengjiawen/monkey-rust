@@ -1,10 +1,13 @@
-//! End-to-end tests (design §10): cross-assemble with the real aarch64
-//! toolchain, run under qemu (or natively on Linux arm64), and check observable
-//! behavior — plus the handwritten ABI probes in `testdata/` that freeze the
-//! `.s` ↔ runtime contract independently of the lowering pass.
+//! End-to-end tests (design §10): assemble with the real platform toolchain,
+//! run natively or under qemu, and check observable behavior — plus the
+//! handwritten ABI probes in `testdata/` that freeze the `.s` ↔ runtime
+//! contract independently of the lowering pass.
 //!
-//! Requirements: `gcc-aarch64-linux-gnu`, `qemu-user` (non-arm64 hosts), and
-//! the Rust `aarch64-unknown-linux-gnu` target. The tests are `#[ignore]`d so
+//! The platform under test follows the host. Apple Silicon macOS exercises
+//! the Mach-O flavor natively (Xcode Command Line Tools plus the Rust
+//! `aarch64-apple-darwin` target); every other host exercises the Linux
+//! flavor (`gcc-aarch64-linux-gnu`, `qemu-user` off-architecture, and the
+//! Rust `aarch64-unknown-linux-gnu` target). The tests are `#[ignore]`d so
 //! the default suite stays hermetic; run them with
 //!
 //! ```text
@@ -18,13 +21,72 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
-const CROSS_TARGET: &str = "aarch64-unknown-linux-gnu";
-/// Mirrors the CLI's documented fallback link set (design §9).
-const FALLBACK_NATIVE_LIBS: &[&str] = &["-lpthread", "-ldl", "-lm", "-lrt", "-lutil"];
+/// The flavor under test, mirroring the CLI's platform selection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Platform {
+    LinuxGnu,
+    MacOs,
+}
+
+impl Platform {
+    fn host() -> Platform {
+        if cfg!(target_os = "macos") {
+            Platform::MacOs
+        } else {
+            Platform::LinuxGnu
+        }
+    }
+
+    fn rust_target(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => "aarch64-unknown-linux-gnu",
+            Platform::MacOs => "aarch64-apple-darwin",
+        }
+    }
+
+    fn default_cc(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => "aarch64-linux-gnu-gcc",
+            Platform::MacOs => "cc",
+        }
+    }
+
+    /// The `--platform` value passed to the CLI, pinned explicitly so these
+    /// assertions never depend on the CLI's host default.
+    fn cli_name(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => "linux",
+            Platform::MacOs => "macos",
+        }
+    }
+
+    /// Mirrors the CLI's documented fallback link set (design §9).
+    fn fallback_native_libs(self) -> &'static [&'static str] {
+        match self {
+            Platform::LinuxGnu => &["-lpthread", "-ldl", "-lm", "-lrt", "-lutil"],
+            Platform::MacOs => &["-lSystem", "-lc", "-lm"],
+        }
+    }
+
+    fn abi_probe(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => include_str!("testdata/abi_probe.s"),
+            Platform::MacOs => include_str!("testdata/abi_probe_macos.s"),
+        }
+    }
+
+    fn abi_fatal_probe(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => include_str!("testdata/abi_fatal_probe.s"),
+            Platform::MacOs => include_str!("testdata/abi_fatal_probe_macos.s"),
+        }
+    }
+}
 
 struct Toolchain {
+    platform: Platform,
     cc: String,
-    /// `None` when the host itself can execute Linux AArch64 ELF binaries.
+    /// `None` when the host itself can execute the produced binaries.
     qemu: Option<String>,
     runtime: PathBuf,
     cli: PathBuf,
@@ -76,11 +138,24 @@ fn unavailable(message: String) -> Option<Toolchain> {
 /// Locates the tools and builds both halves of the crate (aarch64 runtime
 /// staticlib + host CLI); `None` means "environment cannot run these tests".
 fn toolchain() -> Option<Toolchain> {
-    let cc = std::env::var("MONKEY_ASM_CC").unwrap_or_else(|_| "aarch64-linux-gnu-gcc".to_string());
-    if !tool_exists(&cc) {
-        return unavailable(format!("{} not found (install gcc-aarch64-linux-gnu)", cc));
+    let platform = Platform::host();
+    if platform == Platform::MacOs && !cfg!(target_arch = "aarch64") {
+        return unavailable(
+            "macOS e2e needs Apple Silicon (arm64 Mach-O binaries do not run on Intel)".to_string(),
+        );
     }
-    let qemu = if cfg!(all(target_arch = "aarch64", target_os = "linux")) {
+    let cc = std::env::var("MONKEY_ASM_CC").unwrap_or_else(|_| platform.default_cc().to_string());
+    if !tool_exists(&cc) {
+        return unavailable(match platform {
+            Platform::LinuxGnu => format!("{} not found (install gcc-aarch64-linux-gnu)", cc),
+            Platform::MacOs => format!("{} not found (install the Xcode Command Line Tools)", cc),
+        });
+    }
+    // Only off-architecture Linux hosts need an emulator; Mach-O runs are
+    // gated to Apple Silicon above, where execution is native.
+    let qemu = if platform == Platform::MacOs
+        || cfg!(all(target_arch = "aarch64", target_os = "linux"))
+    {
         None
     } else {
         let qemu = std::env::var("MONKEY_ASM_QEMU").unwrap_or_else(|_| "qemu-aarch64".to_string());
@@ -92,20 +167,20 @@ fn toolchain() -> Option<Toolchain> {
 
     // `--lib` only: the staticlib needs no aarch64 linker, while the (unused)
     // cross-built CLI bin would.
-    let cross = cargo_build(&["--lib", "--release", "--target", CROSS_TARGET]);
+    let cross = cargo_build(&["--lib", "--release", "--target", platform.rust_target()]);
     if !cross.status.success() {
         let stderr = String::from_utf8_lossy(&cross.stderr).into_owned();
         if stderr.contains("may not be installed") || stderr.contains("can't find crate for `core`")
         {
             return unavailable(format!(
                 "rust target missing (rustup target add {})",
-                CROSS_TARGET
+                platform.rust_target()
             ));
         }
         panic!("aarch64 runtime build failed:\n{}", stderr);
     }
     let runtime = target_directory()
-        .join(CROSS_TARGET)
+        .join(platform.rust_target())
         .join("release")
         .join("libmonkey_asm.a");
     assert!(runtime.exists(), "missing {}", runtime.display());
@@ -122,6 +197,7 @@ fn toolchain() -> Option<Toolchain> {
     let scratch = std::env::temp_dir().join(format!("monkey-asm-e2e-{}", std::process::id()));
     std::fs::create_dir_all(&scratch).expect("scratch dir");
     Some(Toolchain {
+        platform,
         cc,
         qemu,
         runtime,
@@ -136,15 +212,24 @@ impl Toolchain {
         let source = self.scratch.join(format!("{}.s", name));
         let program = self.scratch.join(name);
         std::fs::write(&source, assembly).expect("write assembly");
-        let output = Command::new(&self.cc)
+        let mut command = Command::new(&self.cc);
+        command
             .arg(&source)
             .arg(&self.runtime)
             .arg("-o")
-            .arg(&program)
-            .arg("-static")
-            .args(FALLBACK_NATIVE_LIBS)
-            .output()
-            .expect("run cross gcc");
+            .arg(&program);
+        match self.platform {
+            // Fully static ELF: runs under bare qemu-user with no sysroot.
+            Platform::LinuxGnu => {
+                command.arg("-static");
+            }
+            // macOS has no static libSystem; pin the arch for Intel hosts.
+            Platform::MacOs => {
+                command.args(["-arch", "arm64"]);
+            }
+        }
+        command.args(self.platform.fallback_native_libs());
+        let output = command.output().expect("run platform cc");
         assert!(
             output.status.success(),
             "link failed for {}:\n{}",
@@ -188,7 +273,7 @@ impl Toolchain {
         command.output().expect("execute arm64 binary")
     }
 
-    /// Full CLI path: `monkey-asm run <src.monkey> [--observe]`.
+    /// Full CLI path: `monkey-asm run <src.monkey> --platform <p> [--observe]`.
     fn cli_run(&self, name: &str, source: &str, observe: bool) -> Output {
         let path = self.scratch.join(format!("{}.monkey", name));
         std::fs::write(&path, source).expect("write monkey source");
@@ -196,6 +281,7 @@ impl Toolchain {
         command
             .arg("run")
             .arg(&path)
+            .args(["--platform", self.platform.cli_name()])
             .env("MONKEY_ASM_RUNTIME", &self.runtime)
             .current_dir(workspace_root());
         if observe {
@@ -220,7 +306,7 @@ fn abi_probe_freezes_the_calling_convention() {
         Some(toolchain) => toolchain,
         None => return,
     };
-    let program = toolchain.link("abi_probe", include_str!("testdata/abi_probe.s"));
+    let program = toolchain.link("abi_probe", toolchain.platform.abi_probe());
     let output = toolchain.execute(&program, None);
     assert_eq!(stdout_of(&output), "abi\n3\n28\n7\n", "stderr: {}", stderr_of(&output));
     assert_eq!(output.status.code(), Some(0));
@@ -233,7 +319,7 @@ fn abi_fatal_probe_reports_overflow_and_exit_1() {
         Some(toolchain) => toolchain,
         None => return,
     };
-    let program = toolchain.link("abi_fatal_probe", include_str!("testdata/abi_fatal_probe.s"));
+    let program = toolchain.link("abi_fatal_probe", toolchain.platform.abi_fatal_probe());
     let output = toolchain.execute(&program, None);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr_of(&output).contains("monkey: IntegerOverflow"));
@@ -362,6 +448,7 @@ fn e2e_observer_record_framing_and_content() {
         .arg(&source_path)
         .arg("-o")
         .arg(&program)
+        .args(["--platform", toolchain.platform.cli_name()])
         .arg("--observe")
         .env("MONKEY_ASM_RUNTIME", &toolchain.runtime)
         .current_dir(workspace_root())

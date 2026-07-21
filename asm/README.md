@@ -1,11 +1,13 @@
 # monkey-asm
 
-AOT Linux arm64 (AArch64) assembly backend for Monkey, implementing
+AOT arm64 (AArch64) assembly backend for Monkey, implementing
 [docs/arm64-asm-backend-design.md](../docs/arm64-asm-backend-design.md):
 a single-pass lowering from the AST to AArch64 assembly text, assembled and
 linked against a Rust runtime static library. No IR, no JIT, no register
 allocation — the accumulator lives in `x0` and temporaries on the machine
-stack.
+stack. One instruction stream, two output flavors selected with
+`--platform linux|macos` (default: the host): Linux/ELF (GNU as spelling)
+and macOS/Mach-O (Apple Silicon, `_`-prefixed symbols, `@PAGE` relocations).
 
 ## One crate, built twice
 
@@ -14,40 +16,53 @@ stack.
 | host          | `cargo build -p monkey-asm`                                                    | `monkey-asm` CLI (parse + lower to `.s`)                        |
 | aarch64 cross | `cargo build -p monkey-asm --lib --release --target aarch64-unknown-linux-gnu` | `libmonkey_asm.a`, the runtime the generated `.s` links against |
 
+(`--platform macos` uses `--target aarch64-apple-darwin` for the runtime
+build instead.)
+
 The generated `.s` file is the only interface between the two: the CLI never
 executes Monkey code, the runtime never parses it.
 
 ## Usage
 
 ```sh
-# One-time setup (Debian/Ubuntu example)
+# One-time setup, Linux flavor (Debian/Ubuntu example, works on any host)
 rustup target add aarch64-unknown-linux-gnu
 sudo apt-get install gcc-aarch64-linux-gnu qemu-user
+
+# One-time setup, macOS flavor (Apple Silicon macOS host)
+rustup target add aarch64-apple-darwin
+xcode-select --install   # clang + ld64
 
 # Optional pre-warm (--lib: the staticlib needs no cross linker). `build` and
 # `run` perform this Cargo freshness check automatically unless overridden.
 cargo build -p monkey-asm --lib --release --target aarch64-unknown-linux-gnu
 
-# Compile and run (uses qemu-aarch64 outside Linux AArch64)
+# Compile and run; --platform defaults to the host (macos on macOS), and the
+# Linux flavor uses qemu-aarch64 outside Linux AArch64
 cargo run -p monkey-asm -- run examples/fib.monkey
+cargo run -p monkey-asm -- run examples/fib.monkey --platform linux
 
-# Just look at the assembly (works on any host, no toolchain needed)
-cargo run -p monkey-asm -- emit examples/fib.monkey
+# Just look at the assembly in either spelling (any host, no toolchain needed)
+cargo run -p monkey-asm -- emit examples/fib.monkey --platform macos
 
-# Produce a static Linux AArch64 ELF executable + its GNU .s next to it
+# Produce an executable + its .s next to it (static ELF / arm64 Mach-O)
 cargo run -p monkey-asm -- build examples/fib.monkey -o fib
 ```
 
-Environment overrides: `MONKEY_ASM_CC` (default `aarch64-linux-gnu-gcc`),
-`MONKEY_ASM_QEMU` (default `qemu-aarch64`), `MONKEY_ASM_RUNTIME` (path to
-`libmonkey_asm.a`). Without `MONKEY_ASM_RUNTIME`, every `build`/`run` asks
-Cargo to build the exact release runtime target above; Cargo's freshness check
+Environment overrides: `MONKEY_ASM_CC` (default `aarch64-linux-gnu-gcc`, or
+`cc` for `--platform macos`), `MONKEY_ASM_QEMU` (default `qemu-aarch64`),
+`MONKEY_ASM_RUNTIME` (path to `libmonkey_asm.a`). Without
+`MONKEY_ASM_RUNTIME`, every `build`/`run` asks Cargo to build the exact
+release runtime target for the selected platform; Cargo's freshness check
 keeps it current. An explicit runtime path bypasses that build.
 
-The only native output today is a Linux AArch64 ELF. It runs directly only on
-Linux AArch64. In particular, Apple Silicon macOS cannot execute it natively;
-it needs a Linux-capable QEMU/container environment, or a future Darwin/Mach-O
-backend.
+Platform reach: `--platform linux` produces a fully static Linux AArch64 ELF —
+it builds on any host with the cross toolchain and runs anywhere via
+`qemu-aarch64`. `--platform macos` produces an arm64 Mach-O executable:
+linking needs a macOS host (the Apple SDK; set `MONKEY_ASM_CC` to a
+cross-capable clang to override) and running needs Apple Silicon, because
+qemu-user only emulates Linux ELF. `emit` works for either platform on any
+host.
 
 `--observe` builds the differential-testing variant: the program writes one
 canonical result record (u64 big-endian length + JSON) to fd 3 at exit, while
@@ -87,9 +102,12 @@ cross-assembles with the command above.
 
 ```sh
 cargo test -p monkey-asm            # unit + snapshot tests (host only)
-cargo test -p monkey-asm -- --ignored   # e2e: cross-assemble + run under qemu
+cargo test -p monkey-asm -- --ignored   # e2e: assemble + run for real
 ```
 
-The e2e tests skip themselves with a message when the cross toolchain, qemu,
-or the Rust AArch64 target is missing. CI sets `MONKEY_ASM_E2E_REQUIRED=1`,
-which turns any missing requirement into a test failure.
+The e2e suite follows the host: Apple Silicon macOS exercises the Mach-O
+flavor natively, every other host exercises the Linux flavor (under qemu when
+off-architecture). The tests skip themselves with a message when a toolchain
+piece is missing. CI sets `MONKEY_ASM_E2E_REQUIRED=1` — on both the Linux
+cross/qemu job and the `macos-15` Apple Silicon job — which turns any missing
+requirement into a test failure.

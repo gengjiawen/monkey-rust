@@ -1,38 +1,122 @@
 //! monkey-asm CLI (design §4, §9): AOT-compile Monkey to arm64.
 //!
 //! - `emit`  — print the generated AArch64 assembly (any host, no toolchain)
-//! - `build` — assemble + link with the aarch64 runtime static library via
-//!   `aarch64-linux-gnu-gcc` (never the host `cc`)
-//! - `run`   — build, then execute (directly on Linux arm64,
-//!   `qemu-aarch64` elsewhere); `--observe` strictly validates the fd-3
-//!   record before printing it to stderr
+//! - `build` — assemble + link with the arm64 runtime static library
+//!   (`aarch64-linux-gnu-gcc` for the linux platform, Xcode `cc` for macos)
+//! - `run`   — build, then execute (natively on a matching arm64 host,
+//!   `qemu-aarch64` for the linux platform elsewhere); `--observe` strictly
+//!   validates the fd-3 record before printing it to stderr
 //!
-//! The runtime library is the aarch64 cross build of this same crate:
-//! `cargo build -p monkey-asm --lib --release --target aarch64-unknown-linux-gnu`.
+//! `--platform linux|macos` selects the target; the default is the platform
+//! the host itself can run (macos on a Mac, linux everywhere else). The
+//! runtime library is this same crate built for the platform's Rust target,
+//! e.g. `cargo build -p monkey-asm --lib --release --target
+//! aarch64-unknown-linux-gnu`.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use monkey_asm::emitter::AsmDialect;
 use monkey_asm::lower::compile_source;
 use monkey_asm::runtime_core::RuntimeErrorKind;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
-const CROSS_TARGET: &str = "aarch64-unknown-linux-gnu";
-/// Documented fallback when the `rustc --print native-static-libs` probe is
-/// unavailable (design §9).
-const FALLBACK_NATIVE_LIBS: &[&str] = &["-lpthread", "-ldl", "-lm", "-lrt", "-lutil"];
+/// Everything `build`/`run` do differently per target platform (design §9):
+/// assembly dialect, Rust target for the runtime staticlib, linker driver
+/// and its arguments, and how the host can execute the result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Platform {
+    LinuxGnu,
+    MacOs,
+}
+
+impl Platform {
+    fn from_name(name: &str) -> Option<Platform> {
+        match name {
+            "linux" => Some(Platform::LinuxGnu),
+            "macos" | "darwin" => Some(Platform::MacOs),
+            _ => None,
+        }
+    }
+
+    /// Default for `--platform`: what the host itself can execute. Only
+    /// macOS hosts default to Mach-O; everything else targets Linux (with
+    /// qemu off-architecture).
+    fn host_default() -> Platform {
+        if cfg!(target_os = "macos") {
+            Platform::MacOs
+        } else {
+            Platform::LinuxGnu
+        }
+    }
+
+    fn dialect(self) -> AsmDialect {
+        match self {
+            Platform::LinuxGnu => AsmDialect::LinuxElf,
+            Platform::MacOs => AsmDialect::MachO,
+        }
+    }
+
+    fn rust_target(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => "aarch64-unknown-linux-gnu",
+            Platform::MacOs => "aarch64-apple-darwin",
+        }
+    }
+
+    fn default_cc(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => "aarch64-linux-gnu-gcc",
+            // Apple clang; Mach-O linking needs the macOS SDK, so this is a
+            // macOS-host default, not a cross tool.
+            Platform::MacOs => "cc",
+        }
+    }
+
+    fn cc_hint(self) -> &'static str {
+        match self {
+            Platform::LinuxGnu => "install the aarch64 cross toolchain (gcc-aarch64-linux-gnu)",
+            Platform::MacOs => "install the Xcode Command Line Tools (xcode-select --install)",
+        }
+    }
+
+    /// `-static` is Linux-only so qemu needs no sysroot; macOS has no static
+    /// libSystem and always links the system dylibs (design §9).
+    fn static_link(self) -> bool {
+        self == Platform::LinuxGnu
+    }
+
+    /// Documented fallback when the `rustc --print native-static-libs`
+    /// probe is unavailable (design §9).
+    fn fallback_native_libs(self) -> &'static [&'static str] {
+        match self {
+            Platform::LinuxGnu => &["-lpthread", "-ldl", "-lm", "-lrt", "-lutil"],
+            Platform::MacOs => &["-lSystem", "-lc", "-lm"],
+        }
+    }
+
+    /// Whether this host executes the produced binary directly (no qemu).
+    fn host_runs_natively(self) -> bool {
+        match self {
+            Platform::LinuxGnu => cfg!(all(target_arch = "aarch64", target_os = "linux")),
+            Platform::MacOs => cfg!(all(target_arch = "aarch64", target_os = "macos")),
+        }
+    }
+}
 
 fn usage() -> ! {
     eprintln!(
         "usage:\n  \
-         monkey-asm emit <file.monkey> [--observe]\n  \
-         monkey-asm build <file.monkey> [-o <output>] [--observe]\n  \
-         monkey-asm run <file.monkey> [--observe]\n\n\
+         monkey-asm emit <file.monkey> [--platform linux|macos] [--observe]\n  \
+         monkey-asm build <file.monkey> [-o <output>] [--platform linux|macos] [--observe]\n  \
+         monkey-asm run <file.monkey> [--platform linux|macos] [--observe]\n\n\
+         platforms (default: what the host runs — macos on a Mac, else linux):\n  \
+         linux   ELF via aarch64-linux-gnu-gcc, static; runs under qemu-aarch64 off-arch\n  \
+         macos   Mach-O via Xcode clang; build and run need macOS (Apple Silicon to run)\n\n\
          environment:\n  \
-         MONKEY_ASM_CC       cross compiler (default aarch64-linux-gnu-gcc)\n  \
-         MONKEY_ASM_QEMU     emulator outside Linux arm64 (default qemu-aarch64)\n  \
-         MONKEY_ASM_RUNTIME  path to libmonkey_asm.a for {}",
-        CROSS_TARGET
+         MONKEY_ASM_CC       linker driver (default aarch64-linux-gnu-gcc or cc)\n  \
+         MONKEY_ASM_QEMU     emulator for linux binaries off Linux arm64 (default qemu-aarch64)\n  \
+         MONKEY_ASM_RUNTIME  path to libmonkey_asm.a for the platform's Rust target"
     );
     std::process::exit(2);
 }
@@ -46,18 +130,24 @@ struct Options {
     input: PathBuf,
     output: Option<PathBuf>,
     observe: bool,
+    platform: Platform,
 }
 
 fn parse_options(args: &[String]) -> Options {
     let mut input = None;
     let mut output = None;
     let mut observe = false;
+    let mut platform = Platform::host_default();
     let mut iter = args.iter();
     while let Some(argument) = iter.next() {
         match argument.as_str() {
             "--observe" => observe = true,
             "-o" => match iter.next() {
                 Some(path) => output = Some(PathBuf::from(path)),
+                None => usage(),
+            },
+            "--platform" => match iter.next().and_then(|name| Platform::from_name(name)) {
+                Some(parsed) => platform = parsed,
                 None => usage(),
             },
             other if !other.starts_with('-') && input.is_none() => {
@@ -71,6 +161,7 @@ fn parse_options(args: &[String]) -> Options {
             input,
             output,
             observe,
+            platform,
         },
         None => usage(),
     }
@@ -85,7 +176,7 @@ fn read_source(path: &Path) -> String {
 
 fn assembly_for(options: &Options) -> String {
     let source = read_source(&options.input);
-    match compile_source(&source, options.observe) {
+    match compile_source(&source, options.platform.dialect(), options.observe) {
         Ok(assembly) => assembly.text,
         Err(message) => fail(&message),
     }
@@ -109,10 +200,11 @@ fn target_directory() -> PathBuf {
     }
 }
 
-/// Locates the aarch64 runtime static library. An explicit override is used
-/// verbatim; otherwise Cargo runs on every build so its freshness checks can
-/// never silently select a stale debug/release archive.
-fn runtime_library() -> PathBuf {
+/// Locates the arm64 runtime static library for the platform's Rust target.
+/// An explicit override is used verbatim; otherwise Cargo runs on every
+/// build so its freshness checks can never silently select a stale
+/// debug/release archive.
+fn runtime_library(platform: Platform) -> PathBuf {
     if let Ok(path) = std::env::var("MONKEY_ASM_RUNTIME") {
         let path = PathBuf::from(path);
         if path.is_file() {
@@ -121,6 +213,7 @@ fn runtime_library() -> PathBuf {
         fail(&format!("MONKEY_ASM_RUNTIME is not a file: {}", path.display()));
     }
 
+    let target = platform.rust_target();
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let status = Command::new(&cargo)
         .args([
@@ -130,7 +223,7 @@ fn runtime_library() -> PathBuf {
             "--lib",
             "--release",
             "--target",
-            CROSS_TARGET,
+            target,
         ])
         .current_dir(workspace_root())
         .status();
@@ -141,7 +234,7 @@ fn runtime_library() -> PathBuf {
     }
 
     let runtime = target_directory()
-        .join(CROSS_TARGET)
+        .join(target)
         .join("release")
         .join("libmonkey_asm.a");
     if !runtime.is_file() {
@@ -163,7 +256,14 @@ fn static_link_libs(libs: &str) -> Vec<String> {
         .collect()
 }
 
-fn native_static_libs() -> Vec<String> {
+fn native_static_libs(platform: Platform) -> Vec<String> {
+    let fallback = || {
+        platform
+            .fallback_native_libs()
+            .iter()
+            .map(|lib| lib.to_string())
+            .collect()
+    };
     let probe_path =
         std::env::temp_dir().join(format!("monkey-asm-native-libs-{}.a", std::process::id()));
     let probe = Command::new("rustc")
@@ -171,7 +271,7 @@ fn native_static_libs() -> Vec<String> {
             "--crate-name",
             "monkey_asm_native_lib_probe",
             "--target",
-            CROSS_TARGET,
+            platform.rust_target(),
             "--crate-type",
             "staticlib",
             "--print",
@@ -194,10 +294,7 @@ fn native_static_libs() -> Vec<String> {
     let _ = std::fs::remove_file(&probe_path);
     if let Ok(output) = probe {
         if !output.status.success() {
-            return FALLBACK_NATIVE_LIBS
-                .iter()
-                .map(|lib| lib.to_string())
-                .collect();
+            return fallback();
         }
         for line in String::from_utf8_lossy(&output.stderr).lines() {
             if let Some(libs) = line.split("native-static-libs:").nth(1) {
@@ -208,10 +305,7 @@ fn native_static_libs() -> Vec<String> {
             }
         }
     }
-    FALLBACK_NATIVE_LIBS
-        .iter()
-        .map(|lib| lib.to_string())
-        .collect()
+    fallback()
 }
 
 fn check_tool(program: &str, hint: &str) {
@@ -227,13 +321,24 @@ fn check_tool(program: &str, hint: &str) {
     }
 }
 
-/// Cross-assembles and links `assembly` into `output` (design §9):
-/// `aarch64-linux-gnu-gcc out.s libmonkey_asm.a -o prog <native libs>`,
-/// statically linked so qemu needs no sysroot.
-fn build_executable(assembly: &str, output: &Path) {
-    let cc = tool("MONKEY_ASM_CC", "aarch64-linux-gnu-gcc");
-    check_tool(&cc, "install the aarch64 cross toolchain (gcc-aarch64-linux-gnu)");
-    let runtime = runtime_library();
+/// Assembles and links `assembly` into `output` (design §9). Linux:
+/// `aarch64-linux-gnu-gcc out.s libmonkey_asm.a -o prog -static <libs>` so
+/// qemu needs no sysroot. macOS: `cc -arch arm64 …` against the system
+/// dylibs (there is no static libSystem).
+fn build_executable(assembly: &str, output: &Path, platform: Platform) {
+    if platform == Platform::MacOs
+        && !cfg!(target_os = "macos")
+        && std::env::var_os("MONKEY_ASM_CC").is_none()
+    {
+        fail(
+            "building a macOS executable needs a macOS host (Mach-O linking \
+             requires the Apple SDK); set MONKEY_ASM_CC to a cross-capable \
+             clang to override",
+        );
+    }
+    let cc = tool("MONKEY_ASM_CC", platform.default_cc());
+    check_tool(&cc, platform.cc_hint());
+    let runtime = runtime_library(platform);
 
     let asm_path = output.with_extension("s");
     if let Err(error) = std::fs::write(&asm_path, assembly) {
@@ -241,12 +346,15 @@ fn build_executable(assembly: &str, output: &Path) {
     }
 
     let mut link = Command::new(&cc);
-    link.arg(&asm_path)
-        .arg(&runtime)
-        .arg("-o")
-        .arg(output)
-        .arg("-static");
-    for lib in native_static_libs() {
+    link.arg(&asm_path).arg(&runtime).arg("-o").arg(output);
+    if platform.static_link() {
+        link.arg("-static");
+    }
+    if platform == Platform::MacOs {
+        // Intel Macs would otherwise assemble for the host architecture.
+        link.args(["-arch", "arm64"]);
+    }
+    for lib in native_static_libs(platform) {
         link.arg(lib);
     }
     match link.status() {
@@ -254,10 +362,6 @@ fn build_executable(assembly: &str, output: &Path) {
         Ok(status) => fail(&format!("{} failed with {}", cc, status)),
         Err(error) => fail(&format!("cannot run {}: {}", cc, error)),
     }
-}
-
-fn host_is_linux_aarch64() -> bool {
-    cfg!(all(target_arch = "aarch64", target_os = "linux"))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -498,24 +602,47 @@ fn validate_observer_exit(record: &ObserverRecord, code: Option<i32>) -> Result<
     }
 }
 
-fn run_executable(program: &Path, observe: bool) -> ! {
+fn run_executable(program: &Path, observe: bool, platform: Platform) -> ! {
+    // qemu-user only emulates Linux binaries; Mach-O output must run on an
+    // Apple Silicon Mac or not at all.
+    let emulator = if platform.host_runs_natively() {
+        None
+    } else {
+        match platform {
+            Platform::LinuxGnu => {
+                let qemu = tool("MONKEY_ASM_QEMU", "qemu-aarch64");
+                check_tool(&qemu, "install qemu-user to run Linux arm64 ELF binaries on this host");
+                Some(qemu)
+            }
+            Platform::MacOs => fail(
+                "macOS arm64 binaries only run on Apple Silicon macOS; \
+                 use --platform linux for qemu-based runs on this host",
+            ),
+        }
+    };
+
     let record_path = program.with_extension("observer");
-    let mut direct;
-    let mut with_fd3;
-    let command = if observe {
+    let mut command = match (&emulator, observe) {
+        (None, false) => Command::new(program),
+        (Some(qemu), false) => {
+            let mut direct = Command::new(qemu);
+            direct.arg(program);
+            direct
+        }
         // Install the record file as fd 3 via the shell so the program's
         // stdout stays the untouched puts/print byte stream (design §10.2).
-        with_fd3 = Command::new("sh");
-        if host_is_linux_aarch64() {
+        (None, true) => {
+            let mut with_fd3 = Command::new("sh");
             with_fd3
                 .arg("-c")
                 .arg("exec \"$1\" 3>\"$2\"")
                 .arg("sh")
                 .arg(program)
                 .arg(&record_path);
-        } else {
-            let qemu = tool("MONKEY_ASM_QEMU", "qemu-aarch64");
-            check_tool(&qemu, "install qemu-user to run Linux arm64 ELF binaries on this host");
+            with_fd3
+        }
+        (Some(qemu), true) => {
+            let mut with_fd3 = Command::new("sh");
             with_fd3
                 .arg("-c")
                 .arg("exec \"$1\" \"$2\" 3>\"$3\"")
@@ -523,17 +650,8 @@ fn run_executable(program: &Path, observe: bool) -> ! {
                 .arg(qemu)
                 .arg(program)
                 .arg(&record_path);
+            with_fd3
         }
-        &mut with_fd3
-    } else if host_is_linux_aarch64() {
-        direct = Command::new(program);
-        &mut direct
-    } else {
-        let qemu = tool("MONKEY_ASM_QEMU", "qemu-aarch64");
-        check_tool(&qemu, "install qemu-user to run Linux arm64 ELF binaries on this host");
-        direct = Command::new(qemu);
-        direct.arg(program);
-        &mut direct
     };
 
     let status = match command.status() {
@@ -576,7 +694,7 @@ fn main() {
                     .unwrap_or_else(|| PathBuf::from("a.out"))
             });
             let assembly = assembly_for(&options);
-            build_executable(&assembly, &output);
+            build_executable(&assembly, &output, options.platform);
             eprintln!(
                 "monkey-asm: wrote {} and {}",
                 output.display(),
@@ -596,8 +714,8 @@ fn main() {
                     .map(PathBuf::from)
                     .unwrap_or_else(|| PathBuf::from("program")),
             );
-            build_executable(&assembly, &program);
-            run_executable(&program, options.observe);
+            build_executable(&assembly, &program, options.platform);
+            run_executable(&program, options.observe, options.platform);
         }
         _ => usage(),
     }

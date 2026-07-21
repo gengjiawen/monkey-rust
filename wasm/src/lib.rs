@@ -4,6 +4,7 @@ use crate::utils::set_panic_hook;
 use compiler::compiler::Compiler;
 use compiler::snapshot::{read_bytecode, write_bytecode};
 use compiler::snapshot_layout::describe_bytecode;
+use monkey_asm::emitter::AsmDialect;
 use monkey_asm::lower::lower_node;
 use parser::parse as parser_pase;
 use parser::parse_ast_json_string;
@@ -133,8 +134,9 @@ fn arm64_envelope(input: &str) -> Result<serde_json::Value, Arm64Failure> {
             .unwrap_or_else(|| "unknown parse error".to_string());
         ("parse", message, None)
     })?;
-    let assembly =
-        lower_node(input, &node, false).map_err(|error| ("compile", error.message, error.span))?;
+    // The playground always shows the Linux/ELF spelling (design §12).
+    let assembly = lower_node(input, &node, AsmDialect::LinuxElf, false)
+        .map_err(|error| ("compile", error.message, error.span))?;
 
     // `Assembly` guarantees one `line_spans` entry per `\n`-terminated line.
     let lines: Vec<serde_json::Value> = assembly

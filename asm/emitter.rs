@@ -2,8 +2,10 @@
 //! encoding-limit helpers (`load_imm64`, frame/sp/global addressing) that
 //! `lower.rs` must never bypass.
 //!
-//! Dialect is Linux GNU `as` only (no symbol prefix, `:lo12:` relocations,
-//! `.bss`/`.rodata` section names; design §9).
+//! Two dialects (design §9): Linux GNU `as`/ELF (bare symbols, `.L` locals,
+//! `:lo12:` relocations, `.rodata`/`.bss`) and macOS Mach-O via clang
+//! (`_`-prefixed C symbols, `L` locals, `@PAGE`/`@PAGEOFF`,
+//! `__TEXT,__const`/`.zerofill`). Instructions are identical on both.
 
 use std::collections::HashMap;
 
@@ -44,6 +46,39 @@ pub fn scratch_area_size(len: usize) -> u64 {
     (packed + 15) & !15
 }
 
+/// Assembler/object-format dialect (design §9). Everything the two supported
+/// platforms disagree on — C symbol prefixes, private-label spelling, `adrp`
+/// relocation syntax, and data-section directives — routes through here; the
+/// instruction stream itself is identical.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AsmDialect {
+    /// Linux GNU `as` + ELF (also what the playground shows).
+    LinuxElf,
+    /// macOS Apple Silicon: clang assembler + Mach-O.
+    MachO,
+}
+
+impl AsmDialect {
+    /// Spells a C-ABI symbol the way the platform assembler expects it:
+    /// Mach-O prefixes every C-visible name with `_` (`_main`, `_rt_add`),
+    /// ELF uses the bare name.
+    pub fn global_symbol(self, name: &str) -> String {
+        match self {
+            AsmDialect::LinuxElf => name.to_string(),
+            AsmDialect::MachO => format!("_{}", name),
+        }
+    }
+
+    /// Prefix that keeps a label out of the object's symbol table: `.L` on
+    /// ELF, `L` on Mach-O.
+    pub(crate) fn local_label_prefix(self) -> &'static str {
+        match self {
+            AsmDialect::LinuxElf => ".L",
+            AsmDialect::MachO => "L",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Line {
     text: String,
@@ -76,6 +111,7 @@ pub struct FunctionFrame {
 }
 
 pub struct Emitter {
+    dialect: AsmDialect,
     main_body: Vec<Line>,
     functions: Vec<Vec<Line>>,
     rodata: Vec<Line>,
@@ -91,8 +127,9 @@ pub struct Emitter {
 }
 
 impl Emitter {
-    pub fn new() -> Emitter {
+    pub fn new(dialect: AsmDialect) -> Emitter {
         Emitter {
+            dialect,
             main_body: vec![],
             functions: vec![],
             rodata: vec![],
@@ -160,13 +197,13 @@ impl Emitter {
     }
 
     pub fn new_label(&mut self) -> String {
-        let label = format!(".L{}", self.label_count);
+        let label = format!("{}{}", self.dialect.local_label_prefix(), self.label_count);
         self.label_count += 1;
         label
     }
 
     pub fn new_function_label(&mut self) -> String {
-        let label = format!(".Lfn{}", self.function_count);
+        let label = format!("{}fn{}", self.dialect.local_label_prefix(), self.function_count);
         self.function_count += 1;
         label
     }
@@ -177,7 +214,7 @@ impl Emitter {
         if let Some((label, len)) = self.strings.get(bytes) {
             return (label.clone(), *len);
         }
-        let label = format!(".Lstr{}", self.strings.len());
+        let label = format!("{}str{}", self.dialect.local_label_prefix(), self.strings.len());
         let len = bytes.len() as u64;
         let preview: String = String::from_utf8_lossy(bytes)
             .chars()
@@ -239,14 +276,37 @@ impl Emitter {
         }
     }
 
-    /// `reg = address of label` via `adrp` + `:lo12:` (design §6).
+    /// `reg = address of label` via `adrp` plus the low-12-bits add, spelled
+    /// `:lo12:` on ELF and `@PAGE`/`@PAGEOFF` on Mach-O (design §6, §9).
     pub fn load_label_address(&mut self, reg: &str, label: &str, comment: &str) {
+        let (page, low) = match self.dialect {
+            AsmDialect::LinuxElf => (
+                format!("adrp {}, {}", reg, label),
+                format!("add {}, {}, :lo12:{}", reg, reg, label),
+            ),
+            AsmDialect::MachO => (
+                format!("adrp {}, {}@PAGE", reg, label),
+                format!("add {}, {}, {}@PAGEOFF", reg, reg, label),
+            ),
+        };
         if comment.is_empty() {
-            self.ins(&format!("adrp {}, {}", reg, label));
+            self.ins(&page);
         } else {
-            self.ins_cmt(&format!("adrp {}, {}", reg, label), comment);
+            self.ins_cmt(&page, comment);
         }
-        self.ins(&format!("add {}, {}, :lo12:{}", reg, reg, label));
+        self.ins(&low);
+    }
+
+    /// `bl` to an `rt_*` entry point by its C name; the dialect supplies the
+    /// Mach-O `_` prefix (`bl rt_add` vs `bl _rt_add`). Every runtime call
+    /// must go through here so no `bl` hardcodes a platform spelling.
+    pub fn call_runtime(&mut self, name: &str, comment: &str) {
+        let text = format!("bl {}", self.dialect.global_symbol(name));
+        if comment.is_empty() {
+            self.ins(&text);
+        } else {
+            self.ins_cmt(&text, comment);
+        }
     }
 
     /// Pushes the accumulator, one value per 16-byte slot (design §6).
@@ -481,16 +541,16 @@ impl Emitter {
             emitter.ins("mov x29, sp");
             if observe {
                 emitter.load_imm64("x0", 3, "observer channel fd");
-                emitter.ins("bl rt_observer_init");
+                emitter.call_runtime("rt_observer_init", "");
             }
             emitter.load_label_address("x0", "g_globals", "");
             emitter.load_imm64("x1", globals_count as u64, "global slot count");
-            emitter.ins("bl rt_globals_init");
+            emitter.call_runtime("rt_globals_init", "");
         });
         let epilogue = self.capture(|emitter| {
             emitter.label(main_epilogue_label);
             if observe {
-                emitter.ins_cmt("bl rt_observe_result", "program result record");
+                emitter.call_runtime("rt_observe_result", "program result record");
             }
             emitter.ins_cmt("mov w0, #0", "exit code is never the tagged value");
             emitter.ins("mov sp, x29");
@@ -505,11 +565,12 @@ impl Emitter {
                 span: None,
             });
         };
+        let main_symbol = self.dialect.global_symbol("main");
         raw("// Generated by monkey-asm (docs/arm64-asm-backend-design.md). Do not edit.");
         raw("    .text");
-        raw("    .globl main");
+        raw(&format!("    .globl {}", main_symbol));
         raw("    .p2align 2");
-        raw("main:");
+        raw(&format!("{}:", main_symbol));
         lines.extend(prologue);
         lines.extend(main_body);
         lines.extend(epilogue);
@@ -525,8 +586,12 @@ impl Emitter {
                 text: String::new(),
                 span: None,
             });
+            let rodata_section = match self.dialect {
+                AsmDialect::LinuxElf => "    .section .rodata",
+                AsmDialect::MachO => "    .section __TEXT,__const",
+            };
             lines.push(Line {
-                text: "    .section .rodata".to_string(),
+                text: rodata_section.to_string(),
                 span: None,
             });
             lines.append(&mut self.rodata);
@@ -535,22 +600,40 @@ impl Emitter {
             text: String::new(),
             span: None,
         });
-        lines.push(Line {
-            text: "    .bss".to_string(),
-            span: None,
-        });
-        lines.push(Line {
-            text: "    .balign 8".to_string(),
-            span: None,
-        });
-        lines.push(Line {
-            text: format!("{:<35} // {} global slot(s)", "g_globals:", globals_count),
-            span: None,
-        });
-        lines.push(Line {
-            text: format!("    .skip {}", 8 * globals_count),
-            span: None,
-        });
+        match self.dialect {
+            AsmDialect::LinuxElf => {
+                lines.push(Line {
+                    text: "    .bss".to_string(),
+                    span: None,
+                });
+                lines.push(Line {
+                    text: "    .balign 8".to_string(),
+                    span: None,
+                });
+                lines.push(Line {
+                    text: format!("{:<35} // {} global slot(s)", "g_globals:", globals_count),
+                    span: None,
+                });
+                lines.push(Line {
+                    text: format!("    .skip {}", 8 * globals_count),
+                    span: None,
+                });
+            }
+            AsmDialect::MachO => {
+                // One directive declares section, symbol, size, and log2
+                // alignment; a program without globals still reserves one
+                // slot rather than betting on zero-size `.zerofill` symbols.
+                let size = (8 * globals_count).max(8);
+                lines.push(Line {
+                    text: format!(
+                        "    {:<31} // {} global slot(s)",
+                        format!(".zerofill __DATA,__bss,g_globals,{},3", size),
+                        globals_count
+                    ),
+                    span: None,
+                });
+            }
+        }
 
         let mut text = String::new();
         let mut line_spans = Vec::with_capacity(lines.len());

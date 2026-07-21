@@ -1,16 +1,23 @@
 //! Lowering snapshot tests (design §10.3): whole `.s` modules for
 //! representative programs, plus the lowering-time error cases.
 
+use crate::emitter::AsmDialect;
 use crate::lower::compile_source;
 
 fn assembly(source: &str) -> String {
-    compile_source(source, false)
+    compile_source(source, AsmDialect::LinuxElf, false)
+        .expect("program should lower")
+        .text
+}
+
+fn macho_assembly(source: &str) -> String {
+    compile_source(source, AsmDialect::MachO, false)
         .expect("program should lower")
         .text
 }
 
 fn error_message(source: &str) -> String {
-    compile_source(source, false).expect_err("program should be rejected")
+    compile_source(source, AsmDialect::LinuxElf, false).expect_err("program should be rejected")
 }
 
 #[test]
@@ -80,13 +87,38 @@ fn snapshot_boxed_integer_literal() {
 
 #[test]
 fn snapshot_observe_mode() {
-    insta::assert_snapshot!(compile_source("1 + 2;", true).unwrap().text);
+    insta::assert_snapshot!(
+        compile_source("1 + 2;", AsmDialect::LinuxElf, true)
+            .unwrap()
+            .text
+    );
+}
+
+#[test]
+fn snapshot_macho_dialect() {
+    // Same lowering, Mach-O spelling: `_`-prefixed calls, `L` labels,
+    // `@PAGE`/`@PAGEOFF`, `__TEXT,__const`, and `.zerofill` globals.
+    insta::assert_snapshot!(macho_assembly(
+        "let msg = \"hé\";\nlet inc = fn(n) { n + 1 };\nif (inc(1) < 3) { msg } else { \"no\" };"
+    ));
+}
+
+#[test]
+fn macho_never_leaks_elf_spellings() {
+    let text = macho_assembly(
+        "class Counter {\n  constructor(start) { this.count = start; }\n  inc() { this.count = this.count + 1; this.count }\n}\nlet c = new Counter(5);\nc.inc();\nlet a = [c.count, len(\"x\")];\n-a[0];\n!true;\nputs(a);"
+    );
+    assert!(!text.contains(":lo12:"));
+    assert!(!text.contains(".L"));
+    assert!(!text.contains("bl rt_"));
+    assert!(text.contains("bl _rt_call"));
+    assert!(text.contains(".zerofill __DATA,__bss,g_globals,"));
 }
 
 #[test]
 fn line_spans_point_into_the_source() {
     let source = "let x = 41;\nx + 1;";
-    let assembly = compile_source(source, false).unwrap();
+    let assembly = compile_source(source, AsmDialect::LinuxElf, false).unwrap();
     assert_eq!(assembly.text.lines().count(), assembly.line_spans.len());
     let mut spanned = 0;
     for span in assembly.line_spans.iter().flatten() {
@@ -116,8 +148,9 @@ fn parameter_limits_are_rejected() {
         "methods accept at most 6 parameters"
     );
     // Seven function parameters / six method parameters are fine.
-    assert!(compile_source("fn(a, b, c, d, e, f, g) { 0 };", false).is_ok());
-    assert!(compile_source("class C { m(a, b, c, d, e, f) { 0 } }", false).is_ok());
+    assert!(compile_source("fn(a, b, c, d, e, f, g) { 0 };", AsmDialect::LinuxElf, false).is_ok());
+    assert!(compile_source("class C { m(a, b, c, d, e, f) { 0 } }", AsmDialect::LinuxElf, false)
+        .is_ok());
 }
 
 #[test]

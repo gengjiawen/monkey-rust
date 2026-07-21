@@ -14,7 +14,7 @@ use parser::validation::validate_program;
 use std::rc::Rc;
 
 use crate::emitter::{
-    call_area_size, scratch_area_size, slot_offset, Assembly, Emitter, FunctionFrame,
+    call_area_size, scratch_area_size, slot_offset, AsmDialect, Assembly, Emitter, FunctionFrame,
     CLOSURE_SLOT_OFFSET,
 };
 use crate::runtime_core::{
@@ -26,7 +26,11 @@ use crate::runtime_core::{
 pub const MAX_FUNCTION_PARAMETERS: usize = 7;
 pub const MAX_METHOD_PARAMETERS: usize = 6;
 
-const MAIN_EPILOGUE_LABEL: &str = ".Lmain_exit";
+/// `main`'s epilogue label, in the dialect's private-label spelling
+/// (`.Lmain_exit` on ELF, `Lmain_exit` on Mach-O).
+fn main_epilogue_label(dialect: AsmDialect) -> String {
+    format!("{}main_exit", dialect.local_label_prefix())
+}
 
 #[derive(Clone, Debug)]
 pub struct LowerError {
@@ -47,10 +51,16 @@ fn error<T>(message: impl Into<String>, span: &Span) -> Result<T, LowerError> {
     })
 }
 
-/// Lowers a parsed program to a complete assembly module. `observe` selects
-/// the differential-testing build: `rt_observer_init(3)` at startup and one
-/// `rt_observe_result` before exit (design §10.2).
-pub fn lower_node(source: &str, node: &Node, observe: bool) -> Result<Assembly, LowerError> {
+/// Lowers a parsed program to a complete assembly module in the given
+/// dialect. `observe` selects the differential-testing build:
+/// `rt_observer_init(3)` at startup and one `rt_observe_result` before exit
+/// (design §10.2).
+pub fn lower_node(
+    source: &str,
+    node: &Node,
+    dialect: AsmDialect,
+    observe: bool,
+) -> Result<Assembly, LowerError> {
     let program = match node {
         Node::Program(program) => program,
         _ => {
@@ -71,11 +81,12 @@ pub fn lower_node(source: &str, node: &Node, observe: bool) -> Result<Assembly, 
         symbols.define_builtin(index, builtin.name.to_string());
     }
 
+    let exit_label = main_epilogue_label(dialect);
     let mut lowerer = Lowerer {
         source,
-        emitter: Emitter::new(),
+        emitter: Emitter::new(dialect),
         symbols,
-        epilogues: vec![MAIN_EPILOGUE_LABEL.to_string()],
+        epilogues: vec![exit_label.clone()],
     };
 
     let mut last_leaves_value = false;
@@ -91,16 +102,18 @@ pub fn lower_node(source: &str, node: &Node, observe: bool) -> Result<Assembly, 
     }
 
     let globals_count = lowerer.symbols.num_definitions;
-    Ok(lowerer
-        .emitter
-        .finish(globals_count, MAIN_EPILOGUE_LABEL, observe))
+    Ok(lowerer.emitter.finish(globals_count, &exit_label, observe))
 }
 
 /// Parses + lowers in one step for the CLI and tests; parse and lowering
 /// failures are joined into printable messages.
-pub fn compile_source(source: &str, observe: bool) -> Result<Assembly, String> {
+pub fn compile_source(
+    source: &str,
+    dialect: AsmDialect,
+    observe: bool,
+) -> Result<Assembly, String> {
     let node = parser::parse(source).map_err(|errors| errors.join("\n"))?;
-    lower_node(source, &node, observe).map_err(|lower| lower.message)
+    lower_node(source, &node, dialect, observe).map_err(|lower| lower.message)
 }
 
 struct Lowerer<'a> {
@@ -190,7 +203,7 @@ impl<'a> Lowerer<'a> {
                     emitter.pop("x0", "object");
                     emitter.load_label_address("x1", &name_label, &property);
                     emitter.load_imm64("x2", name_len, "");
-                    emitter.ins("bl rt_set_property");
+                    emitter.call_runtime("rt_set_property", "");
                 });
                 Ok(false)
             }
@@ -260,7 +273,7 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&span.clone(), |emitter| {
                     emitter.frame_load("x0", CLOSURE_SLOT_OFFSET, "current closure");
                     emitter.load_imm64("x1", index as u64, &format!("free variable {}", name));
-                    emitter.ins("bl rt_get_free");
+                    emitter.call_runtime("rt_get_free", "");
                 });
             }
             SymbolScope::Function => {
@@ -297,14 +310,14 @@ impl<'a> Lowerer<'a> {
                 self.lower_expression(&prefix.operand)?;
                 let comment = self.snippet(&prefix.span);
                 let runtime_call = match prefix.op.kind {
-                    TokenKind::MINUS => "bl rt_minus",
-                    TokenKind::BANG => "bl rt_bang",
+                    TokenKind::MINUS => "rt_minus",
+                    TokenKind::BANG => "rt_bang",
                     _ => {
                         return error(format!("unexpected prefix op: {}", prefix.op), &prefix.span)
                     }
                 };
                 self.emitter.with_span(&prefix.span.clone(), |emitter| {
-                    emitter.ins_cmt(runtime_call, &comment);
+                    emitter.call_runtime(runtime_call, &comment);
                 });
                 Ok(())
             }
@@ -315,7 +328,7 @@ impl<'a> Lowerer<'a> {
                 let end_label = self.emitter.new_label();
                 let comment = format!("if ({})", self.snippet(if_node.condition.span()));
                 self.emitter.with_span(&if_node.span.clone(), |emitter| {
-                    emitter.ins_cmt("bl rt_truthy", &comment);
+                    emitter.call_runtime("rt_truthy", &comment);
                     emitter.ins(&format!("cbz x0, {}", else_label));
                 });
                 self.lower_block_value(&if_node.consequent)?;
@@ -346,7 +359,7 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&index.span.clone(), |emitter| {
                     emitter.ins_cmt("mov x1, x0", "index");
                     emitter.pop("x0", "object");
-                    emitter.ins_cmt("bl rt_index", &comment);
+                    emitter.call_runtime("rt_index", &comment);
                 });
                 Ok(())
             }
@@ -373,7 +386,7 @@ impl<'a> Lowerer<'a> {
                     emitter.ins_cmt("ldr x0, [sp]", "callee");
                     emitter.load_imm64("x1", argc as u64, "argc");
                     emitter.sp_address("x2", 8, "argv");
-                    emitter.ins("bl rt_call");
+                    emitter.call_runtime("rt_call", "");
                     emitter.sp_add(area);
                 });
                 Ok(())
@@ -394,7 +407,7 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&property.span.clone(), |emitter| {
                     emitter.load_label_address("x1", &name_label, &name);
                     emitter.load_imm64("x2", name_len, "");
-                    emitter.ins_cmt("bl rt_get_property", &format!(".{}", name));
+                    emitter.call_runtime("rt_get_property", &format!(".{}", name));
                 });
                 Ok(())
             }
@@ -439,7 +452,7 @@ impl<'a> Lowerer<'a> {
                         emitter.ins_cmt("ldr x0, [sp]", "class");
                         emitter.load_imm64("x1", argc as u64, "argc");
                         emitter.sp_address("x2", 8, "argv");
-                        emitter.ins("bl rt_construct");
+                        emitter.call_runtime("rt_construct", "");
                         emitter.sp_add(area);
                     });
                 Ok(())
@@ -456,7 +469,7 @@ impl<'a> Lowerer<'a> {
                         emitter.load_imm64("x0", (raw << 1) as u64, &format!("{}", raw));
                     } else {
                         emitter.load_imm64("x0", raw as u64, &format!("{} (beyond SMI)", raw));
-                        emitter.ins("bl rt_box_int");
+                        emitter.call_runtime("rt_box_int", "");
                     }
                 });
                 Ok(())
@@ -475,7 +488,7 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&string.span.clone(), |emitter| {
                     emitter.load_label_address("x0", &label, &preview);
                     emitter.load_imm64("x1", len, "byte length");
-                    emitter.ins("bl rt_string_from_bytes");
+                    emitter.call_runtime("rt_string_from_bytes", "");
                 });
                 Ok(())
             }
@@ -494,7 +507,7 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&array.span.clone(), |emitter| {
                     emitter.sp_address("x0", 0, "element base");
                     emitter.load_imm64("x1", len as u64, "element count");
-                    emitter.ins("bl rt_array");
+                    emitter.call_runtime("rt_array", "");
                     emitter.sp_add(area);
                 });
                 Ok(())
@@ -522,7 +535,7 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&hash.span.clone(), |emitter| {
                     emitter.sp_address("x0", 0, "pair base");
                     emitter.load_imm64("x1", pairs as u64, "pair count");
-                    emitter.ins("bl rt_hash");
+                    emitter.call_runtime("rt_hash", "");
                     emitter.sp_add(area);
                 });
                 Ok(())
@@ -543,19 +556,19 @@ impl<'a> Lowerer<'a> {
         if infix.op.kind == TokenKind::LT {
             self.emitter.with_span(&infix.span.clone(), |emitter| {
                 emitter.pop("x1", "left operand");
-                emitter.ins_cmt("bl rt_gt", &comment);
+                emitter.call_runtime("rt_gt", &comment);
             });
             return Ok(());
         }
 
         let runtime_call = match infix.op.kind {
-            TokenKind::PLUS => "bl rt_add",
-            TokenKind::MINUS => "bl rt_sub",
-            TokenKind::ASTERISK => "bl rt_mul",
-            TokenKind::SLASH => "bl rt_div",
-            TokenKind::GT => "bl rt_gt",
-            TokenKind::EQ => "bl rt_eq",
-            TokenKind::NotEq => "bl rt_neq",
+            TokenKind::PLUS => "rt_add",
+            TokenKind::MINUS => "rt_sub",
+            TokenKind::ASTERISK => "rt_mul",
+            TokenKind::SLASH => "rt_div",
+            TokenKind::GT => "rt_gt",
+            TokenKind::EQ => "rt_eq",
+            TokenKind::NotEq => "rt_neq",
             _ => return error(format!("unexpected infix op: {}", infix.op), &infix.span),
         };
 
@@ -575,7 +588,7 @@ impl<'a> Lowerer<'a> {
                 emitter.ins("mov x0, x8");
                 emitter.ins(&format!("b {}", done_label));
                 emitter.label(&slow_label);
-                emitter.ins_cmt(runtime_call, &comment);
+                emitter.call_runtime(runtime_call, &comment);
                 emitter.label(&done_label);
             });
             return Ok(());
@@ -584,7 +597,7 @@ impl<'a> Lowerer<'a> {
         self.emitter.with_span(&infix.span.clone(), |emitter| {
             emitter.ins_cmt("mov x1, x0", "right operand");
             emitter.pop("x0", "left operand");
-            emitter.ins_cmt(runtime_call, &comment);
+            emitter.call_runtime(runtime_call, &comment);
         });
         Ok(())
     }
@@ -718,7 +731,7 @@ impl<'a> Lowerer<'a> {
             emitter.load_imm64("x1", num_parameters as u64, "num_parameters");
             emitter.sp_address("x2", 0, "captured values");
             emitter.load_imm64("x3", num_free as u64, "num_free");
-            emitter.ins("bl rt_closure");
+            emitter.call_runtime("rt_closure", "");
             emitter.sp_add(area);
         });
         Ok(())
@@ -735,7 +748,7 @@ impl<'a> Lowerer<'a> {
         self.emitter.with_span(&class.span.clone(), |emitter| {
             emitter.load_label_address("x0", &name_label, &class_name);
             emitter.load_imm64("x1", name_len, "");
-            emitter.ins("bl rt_class");
+            emitter.call_runtime("rt_class", "");
             emitter.push_acc("class value");
         });
         for method in &class.methods {
@@ -750,7 +763,7 @@ impl<'a> Lowerer<'a> {
                 emitter.load_label_address("x1", &method_label, &method_name);
                 emitter.load_imm64("x2", method_len, "");
                 emitter.load_imm64("x4", if is_constructor { 1 } else { 0 }, "is_ctor");
-                emitter.ins("bl rt_class_add_method");
+                emitter.call_runtime("rt_class_add_method", "");
             });
         }
         self.emitter.with_span(&class.span.clone(), |emitter| {
