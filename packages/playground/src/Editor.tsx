@@ -139,6 +139,7 @@ interface EditorProps {
   onSelectionChange?: (selection: { from: number; to: number }) => void
   vimMode?: boolean
   fill?: boolean
+  lineWrapping?: boolean
 }
 
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
@@ -149,6 +150,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     onSelectionChange,
     vimMode = true,
     fill = false,
+    lineWrapping = false,
   },
   ref
 ) {
@@ -185,11 +187,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (vimMode) {
       next.push(vim())
     }
+    if (lineWrapping) {
+      next.push(EditorView.lineWrapping)
+    }
     if (extraExtensions) {
       next.push(...extraExtensions)
     }
     return next
-  }, [extraExtensions, vimMode])
+  }, [extraExtensions, lineWrapping, vimMode])
 
   const handleCreateEditor = useCallback(
     (

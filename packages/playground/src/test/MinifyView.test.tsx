@@ -12,7 +12,7 @@ describe('MinifyView', () => {
   })
 
   it('renders byte savings and parser failures', () => {
-    const { rerender } = render(
+    const { container, rerender } = render(
       <Theme>
         <MinifyView
           state={{
@@ -27,6 +27,11 @@ describe('MinifyView', () => {
     expect(screen.getByLabelText('Minified byte statistics')).toHaveTextContent(
       '8 → 4 UTF-8 bytes · saved 50.0%'
     )
+    // Minified output is one long line; the pane wraps it instead of
+    // requiring horizontal scrolling.
+    expect(
+      container.querySelector('.cm-content.cm-lineWrapping')
+    ).not.toBeNull()
 
     rerender(
       <Theme>

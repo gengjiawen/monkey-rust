@@ -61,6 +61,7 @@ export function MinifyView({ state }: MinifyViewProps) {
         extra={{ readOnly: true, editable: false }}
         vimMode={false}
         fill
+        lineWrapping
       />
     </div>
   )
