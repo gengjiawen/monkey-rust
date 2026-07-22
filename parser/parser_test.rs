@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::ast::{Expression, MethodKind, Node, Statement};
-    use crate::parse;
+    use crate::{parse, parse_ast_lossless_json_string};
 
     fn verify_program(test_cases: &[(&str, &str)]) {
         for (input, expected) in test_cases {
@@ -251,5 +251,20 @@ connect();"#;
                 errors
             );
         }
+    }
+
+    #[test]
+    fn lossless_json_stringifies_every_integer_literal() {
+        let json = parse_ast_lossless_json_string(
+            r#"let large = 9007199254740993; [9223372036854775807, {1: 2}];"#,
+        )
+        .unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let program = &value["Program"];
+        assert_eq!(program["body"][0]["expr"]["raw"], "9007199254740993");
+        assert_eq!(program["body"][1]["elements"][0]["raw"], "9223372036854775807");
+        assert_eq!(program["body"][1]["elements"][1]["elements"][0][0]["raw"], "1");
+        assert_eq!(program["body"][1]["elements"][1]["elements"][0][1]["raw"], "2");
     }
 }

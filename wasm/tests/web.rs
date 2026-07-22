@@ -3,7 +3,10 @@
 #![cfg(target_arch = "wasm32")]
 
 extern crate wasm_bindgen_test;
-use monkey_wasm::{compile_to_arm64, compile_to_snapshot, parse, run_gc_with_report, run_snapshot};
+use monkey_wasm::{
+    compile_to_arm64, compile_to_snapshot, parse, parse_lossless, run_gc_with_report, run_snapshot,
+    run_snapshot_with_output,
+};
 use serde_json::Value;
 use wasm_bindgen_test::*;
 
@@ -12,6 +15,14 @@ fn pass() {
     let input = "let a = 3";
     let r = parse(input);
     println!("{}", r);
+}
+
+#[wasm_bindgen_test]
+fn lossless_parse_preserves_i64_literals_as_strings() {
+    let ast: Value =
+        serde_json::from_str(&parse_lossless("[9007199254740993, 9223372036854775807]")).unwrap();
+    assert_eq!(ast["Program"]["body"][0]["elements"][0]["raw"], "9007199254740993");
+    assert_eq!(ast["Program"]["body"][0]["elements"][1]["raw"], "9223372036854775807");
 }
 
 fn run_gc(source: &str) -> Value {
@@ -180,6 +191,23 @@ fn snapshot_envelope_roundtrips_through_the_vm() {
     let run = run_bytes(&bytes);
     assert_eq!(run["status"], "ok");
     assert_eq!(run["result"], "3");
+}
+
+#[wasm_bindgen_test]
+fn snapshot_output_is_captured_before_success_or_failure() {
+    let success = build_snapshot(r#"puts("before"); 42"#, false);
+    let run: Value = serde_json::from_str(&run_snapshot_with_output(&snapshot_bytes(&success)))
+        .expect("valid output envelope");
+    assert_eq!(run["status"], "ok");
+    assert_eq!(run["result"], "42");
+    assert_eq!(run["stdout"], "before\n");
+
+    let failure = build_snapshot(r#"puts("before"); 1 / 0"#, false);
+    let run: Value = serde_json::from_str(&run_snapshot_with_output(&snapshot_bytes(&failure)))
+        .expect("valid output envelope");
+    assert_eq!(run["status"], "error");
+    assert_eq!(run["kind"], "arithmetic");
+    assert_eq!(run["stdout"], "before\n");
 }
 
 #[wasm_bindgen_test]

@@ -7,7 +7,7 @@ use compiler::snapshot_layout::describe_bytecode;
 use monkey_asm::emitter::AsmDialect;
 use monkey_asm::lower::lower_node;
 use parser::parse as parser_pase;
-use parser::parse_ast_json_string;
+use parser::{parse_ast_json_string, parse_ast_lossless_json_string};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::throw_str;
 
@@ -24,6 +24,17 @@ pub fn parse(input: &str) -> String {
     set_panic_hook();
     match parse_ast_json_string(input) {
         Ok(node) => node.to_string(),
+        Err(e) => throw_str(format!("parse error: {}", e[0]).as_str()),
+    }
+}
+
+/// Parse Monkey source to JSON while encoding every i64 literal as a decimal
+/// string so JavaScript consumers do not lose integer precision.
+#[wasm_bindgen]
+pub fn parse_lossless(input: &str) -> String {
+    set_panic_hook();
+    match parse_ast_lossless_json_string(input) {
+        Ok(node) => node,
         Err(e) => throw_str(format!("parse error: {}", e[0]).as_str()),
     }
 }
@@ -84,19 +95,21 @@ pub fn compile_with_debug(input: &str) -> String {
 pub fn run_gc_with_report(input: &str) -> String {
     set_panic_hook();
 
-    let envelope = match gc::run_source_with_report(input, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
-        Ok(success) => serde_json::json!({
-            "status": "ok",
-            "result": success.result,
-            "report": success.report,
-        }),
-        Err(error) => serde_json::json!({
-            "status": "error",
-            "stage": error.stage,
-            "message": error.message,
-            "span": error.span,
-        }),
-    };
+    let envelope =
+        match gc::run_source_with_report_classified(input, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
+            Ok(success) => serde_json::json!({
+                "status": "ok",
+                "result": success.result,
+                "report": success.report,
+            }),
+            Err(error) => serde_json::json!({
+                "status": "error",
+                "stage": error.stage,
+                "kind": error.kind,
+                "message": error.message,
+                "span": error.span,
+            }),
+        };
 
     serde_json::to_string(&envelope).expect("GC run envelope serialization should not fail")
 }
@@ -117,6 +130,7 @@ pub fn compile_to_arm64(input: &str) -> String {
         Err((stage, message, span)) => serde_json::json!({
             "status": "error",
             "stage": stage,
+            "kind": stage,
             "message": message,
             "span": span.map(|(start, end)| serde_json::json!({ "start": start, "end": end })),
         }),
@@ -192,6 +206,7 @@ pub fn compile_to_snapshot(input: &str, strip_debug: bool) -> String {
         Err((stage, message)) => serde_json::json!({
             "status": "error",
             "stage": stage,
+            "kind": stage,
             "message": message,
         }),
     };
@@ -234,7 +249,8 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 /// Execute `.mbc` snapshot bytes on the cycle-collecting VM — the browser twin of
-/// `monkey-gc run foo.mbc`, sharing its execution path (`gc::run_bytecode`).
+/// `monkey-gc run foo.mbc`, running the same VM with raise-site error
+/// classification so the envelope can carry a stable `kind`.
 ///
 /// The buffer is untrusted input: it goes through the validating snapshot reader
 /// before the VM. Failures are data in the envelope — stage `snapshot` when the
@@ -245,23 +261,70 @@ pub fn run_snapshot(bytes: &[u8]) -> String {
     set_panic_hook();
 
     let envelope = match read_bytecode(bytes) {
-        Ok(bytecode) => match gc::run_bytecode(bytecode, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
-            Ok(result) => serde_json::json!({
-                "status": "ok",
-                "result": result,
-            }),
-            Err(error) => serde_json::json!({
-                "status": "error",
-                "stage": "runtime",
-                "message": error.message,
-                "span": error.span,
-            }),
-        },
+        Ok(bytecode) => {
+            let mut vm = gc::GcVM::new(bytecode);
+            match vm
+                .run_with_budget_classified(PLAYGROUND_GC_INSTRUCTION_BUDGET)
+                .map(|()| vm.last_result_string())
+            {
+                Ok(result) => serde_json::json!({
+                    "status": "ok",
+                    "result": result,
+                }),
+                Err(error) => serde_json::json!({
+                    "status": "error",
+                    "stage": "runtime",
+                    "kind": error.kind,
+                    "message": error.message,
+                    "span": error.span,
+                }),
+            }
+        }
         Err(error) => serde_json::json!({
             "status": "error",
             "stage": "snapshot",
+            "kind": "invalidSnapshot",
             "message": format!("{:?}", error),
             "span": null,
+        }),
+    };
+    serde_json::to_string(&envelope).expect("snapshot run envelope serialization should not fail")
+}
+
+/// Execute an untrusted snapshot on a fresh GC VM and capture observable
+/// output. `stdout` is present on both success and failure so callers can
+/// compare programs that print before raising an error.
+#[wasm_bindgen]
+pub fn run_snapshot_with_output(bytes: &[u8]) -> String {
+    set_panic_hook();
+
+    let envelope = match read_bytecode(bytes) {
+        Ok(bytecode) => {
+            let (result, stdout) =
+                gc::run_bytecode_with_output(bytecode, PLAYGROUND_GC_INSTRUCTION_BUDGET);
+            match result {
+                Ok(result) => serde_json::json!({
+                    "status": "ok",
+                    "result": result,
+                    "stdout": stdout,
+                }),
+                Err(error) => serde_json::json!({
+                    "status": "error",
+                    "stage": "runtime",
+                    "kind": error.kind,
+                    "message": error.message,
+                    "span": error.span,
+                    "stdout": stdout,
+                }),
+            }
+        }
+        Err(error) => serde_json::json!({
+            "status": "error",
+            "stage": "snapshot",
+            "kind": "invalidSnapshot",
+            "message": format!("{:?}", error),
+            "span": null,
+            "stdout": "",
         }),
     };
     serde_json::to_string(&envelope).expect("snapshot run envelope serialization should not fail")

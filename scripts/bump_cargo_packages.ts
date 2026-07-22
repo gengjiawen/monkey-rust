@@ -82,17 +82,28 @@ const bump_cmd = `cargo workspaces version custom ${nextVersion} --no-git-commit
 console.log(bump_cmd)
 execSync(bump_cmd)
 
-// Also bump playground dependency on @gengjiawen/monkey-wasm
+// Also bump playground dependencies on the versioned Monkey packages.
 try {
   const playgroundPkgPath = repoPath('packages', 'playground', 'package.json')
   const playground = readPackageJson(playgroundPkgPath)
-  const changed = syncDependencyRange(
-    playground,
-    'playground',
-    '@gengjiawen/monkey-wasm',
-    `workspace:^${nextVersion}`
-  )
-  if (changed) {
+  let playgroundChanged = false
+
+  playgroundChanged =
+    syncDependencyRange(
+      playground,
+      'playground',
+      '@gengjiawen/monkey-wasm',
+      `workspace:^${nextVersion}`
+    ) || playgroundChanged
+  playgroundChanged =
+    syncDependencyRange(
+      playground,
+      'playground',
+      '@gengjiawen/monkey-minifier',
+      `workspace:^${nextVersion}`
+    ) || playgroundChanged
+
+  if (playgroundChanged) {
     writePackageJson(playgroundPkgPath, playground)
   }
 } catch (e) {
@@ -125,6 +136,37 @@ try {
   }
 } catch (e) {
   console.warn('Failed to update prettier-plugin-monkey dependency:', e)
+}
+
+// Also keep monkey-minifier package version and wasm dependency in sync.
+// The repository uses workspace: during development, while release PRs must
+// contain a registry-compatible range because npm publish preserves
+// workspace: specifiers verbatim.
+try {
+  const minifierPkgPath = repoPath(
+    'packages',
+    'monkey-minifier',
+    'package.json'
+  )
+  const minifier = readPackageJson(minifierPkgPath)
+  let minifierChanged = false
+
+  minifierChanged =
+    syncPackageVersion(minifier, 'monkey-minifier', nextVersion) ||
+    minifierChanged
+  minifierChanged =
+    syncDependencyRange(
+      minifier,
+      'monkey-minifier',
+      '@gengjiawen/monkey-wasm',
+      `^${nextVersion}`
+    ) || minifierChanged
+
+  if (minifierChanged) {
+    writePackageJson(minifierPkgPath, minifier)
+  }
+} catch (e) {
+  console.warn('Failed to update monkey-minifier dependency:', e)
 }
 
 // Also keep vscode-extension package version in sync

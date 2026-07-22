@@ -799,3 +799,36 @@ pub fn parse_ast_json_string(input: &str) -> Result<String, ParseErrors> {
 
     return Ok(ast);
 }
+
+/// Serialize the parser AST without routing i64 integer literals through a
+/// JavaScript `number`. The JSON shape otherwise stays identical to
+/// [`parse_ast_json_string`].
+pub fn parse_ast_lossless_json_string(input: &str) -> Result<String, ParseErrors> {
+    let node = parse(input)?;
+    let mut ast = serde_json::to_value(&node).expect("AST serialization should not fail");
+    stringify_integer_literals(&mut ast);
+    Ok(serde_json::to_string_pretty(&ast).expect("AST serialization should not fail"))
+}
+
+fn stringify_integer_literals(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(values) => {
+            for value in values {
+                stringify_integer_literals(value);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            if object.get("type").and_then(serde_json::Value::as_str) == Some("Integer") {
+                if let Some(raw) = object.get_mut("raw") {
+                    if let Some(integer) = raw.as_i64() {
+                        *raw = serde_json::Value::String(integer.to_string());
+                    }
+                }
+            }
+            for value in object.values_mut() {
+                stringify_integer_literals(value);
+            }
+        }
+        _ => {}
+    }
+}

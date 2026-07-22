@@ -45,12 +45,14 @@ async function createWasmBindings(): Promise<MonkeyWasm> {
 
   return {
     parse: bindings.parse,
+    parse_lossless: bindings.parse_lossless,
     compile: bindings.compile,
     compile_detail: bindings.compile_detail,
     compile_with_debug: bindings.compile_with_debug,
     run_gc_with_report: bindings.run_gc_with_report,
     compile_to_snapshot: bindings.compile_to_snapshot,
     run_snapshot: bindings.run_snapshot,
+    run_snapshot_with_output: bindings.run_snapshot_with_output,
     compile_to_arm64: bindings.compile_to_arm64,
   }
 }
