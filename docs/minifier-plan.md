@@ -2,7 +2,7 @@
 
 本仓库为 Monkey 方言实现了一个 TypeScript source-to-source minifier，作为
 workspace package 提供，并准备发布为 npm package；playground 已提供在线 demo。
-本文记录当前实现、correctness boundaries 和仍未完成的 release follow-up；Phase
+本文记录当前实现、correctness boundaries 和剩余的 optional follow-up；Phase
 编号只表示功能演进顺序，不再表示多个待提交的 PR。
 
 处理管线：
@@ -489,8 +489,9 @@ Compression ratio 不是 correctness assertion，也不会写进 test output。P
 - 按 `AGENTS.md`，feature PR 不做 version bump。
   `scripts/bump_cargo_packages.ts` 会在 release PR 中同步 minifier version、Wasm
   dependency range 和 playground minifier range。
-- npm release 仍需给 release-please workflow 增加 minifier build/publish step；
-  playground demo 直接 import workspace source，不依赖 package 发布。
+- release-please workflow 会把 `@gengjiawen/monkey-minifier` 作为最后一个 release
+  artifact build 并 publish；playground demo 直接 import workspace source，不依赖 package
+  发布。
 - `AGENTS.md` 已加入 minifier package，package 自带 README 和 CLI usage。
 
 ## Implementation status
@@ -504,4 +505,4 @@ Compression ratio 不是 correctness assertion，也不会写进 test output。P
 | Constant folding、constant propagation、DCE                         | Implemented        |
 | CLI、Node/browser entries、package smoke tests、README              | Implemented        |
 | `runs identically ✓` playground badge                               | Optional follow-up |
-| release-please build/publish step for `@gengjiawen/monkey-minifier` | Follow-up          |
+| release-please build/publish step for `@gengjiawen/monkey-minifier` | Implemented        |

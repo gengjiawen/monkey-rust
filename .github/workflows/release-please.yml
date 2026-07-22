@@ -102,3 +102,10 @@ jobs:
           rm -f *.vsix
           pnpm run package
           pnpm exec ovsx publish --skip-duplicate --pat "$OVSX_PAT" *.vsix
+      - run: pnpm install --filter @gengjiawen/monkey-minifier... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-minifier run build
+        if: ${{ steps.release.outputs.release_created }}
+      - run: npm publish --access public
+        working-directory: packages/monkey-minifier
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
