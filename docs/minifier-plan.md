@@ -489,9 +489,9 @@ Compression ratio 不是 correctness assertion，也不会写进 test output。P
 - 按 `AGENTS.md`，feature PR 不做 version bump。
   `scripts/bump_cargo_packages.ts` 会在 release PR 中同步 minifier version、Wasm
   dependency range 和 playground minifier range。
-- release-please workflow 会在 Wasm package 发布后 build 并 publish
-  `@gengjiawen/monkey-minifier`；playground demo 直接 import workspace source，不依赖
-  package 发布。
+- release-please workflow 会把 `@gengjiawen/monkey-minifier` 作为最后一个 release
+  artifact build 并 publish；playground demo 直接 import workspace source，不依赖 package
+  发布。
 - `AGENTS.md` 已加入 minifier package，package 自带 README 和 CLI usage。
 
 ## Implementation status
