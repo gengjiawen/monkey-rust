@@ -9,6 +9,7 @@ import {
   minify,
   printProgram,
 } from '../src'
+import { propagateConstants } from '../src/propagate'
 import { canonical, parseProgram } from './helpers'
 
 const corpus = [
@@ -38,6 +39,9 @@ describe('structural round trip', () => {
     (source) => {
       const transformed = parseProgram(source)
       foldConstants(transformed)
+      while (propagateConstants(transformed)) {
+        foldConstants(transformed)
+      }
       eliminateDeadLets(transformed)
       mangle(transformed)
       const reparsed = parseProgram(printProgram(transformed))
