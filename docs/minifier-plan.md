@@ -430,9 +430,11 @@ compiler 也接受时才进入语义语料；两者结果冲突时以 compiler +
 - CI：`.github/workflows/rust.yml` 已有 playground 测试；给 scoped 包加 build、
   Vitest、Node 发布入口和 Vite browser 入口冒烟，并在声明的最低 Node 24 上
   运行。playground 的测试步骤顺带覆盖 `MinifyView`。
-- 版本：按 `AGENTS.md`，功能 PR 不带版本号变更。留给维护者的后续接线：
-  `scripts/bump_cargo_packages.ts` 加上新包；要发 npm 时补 release-please /
-  publish 配置。playground demo 不依赖发布。
+- 版本：按 `AGENTS.md`，功能 PR 不带版本号变更。
+  `scripts/bump_cargo_packages.ts` 会在 release PR 中同步 minifier 版本、
+  Wasm 最低版本和 playground 的 minifier range；要发 npm 时仍需补
+  release-please / publish 配置。
+  playground demo 不依赖发布。
 - 文档：更新 `AGENTS.md` 的项目结构一节（它连 vscode extension 都还没写进去），
   新包加 README。
 

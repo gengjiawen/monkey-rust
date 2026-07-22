@@ -30,7 +30,7 @@ importers:
   packages/monkey-minifier:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^1.1.0
+        specifier: workspace:^1.1.0
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
