@@ -1,5 +1,9 @@
-import { linter, lintGutter, type Diagnostic } from '@codemirror/lint'
-import type { Extension } from '@codemirror/state'
+import {
+  openLintPanel,
+  setDiagnostics,
+  type Diagnostic,
+} from '@codemirror/lint'
+import type { EditorView } from '@codemirror/view'
 
 import { utf8ByteSpanToUtf16 } from './sourceSpan'
 
@@ -36,17 +40,13 @@ export async function monkeyLintDiagnostics(
   })
 }
 
-export const monkeyLintExtension: Extension = [
-  lintGutter(),
-  linter(
-    async (view) => {
-      try {
-        return await monkeyLintDiagnostics(view.state.doc.toString())
-      } catch (error) {
-        console.error('monkey-lint failed:', error)
-        return []
-      }
-    },
-    { delay: 300 }
-  ),
-]
+/**
+ * Lint the current document once and surface the results as squiggles plus
+ * the diagnostics panel below the editor. Ranges follow subsequent edits but
+ * are only refreshed by the next run.
+ */
+export async function runMonkeyLint(view: EditorView): Promise<void> {
+  const diagnostics = await monkeyLintDiagnostics(view.state.doc.toString())
+  view.dispatch(setDiagnostics(view.state, diagnostics))
+  openLintPanel(view)
+}

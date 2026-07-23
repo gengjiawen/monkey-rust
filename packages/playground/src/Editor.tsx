@@ -17,7 +17,9 @@ import {
   useRef,
 } from 'react'
 
-import { monkeyLintExtension } from './lint'
+import { lintGutter } from '@codemirror/lint'
+
+import { runMonkeyLint } from './lint'
 
 interface HighlightRange {
   from: number
@@ -61,6 +63,16 @@ const playgroundEditorTheme = EditorView.theme({
   '.cm-activeLine': {
     backgroundColor: 'var(--gray-a2)',
   },
+  '.cm-panels': {
+    backgroundColor: 'var(--gray-2)',
+    color: 'var(--gray-12)',
+  },
+  '.cm-panels.cm-panels-bottom': {
+    borderTop: '1px solid var(--gray-a5)',
+  },
+  '.cm-panel.cm-panel-lint ul [aria-selected]': {
+    backgroundColor: 'var(--accent-a4)',
+  },
 })
 
 const highlightTheme = EditorView.baseTheme({
@@ -99,6 +111,8 @@ export interface EditorHandle {
   highlightRange: (from: number, to: number) => void
   highlightRanges: (ranges: HighlightRange[]) => void
   clearHighlight: () => void
+  /** Lint the current document and show the diagnostics panel. */
+  runLint: () => Promise<void>
 }
 
 function showHighlightRanges(view: EditorView, ranges: HighlightRange[]) {
@@ -142,7 +156,7 @@ interface EditorProps {
   vimMode?: boolean
   fill?: boolean
   lineWrapping?: boolean
-  /** Run the Monkey linter on the document (squiggles + gutter markers). */
+  /** Show lint gutter markers for diagnostics produced by `runLint`. */
   lint?: boolean
 }
 
@@ -183,6 +197,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       clearHighlight() {
         viewRef.current?.dispatch({ effects: setHighlight.of(null) })
       },
+      async runLint() {
+        const view = viewRef.current
+        if (!view) return
+        await runMonkeyLint(view)
+      },
     }),
     []
   )
@@ -196,7 +215,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       next.push(EditorView.lineWrapping)
     }
     if (lint) {
-      next.push(monkeyLintExtension)
+      next.push(lintGutter())
     }
     if (extraExtensions) {
       next.push(...extraExtensions)

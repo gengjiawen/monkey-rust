@@ -111,6 +111,17 @@ let b = a + 1;
 print(a)
 `.trimStart(),
   },
+  {
+    // Trips four lint rules; press Lint to see the diagnostics.
+    label: 'Lint demo',
+    code: `
+let unused = 1;
+let s = "hi";
+len(s, s);
+{1: "a", 1: "b"};
+if (true) { puts(s); }
+`.trimStart(),
+  },
 ]
 
 type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot' | 'arm64' | 'minify'
@@ -376,6 +387,10 @@ function App() {
     }
   }, [code, compileCode, invalidateSnapshot])
 
+  const runLint = useCallback(() => {
+    void editorRef.current?.runLint()
+  }, [])
+
   useEffect(() => {
     debouncedCompile(code)
   }, [code, debouncedCompile])
@@ -603,6 +618,9 @@ function App() {
           <div className="flex items-center gap-3">
             <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
+            </Button>
+            <Button size="2" onClick={runLint}>
+              Lint
             </Button>
             <Select.Root
               size="2"

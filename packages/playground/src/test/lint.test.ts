@@ -1,6 +1,8 @@
+import { diagnosticCount } from '@codemirror/lint'
+import { EditorView } from '@codemirror/view'
 import { describe, expect, it } from 'vitest'
 
-import { monkeyLintDiagnostics } from '../lint'
+import { monkeyLintDiagnostics, runMonkeyLint } from '../lint'
 
 describe('monkeyLintDiagnostics', () => {
   it('maps UTF-8 byte spans onto UTF-16 editor positions', async () => {
@@ -42,5 +44,37 @@ describe('monkeyLintDiagnostics', () => {
   it('returns nothing for a clean document', async () => {
     expect(await monkeyLintDiagnostics('puts(1);')).toEqual([])
     expect(await monkeyLintDiagnostics('')).toEqual([])
+  })
+})
+
+describe('runMonkeyLint', () => {
+  it('attaches diagnostics to the view and opens the panel', async () => {
+    const view = new EditorView({
+      doc: 'let unused = 1;',
+      parent: document.body,
+    })
+    try {
+      await runMonkeyLint(view)
+
+      expect(diagnosticCount(view.state)).toBe(1)
+      expect(view.dom.querySelector('.cm-panel-lint')).not.toBeNull()
+      expect(view.dom.textContent).toContain(
+        "'unused' is declared but never used"
+      )
+    } finally {
+      view.destroy()
+    }
+  })
+
+  it('still opens the panel for a clean document', async () => {
+    const view = new EditorView({ doc: 'puts(1);', parent: document.body })
+    try {
+      await runMonkeyLint(view)
+
+      expect(diagnosticCount(view.state)).toBe(0)
+      expect(view.dom.querySelector('.cm-panel-lint')).not.toBeNull()
+    } finally {
+      view.destroy()
+    }
   })
 })

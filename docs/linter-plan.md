@@ -394,10 +394,11 @@ JSON 格式给编辑器集成与脚本消费。
    pnpm --filter @gengjiawen/monkey-lint test
    ```
 
-2. **playground**：`Editor.tsx` 挂 `@codemirror/lint` 的 `linter()` +
-   `lintGutter()`，编辑时实时出 squiggle（防抖用 `linter()` 自带的 `delay`），span
-   映射先复用现有 `sourceSpan.ts` 的 byte→UTF-16 转换；供 VS Code 使用时再提取
-   成共享工具或保留等价 adapter。不要新开 pane——诊断属于编辑器本体。
+2. **playground**：工具栏在 Format 旁放一个 Lint 按钮，按需跑一遍 linter——
+   `setDiagnostics()` 把结果标成 squiggle + gutter 标记，`openLintPanel()` 在编辑
+   器底部展开诊断列表；示例下拉里加一条 `Lint demo` 片段。span 映射先复用现有
+   `sourceSpan.ts` 的 byte→UTF-16 转换；供 VS Code 使用时再提取成共享工具或
+   保留等价 adapter。诊断仍属于编辑器本体，不新开输出 pane。
 3. **VS Code extension**：现有实现只调用 `mod.parse()`，失败时把整条诊断标在
    `(0, 0)..(0, 1)`；接入后改用 analyzer。分析失败时输出一条 parse/validation
    error，成功时才输出 lint diagnostics，不在失败 AST 上继续 lint。linter 暴露
@@ -411,7 +412,7 @@ JSON 格式给编辑器集成与脚本消费。
 ## 演进路线
 
 - **v0**：结构化 wasm analyzer API、包骨架、walker/scope、上表 9 条规则、CLI、
-  测试与 CI，以及 playground 编辑器的 squiggle 接入。
+  测试与 CI，以及 playground 的 Lint 按钮接入。
 - **v1**：VS Code extension 接入；`backend-divergent-rebinding`
   与 `backend-divergent-builtin-arity` 等进阶规则。
 - **v2**：行内禁用指令（`// monkey-lint-disable-next-line <rule>`——
