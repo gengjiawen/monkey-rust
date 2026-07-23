@@ -17,6 +17,8 @@ import {
   useRef,
 } from 'react'
 
+import { monkeyLintExtension } from './lint'
+
 interface HighlightRange {
   from: number
   to: number
@@ -140,6 +142,8 @@ interface EditorProps {
   vimMode?: boolean
   fill?: boolean
   lineWrapping?: boolean
+  /** Run the Monkey linter on the document (squiggles + gutter markers). */
+  lint?: boolean
 }
 
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
@@ -151,6 +155,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     vimMode = true,
     fill = false,
     lineWrapping = false,
+    lint = false,
   },
   ref
 ) {
@@ -190,11 +195,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (lineWrapping) {
       next.push(EditorView.lineWrapping)
     }
+    if (lint) {
+      next.push(monkeyLintExtension)
+    }
     if (extraExtensions) {
       next.push(...extraExtensions)
     }
     return next
-  }, [extraExtensions, lineWrapping, vimMode])
+  }, [extraExtensions, lineWrapping, lint, vimMode])
 
   const handleCreateEditor = useCallback(
     (

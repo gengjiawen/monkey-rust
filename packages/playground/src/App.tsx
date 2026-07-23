@@ -636,6 +636,7 @@ function App() {
             onSelectionChange={setSelection}
             vimMode={vimMode}
             fill
+            lint
           />
         </div>
       </div>

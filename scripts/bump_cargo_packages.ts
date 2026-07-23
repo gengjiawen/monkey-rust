@@ -102,6 +102,13 @@ try {
       '@gengjiawen/monkey-minifier',
       `workspace:^${nextVersion}`
     ) || playgroundChanged
+  playgroundChanged =
+    syncDependencyRange(
+      playground,
+      'playground',
+      '@gengjiawen/monkey-lint',
+      `workspace:^${nextVersion}`
+    ) || playgroundChanged
 
   if (playgroundChanged) {
     writePackageJson(playgroundPkgPath, playground)

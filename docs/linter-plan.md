@@ -395,7 +395,7 @@ JSON 格式给编辑器集成与脚本消费。
    ```
 
 2. **playground**：`Editor.tsx` 挂 `@codemirror/lint` 的 `linter()` +
-   `lintGutter()`，编辑时实时出 squiggle（防抖用已有 lodash.debounce），span
+   `lintGutter()`，编辑时实时出 squiggle（防抖用 `linter()` 自带的 `delay`），span
    映射先复用现有 `sourceSpan.ts` 的 byte→UTF-16 转换；供 VS Code 使用时再提取
    成共享工具或保留等价 adapter。不要新开 pane——诊断属于编辑器本体。
 3. **VS Code extension**：现有实现只调用 `mod.parse()`，失败时把整条诊断标在
@@ -411,8 +411,8 @@ JSON 格式给编辑器集成与脚本消费。
 ## 演进路线
 
 - **v0**：结构化 wasm analyzer API、包骨架、walker/scope、上表 9 条规则、CLI、
-  测试与 CI。
-- **v1**：playground 与 VS Code extension 接入；`backend-divergent-rebinding`
+  测试与 CI，以及 playground 编辑器的 squiggle 接入。
+- **v1**：VS Code extension 接入；`backend-divergent-rebinding`
   与 `backend-divergent-builtin-arity` 等进阶规则。
 - **v2**：行内禁用指令（`// monkey-lint-disable-next-line <rule>`——
   `parse_lossless` 不含注释，需对原始 source 做行级扫描，不改 parser）；
