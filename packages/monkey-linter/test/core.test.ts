@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { lint } from '../src'
+import type { LintOptions } from '../src/types'
 import { diagnose, rulesOf } from './helpers'
 
 describe('analysis failures', () => {
@@ -28,13 +29,23 @@ describe('analysis failures', () => {
     // the run before any rule sees the tree.
     expect(rulesOf('let unusedLet = 1; missing;')).toEqual(['validation-error'])
   })
+
+  it('rejects a let initializer that reads its own uninitialized binding', () => {
+    expect(diagnose('let x = x;')).toEqual([
+      expect.objectContaining({
+        rule: 'validation-error',
+        severity: 'error',
+        span: { start: 8, end: 9 },
+      }),
+    ])
+  })
 })
 
 describe('rule levels', () => {
   it('disables a rule with `off`', () => {
-    expect(rulesOf('let x = 1;', { rules: { 'no-unused-let': 'off' } })).toEqual(
-      []
-    )
+    expect(
+      rulesOf('let x = 1;', { rules: { 'no-unused-let': 'off' } })
+    ).toEqual([])
   })
 
   it('promotes a warning to an error', () => {
@@ -65,7 +76,7 @@ describe('rule levels', () => {
     ['let h = {1: 1, 1: 2}; puts(h);', 'no-duplicate-hash-key'],
     ['puts(1 + "a");', 'no-literal-type-mismatch'],
   ])(
-    'ships the runtime-rejection rule for %s as an error by default',
+    'ships the high-confidence rule for %s as an error by default',
     (source, rule) => {
       const diagnostic = diagnose(source).find((d) => d.rule === rule)
       expect(diagnostic?.severity).toBe('error')
@@ -76,6 +87,15 @@ describe('rule levels', () => {
     expect(() =>
       diagnose('puts(1);', { rules: { 'no-unused-lets': 'off' } })
     ).toThrow("unknown rule 'no-unused-lets'")
+  })
+
+  it('throws on an invalid rule level', () => {
+    const options = {
+      rules: { 'no-unused-let': 'oops' },
+    } as unknown as LintOptions
+    expect(() => diagnose('puts(1);', options)).toThrow(
+      "invalid level 'oops' for rule 'no-unused-let'"
+    )
   })
 
   it('ignores overrides for the synthetic analysis diagnostics', () => {

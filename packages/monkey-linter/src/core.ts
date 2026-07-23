@@ -36,8 +36,8 @@ const SYNTHETIC_RULES = new Set(['parse-error', 'validation-error'])
  * `parse-error` / `validation-error` diagnostic and stops the run — the linter
  * never lints half of a broken tree.
  *
- * An unknown name in `options.rules` throws: a typo would otherwise silently
- * disable nothing and lull the caller into thinking the override took effect.
+ * An unknown name or invalid level in `options.rules` throws: malformed
+ * overrides must not silently do nothing or leak an invalid diagnostic shape.
  */
 export function lintWithAnalyzer(
   analyze: AnalyzeLossless,
@@ -87,20 +87,24 @@ function validateRuleOverrides(options: LintOptions): void {
   if (!options.rules) {
     return
   }
-  for (const name of Object.keys(options.rules)) {
-    if (SYNTHETIC_RULES.has(name)) {
-      continue
-    }
-    if (!rules.some((rule) => rule.name === name)) {
+  for (const [name, level] of Object.entries(options.rules)) {
+    if (
+      !SYNTHETIC_RULES.has(name) &&
+      !rules.some((rule) => rule.name === name)
+    ) {
       throw new Error(`unknown rule '${name}'`)
+    }
+    if (level !== 'off' && level !== 'warn' && level !== 'error') {
+      throw new Error(
+        `invalid level '${String(
+          level
+        )}' for rule '${name}'; expected 'off', 'warn', or 'error'`
+      )
     }
   }
 }
 
-function runAnalyzer(
-  analyze: AnalyzeLossless,
-  source: string
-): AnalyzeResult {
+function runAnalyzer(analyze: AnalyzeLossless, source: string): AnalyzeResult {
   let json: string
   try {
     json = analyze(source)

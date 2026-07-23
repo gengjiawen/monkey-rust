@@ -15,10 +15,9 @@ import type { Rule } from '../core'
  *   - an `if` branch's tail is observed exactly when the `if` itself is;
  *   - every non-tail statement is discarded.
  *
- * Only *pure* expressions are reported. A pure expression contains no call,
- * `new`, `if`, or index/property read, so flagging one never hides a side
- * effect or a possible runtime error — and, conveniently, a pure expression has
- * no nested blocks, so the walk never double-reports.
+ * Only expressions that are both side-effect-free and guaranteed not to raise
+ * a runtime error are reported. The deliberately small safe subset has no
+ * nested blocks, so the walk never double-reports.
  */
 export const noUnusedExpression: Rule = {
   name: 'no-unused-expression',
@@ -37,10 +36,10 @@ export const noUnusedExpression: Rule = {
     const checkStatement = (statement: Statement, observed: boolean): void => {
       switch (statement.type) {
         case 'Let':
-          descend(statement.expr)
+          descend(statement.expr, true)
           return
         case 'ReturnStatement':
-          descend(statement.argument)
+          descend(statement.argument, true)
           return
         case 'ClassDeclaration':
           for (const method of statement.methods) {
@@ -48,8 +47,8 @@ export const noUnusedExpression: Rule = {
           }
           return
         case 'SetPropertyStatement':
-          descend(statement.object)
-          descend(statement.value)
+          descend(statement.object, true)
+          descend(statement.value, true)
           return
         default:
           if (!observed && isPure(statement)) {
@@ -64,53 +63,53 @@ export const noUnusedExpression: Rule = {
 
     // Recurse into the statement lists nested inside an expression. Never
     // reports on its own — reporting happens only at statement position above.
-    const descend = (expression: Expression, observed = false): void => {
+    const descend = (expression: Expression, observed: boolean): void => {
       switch (expression.type) {
         case 'FunctionDeclaration':
           checkStatements(expression.body.body, true)
           return
         case 'IF':
-          descend(expression.condition)
+          descend(expression.condition, true)
           checkStatements(expression.consequent.body, observed)
           if (expression.alternate) {
             checkStatements(expression.alternate.body, observed)
           }
           return
         case 'UnaryExpression':
-          descend(expression.operand)
+          descend(expression.operand, true)
           return
         case 'BinaryExpression':
-          descend(expression.left)
-          descend(expression.right)
+          descend(expression.left, true)
+          descend(expression.right, true)
           return
         case 'Array':
           for (const element of expression.elements) {
-            descend(element)
+            descend(element, true)
           }
           return
         case 'Hash':
           for (const [key, value] of expression.elements) {
-            descend(key)
-            descend(value)
+            descend(key, true)
+            descend(value, true)
           }
           return
         case 'FunctionCall':
-          descend(expression.callee)
+          descend(expression.callee, true)
           for (const argument of expression.arguments) {
-            descend(argument)
+            descend(argument, true)
           }
           return
         case 'NewExpression':
           for (const argument of expression.arguments) {
-            descend(argument)
+            descend(argument, true)
           }
           return
         case 'Index':
-          descend(expression.object)
-          descend(expression.index)
+          descend(expression.object, true)
+          descend(expression.index, true)
           return
         case 'PropertyExpression':
-          descend(expression.object)
+          descend(expression.object, true)
           return
         default:
           // IDENTIFIER, Integer, Boolean, String, ThisExpression: no nested
@@ -124,12 +123,11 @@ export const noUnusedExpression: Rule = {
 }
 
 /**
- * An expression with no side effect and no nested block. A call, `new`, `if`, or
- * function literal may run arbitrary code, so those are never pure. Index and
- * property reads have no user-defined getters, but both backends raise a
- * runtime error when the object is not indexable (or has no such property), so
- * they are conservatively excluded too (docs/linter-plan.md; revisit in v1).
- * Everything else is pure only if all of its sub-expressions are.
+ * An expression with no side effect, no nested block, and no possible runtime
+ * error. Calls, `new`, conditionals, function literals, index/property reads,
+ * operators, and hashes are conservatively excluded: even apparently pure
+ * forms can fail because of arity, types, division by zero, or unhashable keys.
+ * Array literals are safe only when every element is safe.
  */
 function isPure(expression: Expression): boolean {
   switch (expression.type) {
@@ -139,19 +137,11 @@ function isPure(expression: Expression): boolean {
     case 'String':
     case 'ThisExpression':
       return true
-    case 'UnaryExpression':
-      return isPure(expression.operand)
-    case 'BinaryExpression':
-      return isPure(expression.left) && isPure(expression.right)
     case 'Array':
       return expression.elements.every(isPure)
-    case 'Hash':
-      return expression.elements.every(
-        ([key, value]) => isPure(key) && isPure(value)
-      )
     default:
-      // FunctionCall, NewExpression, IF, FunctionDeclaration, Index,
-      // PropertyExpression.
+      // UnaryExpression, BinaryExpression, Hash, FunctionCall, NewExpression,
+      // IF, FunctionDeclaration, Index, PropertyExpression.
       return false
   }
 }

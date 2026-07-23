@@ -95,9 +95,8 @@ fn analyze_envelope(input: &str) -> Result<serde_json::Value, AnalyzeFailure> {
         .iter()
         .map(|builtin| builtin.name)
         .collect::<Vec<_>>();
-    validate_program(program, &predefined).map_err(|error| {
-        ("validation", error.message, Some((error.span.start, error.span.end)))
-    })?;
+    validate_program(program, &predefined)
+        .map_err(|error| ("validation", error.message, Some((error.span.start, error.span.end))))?;
 
     let mut ast = serde_json::to_value(program).expect("AST serialization should not fail");
     stringify_integer_literals(&mut ast);

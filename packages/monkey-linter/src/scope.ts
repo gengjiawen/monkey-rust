@@ -37,13 +37,17 @@ export interface Binding {
 
 export interface ScopeAnalysis {
   bindings: Binding[]
-  /** Every resolved identifier reference mapped to the binding it hit. */
+  /** References with one definite target, mapped to that binding. */
   referenceBindings: Map<Identifier, Binding>
 }
 
 interface Scope {
   parent?: Scope
-  names: Map<string, Binding>
+  // More than one binding is possible after a conditional: the interpreter
+  // mutates the environment of only the arm that executes. Keeping every
+  // candidate lets later references count conservatively as uses of all
+  // bindings they may observe.
+  names: Map<string, Binding[]>
 }
 
 interface Context {
@@ -51,11 +55,11 @@ interface Context {
 }
 
 /**
- * Binding and reference analysis that mirrors `Compiler::compile_stmt`
- * ordering: a `let`'s right-hand side sees the *previous* binding of the same
- * name, and a `let`-bound function resolves its own name to that binding
- * (recursion). This is the same walk `@gengjiawen/monkey-minifier` uses for
- * scope/mangle; the linter only needs declarations, references, and shadowing.
+ * Binding and reference analysis. A `let`'s right-hand side sees the previous
+ * binding of the same name, while a directly let-bound function resolves its
+ * own name inside its body for recursion. Conditional arms start from the same
+ * entering environment and their possible bindings are merged conservatively;
+ * this avoids source-order guesses where the interpreter executes only one arm.
  */
 export function analyzeScopes(program: Program): ScopeAnalysis {
   const analysis: ScopeAnalysis = {
@@ -81,18 +85,18 @@ function createBinding(
 }
 
 function define(scope: Scope, binding: Binding): void {
-  scope.names.set(binding.name, binding)
+  scope.names.set(binding.name, [binding])
 }
 
-function resolve(scope: Scope, name: string): Binding | undefined {
+function resolve(scope: Scope, name: string): Binding[] | undefined {
   for (
     let current: Scope | undefined = scope;
     current;
     current = current.parent
   ) {
-    const binding = current.names.get(name)
-    if (binding) {
-      return binding
+    const bindings = current.names.get(name)
+    if (bindings) {
+      return bindings
     }
   }
   return undefined
@@ -208,14 +212,39 @@ function analyzeIdentifier(
   scope: Scope,
   analysis: ScopeAnalysis
 ): void {
-  const binding = resolve(scope, identifier.name)
-  if (!binding) {
+  const bindings = resolve(scope, identifier.name)
+  if (!bindings) {
     // Unresolved references are validation errors caught before lint; a lint
     // run only reaches scope analysis on a validated tree.
     return
   }
-  binding.references.push(identifier)
-  analysis.referenceBindings.set(identifier, binding)
+  for (const binding of bindings) {
+    binding.references.push(identifier)
+  }
+  // Rules such as builtin-arity require a definite binding. An ambiguous
+  // post-branch reference is deliberately left unmapped.
+  if (bindings.length === 1) {
+    analysis.referenceBindings.set(identifier, bindings[0])
+  }
+}
+
+function forkScope(scope: Scope): Scope {
+  return { parent: scope.parent, names: new Map(scope.names) }
+}
+
+function mergeBranchScopes(
+  scope: Scope,
+  consequent: Scope,
+  alternate: Scope
+): void {
+  const names = new Set([...consequent.names.keys(), ...alternate.names.keys()])
+  for (const name of names) {
+    const candidates = [
+      ...(resolve(consequent, name) ?? []),
+      ...(resolve(alternate, name) ?? []),
+    ]
+    scope.names.set(name, [...new Set(candidates)])
+  }
 }
 
 function analyzeExpression(
@@ -252,14 +281,33 @@ function analyzeExpression(
       analyzeExpression(expression.left, scope, analysis, context)
       analyzeExpression(expression.right, scope, analysis, context)
       return
-    case 'IF':
-      // Branches share the enclosing scope, matching the compiler.
+    case 'IF': {
       analyzeExpression(expression.condition, scope, analysis, context)
-      analyzeStatements(expression.consequent.body, scope, analysis, context)
+      // The interpreter executes exactly one arm against the entering
+      // environment. Analyze each arm from that same state so a declaration in
+      // the consequence cannot capture references in the alternative.
+      const consequent = forkScope(scope)
+      analyzeStatements(
+        expression.consequent.body,
+        consequent,
+        analysis,
+        context
+      )
+      const alternate = forkScope(scope)
       if (expression.alternate) {
-        analyzeStatements(expression.alternate.body, scope, analysis, context)
+        analyzeStatements(
+          expression.alternate.body,
+          alternate,
+          analysis,
+          context
+        )
       }
+      // A later reference can observe the binding left behind by either path.
+      // Credit every candidate rather than inventing a definite source-order
+      // winner and risking a false unused-binding diagnostic.
+      mergeBranchScopes(scope, consequent, alternate)
       return
+    }
     case 'FunctionDeclaration':
       analyzeFunction(expression, scope, analysis, context, directLetBinding)
       return

@@ -38,6 +38,24 @@ describe('no-unused-let', () => {
       "no-unused-let@6-7: class 'C' is only referenced by itself and never used",
     ])
   })
+
+  it('does not resolve an else-arm reference to a then-arm declaration', () => {
+    const source = 'let x = 1; if (false) { let x = 2; } else { puts(x); }'
+    const unused = compact(source).filter((diagnostic) =>
+      diagnostic.startsWith('no-unused-let@')
+    )
+
+    // The declaration in the untaken arm is unused; the outer x is referenced
+    // by the alternative and must not be reported.
+    expect(unused).toEqual([
+      "no-unused-let@28-29: 'x' is declared but never used",
+    ])
+  })
+
+  it('credits a post-conditional reference to every possible binding', () => {
+    const source = 'let c = true; let x = 1; if (c) { let x = 2; } puts(x);'
+    expect(rulesOf(source)).not.toContain('no-unused-let')
+  })
 })
 
 describe('no-unused-param', () => {
@@ -86,6 +104,37 @@ describe('no-unused-expression', () => {
   ])('stays quiet otherwise: %s', (source) => {
     expect(rulesOf(source)).not.toContain('no-unused-expression')
   })
+
+  it.each([
+    // Initializers and return arguments consume the conditional's value.
+    'let c = true; let x = if (c) { 1; } else { 2; }; puts(x);',
+    'let f = fn(c) { return if (c) { 1; } else { 2; }; }; f(true);',
+    // Operators and collection literals consume their operands/elements.
+    'let c = true; !(if (c) { true; } else { false; }); puts(c);',
+    'let c = true; 1 + if (c) { 2; } else { 3; }; puts(c);',
+    'let c = true; [if (c) { 1; } else { 2; }]; puts(c);',
+    'let c = true; {"k": if (c) { 1; } else { 2; }}; puts(c);',
+    // Calls/new and index/property access consume all nested values.
+    'let c = true; let id = fn(x) { x; }; id(if (c) { 1; } else { 2; });',
+    'let c = true; let id = fn(x) { x; }; (if (c) { id; } else { id; })(1);',
+    'class Box { constructor(v) { this.v = v; } } let c = true; new Box(if (c) { 1; } else { 2; });',
+    'let c = true; let xs = [1]; xs[if (c) { 0; } else { 0; }];',
+    'class Box { constructor() { this.v = 1; } } let c = true; let b = new Box(); (if (c) { b; } else { b; }).v;',
+    // A property assignment consumes both the receiver and assigned value.
+    'class Box { constructor() { this.v = 1; } } let c = true; let b = new Box(); b.v = if (c) { 2; } else { 3; };',
+  ])(
+    'does not flag branch tails in a consumed value position: %s',
+    (source) => {
+      expect(rulesOf(source)).not.toContain('no-unused-expression')
+    }
+  )
+
+  it.each(['1 / 0; puts(1);', '-"x"; puts(1);', '{[]: 1}; puts(1);'])(
+    'does not suggest removing an expression that can fail: %s',
+    (source) => {
+      expect(rulesOf(source)).not.toContain('no-unused-expression')
+    }
+  )
 })
 
 describe('no-unreachable-code', () => {
@@ -107,13 +156,12 @@ describe('no-unreachable-code', () => {
 })
 
 describe('no-duplicate-hash-key', () => {
-  it.each([
-    '{1: "a", 1: "b"};',
-    '{"k": 1, "k": 2};',
-    '{true: 1, true: 2};',
-  ])('flags a repeated scalar key: %s', (source) => {
-    expect(rulesOf(source)).toEqual(['no-duplicate-hash-key'])
-  })
+  it.each(['{1: "a", 1: "b"};', '{"k": 1, "k": 2};', '{true: 1, true: 2};'])(
+    'flags a repeated scalar key: %s',
+    (source) => {
+      expect(rulesOf(source)).toEqual(['no-duplicate-hash-key'])
+    }
+  )
 
   it.each([
     '{1: "a", 2: "b"};',
@@ -174,9 +222,7 @@ describe('no-constant-condition', () => {
     ['if ("") { 1; };', 'truthy'],
     ['if (false) { 1; } else { 2; };', 'falsy'],
   ])('flags a literal condition: %s', (source, outcome) => {
-    expect(compact(source)[0]).toContain(
-      `no-constant-condition@`
-    )
+    expect(compact(source)[0]).toContain(`no-constant-condition@`)
     expect(compact(source)[0]).toContain(`always ${outcome}`)
   })
 
@@ -186,15 +232,12 @@ describe('no-constant-condition', () => {
 })
 
 describe('no-literal-type-mismatch', () => {
-  it.each([
-    '1 + "a";',
-    'true + 1;',
-    '"a" - "b";',
-    '1 < "a";',
-    'true * false;',
-  ])('flags an incompatible literal operation: %s', (source) => {
-    expect(rulesOf(source)).toEqual(['no-literal-type-mismatch'])
-  })
+  it.each(['1 + "a";', 'true + 1;', '"a" - "b";', '1 < "a";', 'true * false;'])(
+    'flags an incompatible literal operation: %s',
+    (source) => {
+      expect(rulesOf(source)).toEqual(['no-literal-type-mismatch'])
+    }
+  )
 
   it.each([
     '1 + 2;',
