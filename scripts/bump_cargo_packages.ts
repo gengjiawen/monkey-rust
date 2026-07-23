@@ -169,6 +169,30 @@ try {
   console.warn('Failed to update monkey-minifier dependency:', e)
 }
 
+// Also keep monkey-lint package version and wasm dependency in sync, using a
+// registry-compatible range for the same publish reason as monkey-minifier.
+try {
+  const linterPkgPath = repoPath('packages', 'monkey-linter', 'package.json')
+  const linter = readPackageJson(linterPkgPath)
+  let linterChanged = false
+
+  linterChanged =
+    syncPackageVersion(linter, 'monkey-lint', nextVersion) || linterChanged
+  linterChanged =
+    syncDependencyRange(
+      linter,
+      'monkey-lint',
+      '@gengjiawen/monkey-wasm',
+      `^${nextVersion}`
+    ) || linterChanged
+
+  if (linterChanged) {
+    writePackageJson(linterPkgPath, linter)
+  }
+} catch (e) {
+  console.warn('Failed to update monkey-lint dependency:', e)
+}
+
 // Also keep vscode-extension package version in sync
 try {
   const vscodeExtensionPkgPath = repoPath(

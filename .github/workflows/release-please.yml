@@ -109,3 +109,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
+      - run: pnpm install --filter @gengjiawen/monkey-lint... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-lint run build
+        if: ${{ steps.release.outputs.release_created }}
+      - run: npm publish --access public
+        working-directory: packages/monkey-linter
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
