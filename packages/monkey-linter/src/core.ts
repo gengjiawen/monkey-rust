@@ -24,6 +24,10 @@ export interface Rule {
   check(context: RuleContext): void
 }
 
+// The analysis-failure diagnostics are not configurable rules, but overriding
+// them is a stated no-op rather than a typo, so they count as known names.
+const SYNTHETIC_RULES = new Set(['parse-error', 'validation-error'])
+
 /**
  * Run the full pipeline against an injected `analyze_lossless` binding:
  * analyze (parse + validation) → scope analysis → per-rule walk → sort.
@@ -31,12 +35,16 @@ export interface Rule {
  * A parse or validation failure becomes a single non-configurable
  * `parse-error` / `validation-error` diagnostic and stops the run — the linter
  * never lints half of a broken tree.
+ *
+ * An unknown name in `options.rules` throws: a typo would otherwise silently
+ * disable nothing and lull the caller into thinking the override took effect.
  */
 export function lintWithAnalyzer(
   analyze: AnalyzeLossless,
   source: string,
   options: LintOptions = {}
 ): LintResult {
+  validateRuleOverrides(options)
   const analyzed = runAnalyzer(analyze, source)
   if (analyzed.status === 'error') {
     const rule = analyzed.stage === 'parse' ? 'parse-error' : 'validation-error'
@@ -75,6 +83,20 @@ export function lintWithAnalyzer(
   return { diagnostics: sortDiagnostics(diagnostics) }
 }
 
+function validateRuleOverrides(options: LintOptions): void {
+  if (!options.rules) {
+    return
+  }
+  for (const name of Object.keys(options.rules)) {
+    if (SYNTHETIC_RULES.has(name)) {
+      continue
+    }
+    if (!rules.some((rule) => rule.name === name)) {
+      throw new Error(`unknown rule '${name}'`)
+    }
+  }
+}
+
 function runAnalyzer(
   analyze: AnalyzeLossless,
   source: string
@@ -95,7 +117,7 @@ function runAnalyzer(
 
 /** Stable order: by span start, then end, then rule id. Span-less last. */
 function sortDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
-  return diagnostics.sort((a, b) => {
+  return [...diagnostics].sort((a, b) => {
     if (a.span && b.span) {
       if (a.span.start !== b.span.start) {
         return a.span.start - b.span.start

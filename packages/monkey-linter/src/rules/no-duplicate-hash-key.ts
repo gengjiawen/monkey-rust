@@ -18,7 +18,7 @@ import { walk } from '../walk'
  */
 export const noDuplicateHashKey: Rule = {
   name: 'no-duplicate-hash-key',
-  severity: 'warn',
+  severity: 'error',
   check({ program, report }) {
     walk(program, (node) => {
       if (node.type !== 'Hash') {

@@ -40,7 +40,7 @@ const TYPE_LABEL: Record<ScalarKind, string> = {
  */
 export const noLiteralTypeMismatch: Rule = {
   name: 'no-literal-type-mismatch',
-  severity: 'warn',
+  severity: 'error',
   check({ program, report }) {
     walk(program, (node) => {
       if (node.type !== 'BinaryExpression') {

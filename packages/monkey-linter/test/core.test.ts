@@ -56,8 +56,26 @@ describe('rule levels', () => {
     )
     expect(bySeverity).toEqual({
       'no-unused-let': 'error',
-      'builtin-arity': 'warn',
+      'builtin-arity': 'error',
     })
+  })
+
+  it.each([
+    ['len();', 'builtin-arity'],
+    ['let h = {1: 1, 1: 2}; puts(h);', 'no-duplicate-hash-key'],
+    ['puts(1 + "a");', 'no-literal-type-mismatch'],
+  ])(
+    'ships the runtime-rejection rule for %s as an error by default',
+    (source, rule) => {
+      const diagnostic = diagnose(source).find((d) => d.rule === rule)
+      expect(diagnostic?.severity).toBe('error')
+    }
+  )
+
+  it('throws on an unknown rule name instead of silently ignoring it', () => {
+    expect(() =>
+      diagnose('puts(1);', { rules: { 'no-unused-lets': 'off' } })
+    ).toThrow("unknown rule 'no-unused-lets'")
   })
 
   it('ignores overrides for the synthetic analysis diagnostics', () => {

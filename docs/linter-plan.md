@@ -165,6 +165,8 @@ failure、错误对象/值，或静默地产生错误结果。`warn` = 大概率
 #### `no-unused-let`（warn）
 
 `let` / `class` 绑定从未被引用。rebinding 时旧绑定若被新绑定的初始化引用，算已使用。
+仅被自身引用不算使用（递归函数、在自己方法里实例化自己的 class）：声明之外无人引用时，
+整个定义连同递归都是死代码。
 
 ```
 // ✗ total 从未被引用
@@ -173,6 +175,9 @@ puts("done");
 
 // ✗ class 声明的绑定同样计入
 class Point { constructor(x) { this.x = x; } }
+
+// ✗ 仅自引用：外部无人调用，整个定义是死代码
+let loop = fn(n) { loop(n); };
 
 // ✓ 不报：旧 x 被新 x 的初始化引用
 let x = 1;
@@ -362,9 +367,11 @@ JSON 格式给编辑器集成与脚本消费。
 - **corpus 冒烟**：`examples/*.monkey` 与各包现有 fixture 全量过 linter，输出
   进人工审阅的快照。作用是让规则漂移与意外假阳性可见，不要求零诊断：例如
   `examples/hello.monkey` 中已有未使用绑定，会被 `no-unused-let` 合理报告。
-- **逐规则双后端 oracle**：`builtin-arity` 的 fixture 断言两个后端都产生对应的
-  error object/value；`no-literal-type-mismatch` 则分别断言 interpreter 与 GC VM
-  的实际拒绝路径。oracle 明确区分 error object/value、classified runtime failure
+- **逐规则 GC VM oracle**：error 级规则的 fixture 在 GC VM 上实际执行——
+  `no-literal-type-mismatch` 命中的程序断言产生 classified type error，
+  `builtin-arity` 命中的程序断言产生对应的 error value。interpreter 侧不做
+  可执行断言（不为此增加 wasm 执行导出），其行为以本文档的实测记录为准。
+  oracle 明确区分 error object/value、classified runtime failure
   与静默错误结果，不用笼统的“报错”代替。`1 == true` 是 divergence fixture，
   不能放进要求两个后端一致的 type-mismatch 表。
 - **与 minifier DCE 交叉验证**（可选、后置）：minifier dead-let elimination

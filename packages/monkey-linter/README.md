@@ -21,25 +21,29 @@ diagnostic and no rules run.
 
 ## Rules
 
-All rules default to `warn`.
+The three rules whose violations the runtime rejects outright default to
+`error`; the rest default to `warn`.
 
-| Rule | Flags |
-| --- | --- |
-| `no-unused-let` | a `let`/`class` binding that is never referenced |
-| `no-unused-param` | a parameter that is never referenced (opt out with a leading `_`) |
-| `no-unused-expression` | an expression statement whose value is discarded and has no side effect |
-| `no-unreachable-code` | a statement following a `return` in the same block |
-| `no-duplicate-hash-key` | a scalar literal key written more than once in one hash |
-| `builtin-arity` | a call to `len` with anything other than one argument |
-| `no-shadowed-builtin` | a binding whose name shadows a predefined builtin |
-| `no-constant-condition` | an `if` whose condition is a literal |
-| `no-literal-type-mismatch` | an operator applied to two literals of incompatible types |
+| Rule | Default | Flags |
+| --- | --- | --- |
+| `no-unused-let` | warn | a `let`/`class` binding that is never referenced (a binding only referenced by itself — recursion included — counts as unused) |
+| `no-unused-param` | warn | a parameter that is never referenced (opt out with a leading `_`) |
+| `no-unused-expression` | warn | an expression statement whose value is discarded and has no side effect |
+| `no-unreachable-code` | warn | a statement following a `return` in the same block |
+| `no-duplicate-hash-key` | error | a scalar literal key written more than once in one hash |
+| `builtin-arity` | error | a call to `len` with anything other than one argument |
+| `no-shadowed-builtin` | warn | a binding whose name shadows a predefined builtin |
+| `no-constant-condition` | warn | an `if` whose condition is a literal |
+| `no-literal-type-mismatch` | error | an operator applied to two literals of incompatible types |
 
 Override a rule's level with the `rules` option (`off`, `warn`, or `error`):
 
 ```ts
 lint(source, { rules: { 'no-unused-let': 'error', 'no-shadowed-builtin': 'off' } })
 ```
+
+An unknown rule name in `rules` throws — a typo would otherwise silently
+disable nothing.
 
 ## Node and CLI
 
@@ -53,6 +57,15 @@ The CLI reads files or stdin:
 monkey-lint input.monkey
 monkey-lint --format json input.monkey
 monkey-lint --rule no-unused-let:error --deny-warnings < input.monkey
+```
+
+The default `pretty` format underlines each diagnostic's span in its source
+line:
+
+```
+input.monkey:1:5: warning no-unused-let: 'x' is declared but never used
+  let x = 1; puts("hi");
+      ^
 ```
 
 It exits `1` when any `error` is reported, or when `--deny-warnings` is set and

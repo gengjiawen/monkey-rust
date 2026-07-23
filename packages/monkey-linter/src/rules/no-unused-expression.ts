@@ -16,8 +16,9 @@ import type { Rule } from '../core'
  *   - every non-tail statement is discarded.
  *
  * Only *pure* expressions are reported. A pure expression contains no call,
- * `new`, or `if`, so flagging one never hides a side effect — and, conveniently,
- * a pure expression has no nested blocks, so the walk never double-reports.
+ * `new`, `if`, or index/property read, so flagging one never hides a side
+ * effect or a possible runtime error — and, conveniently, a pure expression has
+ * no nested blocks, so the walk never double-reports.
  */
 export const noUnusedExpression: Rule = {
   name: 'no-unused-expression',
@@ -124,8 +125,11 @@ export const noUnusedExpression: Rule = {
 
 /**
  * An expression with no side effect and no nested block. A call, `new`, `if`, or
- * function literal may run arbitrary code, so those are never pure; everything
- * else is pure only if all of its sub-expressions are.
+ * function literal may run arbitrary code, so those are never pure. Index and
+ * property reads have no user-defined getters, but both backends raise a
+ * runtime error when the object is not indexable (or has no such property), so
+ * they are conservatively excluded too (docs/linter-plan.md; revisit in v1).
+ * Everything else is pure only if all of its sub-expressions are.
  */
 function isPure(expression: Expression): boolean {
   switch (expression.type) {
@@ -145,12 +149,9 @@ function isPure(expression: Expression): boolean {
       return expression.elements.every(
         ([key, value]) => isPure(key) && isPure(value)
       )
-    case 'Index':
-      return isPure(expression.object) && isPure(expression.index)
-    case 'PropertyExpression':
-      return isPure(expression.object)
     default:
-      // FunctionCall, NewExpression, IF, FunctionDeclaration.
+      // FunctionCall, NewExpression, IF, FunctionDeclaration, Index,
+      // PropertyExpression.
       return false
   }
 }

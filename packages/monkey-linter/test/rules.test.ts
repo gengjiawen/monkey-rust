@@ -25,6 +25,19 @@ describe('no-unused-let', () => {
       "no-unused-let@4-10: 'unused' is declared but never used",
     ])
   })
+
+  it('flags a binding only referenced by itself', () => {
+    // `f` recurses, but nothing outside the declaration ever calls it — the
+    // whole definition is dead, recursion and all.
+    expect(compact('let f = fn(n) { f(n); };')).toEqual([
+      "no-unused-let@4-5: 'f' is only referenced by itself and never used",
+    ])
+    expect(
+      compact('class C { constructor() {} m() { new C(); } } puts(1);')
+    ).toEqual([
+      "no-unused-let@6-7: class 'C' is only referenced by itself and never used",
+    ])
+  })
 })
 
 describe('no-unused-param', () => {
@@ -66,6 +79,10 @@ describe('no-unused-expression', () => {
     'let compute = fn() { puts(0); 40 + 2 }; compute();',
     // Calls, `new`, and index reads may have effects, so they are never flagged.
     'let store = fn() { puts(1); }; store(); puts(2);',
+    // Discarded index/property reads can raise runtime errors (bad index,
+    // missing property), so v0 leaves them alone.
+    'let xs = [1, 2]; xs[5]; puts(xs);',
+    'class P { constructor() { this.v = 1; } } let p = new P(); p.v; puts(p);',
   ])('stays quiet otherwise: %s', (source) => {
     expect(rulesOf(source)).not.toContain('no-unused-expression')
   })

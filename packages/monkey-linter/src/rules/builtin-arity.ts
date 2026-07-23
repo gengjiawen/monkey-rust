@@ -22,7 +22,7 @@ const FIXED_ARITY: Record<string, number> = {
 
 export const builtinArity: Rule = {
   name: 'builtin-arity',
-  severity: 'warn',
+  severity: 'error',
   check({ program, scope, report }) {
     walk(program, (node) => {
       if (node.type !== 'FunctionCall') {

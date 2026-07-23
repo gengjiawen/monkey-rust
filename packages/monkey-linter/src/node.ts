@@ -30,11 +30,16 @@ function loadNodeAnalyzer(): AnalyzeLossless {
   return glue.analyze_lossless
 }
 
-const analyzeLossless = loadNodeAnalyzer()
+let cachedAnalyzer: AnalyzeLossless | undefined
 
-/** Lint Monkey source in Node, instantiating the bundled wasm module directly. */
+/**
+ * Lint Monkey source in Node, instantiating the bundled wasm module directly.
+ * Instantiation happens on the first call and is cached, so merely importing
+ * this module (e.g. for `monkey-lint --help`) never pays the wasm setup cost.
+ */
 export function lint(source: string, options: LintOptions = {}): LintResult {
-  return lintWithAnalyzer(analyzeLossless, source, options)
+  cachedAnalyzer ??= loadNodeAnalyzer()
+  return lintWithAnalyzer(cachedAnalyzer, source, options)
 }
 
 export { lintWithAnalyzer } from './core'
