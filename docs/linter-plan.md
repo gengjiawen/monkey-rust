@@ -155,7 +155,7 @@ failure、错误对象/值，或静默地产生错误结果。`warn` = 大概率
 | `no-unused-let`            | warn  | 绑定从未被引用                           |
 | `no-unused-param`          | warn  | 参数从未被引用                           |
 | `no-unreachable-code`      | warn  | `return` 之后的语句                      |
-| `no-unused-expression`     | warn  | 值不处于被观察位置的纯表达式语句         |
+| `no-unused-expression`     | warn  | 值被丢弃且确认求值安全的无副作用表达式   |
 | `no-duplicate-hash-key`    | error | hash 字面量重复 key                      |
 | `builtin-arity`            | error | `len` 调用参数个数错误                   |
 | `no-shadowed-builtin`      | warn  | 用户绑定遮蔽 builtin                     |
@@ -212,15 +212,18 @@ position：function/method 的尾表达式是隐式返回值；被使用的 `if`
 的尾表达式决定 `if` 的值；program 顶层最后一个表达式也是可观察结果。constructor
 是例外，它总是返回 `this`，尾表达式的值仍会被丢弃。
 
-调用与 `new` 可能有副作用，一律放过。index/property 读取虽然没有用户 getter，
-但可能触发 runtime error，v0 也保守放过。规则只报告确认无副作用、且值没有任何
-消费者的表达式语句。
+v0 对“可安全报告”采用白名单：只包含 identifier、integer/boolean/string literal、
+`this`，以及元素也全部属于安全白名单的 array literal。调用与 `new` 可能有副作用；
+unary/binary operator 可能因类型或除零失败；hash literal 可能遇到不可 hash 的 key；
+index/property 读取也可能触发 runtime error。这些表达式一律保守放过，function
+literal 与 `if` 等含嵌套 block 的表达式也不作为报告对象。规则因此只报告值没有
+消费者、无副作用，且删除不会掩盖可能 runtime failure 的表达式语句。
 
 ```
-// ✗ x + 1 的结果被丢弃（不是 block 末位）
+// ✗ x 的值被丢弃（不是 block 末位，且 identifier 属于安全白名单）
 let f = fn(x) {
-  x + 1;
-  return x;
+  x;
+  return 0;
 };
 
 // ✓ 不报：末位表达式语句是隐式返回值
@@ -233,8 +236,11 @@ puts(sign(true));
 // ✓ 不报：调用可能有副作用
 let g = fn() { puts("side effect"); 1; };
 
-// ✗ constructor 的结果固定为 this，尾表达式值不会成为返回值
-class Box { constructor() { 1 + 2; } }
+// ✗ constructor 的结果固定为 this，安全 literal 的尾值不会成为返回值
+class Box { constructor() { 1; } }
+
+// ✓ v0 不对 operator 做逐表达式 totality 证明，二元运算统一保守放过
+class ConservativeBox { constructor() { 1 + 2; } }
 ```
 
 #### `no-duplicate-hash-key`（error）
@@ -419,9 +425,10 @@ JSON 格式给编辑器集成与脚本消费。
 
 - extension 打包 linter 后体积影响（wasm 已在 bundle 里，linter 纯 JS，预计
   可忽略；打包时确认与现有 wasm 实例复用同一份，避免双实例）。
-- `no-unused-expression` 对 index/property 访问的保守豁免要不要在 v1 收紧：
-  MethodKind 只有 Constructor/Method、没有 getter，property 访问本身无副作用，
-  只是可能 runtime error——届时看误报数据再定。
+- `no-unused-expression` 的安全白名单要不要在 v1 扩大：当前统一豁免
+  unary/binary operator、hash literal 与 index/property 访问。前两类需要证明类型、
+  divisor 与 hash key 均安全；index/property 即使没有用户 getter，也要证明读取不会
+  触发 runtime error。只有能证明求值 total 时才应纳入，避免建议删除会失败的代码。
 - runtime 是否先统一 `first`/`last`/`rest`/`push` 的 arity 行为；若统一，相关检查
   可从 divergence 规则并回 `builtin-arity`。
 - AST 类型在第三份实现稳定后是否抽成 `@gengjiawen/monkey-ast`，以及由哪个包

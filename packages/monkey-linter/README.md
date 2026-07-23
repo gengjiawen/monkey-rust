@@ -29,7 +29,7 @@ The rest default to `warn`.
 | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `no-unused-let`            | warn    | a `let`/`class` binding that is never referenced (a binding only referenced by itself — recursion included — counts as unused) |
 | `no-unused-param`          | warn    | a parameter that is never referenced (opt out with a leading `_`)                                                              |
-| `no-unused-expression`     | warn    | an expression statement whose value is discarded and has no side effect                                                        |
+| `no-unused-expression`     | warn    | a discarded expression statement known to be side-effect-free and safe to evaluate                                             |
 | `no-unreachable-code`      | warn    | a statement following a `return` in the same block                                                                             |
 | `no-duplicate-hash-key`    | error   | a scalar literal key written more than once in one hash                                                                        |
 | `builtin-arity`            | error   | a call to `len` with anything other than one argument                                                                          |
