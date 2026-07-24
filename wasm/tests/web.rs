@@ -121,6 +121,17 @@ makeCycle();
 }
 
 #[wasm_bindgen_test]
+fn gc_if_arms_without_values_stay_stack_balanced() {
+    let let_tail = run_gc("let value = if (true) { let y = 1; } else { 2 }; value");
+    assert_eq!(let_tail["status"], "ok");
+    assert_eq!(let_tail["result"], "null");
+
+    let empty_arm = run_gc("if (true) {} 2;");
+    assert_eq!(empty_arm["status"], "ok");
+    assert_eq!(empty_arm["result"], "2");
+}
+
+#[wasm_bindgen_test]
 fn gc_hash_edges_preserve_key_kinds_and_unicode_boundaries() {
     let unicode_key = format!("{}中", "a".repeat(63));
     let source = format!(

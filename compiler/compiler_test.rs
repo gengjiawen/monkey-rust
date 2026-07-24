@@ -423,6 +423,26 @@ mod tests {
     }
 
     #[test]
+    fn condition_arms_without_values_emit_null() {
+        let tests = vec![CompilerTestCase {
+            input: "if (true) { let y = 1; } else {};",
+            expected_constants: vec![Object::Integer(1)],
+            expected_instructions: vec![
+                make_instructions(OpTrue, &[]),
+                make_instructions(OpJumpNotTruthy, &[14]),
+                make_instructions(OpConst, &[0]),
+                make_instructions(OpSetGlobal, &[0]),
+                make_instructions(OpNull, &[]),
+                make_instructions(OpJump, &[15]),
+                make_instructions(OpNull, &[]),
+                make_instructions(OpPop, &[]),
+            ],
+        }];
+
+        run_compiler_test(tests);
+    }
+
+    #[test]
     fn test_global_constants() {
         let tests = vec![
             CompilerTestCase {

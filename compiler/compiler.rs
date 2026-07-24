@@ -468,23 +468,17 @@ impl Compiler {
             Expression::IF(if_node) => {
                 self.compile_expr(&if_node.condition)?;
                 let jump_not_truthy = self.emit_with_span(OpJumpNotTruthy, &[9527], &if_node.span);
-                self.compile_block_statement(&if_node.consequent)?;
-                if self.last_instruction_is(OpPop) {
-                    self.remove_last_pop();
-                }
+                self.compile_block_statement_as_value(&if_node.consequent)?;
 
                 let jump_pos = self.emit_with_span(OpJump, &[9527], &if_node.span);
 
                 let after_consequence_location = self.current_instruction().data.len();
                 self.change_operand(jump_not_truthy, after_consequence_location);
 
-                if if_node.alternate.is_none() {
-                    self.emit_with_span(OpNull, &[], &if_node.span);
+                if let Some(alternate) = &if_node.alternate {
+                    self.compile_block_statement_as_value(alternate)?;
                 } else {
-                    self.compile_block_statement(&if_node.clone().alternate.unwrap())?;
-                    if self.last_instruction_is(OpPop) {
-                        self.remove_last_pop();
-                    }
+                    self.emit_with_span(OpNull, &[], &if_node.span);
                 }
                 let after_alternative_location = self.current_instruction().data.len();
                 self.change_operand(jump_pos, after_alternative_location);
@@ -623,6 +617,22 @@ impl Compiler {
     ) -> Result<(), CompileError> {
         for stmt in &block_statement.body {
             self.compile_stmt(stmt)?;
+        }
+        Ok(())
+    }
+
+    fn compile_block_statement_as_value(
+        &mut self,
+        block_statement: &BlockStatement,
+    ) -> Result<(), CompileError> {
+        let block_start = self.current_instruction().data.len();
+        self.compile_block_statement(block_statement)?;
+        // A block in expression position must leave one value on every
+        // fallthrough path. Statement-only and empty blocks evaluate to null.
+        if self.current_instruction().data.len() > block_start && self.last_instruction_is(OpPop) {
+            self.remove_last_pop();
+        } else {
+            self.emit_with_span(OpNull, &[], &block_statement.span);
         }
         Ok(())
     }
