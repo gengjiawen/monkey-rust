@@ -20,6 +20,7 @@ Repo: https://github.com/gengjiawen/monkey-rust
 - Before/after heap snapshots, per-value-kind counts, and diagnostics for the three collector phases
 - Object decision walkthrough (RC before / heap in-edges / trial RC / Candidate|Survivor / Scan / Final)
 - Visited heap edges with typed relations (`fields["next"]`, `items[0]`, …) and Scan reachability witnesses
+- Heap topology graph plus a step-by-step phase replay that animates trial deletion, Scan restores, and freeing over the same drawing
 - Tagged parse/compile/runtime errors and stale-request protection for GC runs
 
 The GC view executes only when **Run GC** is pressed. Editing never runs the
