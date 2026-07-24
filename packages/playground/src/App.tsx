@@ -669,23 +669,26 @@ function App() {
 
       <div className={panelClass}>
         <div className={outputToolbarClass}>
-          <SegmentedControl.Root
-            className="max-w-full min-w-0!"
-            size="2"
-            value={outputView}
-            onValueChange={handleOutputViewChange}
-          >
-            <SegmentedControl.Item value="ast">AST</SegmentedControl.Item>
-            <SegmentedControl.Item value="bytecode">
-              Bytecode
-            </SegmentedControl.Item>
-            <SegmentedControl.Item value="gc">GC</SegmentedControl.Item>
-            <SegmentedControl.Item value="snapshot">
-              Snapshot
-            </SegmentedControl.Item>
-            <SegmentedControl.Item value="arm64">ARM64</SegmentedControl.Item>
-            <SegmentedControl.Item value="minify">Minify</SegmentedControl.Item>
-          </SegmentedControl.Root>
+          <div className="min-w-0 max-w-full overflow-x-auto">
+            <SegmentedControl.Root
+              size="2"
+              value={outputView}
+              onValueChange={handleOutputViewChange}
+            >
+              <SegmentedControl.Item value="ast">AST</SegmentedControl.Item>
+              <SegmentedControl.Item value="bytecode">
+                Bytecode
+              </SegmentedControl.Item>
+              <SegmentedControl.Item value="gc">GC</SegmentedControl.Item>
+              <SegmentedControl.Item value="snapshot">
+                Snapshot
+              </SegmentedControl.Item>
+              <SegmentedControl.Item value="arm64">ARM64</SegmentedControl.Item>
+              <SegmentedControl.Item value="minify">
+                Minify
+              </SegmentedControl.Item>
+            </SegmentedControl.Root>
+          </div>
           {outputView === 'gc' ? (
             <Button
               size="2"
