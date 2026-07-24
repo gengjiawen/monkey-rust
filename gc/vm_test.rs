@@ -214,6 +214,32 @@ mod tests {
     }
 
     #[test]
+    fn test_conditionals_without_values() {
+        run_gc_vm_tests(vec![
+            VmTestCase {
+                input: "if (true) { let y = 1; }",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "if (true) {} 2",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "if (false) { 1 } else {}",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "let result = if (true) { let y = 1; } else { 2 }; result",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "let f = fn() { if (true) { let y = 2; }; y }; f()",
+                expected: Object::Integer(2),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_global_let_statements() {
         run_gc_vm_tests(vec![
             VmTestCase {

@@ -285,6 +285,34 @@ mod tests {
     }
 
     #[test]
+    fn test_conditionals_without_values() {
+        let tests = vec![
+            VmTestCase {
+                input: "if (true) { let y = 1; }",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "if (true) {} 2",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "if (false) { 1 } else {}",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "let result = if (true) { let y = 1; } else { 2 }; result",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "let f = fn() { if (true) { let y = 2; }; y }; f()",
+                expected: Object::Integer(2),
+            },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
     fn test_global_let_statements() {
         let tests = vec![
             VmTestCase {
