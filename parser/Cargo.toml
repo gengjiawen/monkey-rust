@@ -1,6 +1,6 @@
 [package]
 name = "monkey-parser"
-version = "1.1.0"
+version = "1.2.0"
 description = "a parser for monkey lang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
