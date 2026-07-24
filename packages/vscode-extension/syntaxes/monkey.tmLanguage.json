@@ -78,7 +78,7 @@
       "patterns": [
         {
           "name": "keyword.control.monkey",
-          "match": "\\b(fn|let|if|else|return|true|false)\\b"
+          "match": "\\b(fn|let|if|else|return|true|false|debugger)\\b"
         },
         {
           "name": "keyword.operator.new.monkey",

@@ -13,6 +13,7 @@ const KEYWORDS = new Set([
   'class',
   'this',
   'new',
+  'debugger',
 ])
 
 export interface MangleOptions {

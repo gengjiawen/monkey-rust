@@ -19,6 +19,8 @@ describe('compact printer', () => {
     ['(fn(x) { x })(1)', '(fn(x){x;})(1);'],
     ['{"a": [1, 2], true: {}}', '{"a":[1,2],true:{}};'],
     ['new Thing(1).value[0]', 'new Thing(1).value[0];'],
+    ['debugger', 'debugger;'],
+    ['fn(x) { x; debugger; }', 'fn(x){x;debugger;};'],
   ])('prints %s', (source, expected) => {
     expect(print(source)).toBe(expected)
   })

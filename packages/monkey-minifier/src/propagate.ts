@@ -122,6 +122,8 @@ function substituteStatements(
         statement.object = substituteExpression(statement.object, substitution)
         statement.value = substituteExpression(statement.value, substitution)
         break
+      case 'DebuggerStatement':
+        break
       default:
         statements[index] = substituteExpression(statement, substitution)
     }

@@ -42,6 +42,15 @@ const programs = [
   'let v = 1; let g = fn() { v }; let v = 2; puts(g()); v;',
   // `new` requires its callee to stay an identifier reference.
   'let a = 1; let b = new a(); b;',
+  // `debugger` is completion-transparent: the statement before a trailing run
+  // of debuggers still decides the block's value, and no pass may drop the
+  // keyword or fold across it.
+  'puts("before"); 5; debugger;',
+  'let f = fn(n) { n * 2; debugger; }; debugger; puts(f(21)); f(2);',
+  // The dead trailing let sits before the debugger and must survive DCE, or
+  // the function's implicit return flips from null to 42.
+  'let f = fn() { 42; let unused = 1; debugger; }; f();',
+  'if (true) { 42; debugger; };',
 ]
 
 describe('GC VM differential semantics', () => {

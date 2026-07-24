@@ -63,6 +63,8 @@ function foldStatements(
         statement.object = foldExpression(statement.object, analysis)
         statement.value = foldExpression(statement.value, analysis)
         break
+      case 'DebuggerStatement':
+        break
       default:
         statements[index] = foldExpression(statement, analysis)
     }
@@ -320,6 +322,8 @@ function statementChangesScope(statement: Statement): boolean {
     case 'Let':
     case 'ClassDeclaration':
       return true
+    case 'DebuggerStatement':
+      return false
     case 'ReturnStatement':
       return expressionChangesScope(statement.argument)
     case 'SetPropertyStatement':
@@ -381,7 +385,19 @@ function isExpression(statement: Statement): statement is Expression {
     'ReturnStatement',
     'ClassDeclaration',
     'SetPropertyStatement',
+    'DebuggerStatement',
   ].includes(statement.type)
+}
+
+// `debugger` is completion-transparent: the statement before a trailing run
+// of debuggers decides whether a block produces a value, so completion
+// checks must look through that suffix.
+function lastCompletionIndex(statements: Statement[]): number {
+  let index = statements.length - 1
+  while (index >= 0 && statements[index].type === 'DebuggerStatement') {
+    index -= 1
+  }
+  return index
 }
 
 function removeDeadStatements(
@@ -392,6 +408,7 @@ function removeDeadStatements(
 ): boolean {
   let removed = false
   const retained: Statement[] = []
+  const barrierIndex = lastCompletionIndex(statements)
   for (const [index, statement] of statements.entries()) {
     if (removeLets && statement.type === 'Let') {
       const binding = analysis.letBindings.get(statement)
@@ -402,8 +419,9 @@ function removeDeadStatements(
         // A trailing let is a value barrier in function/method bodies and in
         // either arm of an if expression. Removing it can expose the previous
         // expression as an implicit return/branch value. Keeping the final
-        // candidate is conservative and lets earlier dead bindings disappear.
-        (!preserveTrailingLet || index !== statements.length - 1)
+        // candidate (looking through completion-transparent debuggers) is
+        // conservative and lets earlier dead bindings disappear.
+        (!preserveTrailingLet || index !== barrierIndex)
       ) {
         removed = true
         continue
@@ -442,6 +460,8 @@ function removeNested(
         removeNestedExpression(statement.object, analysis, removeLets) ||
         removeNestedExpression(statement.value, analysis, removeLets)
       )
+    case 'DebuggerStatement':
+      return false
     default:
       return removeNestedExpression(statement, analysis, removeLets)
   }
@@ -546,6 +566,7 @@ function statementContainsIncompleteIf(statement: Statement): boolean {
     case 'ReturnStatement':
       return expressionContainsIncompleteIf(statement.argument)
     case 'ClassDeclaration':
+    case 'DebuggerStatement':
       return false
     case 'SetPropertyStatement':
       return (
@@ -616,7 +637,7 @@ function ifCanFallThroughWithoutValue(expression: {
 }
 
 function blockCanFallThroughWithoutValue(block: BlockStatement): boolean {
-  const last = block.body[block.body.length - 1]
+  const last = block.body[lastCompletionIndex(block.body)]
   if (!last) {
     return true
   }

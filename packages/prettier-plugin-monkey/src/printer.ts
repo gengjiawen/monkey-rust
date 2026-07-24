@@ -59,6 +59,8 @@ export function print(
         path,
         print
       )
+    case 'DebuggerStatement':
+      return 'debugger;'
     case 'IDENTIFIER':
       return printIdentifier(node as Identifier)
     case 'UnaryExpression':
