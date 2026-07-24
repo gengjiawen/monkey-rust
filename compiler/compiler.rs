@@ -750,9 +750,7 @@ impl Compiler {
         // block's value (or null) is decided before they execute, and
         // OpDebugger leaves the stack untouched, so a kept value stays on top.
         let (leading, trailing_debuggers) = split_trailing_debuggers(&block_statement.body);
-        let has_value = leading
-            .last()
-            .is_some_and(|statement| statement_contributes_value(statement));
+        let has_value = leading.last().is_some_and(statement_contributes_value);
         for stmt in leading {
             self.compile_stmt(stmt)?;
         }
@@ -792,9 +790,7 @@ impl Compiler {
             return Ok(());
         }
 
-        let produced_value = leading
-            .last()
-            .is_some_and(|statement| statement_contributes_value(statement));
+        let produced_value = leading.last().is_some_and(statement_contributes_value);
         for stmt in leading {
             self.compile_stmt(stmt)?;
         }
