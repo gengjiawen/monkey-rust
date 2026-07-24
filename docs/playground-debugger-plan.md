@@ -1,6 +1,6 @@
 # Monkey Playground Debugger（`debugger` 关键字 + 栈/堆检视）— 设计提案
 
-> 状态：提案（未实施）。本文设计一个教学用 debugger：给 Monkey 语言加入
+> 状态：已实施（§10 未来方向除外）。本文设计一个教学用 debugger：给 Monkey 语言加入
 > `debugger` 关键字，程序在 GC VM 上执行到该语句时记录一份“调用栈 + 堆”的
 > 快照。playground 新增 Debugger tab，并排展示帧内命名槽位与堆对象；槽位中的
 > 引用以 `ref #n` chip 呈现，hover/click 时联动高亮对应堆节点。
