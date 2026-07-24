@@ -1,6 +1,6 @@
 import { diagnosticCount } from '@codemirror/lint'
 import { EditorView } from '@codemirror/view'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { monkeyLintDiagnostics, runMonkeyLint } from '../lint'
 
@@ -74,6 +74,61 @@ describe('runMonkeyLint', () => {
       expect(diagnosticCount(view.state)).toBe(0)
       expect(view.dom.querySelector('.cm-panel-lint')).not.toBeNull()
     } finally {
+      view.destroy()
+    }
+  })
+
+  it('discards diagnostics when the document changes during the run', async () => {
+    let resolveDiagnostics!: (
+      diagnostics: Awaited<ReturnType<typeof monkeyLintDiagnostics>>
+    ) => void
+    const diagnostics = new Promise<
+      Awaited<ReturnType<typeof monkeyLintDiagnostics>>
+    >((resolve) => {
+      resolveDiagnostics = resolve
+    })
+    const view = new EditorView({
+      doc: 'let unused = 1;',
+      parent: document.body,
+    })
+    try {
+      const run = runMonkeyLint(view, () => diagnostics)
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: 'puts(1);' },
+      })
+      resolveDiagnostics([
+        {
+          from: 4,
+          to: 10,
+          severity: 'warning',
+          source: 'no-unused-let',
+          message: "'unused' is declared but never used",
+        },
+      ])
+      await run
+
+      expect(diagnosticCount(view.state)).toBe(0)
+      expect(view.dom.querySelector('.cm-panel-lint')).toBeNull()
+    } finally {
+      view.destroy()
+    }
+  })
+
+  it('shows a diagnostic when the linter fails', async () => {
+    const error = new Error('chunk load failed')
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const view = new EditorView({ doc: 'puts(1);', parent: document.body })
+    try {
+      await runMonkeyLint(view, async () => {
+        throw error
+      })
+
+      expect(consoleError).toHaveBeenCalledWith('monkey-lint failed:', error)
+      expect(diagnosticCount(view.state)).toBe(1)
+      expect(view.dom.querySelector('.cm-panel-lint')).not.toBeNull()
+      expect(view.dom.textContent).toContain('Linter failed: chunk load failed')
+    } finally {
+      consoleError.mockRestore()
       view.destroy()
     }
   })

@@ -40,13 +40,40 @@ export async function monkeyLintDiagnostics(
   })
 }
 
+type DiagnosticsProvider = (source: string) => Promise<Diagnostic[]>
+
+function lintFailureDiagnostic(error: unknown): Diagnostic {
+  const message = error instanceof Error ? error.message : String(error)
+  return {
+    from: 0,
+    to: 0,
+    severity: 'error',
+    source: 'monkey-lint',
+    message: `Linter failed: ${message}`,
+  }
+}
+
 /**
  * Lint the current document once and surface the results as squiggles plus
- * the diagnostics panel below the editor. Ranges follow subsequent edits but
- * are only refreshed by the next run.
+ * the diagnostics panel below the editor. Results are discarded when the
+ * document changes during the run; accepted ranges follow subsequent edits
+ * but are only refreshed by the next run.
  */
-export async function runMonkeyLint(view: EditorView): Promise<void> {
-  const diagnostics = await monkeyLintDiagnostics(view.state.doc.toString())
+export async function runMonkeyLint(
+  view: EditorView,
+  diagnosticsProvider: DiagnosticsProvider = monkeyLintDiagnostics
+): Promise<void> {
+  const state = view.state
+  let diagnostics: Diagnostic[]
+  try {
+    diagnostics = await diagnosticsProvider(state.doc.toString())
+  } catch (error) {
+    console.error('monkey-lint failed:', error)
+    diagnostics = [lintFailureDiagnostic(error)]
+  }
+
+  if (view.state.doc !== state.doc) return
+
   view.dispatch(setDiagnostics(view.state, diagnostics))
   openLintPanel(view)
 }
