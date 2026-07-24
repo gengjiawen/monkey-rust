@@ -4,7 +4,7 @@ use std::rc::Rc;
 use compiler::compiler::{Bytecode, DebugInfo};
 use compiler::op_code::{Instructions, Opcode};
 use compiler::snapshot::{read_bytecode, write_bytecode};
-use object::Object;
+use object::{CompiledFunction, Object};
 
 use crate::runner::{compile_source, run_bytecode, run_bytecode_with_output};
 use crate::{GcRunError, GcRunStage, GcRuntimeError, GcVM};
@@ -132,6 +132,23 @@ fn structurally_valid_hostile_bytecode_errors_instead_of_panicking() {
         let error = run_bytecode(bytecode, 10_000).unwrap_err();
         assert!(!error.message.is_empty(), "case: {}", name);
     }
+}
+
+#[test]
+fn oversized_function_locals_fail_before_frame_allocation() {
+    let function = Rc::new(Object::CompiledFunction(Rc::new(CompiledFunction {
+        name: "oversized".to_string(),
+        instructions: vec![Opcode::OpReturn as u8],
+        num_locals: usize::MAX,
+        num_parameters: 0,
+    })));
+    let bytecode = hostile_bytecode(
+        vec![Opcode::OpClosure as u8, 0, 0, 0, Opcode::OpCall as u8, 0],
+        vec![function],
+    );
+
+    let error = run_bytecode(bytecode, 10_000).unwrap_err();
+    assert_eq!(error.message, "stack limit exceeded");
 }
 
 #[test]

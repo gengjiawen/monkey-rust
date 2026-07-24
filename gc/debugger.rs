@@ -383,6 +383,8 @@ impl BoundedText {
 
     fn finish(mut self) -> String {
         if self.truncated {
+            // The ellipsis is part of the advertised character budget.
+            self.out.pop();
             self.out.push('…');
         }
         self.out
@@ -585,7 +587,14 @@ fn project_heap(heap: &GcHeap, roots: &[GcRef]) -> HeapView {
         objects.push(HeapObjectView {
             id,
             kind: summary.kind,
-            label: summary.label,
+            // GC report labels carry identity as a suffix (for example
+            // `Array#7`), while debugger nodes already expose `id` separately
+            // and the Playground renders it as a `#7` prefix.
+            label: summary
+                .label
+                .strip_suffix(&format!("#{}", id))
+                .unwrap_or(&summary.label)
+                .to_string(),
             members,
         });
     }

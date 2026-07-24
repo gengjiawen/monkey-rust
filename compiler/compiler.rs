@@ -205,6 +205,13 @@ fn split_trailing_debuggers(body: &[Statement]) -> (&[Statement], &[Statement]) 
     body.split_at(split)
 }
 
+/// Whether a statement contributes the surrounding block's completion value.
+/// This must be decided from the AST: statement-only forms such as property
+/// assignment may end in an implementation-detail `OpNull; OpPop` sequence.
+fn statement_contributes_value(statement: &Statement) -> bool {
+    matches!(statement, Statement::Expr(_))
+}
+
 fn parse_instruction_pc(line: &str) -> Option<usize> {
     let trimmed = line.trim_start();
     if trimmed.len() < 4 {
@@ -743,15 +750,16 @@ impl Compiler {
         // block's value (or null) is decided before they execute, and
         // OpDebugger leaves the stack untouched, so a kept value stays on top.
         let (leading, trailing_debuggers) = split_trailing_debuggers(&block_statement.body);
-        let block_start = self.current_instruction().data.len();
+        let has_value = leading
+            .last()
+            .is_some_and(|statement| statement_contributes_value(statement));
         for stmt in leading {
             self.compile_stmt(stmt)?;
         }
         // A block in expression position must leave one value on every
         // fallthrough path. Statement-only and empty blocks evaluate to null.
-        let has_value =
-            self.current_instruction().data.len() > block_start && self.last_instruction_is(OpPop);
         if has_value {
+            debug_assert!(self.last_instruction_is(OpPop));
             self.remove_last_pop();
         }
         for stmt in trailing_debuggers {
@@ -784,11 +792,14 @@ impl Compiler {
             return Ok(());
         }
 
+        let produced_value = leading
+            .last()
+            .is_some_and(|statement| statement_contributes_value(statement));
         for stmt in leading {
             self.compile_stmt(stmt)?;
         }
-        let produced_value = self.last_instruction_is(OpPop);
         if produced_value {
+            debug_assert!(self.last_instruction_is(OpPop));
             self.remove_last_pop();
         }
         for stmt in trailing_debuggers {

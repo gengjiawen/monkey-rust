@@ -81,6 +81,9 @@ pub enum SnapshotError {
     /// Main's debug info must not carry local bindings or free names; its
     /// bindings are the globals, which live outside the container.
     DebugMainBindingsNotEmpty,
+    /// A debug-bearing snapshot must describe every function targeted by an
+    /// `OpClosure`, otherwise its capture count cannot be validated.
+    MissingFunctionDebugInfo(usize),
     /// An `OpClosure`'s free count disagrees with the target function's
     /// `free_names` metadata.
     DebugFreeCountMismatch {
@@ -561,7 +564,10 @@ fn validate_instruction_stream(
                         format!("OpClosure needs a function constant at index {}", index),
                     ));
                 }
-                if let Some(info) = debug.and_then(|map| map.get(&index)) {
+                if let Some(debug) = debug {
+                    let info = debug
+                        .get(&index)
+                        .ok_or(SnapshotError::MissingFunctionDebugInfo(index))?;
                     if operands[1] != info.free_names.len() {
                         return Err(SnapshotError::DebugFreeCountMismatch {
                             constant_index: index,

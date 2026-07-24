@@ -446,6 +446,18 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rejects_closure_missing_function_debug_info() {
+        // The file advertises a debug section, but its function-entry map is
+        // empty even though main constructs function constant 0.
+        let main = [Opcode::OpClosure as u8, 0, 0, 0];
+        let constants = [1, TAG_FUNCTION, 0, 0, 0, 0];
+        let debug = [0, 0, 0, 0];
+        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &main, &constants, &debug);
+
+        assert_eq!(read_bytecode(&blob), Err(SnapshotError::MissingFunctionDebugInfo(0)));
+    }
+
     // Fuzz-lite (design doc §8): reading arbitrarily truncated or corrupted
     // input must never panic. Ok results are acceptable — flipping a bit in
     // an integer payload just yields a different valid file.

@@ -582,6 +582,17 @@ function App() {
 
   const handleErrorSpanSelect = highlightSourceSpan
 
+  const handleDebuggerSpanSelect = useCallback(
+    (span: SourceSpan | null) => {
+      if (span === null) {
+        editorRef.current?.clearHighlight()
+        return
+      }
+      highlightSourceSpan(span)
+    },
+    [highlightSourceSpan]
+  )
+
   const handleBytecodeSelection = useCallback(
     (selection: { from: number; to: number }) => {
       if (bytecodeDebugView == null) {
@@ -641,7 +652,9 @@ function App() {
   }, [arm64Build, code, outputView, selection])
 
   useEffect(() => {
-    if (outputView !== 'bytecode') {
+    // DebuggerView owns its span lifecycle, including clearing idle/running
+    // states. Do not clear after its mount effect restores Hit 1.
+    if (outputView !== 'bytecode' && outputView !== 'debugger') {
       editorRef.current?.clearHighlight()
     }
   }, [outputView])
@@ -661,22 +674,6 @@ function App() {
       editor?.clearHighlight()
     }
   }, [gcState, highlightSourceSpan, outputView])
-
-  useEffect(() => {
-    if (
-      outputView !== 'debugger' ||
-      debuggerState.status !== 'error' ||
-      debuggerState.span === null
-    ) {
-      return
-    }
-    const { span } = debuggerState
-    const editor = editorRef.current
-    highlightSourceSpan(span)
-    return () => {
-      editor?.clearHighlight()
-    }
-  }, [debuggerState, highlightSourceSpan, outputView])
 
   useEffect(() => {
     if (
@@ -834,7 +831,7 @@ function App() {
             <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) p-4.5">
               <DebuggerView
                 state={debuggerState}
-                onSpanSelect={highlightSourceSpan}
+                onSpanSelect={handleDebuggerSpanSelect}
               />
             </div>
           ) : null}

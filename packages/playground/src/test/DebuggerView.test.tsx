@@ -113,9 +113,13 @@ describe('DebuggerView', () => {
   })
 
   it('renders frames innermost first with callee, slot, and capture state', () => {
-    render(<DebuggerView state={twoHitEnvelope()} onSpanSelect={vi.fn()} />)
+    const onSpanSelect = vi.fn()
+    render(
+      <DebuggerView state={twoHitEnvelope()} onSpanSelect={onSpanSelect} />
+    )
 
     expect(screen.getByText('Hit 1 of 2')).toBeInTheDocument()
+    expect(onSpanSelect).toHaveBeenLastCalledWith({ start: 30, end: 39 })
     const stack = screen.getByLabelText('Call stack')
     const frameButtons = within(stack)
       .getAllByRole('button')
@@ -139,10 +143,9 @@ describe('DebuggerView', () => {
   })
 
   it('reports dropped hits and snapshot omissions', () => {
-    const envelope = okEnvelope(
-      [hit(1, twoHitEnvelope().hits[0])],
-      { droppedHits: 5 }
-    )
+    const envelope = okEnvelope([hit(1, twoHitEnvelope().hits[0])], {
+      droppedHits: 5,
+    })
     render(<DebuggerView state={envelope} />)
 
     expect(
@@ -185,6 +188,35 @@ describe('DebuggerView', () => {
     )
   })
 
+  it('clears a stale span while rerunning and prefers a recorded hit over a later error', () => {
+    const onSpanSelect = vi.fn()
+    const { rerender } = render(
+      <DebuggerView state={twoHitEnvelope()} onSpanSelect={onSpanSelect} />
+    )
+    expect(onSpanSelect).toHaveBeenLastCalledWith({ start: 30, end: 39 })
+
+    rerender(
+      <DebuggerView state={{ status: 'running' }} onSpanSelect={onSpanSelect} />
+    )
+    expect(onSpanSelect).toHaveBeenLastCalledWith(null)
+
+    rerender(
+      <DebuggerView
+        state={errorEnvelope([hit(1)], { span: { start: 90, end: 99 } })}
+        onSpanSelect={onSpanSelect}
+      />
+    )
+    expect(onSpanSelect).toHaveBeenLastCalledWith({ start: 10, end: 19 })
+
+    rerender(
+      <DebuggerView
+        state={errorEnvelope([], { span: { start: 90, end: 99 } })}
+        onSpanSelect={onSpanSelect}
+      />
+    )
+    expect(onSpanSelect).toHaveBeenLastCalledWith({ start: 90, end: 99 })
+  })
+
   it('hovering a ref chip regenerates the graph with a highlight class', async () => {
     render(<DebuggerView state={twoHitEnvelope()} />)
 
@@ -195,10 +227,10 @@ describe('DebuggerView', () => {
 
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'ref #7' }))
     await waitFor(() => {
-      const sources = renderMock.mock.calls.map(
-        (call) => call[1] as string
-      )
-      expect(sources.some((source) => source.includes('class o7 highlighted'))).toBe(true)
+      const sources = renderMock.mock.calls.map((call) => call[1] as string)
+      expect(
+        sources.some((source) => source.includes('class o7 highlighted'))
+      ).toBe(true)
     })
   })
 
@@ -245,9 +277,7 @@ describe('DebuggerView', () => {
   })
 
   it('surfaces invalid responses as an alert', () => {
-    render(
-      <DebuggerView state={{ status: 'invalid', message: 'bad JSON' }} />
-    )
+    render(<DebuggerView state={{ status: 'invalid', message: 'bad JSON' }} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('bad JSON')
   })

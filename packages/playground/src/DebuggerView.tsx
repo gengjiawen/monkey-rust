@@ -20,7 +20,7 @@ export type DebuggerPanelState =
 
 interface DebuggerViewProps {
   state: DebuggerPanelState
-  onSpanSelect?: (span: SourceSpan) => void
+  onSpanSelect?: (span: SourceSpan | null) => void
 }
 
 const cardClass =
@@ -88,13 +88,7 @@ interface RefControls {
   onPin: (heapId: number) => void
 }
 
-function HeapRefChip({
-  heapId,
-  refs,
-}: {
-  heapId: number
-  refs: RefControls
-}) {
+function HeapRefChip({ heapId, refs }: { heapId: number; refs: RefControls }) {
   if (!refs.includedIds.has(heapId)) {
     return (
       <button
@@ -221,7 +215,9 @@ function FrameCard({
       )}
       {frame.captures.length > 0 ? (
         <>
-          <h4 className={subheadingClass}>Captures ({frame.captures.length})</h4>
+          <h4 className={subheadingClass}>
+            Captures ({frame.captures.length})
+          </h4>
           <ul className={slotListClass}>
             {frame.captures.map((capture) => (
               <li
@@ -347,8 +343,8 @@ function HitExplorer({
           ▶
         </button>
         <span className={mutedClass}>
-          Switching hits highlights that <code>debugger;</code> statement in
-          the editor.
+          Switching hits highlights that <code>debugger;</code> statement in the
+          editor.
         </span>
       </div>
       <div className="grid grid-cols-2 items-start gap-3 max-[1100px]:grid-cols-1">
@@ -398,7 +394,17 @@ export function DebuggerView({ state, onSpanSelect }: DebuggerViewProps) {
     setHitPosition(0)
     setPinnedHeapId(null)
     setHoveredHeapId(null)
-  }, [state])
+
+    let initialSpan: SourceSpan | null = null
+    if (state.status === 'ok' || state.status === 'error') {
+      if (state.hits.length > 0) {
+        initialSpan = state.hits[0]?.span ?? null
+      } else if (state.status === 'error') {
+        initialSpan = state.span
+      }
+    }
+    onSpanSelect?.(initialSpan)
+  }, [onSpanSelect, state])
 
   if (state.status === 'idle') {
     return (
@@ -499,9 +505,9 @@ export function DebuggerView({ state, onSpanSelect }: DebuggerViewProps) {
           <div className={emptyStateClass}>
             <h2 className={stateHeadingClass}>No debugger hits</h2>
             <p className={stateTextClass}>
-              The program finished without executing a{' '}
-              <code>debugger;</code> statement. Add one inside the code path
-              you want to inspect and run again.
+              The program finished without executing a <code>debugger;</code>{' '}
+              statement. Add one inside the code path you want to inspect and
+              run again.
             </p>
             <p className={`${stateTextClass} ${mutedClass}`}>
               Result: <code>{state.result}</code>

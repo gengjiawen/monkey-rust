@@ -1054,20 +1054,21 @@ impl GcVM {
             ));
         }
 
-        let frame = Frame::new(
-            closure,
-            compiled.instructions,
-            self.sp - num_args,
-            compiled.num_locals,
-            compiled.num_parameters,
-        );
         // checked_add: num_locals comes from bytecode, so it can be an
-        // arbitrary usize, not just a compiler-emitted small count.
-        let next_sp = frame
-            .base_pointer
+        // arbitrary usize, not just a compiler-emitted small count. Validate
+        // it before Frame::new allocates the per-local initialized bitset.
+        let base_pointer = self.sp - num_args;
+        let next_sp = base_pointer
             .checked_add(compiled.num_locals)
             .filter(|next_sp| *next_sp <= STACK_SIZE)
             .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded"))?;
+        let frame = Frame::new(
+            closure,
+            compiled.instructions,
+            base_pointer,
+            compiled.num_locals,
+            compiled.num_parameters,
+        );
         self.sp = next_sp;
         self.push_frame(frame)
     }

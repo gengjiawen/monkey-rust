@@ -195,6 +195,25 @@ mod tests {
     }
 
     #[test]
+    fn statement_only_completion_stays_out_of_debugger_temporaries() {
+        let source = r#"
+            class Box {}
+            let assign = fn(value) {
+                value.item = 1;
+                debugger;
+            };
+            assign(new Box());
+        "#;
+        let (result, _, hits, _) = debug_run(source);
+
+        assert_eq!(result, "null");
+        assert_eq!(hits.len(), 1);
+        let frame = hits[0].frames.last().expect("assign frame");
+        assert_eq!(frame.name, "assign");
+        assert!(frame.temporaries.is_empty());
+    }
+
+    #[test]
     fn captures_use_free_names_in_capture_order() {
         let source = r#"
             let outer = fn(a, b) {
@@ -361,9 +380,9 @@ mod tests {
         );
         // Hash entries sort by key (integers before strings).
         assert_eq!(global(hit, "mixed").value.as_ref().unwrap().display, "{3: 2, a: 3, b: 1}");
-        // Character budget: 64 chars survive plus the ellipsis.
+        // Character budget includes the ellipsis.
         let text = &global(hit, "text").value.as_ref().unwrap().display;
-        assert_eq!(text.chars().count(), MAX_DEBUGGER_DISPLAY_CHARS + 1);
+        assert_eq!(text.chars().count(), MAX_DEBUGGER_DISPLAY_CHARS);
         assert!(text.ends_with('…'));
 
         let wide_id = global(hit, "wide").value.as_ref().unwrap().heap_id.unwrap();
@@ -533,7 +552,7 @@ mod tests {
             .iter()
             .find(|object| object.id == instance_id)
             .expect("instance node selected");
-        assert!(instance.label.starts_with("Instance(Point)"));
+        assert_eq!(instance.label, "Instance(Point)");
         assert!(instance.members.iter().any(|member| {
             matches!(&member.relation, EdgeRelation::InstanceField { name } if name == "x")
                 && member.display == "3"
