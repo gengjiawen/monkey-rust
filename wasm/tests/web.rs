@@ -5,7 +5,7 @@
 extern crate wasm_bindgen_test;
 use monkey_wasm::{
     analyze_lossless, compile_to_arm64, compile_to_snapshot, parse, parse_lossless,
-    run_gc_with_report, run_snapshot, run_snapshot_with_output,
+    run_gc_with_debugger, run_gc_with_report, run_snapshot, run_snapshot_with_output,
 };
 use serde_json::Value;
 use wasm_bindgen_test::*;
@@ -189,6 +189,53 @@ fn gc_error_envelope_distinguishes_all_stages_and_instruction_limit() {
         .contains("instruction limit exceeded"));
 }
 
+#[wasm_bindgen_test]
+fn debugger_envelope_records_stack_and_heap_snapshots() {
+    let envelope: Value = serde_json::from_str(&run_gc_with_debugger(
+        r#"
+let makePoint = fn(x, y) {
+  let p = [x, y];
+  debugger;
+  p;
+};
+makePoint(3, 2);
+"#,
+    ))
+    .expect("valid debugger envelope JSON");
+
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["result"], "[3, 2]");
+    assert_eq!(envelope["droppedHits"], 0);
+
+    let hits = envelope["hits"].as_array().expect("hits array");
+    assert_eq!(hits.len(), 1);
+    let hit = &hits[0];
+    assert_eq!(hit["index"], 1);
+    assert!(hit["span"]["start"].is_number());
+
+    let frames = hit["frames"].as_array().expect("frames array");
+    assert_eq!(frames[0]["name"], "main");
+    let current = frames.last().expect("current frame");
+    assert_eq!(current["name"], "makePoint");
+    let locals = current["locals"].as_array().expect("locals array");
+    let point = locals
+        .iter()
+        .find(|local| local["name"] == "p")
+        .expect("local p");
+    assert_eq!(point["initialized"], true);
+    let heap_id = point["value"]["heapId"]
+        .as_u64()
+        .expect("p lives on the heap");
+
+    let objects = hit["heap"]["objects"].as_array().expect("heap objects");
+    assert!(objects
+        .iter()
+        .any(|object| object["id"] == heap_id && object["kind"] == "array"));
+
+    let globals = hit["globals"].as_array().expect("globals array");
+    assert!(globals.iter().any(|global| global["name"] == "makePoint"));
+}
+
 fn build_snapshot(source: &str, strip_debug: bool) -> Value {
     serde_json::from_str(&compile_to_snapshot(source, strip_debug))
         .expect("valid snapshot envelope JSON")
@@ -240,7 +287,7 @@ fn snapshot_output_is_captured_before_success_or_failure() {
 fn snapshot_layout_regions_tile_the_buffer_and_disassemble() {
     let envelope = build_snapshot("let add = fn(a, b) { a + b }; add(1, 2)", false);
     let layout = &envelope["layout"];
-    assert_eq!(layout["formatVersion"], 1);
+    assert_eq!(layout["formatVersion"], 2);
     assert_eq!(layout["hasDebugInfo"], true);
     assert!(layout["abiFingerprint"].as_str().unwrap().starts_with("0x"));
 
