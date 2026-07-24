@@ -449,7 +449,19 @@ describe('Examples', () => {
     await user.click(await screen.findByRole('option', { name: 'Lint demo' }))
 
     expect(screen.getByLabelText('Source editor')).toHaveValue(
-      'let unused = 1;\nlet s = "hi";\nlen(s, s);\n{1: "a", 1: "b"};\nif (true) { puts(s); }\n'
+      'let unused = 1;   // no-unused-let\n' +
+        'let s = "hi";\n' +
+        'len(s, s);        // builtin-arity\n' +
+        '{1: "a", 1: "b"}; // no-duplicate-hash-key\n' +
+        'if (true) { puts(s); } // no-constant-condition\n' +
+        'puts(1 + "a");    // no-literal-type-mismatch\n' +
+        'let greet = fn(name, extra) { puts(name); }; // no-unused-param\n' +
+        'greet("hello", 2);\n' +
+        '// no-shadowed-builtin + no-unreachable-code:\n' +
+        'let last = fn() { return s; puts("nope"); };\n' +
+        'last();\n' +
+        '42;               // no-unused-expression\n' +
+        'puts(s);\n'
     )
   })
 })

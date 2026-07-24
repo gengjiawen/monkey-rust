@@ -112,14 +112,22 @@ print(a)
 `.trimStart(),
   },
   {
-    // Trips four lint rules; press Lint to see the diagnostics.
+    // Trips all nine lint rules; press Lint to see the diagnostics.
     label: 'Lint demo',
     code: `
-let unused = 1;
+let unused = 1;   // no-unused-let
 let s = "hi";
-len(s, s);
-{1: "a", 1: "b"};
-if (true) { puts(s); }
+len(s, s);        // builtin-arity
+{1: "a", 1: "b"}; // no-duplicate-hash-key
+if (true) { puts(s); } // no-constant-condition
+puts(1 + "a");    // no-literal-type-mismatch
+let greet = fn(name, extra) { puts(name); }; // no-unused-param
+greet("hello", 2);
+// no-shadowed-builtin + no-unreachable-code:
+let last = fn() { return s; puts("nope"); };
+last();
+42;               // no-unused-expression
+puts(s);
 `.trimStart(),
   },
 ]
