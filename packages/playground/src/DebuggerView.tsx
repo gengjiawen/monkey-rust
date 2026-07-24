@@ -64,6 +64,15 @@ const pagerButtonClass =
 const frameButtonClass =
   'flex w-full cursor-pointer items-baseline gap-2 rounded-md border-0 bg-transparent p-0 text-left [font-family:inherit] disabled:cursor-default'
 
+const stackTubeClass =
+  'overflow-hidden rounded-lg border border-(--gray-a6) divide-y divide-(--gray-a6)'
+
+const stackCaptionClass =
+  'm-0 font-mono text-[10px] tracking-[0.08em] uppercase text-(--gray-9)'
+
+const frameDepthBadgeClass =
+  'shrink-0 rounded bg-(--gray-a3) px-1.5 py-0.5 font-mono text-[10px] text-(--gray-10)'
+
 const chipBaseClass =
   'rounded-full border px-2 py-0.5 font-mono text-[11px] leading-[1.4]'
 
@@ -156,13 +165,16 @@ function SlotRow({ slot, refs }: { slot: DebuggerSlot; refs: RefControls }) {
   )
 }
 
-function FrameCard({
+function FrameSegment({
   frame,
+  depth,
   isCurrent,
   refs,
   onSpanSelect,
 }: {
   frame: DebuggerFrame
+  /** How many frames sit below this one; main is 0. */
+  depth: number
   isCurrent: boolean
   refs: RefControls
   onSpanSelect?: (span: SourceSpan) => void
@@ -170,7 +182,7 @@ function FrameCard({
   const { currentSpan } = frame
   const linkable = currentSpan !== null && onSpanSelect !== undefined
   return (
-    <section className={`${cardClass} p-3`}>
+    <section className={isCurrent ? 'bg-(--accent-a2) p-3' : 'p-3'}>
       <button
         type="button"
         className={frameButtonClass}
@@ -186,6 +198,7 @@ function FrameCard({
           }
         }}
       >
+        <span className={frameDepthBadgeClass}>frame {depth}</span>
         <span className="font-mono text-sm font-bold text-(--gray-12)">
           {frame.name}
         </span>
@@ -349,16 +362,29 @@ function HitExplorer({
       </div>
       <div className="grid grid-cols-2 items-start gap-3 max-[1100px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-3">
-          <section aria-label="Call stack" className="flex flex-col gap-3">
-            {displayFrames.map((frame, index) => (
-              <FrameCard
-                key={`${hit.index}-${index}`}
-                frame={frame}
-                isCurrent={index === 0}
-                refs={refs}
-                onSpanSelect={onSpanSelect}
-              />
-            ))}
+          <section aria-label="Call stack" className={`${cardClass} p-3`}>
+            <h2 className={`${sectionHeadingClass} mb-2`}>
+              Call stack ({displayFrames.length}{' '}
+              {displayFrames.length === 1 ? 'frame' : 'frames'})
+            </h2>
+            <p className={`${stackCaptionClass} mb-1`}>
+              ▲ top of stack · most recent call
+            </p>
+            <div className={stackTubeClass}>
+              {displayFrames.map((frame, index) => (
+                <FrameSegment
+                  key={`${hit.index}-${index}`}
+                  frame={frame}
+                  depth={displayFrames.length - 1 - index}
+                  isCurrent={index === 0}
+                  refs={refs}
+                  onSpanSelect={onSpanSelect}
+                />
+              ))}
+            </div>
+            <p className={`${stackCaptionClass} mt-1`}>
+              ▼ stack base · program entry
+            </p>
           </section>
           {hit.globals.length > 0 ? (
             <section className={cardClass}>

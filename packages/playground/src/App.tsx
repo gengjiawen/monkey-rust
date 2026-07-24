@@ -105,27 +105,6 @@ makeCycle();
 `.trimStart(),
   },
   {
-    // Two debugger hits: one inside makePoint with three live frames, one
-    // in sum after makePoint returned but its array is still reachable.
-    label: 'Debugger',
-    code: `
-let makePoint = fn(x, y) {
-  let p = [x, y];
-  debugger;
-  p;
-};
-
-let sum = fn(a, b) {
-  let total = a + b;
-  let point = makePoint(total, b);
-  debugger;
-  total;
-};
-
-sum(1, 2);
-`.trimStart(),
-  },
-  {
     // The Minify view folds this whole program down to `print(2);`.
     label: 'Constant folding',
     code: `
@@ -153,16 +132,37 @@ last();
 puts(s);
 `.trimStart(),
   },
+  {
+    // Two debugger hits: one inside makePoint with three live frames, one
+    // in sum after makePoint returned but its array is still reachable.
+    label: 'Debugger',
+    code: `
+let makePoint = fn(x, y) {
+  let p = [x, y];
+  debugger;
+  p;
+};
+
+let sum = fn(a, b) {
+  let total = a + b;
+  let point = makePoint(total, b);
+  debugger;
+  total;
+};
+
+sum(1, 2);
+`.trimStart(),
+  },
 ]
 
 type OutputView =
   | 'ast'
   | 'bytecode'
   | 'gc'
-  | 'debugger'
   | 'snapshot'
   | 'arm64'
   | 'minify'
+  | 'debugger'
 
 const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
@@ -754,15 +754,15 @@ function App() {
                 Bytecode
               </SegmentedControl.Item>
               <SegmentedControl.Item value="gc">GC</SegmentedControl.Item>
-              <SegmentedControl.Item value="debugger">
-                Debugger
-              </SegmentedControl.Item>
               <SegmentedControl.Item value="snapshot">
                 Snapshot
               </SegmentedControl.Item>
               <SegmentedControl.Item value="arm64">ARM64</SegmentedControl.Item>
               <SegmentedControl.Item value="minify">
                 Minify
+              </SegmentedControl.Item>
+              <SegmentedControl.Item value="debugger">
+                Debugger
               </SegmentedControl.Item>
             </SegmentedControl.Root>
           </div>
@@ -773,15 +773,6 @@ function App() {
               loading={gcState.status === 'running'}
             >
               Run GC
-            </Button>
-          ) : null}
-          {outputView === 'debugger' ? (
-            <Button
-              size="2"
-              onClick={runDebuggerProgram}
-              loading={debuggerState.status === 'running'}
-            >
-              Run
             </Button>
           ) : null}
           {outputView === 'snapshot' ? (
@@ -807,6 +798,15 @@ function App() {
               />
               Mangle names
             </label>
+          ) : null}
+          {outputView === 'debugger' ? (
+            <Button
+              size="2"
+              onClick={runDebuggerProgram}
+              loading={debuggerState.status === 'running'}
+            >
+              Run
+            </Button>
           ) : null}
         </div>
         <div className={editorFrameClass}>
