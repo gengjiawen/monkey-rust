@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0](https://github.com/gengjiawen/monkey-rust/compare/v1.1.0...v1.2.0) (2026-07-24)
+
+
+### Features
+
+* add Monkey linter (@gengjiawen/monkey-lint) ([#301](https://github.com/gengjiawen/monkey-rust/issues/301)) ([03cccfe](https://github.com/gengjiawen/monkey-rust/commit/03cccfea1aeafa99a3e0d96c56065d8ec385c953))
+* add Monkey source minifier ([#298](https://github.com/gengjiawen/monkey-rust/issues/298)) ([add042a](https://github.com/gengjiawen/monkey-rust/commit/add042aa8b0e8fb9f9b917725f72c063c95f7a32))
+* **gc:** runtime error kinds, output capture, and wrapping arithmetic ([#299](https://github.com/gengjiawen/monkey-rust/issues/299)) ([ffd62b1](https://github.com/gengjiawen/monkey-rust/commit/ffd62b1922717db117829a4e82e784a3030994e9))
+* **playground:** make the ARM64 pane beginner-friendly with hover docs, highlighting, and a reading guide ([#296](https://github.com/gengjiawen/monkey-rust/issues/296)) ([5488498](https://github.com/gengjiawen/monkey-rust/commit/548849845f721affb0509fd69f761aa855a55d26))
+
+
+### Bug Fixes
+
+* **compiler:** balance valueless if arms ([#304](https://github.com/gengjiawen/monkey-rust/issues/304)) ([ff1cd1f](https://github.com/gengjiawen/monkey-rust/commit/ff1cd1fc0bbd384a724eea1ffe92555f9a3c076a))
+* **playground:** increase theme/GitHub button spacing ([#295](https://github.com/gengjiawen/monkey-rust/issues/295)) ([7a2dc9a](https://github.com/gengjiawen/monkey-rust/commit/7a2dc9ad4c7e955788ab81048f7be16577c8d1b1))
+* **playground:** let output tabs scroll instead of collapsing on mobile ([#303](https://github.com/gengjiawen/monkey-rust/issues/303)) ([14568ab](https://github.com/gengjiawen/monkey-rust/commit/14568abb298bbc6f20bd029fc44a154f0566feb6))
+
 ## [1.1.0](https://github.com/gengjiawen/monkey-rust/compare/v1.0.0...v1.1.0) (2026-07-21)
 
 
