@@ -8,6 +8,7 @@ use object::Object;
 use parser::lexer::token::Span;
 use serde::Serialize;
 
+use crate::debugger::{collect_hit, DebuggerHit, HitContext, MAX_DEBUGGER_HITS};
 use crate::frame::Frame;
 use crate::report::{
     empty_value_kind_counts, select_global_roots, summarize_gc_object, GcCollectionReport,
@@ -104,6 +105,10 @@ pub struct GcVM {
     last_popped: GcRef,
     main_debug_info: DebugInfo,
     function_debug_info: HashMap<GcRef, DebugInfo>,
+    debugger_hits: Vec<DebuggerHit>,
+    /// Hits past `MAX_DEBUGGER_HITS` are counted, not recorded, so a
+    /// `debugger;` in a hot loop cannot grow memory without bound.
+    dropped_debugger_hits: usize,
     output: Option<String>,
 }
 
@@ -186,6 +191,8 @@ impl GcVM {
             last_popped,
             main_debug_info,
             function_debug_info,
+            debugger_hits: Vec::new(),
+            dropped_debugger_hits: 0,
             output: None,
         }
     }
@@ -267,6 +274,11 @@ impl GcVM {
         self.frames = vec![empty_frame; MAX_FRAMES];
         self.frames[0] = main_frame;
         self.frame_index = 1;
+
+        // Hits describe the program that recorded them; a new program starts
+        // clean. Globals and their initialized bits survive, as above.
+        self.debugger_hits.clear();
+        self.dropped_debugger_hits = 0;
     }
 
     pub fn heap(&self) -> &GcHeap {
@@ -298,6 +310,33 @@ impl GcVM {
     /// snapshots use this to tell a user-assigned null from a never-run `let`.
     pub fn globals_initialized(&self) -> &[bool] {
         &self.globals_initialized
+    }
+
+    /// Drain recorded `debugger;` snapshots plus the count of hits dropped
+    /// after `MAX_DEBUGGER_HITS`. Recording resumes from zero afterwards.
+    pub fn take_debugger_hits(&mut self) -> (Vec<DebuggerHit>, usize) {
+        let dropped = std::mem::take(&mut self.dropped_debugger_hits);
+        return (std::mem::take(&mut self.debugger_hits), dropped);
+    }
+
+    fn record_debugger_hit(&mut self) {
+        if self.debugger_hits.len() >= MAX_DEBUGGER_HITS {
+            self.dropped_debugger_hits += 1;
+            return;
+        }
+        let hit = collect_hit(HitContext {
+            heap: &self.heap,
+            frames: &self.frames[..self.frame_index],
+            stack: &self.stack,
+            sp: self.sp,
+            globals: &self.globals,
+            global_bindings: &self.global_bindings,
+            globals_initialized: &self.globals_initialized,
+            main_debug_info: &self.main_debug_info,
+            function_debug_info: &self.function_debug_info,
+            index: self.debugger_hits.len() + 1,
+        });
+        self.debugger_hits.push(hit);
     }
 
     pub fn collect_garbage(&mut self) -> GcCollectionReport {
@@ -648,8 +687,8 @@ impl GcVM {
                     self.execute_new(num_args)?;
                 }
                 Opcode::OpDebugger => {
-                    // No stack effect. Snapshot recording lands here once the
-                    // debugger runtime ships; until then it is a no-op.
+                    // No stack effect; completion semantics stay transparent.
+                    self.record_debugger_hit();
                 }
             }
         }

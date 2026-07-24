@@ -178,6 +178,51 @@ pub fn run_gc_with_report(input: &str) -> String {
     serde_json::to_string(&envelope).expect("GC run envelope serialization should not fail")
 }
 
+/// Execute Monkey source on the cycle-collecting VM, recording a snapshot at
+/// every `debugger;` statement, and return a tagged JSON envelope.
+///
+/// Both arms carry `stdout`, `hits`, and `droppedHits`: snapshots recorded
+/// before a runtime failure are exactly what the playground's Debugger tab
+/// needs to explain that failure. Failures are data in the envelope, not
+/// JavaScript exceptions, mirroring [`run_gc_with_report`].
+#[wasm_bindgen]
+pub fn run_gc_with_debugger(input: &str) -> String {
+    set_panic_hook();
+
+    let envelope =
+        match gc::run_source_with_debugger_classified(input, PLAYGROUND_GC_INSTRUCTION_BUDGET) {
+            gc::GcDebuggerRunOutcome::Ok {
+                result,
+                stdout,
+                hits,
+                dropped_hits,
+            } => serde_json::json!({
+                "status": "ok",
+                "result": result,
+                "stdout": stdout,
+                "hits": hits,
+                "droppedHits": dropped_hits,
+            }),
+            gc::GcDebuggerRunOutcome::Error {
+                error,
+                stdout,
+                hits,
+                dropped_hits,
+            } => serde_json::json!({
+                "status": "error",
+                "stage": error.stage,
+                "kind": error.kind,
+                "message": error.message,
+                "span": error.span,
+                "stdout": stdout,
+                "hits": hits,
+                "droppedHits": dropped_hits,
+            }),
+        };
+
+    serde_json::to_string(&envelope).expect("GC debugger envelope serialization should not fail")
+}
+
 /// Compile Monkey source to AArch64 assembly and return a tagged JSON envelope
 /// of per-line `text`/`kind`/`span` records for the playground's godbolt-style
 /// ARM64 view (arm64 backend design §12 V1).
