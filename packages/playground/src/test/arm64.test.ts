@@ -67,8 +67,13 @@ describe('parseArm64BuildEnvelope', () => {
           message: 'expected token',
           span: null,
         })
-      ).span
-    ).toBeNull()
+      )
+    ).toEqual({
+      status: 'error',
+      stage: 'parse',
+      message: 'expected token',
+      span: null,
+    })
   })
 
   it.each([

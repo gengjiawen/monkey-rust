@@ -90,6 +90,6 @@
     "@vscode/vsce": "3.7.1",
     "esbuild": "^0.28.0",
     "ovsx": "1.0.1",
-    "typescript": "5.0.4"
+    "typescript": "7.0.2"
   }
 }

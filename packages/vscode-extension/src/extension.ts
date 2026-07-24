@@ -33,7 +33,7 @@ async function createWasmBindings(): Promise<MonkeyWasm> {
     './monkey_wasm_bg.js': bindings as unknown as Record<string, unknown>,
   }
   const { instance } = await wasmRuntime.instantiate(
-    readFileSync(wasmPath),
+    new Uint8Array(readFileSync(wasmPath)),
     imports
   )
 
