@@ -608,6 +608,28 @@ mod tests {
     }
 
     #[test]
+    fn global_roots_report_a_rebound_name_at_its_final_slot() {
+        // `let a = ...` twice allocates two global slots; the report derives
+        // its view from the binding ledger and must show only the visible
+        // (latest) slot for the name.
+        let success =
+            run_source_with_report(r#"let a = [1, 2]; let a = "rebound";"#, 10_000).unwrap();
+        let report = success.report;
+        let names: Vec<&str> = report
+            .global_roots
+            .iter()
+            .map(|root| root.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["a"]);
+        let object = report
+            .objects
+            .iter()
+            .find(|object| object.id == report.global_roots[0].object_id)
+            .expect("named root in catalog");
+        assert_eq!(object.kind, ValueKind::String);
+    }
+
+    #[test]
     fn global_roots_name_survivors_but_never_freed_cycle_members() {
         let success = run_source_with_report(
             r#"

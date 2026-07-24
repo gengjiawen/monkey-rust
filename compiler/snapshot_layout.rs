@@ -190,7 +190,7 @@ impl<'a> Walker<'a> {
                     start,
                     Debug,
                     "debug fn index".to_string(),
-                    format!("pc→span entries for {}", stream),
+                    format!("debug metadata for {}", stream),
                 );
                 self.record_debug_info(&stream)?;
             }
@@ -312,7 +312,8 @@ impl<'a> Walker<'a> {
         Ok(())
     }
 
-    /// Span count plus one region per `{pc, start, end}` triple.
+    /// Span count plus one region per `{pc, start, end}` triple, then the v2
+    /// binding metadata: named local slots and captured free names.
     fn record_debug_info(&mut self, stream: &str) -> Result<(), SnapshotError> {
         let count = self.record(
             SnapshotSection::Debug,
@@ -331,6 +332,34 @@ impl<'a> Walker<'a> {
                 format!("{} pc {:04}", stream, pc),
                 format!("source {}..{}", span_start, span_end),
             );
+        }
+        let binding_count = self.record(
+            SnapshotSection::Debug,
+            format!("{} local count", stream),
+            Reader::read_usize,
+            |count| format!("{} named local slots (ULEB128)", count),
+        )?;
+        for _ in 0..binding_count {
+            let start = self.reader.position();
+            let slot = self.reader.read_usize()?;
+            let name_len = self.reader.read_usize()?;
+            let bytes = self.reader.read_exact(name_len)?;
+            let name = String::from_utf8(bytes.to_vec()).map_err(|_| SnapshotError::BadUtf8)?;
+            self.push(
+                start,
+                SnapshotSection::Debug,
+                format!("{} local {}", stream, slot),
+                format!("slot {} is {:?}", slot, name),
+            );
+        }
+        let free_count = self.record(
+            SnapshotSection::Debug,
+            format!("{} free count", stream),
+            Reader::read_usize,
+            |count| format!("{} captured names (ULEB128)", count),
+        )?;
+        for index in 0..free_count {
+            self.record_str(SnapshotSection::Debug, &format!("{} free {}", stream, index))?;
         }
         Ok(())
     }

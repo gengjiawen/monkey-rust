@@ -22,6 +22,10 @@ pub struct SymbolTable {
     pub outer: Option<Rc<SymbolTable>>,
     symbols: HashMap<String, Rc<Symbol>>,
     pub free_symbols: Vec<Rc<Symbol>>,
+    /// Every slot-allocating definition of this scope in definition order, so
+    /// `definitions[i].index == i`. A rebinding appends a fresh entry instead
+    /// of replacing the shadowed slot's entry, unlike `symbols`.
+    pub definitions: Vec<Rc<Symbol>>,
     pub num_definitions: usize,
 }
 
@@ -36,6 +40,7 @@ impl SymbolTable {
         SymbolTable {
             symbols: HashMap::new(),
             free_symbols: vec![],
+            definitions: vec![],
             num_definitions: 0,
             outer: None,
         }
@@ -45,6 +50,7 @@ impl SymbolTable {
         SymbolTable {
             symbols: HashMap::new(),
             free_symbols: vec![],
+            definitions: vec![],
             num_definitions: 0,
             outer: Some(Rc::new(outer)),
         }
@@ -64,6 +70,7 @@ impl SymbolTable {
 
         self.num_definitions += 1;
         self.symbols.insert(name.clone(), Rc::clone(&symbol));
+        self.definitions.push(Rc::clone(&symbol));
         return symbol;
     }
 
@@ -77,21 +84,15 @@ impl SymbolTable {
         names
     }
 
-    /// Names defined in the outermost (global) scope, paired with their slot
-    /// index. Sorted by name so reports stay deterministic.
-    pub fn global_symbols(&self) -> Vec<(String, usize)> {
+    /// The outermost scope's definition ledger, in slot order. Unlike a view
+    /// derived from `symbols`, a rebound name appears once per slot it ever
+    /// occupied, which is what debug metadata needs.
+    pub fn global_definitions(&self) -> &[Rc<Symbol>] {
         let mut table = self;
         while let Some(outer) = table.outer.as_deref() {
             table = outer;
         }
-        let mut globals: Vec<(String, usize)> = table
-            .symbols
-            .values()
-            .filter(|symbol| symbol.scope == SymbolScope::Global)
-            .map(|symbol| (symbol.name.clone(), symbol.index))
-            .collect();
-        globals.sort();
-        globals
+        &table.definitions
     }
 
     // Resolve a name in the current scope, capturing free variables from outers when needed.

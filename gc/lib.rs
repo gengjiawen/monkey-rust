@@ -144,9 +144,9 @@ pub fn run_source_with_report_classified(
             message,
             span: None,
         })?;
-    let global_names = compiler.symbol_table.global_symbols();
+    let global_bindings = compiler.global_bindings();
     let mut vm = GcVM::new(bytecode);
-    vm.set_global_names(global_names);
+    vm.set_global_bindings(global_bindings);
     vm.heap_mut().set_gc_threshold(usize::MAX);
     vm.run_with_budget_classified(instruction_budget)
         .map_err(|error| GcClassifiedRunError {

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use byteorder::{BigEndian, ByteOrder};
-use compiler::compiler::{Bytecode, DebugInfo};
+use compiler::compiler::{BindingDebugInfo, Bytecode, DebugInfo};
 use compiler::op_code::Opcode;
 use object::builtins::{BuiltIns, BuiltinId};
 use object::Object;
@@ -93,7 +93,11 @@ pub struct GcVM {
     stack: Vec<GcRef>,
     sp: usize,
     globals: Vec<GcRef>,
-    global_names: Vec<(String, usize)>,
+    global_bindings: Vec<BindingDebugInfo>,
+    /// One flag per global slot: set once `OpSetGlobal` writes it, so the
+    /// debugger can tell a never-executed `let`'s prefilled null from a real
+    /// null value. Kept across `load_bytecode` like the globals themselves.
+    globals_initialized: Vec<bool>,
     frames: Vec<Frame>,
     frame_index: usize,
     null: GcRef,
@@ -146,6 +150,8 @@ impl GcVM {
             },
             main_instructions,
             0,
+            0,
+            0,
         );
 
         let empty_frame = Frame::new(
@@ -154,6 +160,8 @@ impl GcVM {
                 free: vec![],
             },
             vec![],
+            0,
+            0,
             0,
         );
 
@@ -170,7 +178,8 @@ impl GcVM {
             stack,
             sp: 0,
             globals,
-            global_names: Vec::new(),
+            global_bindings: Vec::new(),
+            globals_initialized: vec![false; GLOBAL_SIZE],
             frames,
             frame_index: 1,
             null,
@@ -242,6 +251,8 @@ impl GcVM {
             },
             main_instructions,
             0,
+            0,
+            0,
         );
         let empty_frame = Frame::new(
             GcClosure {
@@ -249,6 +260,8 @@ impl GcVM {
                 free: vec![],
             },
             vec![],
+            0,
+            0,
             0,
         );
         self.frames = vec![empty_frame; MAX_FRAMES];
@@ -274,22 +287,37 @@ impl GcVM {
         self.output.as_mut().map(std::mem::take).unwrap_or_default()
     }
 
-    /// Record which global slot each source-level global name refers to, so
-    /// reports can state the named root set (see `GlobalRoot`).
-    pub fn set_global_names(&mut self, names: Vec<(String, usize)>) {
-        self.global_names = names;
+    /// Record the compiler's global definition ledger (slot order, rebindings
+    /// included), used by GC reports for the named root set (see `GlobalRoot`)
+    /// and by debugger snapshots for slot names.
+    pub fn set_global_bindings(&mut self, bindings: Vec<BindingDebugInfo>) {
+        self.global_bindings = bindings;
+    }
+
+    /// One flag per global slot: has `OpSetGlobal` written it? Debugger
+    /// snapshots use this to tell a user-assigned null from a never-run `let`.
+    pub fn globals_initialized(&self) -> &[bool] {
+        &self.globals_initialized
     }
 
     pub fn collect_garbage(&mut self) -> GcCollectionReport {
         // Read the named global slots before collecting. Named slots are VM
         // roots, so every object listed here survives the cycle collector.
-        let global_roots = self
-            .global_names
-            .iter()
-            .filter(|(_, index)| *index < self.globals.len())
-            .map(|(name, index)| GlobalRoot {
-                name: name.clone(),
-                object_id: self.globals[*index].0,
+        // Reports show one root per visible name — for a rebound name the
+        // highest slot wins, matching what source-level code can still read —
+        // sorted by name for determinism.
+        let mut visible: HashMap<&str, usize> = HashMap::new();
+        for binding in &self.global_bindings {
+            visible.insert(binding.name.as_str(), binding.slot);
+        }
+        let mut named: Vec<(&str, usize)> = visible.into_iter().collect();
+        named.sort_unstable();
+        let global_roots = named
+            .into_iter()
+            .filter(|(_, slot)| *slot < self.globals.len())
+            .map(|(name, slot)| GlobalRoot {
+                name: name.to_string(),
+                object_id: self.globals[slot].0,
             })
             .collect();
         let before_kinds = self.heap.value_kinds_by_id();
@@ -449,6 +477,7 @@ impl GcVM {
                     let value = self.pop_owned()?;
                     self.heap.free(self.globals[global_index]);
                     self.globals[global_index] = value;
+                    self.globals_initialized[global_index] = true;
                 }
                 Opcode::OpArray => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -521,6 +550,11 @@ impl GcVM {
                     let value = self.pop_owned()?;
                     self.heap.free(self.stack[slot]);
                     self.stack[slot] = value;
+                    // get_mut: hostile bytecode can index past num_locals; the
+                    // write above is bounded by STACK_SIZE, the bitset is not.
+                    if let Some(flag) = self.current_frame().initialized.get_mut(local_index) {
+                        *flag = true;
+                    }
                 }
                 Opcode::OpGetLocal => {
                     let local_index = ins[ip + 1] as usize;
@@ -981,7 +1015,13 @@ impl GcVM {
             ));
         }
 
-        let frame = Frame::new(closure, compiled.instructions, self.sp - num_args);
+        let frame = Frame::new(
+            closure,
+            compiled.instructions,
+            self.sp - num_args,
+            compiled.num_locals,
+            compiled.num_parameters,
+        );
         // checked_add: num_locals comes from bytecode, so it can be an
         // arbitrary usize, not just a compiler-emitted small count.
         let next_sp = frame

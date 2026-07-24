@@ -224,6 +224,101 @@ mod tests {
         );
     }
 
+    fn binding(name: &str, slot: usize) -> crate::compiler::BindingDebugInfo {
+        crate::compiler::BindingDebugInfo {
+            name: name.to_string(),
+            slot,
+        }
+    }
+
+    fn function_constant_index(bytecode: &crate::compiler::Bytecode, name: &str) -> usize {
+        bytecode
+            .constants
+            .iter()
+            .position(|constant| {
+                matches!(&**constant, Object::CompiledFunction(function) if function.name == name)
+            })
+            .expect("named function constant")
+    }
+
+    #[test]
+    fn function_debug_info_lists_parameters_then_lets() {
+        let program = parse("let add = fn(a, b) { let c = a + b; c; };").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        let info = bytecode.function_debug_info.get(&0).unwrap();
+        assert_eq!(info.local_bindings, vec![binding("a", 0), binding("b", 1), binding("c", 2)]);
+        assert_eq!(info.free_names, Vec::<String>::new());
+    }
+
+    #[test]
+    fn function_debug_info_orders_free_names_by_capture() {
+        let program = parse("fn(a, b) { fn() { b + a; }; };").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        // The inner function is compiled first, so it is constant 0. `b` is
+        // resolved before `a`, so it captures free slot 0: free_names must
+        // follow capture order, not parameter order.
+        let inner = bytecode.function_debug_info.get(&0).unwrap();
+        assert_eq!(inner.local_bindings, vec![]);
+        assert_eq!(inner.free_names, vec!["b".to_string(), "a".to_string()]);
+
+        let outer = bytecode.function_debug_info.get(&1).unwrap();
+        assert_eq!(outer.local_bindings, vec![binding("a", 0), binding("b", 1)]);
+        assert_eq!(outer.free_names, Vec::<String>::new());
+    }
+
+    #[test]
+    fn method_debug_info_lists_this_before_parameters_and_lets() {
+        let source = "class Point {
+            constructor(x) { this.value = x; }
+            scaled(factor) { let result = this.value * factor; result; }
+        }";
+        let program = parse(source).unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        let scaled = function_constant_index(&bytecode, "Point.scaled");
+        let info = bytecode.function_debug_info.get(&scaled).unwrap();
+        assert_eq!(
+            info.local_bindings,
+            vec![
+                binding("this", 0),
+                binding("factor", 1),
+                binding("result", 2)
+            ]
+        );
+    }
+
+    #[test]
+    fn function_debug_info_keeps_rebound_let_slots() {
+        let program = parse("fn() { let x = 1; let x = 2; x; };").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        let function = function_constant_index(&bytecode, "");
+        let info = bytecode.function_debug_info.get(&function).unwrap();
+        assert_eq!(info.local_bindings, vec![binding("x", 0), binding("x", 1)]);
+    }
+
+    #[test]
+    fn main_debug_info_never_lists_bindings() {
+        let program = parse("let a = 1; let b = 2; let a = 3;").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+
+        // Globals live in the VM-wide table, not in a frame, so main's
+        // DebugInfo carries no bindings; global_bindings() is the ledger.
+        assert_eq!(bytecode.debug_info.local_bindings, vec![]);
+        assert_eq!(bytecode.debug_info.free_names, Vec::<String>::new());
+        assert_eq!(
+            compiler.global_bindings(),
+            vec![binding("a", 0), binding("b", 1), binding("a", 2)]
+        );
+    }
+
     #[test]
     fn bytecode_debug_view_maps_instruction_lines_to_pc() {
         let input = "1;\n22";

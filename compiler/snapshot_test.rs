@@ -373,16 +373,77 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_function_debug_entries() {
-        // One function constant with an empty body; two fn_debug entries for it.
+        // One function constant with an empty body; two fn_debug entries for
+        // it. Each debug info is {0 spans, 0 locals, 0 free names}.
         let constants = [1, TAG_FUNCTION, 0, 0, 0, 0];
-        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &[], &constants, &[0, 2, 0, 0, 0, 0]);
+        let debug = [0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0];
+        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &[], &constants, &debug);
         assert_eq!(read_bytecode(&blob), Err(SnapshotError::DuplicateDebugEntry(0)));
     }
 
     #[test]
     fn rejects_debug_entry_for_non_function_constant() {
-        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &[], &[1, TAG_INTEGER, 7], &[0, 1, 0, 0]);
+        // Empty main debug info, then one fn_debug entry naming constant 0.
+        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &[], &[1, TAG_INTEGER, 7], &[0, 0, 0, 1, 0]);
         assert_eq!(read_bytecode(&blob), Err(SnapshotError::DebugIndexNotFunction(0)));
+    }
+
+    #[test]
+    fn rejects_debug_local_slot_not_increasing() {
+        // Function constant: empty name, 2 locals, 0 params, empty body. Its
+        // debug entry lists slot 1 twice: {0 spans, [(1, "a"), (1, "b")], 0 free}.
+        let constants = [1, TAG_FUNCTION, 0, 2, 0, 0];
+        let debug = [0, 0, 0, 1, 0, 0, 2, 1, 1, b'a', 1, 1, b'b', 0];
+        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &[], &constants, &debug);
+        assert_eq!(
+            read_bytecode(&blob),
+            Err(SnapshotError::DebugSlotNotIncreasing {
+                slot: 1
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_debug_local_slot_out_of_range() {
+        // Function constant with 1 local; its debug entry names slot 1.
+        let constants = [1, TAG_FUNCTION, 0, 1, 0, 0];
+        let debug = [0, 0, 0, 1, 0, 0, 1, 1, 1, b'x', 0];
+        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &[], &constants, &debug);
+        assert_eq!(
+            read_bytecode(&blob),
+            Err(SnapshotError::DebugSlotOutOfRange {
+                slot: 1,
+                num_locals: 1
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_main_debug_info_with_bindings() {
+        // Main's bindings are the globals, which live outside the container,
+        // so both a local binding and a free name on main are malformed.
+        let with_binding = raw_file(FLAG_HAS_DEBUG_INFO, &[], &[0], &[0, 1, 0, 1, b'x', 0, 0]);
+        assert_eq!(read_bytecode(&with_binding), Err(SnapshotError::DebugMainBindingsNotEmpty));
+        let with_free_name = raw_file(FLAG_HAS_DEBUG_INFO, &[], &[0], &[0, 0, 1, 1, b'x', 0]);
+        assert_eq!(read_bytecode(&with_free_name), Err(SnapshotError::DebugMainBindingsNotEmpty));
+    }
+
+    #[test]
+    fn rejects_closure_free_count_disagreeing_with_debug_info() {
+        // OpClosure claims 1 free value, but the function's debug entry lists
+        // no free names: one of the two sites is lying about the layout.
+        let main = [Opcode::OpClosure as u8, 0, 0, 1];
+        let constants = [1, TAG_FUNCTION, 0, 0, 0, 0];
+        let debug = [0, 0, 0, 1, 0, 0, 0, 0];
+        let blob = raw_file(FLAG_HAS_DEBUG_INFO, &main, &constants, &debug);
+        assert_eq!(
+            read_bytecode(&blob),
+            Err(SnapshotError::DebugFreeCountMismatch {
+                constant_index: 0,
+                operand: 1,
+                free_names: 0
+            })
+        );
     }
 
     // Fuzz-lite (design doc §8): reading arbitrarily truncated or corrupted

@@ -46,10 +46,23 @@ pub struct PcSpan {
     pub span: Span,
 }
 
+/// One named slot in a frame's locals or the VM's globals.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BindingDebugInfo {
+    pub name: String,
+    pub slot: usize,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugInfo {
     pub pc_spans: Vec<PcSpan>,
+    /// Parameters (`this` first for methods) then `let`s, strictly increasing
+    /// by slot. Empty for main, whose bindings are the globals.
+    pub local_bindings: Vec<BindingDebugInfo>,
+    /// Captured names aligned with `GcClosure.free` / `OpGetFree` indices.
+    pub free_names: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -672,6 +685,19 @@ impl Compiler {
         Ok(symbol)
     }
 
+    /// Global slots in slot order, one entry per definition — a rebound name
+    /// appears once for every slot it ever occupied.
+    pub fn global_bindings(&self) -> Vec<BindingDebugInfo> {
+        self.symbol_table
+            .global_definitions()
+            .iter()
+            .map(|symbol| BindingDebugInfo {
+                name: symbol.name.clone(),
+                slot: symbol.index,
+            })
+            .collect()
+    }
+
     /// Kept infallible for the published 1.1.0 signature. Prefer
     /// [`Compiler::try_add_constant`], which rejects a pool too large for
     /// `OpConst`'s u16 operand instead of handing back an index that truncates.
@@ -939,7 +965,24 @@ impl Compiler {
 
     fn leave_scope(&mut self) -> ScopedInstructions {
         let instructions = self.current_instruction().clone();
-        let debug_info = self.current_debug_info().clone();
+        let mut debug_info = self.current_debug_info().clone();
+        // The scope's definition ledger is final here: `definitions[i].index == i`,
+        // so the copied bindings come out strictly increasing by slot.
+        debug_info.local_bindings = self
+            .symbol_table
+            .definitions
+            .iter()
+            .map(|symbol| BindingDebugInfo {
+                name: symbol.name.clone(),
+                slot: symbol.index,
+            })
+            .collect();
+        debug_info.free_names = self
+            .symbol_table
+            .free_symbols
+            .iter()
+            .map(|symbol| symbol.name.clone())
+            .collect();
         self.scopes.pop();
         self.scope_index -= 1;
         let s = self.symbol_table.outer.as_ref().unwrap().as_ref().clone();
