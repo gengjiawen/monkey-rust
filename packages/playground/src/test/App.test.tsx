@@ -31,6 +31,7 @@ const {
   highlightRangeMock,
   highlightRangesMock,
   clearHighlightMock,
+  runLintMock,
   formatMock,
   minifyMock,
   sourceEditorHooks,
@@ -52,6 +53,7 @@ const {
   highlightRangeMock: vi.fn(),
   highlightRangesMock: vi.fn(),
   clearHighlightMock: vi.fn(),
+  runLintMock: vi.fn(async () => {}),
   formatMock: vi.fn(),
   minifyMock: vi.fn(),
   // The mock editor below is a plain <textarea>, which cannot reproduce every
@@ -113,12 +115,14 @@ vi.mock('../Editor', () => ({
       highlightRange(): void
       highlightRanges(): void
       clearHighlight(): void
+      runLint(): Promise<void>
     }>
   ) {
     useImperativeHandle(ref, () => ({
       highlightRange: highlightRangeMock,
       highlightRanges: highlightRangesMock,
       clearHighlight: clearHighlightMock,
+      runLint: runLintMock,
     }))
 
     if (!extra?.readOnly) {
@@ -422,6 +426,7 @@ beforeEach(() => {
   highlightRangeMock.mockClear()
   highlightRangesMock.mockClear()
   clearHighlightMock.mockClear()
+  runLintMock.mockClear()
   sourceEditorHooks.onChange = undefined
   sourceEditorHooks.onSelectionChange = undefined
   outputEditorHooks.onSelectionChange = undefined
@@ -434,6 +439,41 @@ describe('Examples', () => {
     expect(screen.getByLabelText('Source editor')).toHaveValue(
       'let a = 1 + 1;\nprint(a)\n'
     )
+  })
+
+  it('loads the Lint demo snippet from the dropdown', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Lint demo' }))
+
+    expect(screen.getByLabelText('Source editor')).toHaveValue(
+      'let unused = 1;   // no-unused-let\n' +
+        'let s = "hi";\n' +
+        'len(s, s);        // builtin-arity\n' +
+        '{1: "a", 1: "b"}; // no-duplicate-hash-key\n' +
+        'if (true) { puts(s); } // no-constant-condition\n' +
+        'puts(1 + "a");    // no-literal-type-mismatch\n' +
+        'let greet = fn(name, extra) { puts(name); }; // no-unused-param\n' +
+        'greet("hello", 2);\n' +
+        '// no-shadowed-builtin + no-unreachable-code:\n' +
+        'let last = fn() { return s; puts("nope"); };\n' +
+        'last();\n' +
+        '42;               // no-unused-expression\n' +
+        'puts(s);\n'
+    )
+  })
+})
+
+describe('Lint', () => {
+  it('lints the source editor when the toolbar button is pressed', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Lint' }))
+
+    expect(runLintMock).toHaveBeenCalledTimes(1)
   })
 })
 

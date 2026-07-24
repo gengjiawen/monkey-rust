@@ -810,7 +810,10 @@ pub fn parse_ast_lossless_json_string(input: &str) -> Result<String, ParseErrors
     Ok(serde_json::to_string_pretty(&ast).expect("AST serialization should not fail"))
 }
 
-fn stringify_integer_literals(value: &mut serde_json::Value) {
+/// Rewrite every `Integer` literal's `raw` field from a JSON number to a
+/// decimal string so JavaScript consumers keep the full signed 64-bit range.
+/// Shared with the wasm `analyze_lossless` envelope.
+pub fn stringify_integer_literals(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Array(values) => {
             for value in values {

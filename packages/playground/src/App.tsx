@@ -111,6 +111,25 @@ let b = a + 1;
 print(a)
 `.trimStart(),
   },
+  {
+    // Trips all nine lint rules; press Lint to see the diagnostics.
+    label: 'Lint demo',
+    code: `
+let unused = 1;   // no-unused-let
+let s = "hi";
+len(s, s);        // builtin-arity
+{1: "a", 1: "b"}; // no-duplicate-hash-key
+if (true) { puts(s); } // no-constant-condition
+puts(1 + "a");    // no-literal-type-mismatch
+let greet = fn(name, extra) { puts(name); }; // no-unused-param
+greet("hello", 2);
+// no-shadowed-builtin + no-unreachable-code:
+let last = fn() { return s; puts("nope"); };
+last();
+42;               // no-unused-expression
+puts(s);
+`.trimStart(),
+  },
 ]
 
 type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot' | 'arm64' | 'minify'
@@ -376,6 +395,10 @@ function App() {
     }
   }, [code, compileCode, invalidateSnapshot])
 
+  const runLint = useCallback(() => {
+    void editorRef.current?.runLint()
+  }, [])
+
   useEffect(() => {
     debouncedCompile(code)
   }, [code, debouncedCompile])
@@ -604,6 +627,9 @@ function App() {
             <Button size="2" onClick={formatCode} loading={isFormatting}>
               Format
             </Button>
+            <Button size="2" onClick={runLint}>
+              Lint
+            </Button>
             <Select.Root
               size="2"
               value={String(snippetIndex)}
@@ -636,6 +662,7 @@ function App() {
             onSelectionChange={setSelection}
             vimMode={vimMode}
             fill
+            lint
           />
         </div>
       </div>

@@ -1,0 +1,49 @@
+{
+  "name": "@gengjiawen/monkey-lint",
+  "version": "1.1.0",
+  "description": "A static linter for the Monkey programming language",
+  "main": "dist/node.js",
+  "browser": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "monkey-lint": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && esbuild src/index.ts --bundle --format=esm --platform=browser --target=es2020 --external:@gengjiawen/monkey-wasm --outfile=dist/index.mjs",
+    "test": "vitest run",
+    "test:browser": "node test/browser-smoke.mjs",
+    "test:node": "node test/node-smoke.cjs",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "monkey",
+    "linter",
+    "lint",
+    "diagnostics"
+  ],
+  "author": "gengjiawen <technicalcute@gmail.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gengjiawen/monkey-rust"
+  },
+  "dependencies": {
+    "@gengjiawen/monkey-wasm": "workspace:^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.0.0",
+    "vite": "^8.1.4",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.10"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

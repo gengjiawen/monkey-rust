@@ -4,8 +4,8 @@
 
 extern crate wasm_bindgen_test;
 use monkey_wasm::{
-    compile_to_arm64, compile_to_snapshot, parse, parse_lossless, run_gc_with_report, run_snapshot,
-    run_snapshot_with_output,
+    analyze_lossless, compile_to_arm64, compile_to_snapshot, parse, parse_lossless,
+    run_gc_with_report, run_snapshot, run_snapshot_with_output,
 };
 use serde_json::Value;
 use wasm_bindgen_test::*;
@@ -23,6 +23,21 @@ fn lossless_parse_preserves_i64_literals_as_strings() {
         serde_json::from_str(&parse_lossless("[9007199254740993, 9223372036854775807]")).unwrap();
     assert_eq!(ast["Program"]["body"][0]["elements"][0]["raw"], "9007199254740993");
     assert_eq!(ast["Program"]["body"][0]["elements"][1]["raw"], "9223372036854775807");
+}
+
+#[wasm_bindgen_test]
+fn lossless_analysis_rejects_uninitialized_self_reference_but_allows_recursion() {
+    let invalid: Value = serde_json::from_str(&analyze_lossless("let x = x;")).unwrap();
+    assert_eq!(invalid["status"], "error");
+    assert_eq!(invalid["stage"], "validation");
+    assert_eq!(invalid["span"]["start"], 8);
+    assert_eq!(invalid["span"]["end"], 9);
+
+    let recursive: Value = serde_json::from_str(&analyze_lossless(
+        "let f = fn(n) { if (n == 0) { 0 } else { f(n - 1) } }; f(1);",
+    ))
+    .unwrap();
+    assert_eq!(recursive["status"], "ok");
 }
 
 fn run_gc(source: &str) -> Value {

@@ -63,8 +63,9 @@ impl Validator {
                     } => name.clone(),
                     _ => unreachable!("parser only creates let statements with identifiers"),
                 };
+                self.validate_expression(&statement.expr)?;
                 self.scopes.last_mut().unwrap().insert(name);
-                self.validate_expression(&statement.expr)
+                Ok(())
             }
             Statement::Return(statement) => {
                 if self.callable_kinds.last() == Some(&CallableKind::Constructor) {
@@ -125,13 +126,19 @@ impl Validator {
 
     fn validate_function(&mut self, function: &FunctionDeclaration) -> Result<(), ValidationError> {
         self.callable_kinds.push(CallableKind::Function);
-        self.scopes.push(
-            function
-                .params
-                .iter()
-                .map(|parameter| parameter.name.clone())
-                .collect(),
-        );
+        let mut scope = function
+            .params
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .collect::<HashSet<_>>();
+        if !function.name.is_empty() {
+            // A directly let-bound function gets its binding name from the
+            // parser. The compiler exposes that name only inside the function
+            // body, which permits recursion without exposing an uninitialized
+            // let binding to the initializer as a whole.
+            scope.insert(function.name.clone());
+        }
+        self.scopes.push(scope);
         let result = self.validate_statements(&function.body.body);
         self.scopes.pop();
         self.callable_kinds.pop();
@@ -264,5 +271,21 @@ let box = new Box(1);"#,
             .contains("undefined variable 'B'"));
         validate("class A { make() { new A(); } }").unwrap();
         validate("len([])").unwrap();
+    }
+
+    #[test]
+    fn let_initializer_sees_only_previous_bindings_and_named_function_self() {
+        assert!(validate("let x = x;")
+            .unwrap_err()
+            .message
+            .contains("undefined variable 'x'"));
+
+        validate("let x = 1; let x = x + 1; x;").unwrap();
+        validate("let f = fn(n) { if (n == 0) { 0 } else { f(n - 1) } }; f(1);").unwrap();
+
+        assert!(validate("let f = if (true) { fn() { f(); } };")
+            .unwrap_err()
+            .message
+            .contains("undefined variable 'f'"));
     }
 }

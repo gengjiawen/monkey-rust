@@ -17,6 +17,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 monkey-parser = { path = "../parser", version = "1.0.0" }
+monkey-object = { path = "../object", version = "1.0.0" }
 monkey-compiler = { path = "../compiler", version = "1.0.0" }
 monkey-gc = { path = "../gc", version = "1.0.0" }
 monkey-asm = { path = "../asm", version = "1.0.0" }

@@ -46,6 +46,7 @@ async function createWasmBindings(): Promise<MonkeyWasm> {
   return {
     parse: bindings.parse,
     parse_lossless: bindings.parse_lossless,
+    analyze_lossless: bindings.analyze_lossless,
     compile: bindings.compile,
     compile_detail: bindings.compile_detail,
     compile_with_debug: bindings.compile_with_debug,

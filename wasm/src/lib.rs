@@ -6,8 +6,11 @@ use compiler::snapshot::{read_bytecode, write_bytecode};
 use compiler::snapshot_layout::describe_bytecode;
 use monkey_asm::emitter::AsmDialect;
 use monkey_asm::lower::lower_node;
+use object::builtins::BuiltIns;
+use parser::ast::Node;
 use parser::parse as parser_pase;
-use parser::{parse_ast_json_string, parse_ast_lossless_json_string};
+use parser::validation::validate_program;
+use parser::{parse_ast_json_string, parse_ast_lossless_json_string, stringify_integer_literals};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::throw_str;
 
@@ -37,6 +40,67 @@ pub fn parse_lossless(input: &str) -> String {
         Ok(node) => node,
         Err(e) => throw_str(format!("parse error: {}", e[0]).as_str()),
     }
+}
+
+/// Parse *and* validate Monkey source, returning a tagged JSON envelope the
+/// linter consumes. Unlike [`parse_lossless`], this runs `parser::validation`
+/// (the semantic pass the interpreter and compiler share) so callers see
+/// undefined-variable, misplaced-`this`, and constructor-return errors — not
+/// just syntax errors. `analyze` is the linter's single entry into the Rust
+/// side: TypeScript never re-implements parse or validation.
+///
+/// Failures are data in the envelope, not JavaScript exceptions:
+/// `{ status: "error", stage, message, span? }`. Parser errors are plain
+/// strings without a span; validation errors carry a UTF-8 byte span. On
+/// success the AST is serialized losslessly (i64 literals as decimal strings),
+/// matching [`parse_lossless`]: `{ status: "ok", program }`.
+///
+/// Standalone source is validated against the same predefined globals a fresh
+/// interpreter/compiler sees — the full builtin table (`len`, `puts`, `first`,
+/// `last`, `rest`, `push`, `print`).
+#[wasm_bindgen]
+pub fn analyze_lossless(input: &str) -> String {
+    set_panic_hook();
+
+    let envelope = match analyze_envelope(input) {
+        Ok(program) => serde_json::json!({
+            "status": "ok",
+            "program": program,
+        }),
+        Err((stage, message, span)) => serde_json::json!({
+            "status": "error",
+            "stage": stage,
+            "message": message,
+            "span": span.map(|(start, end)| serde_json::json!({ "start": start, "end": end })),
+        }),
+    };
+    serde_json::to_string(&envelope).expect("analyze envelope serialization should not fail")
+}
+
+type AnalyzeFailure = (&'static str, String, Option<(usize, usize)>);
+
+fn analyze_envelope(input: &str) -> Result<serde_json::Value, AnalyzeFailure> {
+    let node = parser_pase(input).map_err(|errors| {
+        let message = errors
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "unknown parse error".to_string());
+        ("parse", message, None)
+    })?;
+    let Node::Program(program) = &node else {
+        unreachable!("parse always returns a Program node");
+    };
+
+    let predefined = BuiltIns
+        .iter()
+        .map(|builtin| builtin.name)
+        .collect::<Vec<_>>();
+    validate_program(program, &predefined)
+        .map_err(|error| ("validation", error.message, Some((error.span.start, error.span.end))))?;
+
+    let mut ast = serde_json::to_value(program).expect("AST serialization should not fail");
+    stringify_integer_literals(&mut ast);
+    Ok(ast)
 }
 
 #[wasm_bindgen]

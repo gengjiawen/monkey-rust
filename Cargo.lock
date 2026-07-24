@@ -313,6 +313,7 @@ dependencies = [
  "monkey-asm",
  "monkey-compiler",
  "monkey-gc",
+ "monkey-object",
  "monkey-parser",
  "serde_json",
  "wasm-bindgen",
