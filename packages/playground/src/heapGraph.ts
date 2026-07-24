@@ -29,7 +29,7 @@ const FATE_TEXT: Record<FateClass, string> = {
  * Escape text for use inside a quoted mermaid label. `#` must go first so the
  * `#name;` entities produced by later replacements survive untouched.
  */
-function escapeMermaidText(text: string): string {
+export function escapeMermaidText(text: string): string {
   return text
     .replace(/#/g, '#35;')
     .replace(/&/g, '#amp;')
@@ -38,7 +38,7 @@ function escapeMermaidText(text: string): string {
     .replace(/>/g, '#gt;')
 }
 
-function mergedEdgeLabel(labels: string[]): string {
+export function mergedEdgeLabel(labels: string[]): string {
   if (labels.length <= 2) {
     return labels.join(', ')
   }
