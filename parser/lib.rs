@@ -97,6 +97,7 @@ impl<'a> Parser<'a> {
         match self.current_token.kind {
             TokenKind::LET => self.parse_let_statement(),
             TokenKind::RETURN => self.parse_return_statement(),
+            TokenKind::DEBUGGER => self.parse_debugger_statement(),
             TokenKind::CLASS if self.block_depth == 0 => self.parse_class_declaration(),
             TokenKind::CLASS => Err("class declarations are only allowed at top level".to_string()),
             _ => self.parse_expression_statement(),
@@ -159,6 +160,22 @@ impl<'a> Parser<'a> {
 
         return Ok(Statement::Return(ReturnStatement {
             argument: value,
+            span: Span {
+                start,
+                end,
+            },
+        }));
+    }
+
+    fn parse_debugger_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.current_token.span.start;
+
+        if self.peek_token_is(&TokenKind::SEMICOLON) {
+            self.next_token();
+        }
+        let end = self.current_token.span.end;
+
+        return Ok(Statement::Debugger(DebuggerStatement {
             span: Span {
                 start,
                 end,

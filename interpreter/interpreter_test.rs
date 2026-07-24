@@ -100,6 +100,25 @@ mod tests {
     }
 
     #[test]
+    fn test_debugger_statements_are_completion_transparent() {
+        let test_case = [
+            ("debugger;", "null"),
+            ("debugger; debugger;", "null"),
+            ("1; debugger;", "1"),
+            ("debugger; 1;", "1"),
+            ("let a = 5; debugger; a;", "5"),
+            ("if (true) { debugger; }", "null"),
+            ("if (true) { 10; debugger; }", "10"),
+            ("fn() { debugger; }()", "null"),
+            ("fn() { 1; debugger; }()", "1"),
+            ("fn() { let x = 1; debugger; }()", "null"),
+            ("fn() { return 2; debugger; }()", "2"),
+            ("fn(x) { if (x) { 1; debugger; } }(true)", "1"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_return_statements() {
         let test_case = [
             ("return 10;", "10"),

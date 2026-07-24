@@ -182,6 +182,16 @@ impl BytecodeDisplayBuilder {
     }
 }
 
+/// Splits a statement list at its final run of `debugger` statements, which
+/// are completion-transparent and execute after the block's value is decided.
+fn split_trailing_debuggers(body: &[Statement]) -> (&[Statement], &[Statement]) {
+    let split = body
+        .iter()
+        .rposition(|statement| !matches!(statement, Statement::Debugger(_)))
+        .map_or(0, |index| index + 1);
+    body.split_at(split)
+}
+
 fn parse_instruction_pc(line: &str) -> Option<usize> {
     let trimmed = line.trim_start();
     if trimmed.len() < 4 {
@@ -405,6 +415,10 @@ impl Compiler {
                 self.emit_with_span(OpPop, &[], &statement.span);
                 Ok(())
             }
+            Statement::Debugger(statement) => {
+                self.emit_with_span(OpDebugger, &[], &statement.span);
+                Ok(())
+            }
         }
     }
 
@@ -539,13 +553,7 @@ impl Compiler {
                 for param in f.params.iter() {
                     self.define_symbol(param.name.clone())?;
                 }
-                self.compile_block_statement(&f.body)?;
-                if self.last_instruction_is(OpPop) {
-                    self.replace_last_pop_with_return();
-                }
-                if !(self.last_instruction_is(OpReturnValue)) {
-                    self.emit_with_span(OpReturn, &[], &function_span);
-                }
+                self.compile_function_body(&f.body, &function_span)?;
                 let num_locals = self.symbol_table.num_definitions;
                 let free_symbols = self.symbol_table.free_symbols.clone();
                 let scoped_instructions = self.leave_scope();
@@ -705,14 +713,65 @@ impl Compiler {
         &mut self,
         block_statement: &BlockStatement,
     ) -> Result<(), CompileError> {
+        // Trailing `debugger` statements are completion-transparent: the
+        // block's value (or null) is decided before they execute, and
+        // OpDebugger leaves the stack untouched, so a kept value stays on top.
+        let (leading, trailing_debuggers) = split_trailing_debuggers(&block_statement.body);
         let block_start = self.current_instruction().data.len();
-        self.compile_block_statement(block_statement)?;
+        for stmt in leading {
+            self.compile_stmt(stmt)?;
+        }
         // A block in expression position must leave one value on every
         // fallthrough path. Statement-only and empty blocks evaluate to null.
-        if self.current_instruction().data.len() > block_start && self.last_instruction_is(OpPop) {
+        let has_value =
+            self.current_instruction().data.len() > block_start && self.last_instruction_is(OpPop);
+        if has_value {
             self.remove_last_pop();
-        } else {
+        }
+        for stmt in trailing_debuggers {
+            self.compile_stmt(stmt)?;
+        }
+        if !has_value {
             self.emit_with_span(OpNull, &[], &block_statement.span);
+        }
+        Ok(())
+    }
+
+    /// Compiles a function or method body plus its implicit return. Trailing
+    /// `debugger` statements must not break the "last expression statement is
+    /// the return value" rule, so the value is unpopped before they execute
+    /// and returned after them.
+    fn compile_function_body(
+        &mut self,
+        body: &BlockStatement,
+        span: &Span,
+    ) -> Result<(), CompileError> {
+        let (leading, trailing_debuggers) = split_trailing_debuggers(&body.body);
+        if trailing_debuggers.is_empty() {
+            self.compile_block_statement(body)?;
+            if self.last_instruction_is(OpPop) {
+                self.replace_last_pop_with_return();
+            }
+            if !(self.last_instruction_is(OpReturnValue)) {
+                self.emit_with_span(OpReturn, &[], span);
+            }
+            return Ok(());
+        }
+
+        for stmt in leading {
+            self.compile_stmt(stmt)?;
+        }
+        let produced_value = self.last_instruction_is(OpPop);
+        if produced_value {
+            self.remove_last_pop();
+        }
+        for stmt in trailing_debuggers {
+            self.compile_stmt(stmt)?;
+        }
+        if produced_value {
+            self.emit_with_span(OpReturnValue, &[], span);
+        } else {
+            self.emit_with_span(OpReturn, &[], span);
         }
         Ok(())
     }
@@ -734,20 +793,17 @@ impl Compiler {
         for parameter in &method.params {
             self.define_symbol(parameter.name.clone())?;
         }
-        self.compile_block_statement(&method.body)?;
 
         match method.kind {
             MethodKind::Constructor => {
+                // A trailing debugger needs no special handling here: the
+                // constructor's `this` return is appended after the body.
+                self.compile_block_statement(&method.body)?;
                 self.emit_with_span(OpGetLocal, &[0], &method_span);
                 self.emit_with_span(OpReturnValue, &[], &method_span);
             }
             MethodKind::Method => {
-                if self.last_instruction_is(OpPop) {
-                    self.replace_last_pop_with_return();
-                }
-                if !self.last_instruction_is(OpReturnValue) {
-                    self.emit_with_span(OpReturn, &[], &method_span);
-                }
+                self.compile_function_body(&method.body, &method_span)?;
             }
         }
 

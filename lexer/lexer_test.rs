@@ -194,4 +194,17 @@ if (5 < 10) {
             );
         }
     }
+
+    #[test]
+    fn debugger_keyword_boundaries_remain_identifiers() {
+        let mut lexer = Lexer::new("debugger; debuggers");
+        assert_eq!(lexer.next_token().kind, TokenKind::DEBUGGER);
+        assert_eq!(lexer.next_token().kind, TokenKind::SEMICOLON);
+        assert_eq!(
+            lexer.next_token().kind,
+            TokenKind::IDENTIFIER {
+                name: "debuggers".to_string(),
+            }
+        );
+    }
 }

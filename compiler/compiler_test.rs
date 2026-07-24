@@ -443,6 +443,61 @@ mod tests {
     }
 
     #[test]
+    fn debugger_statements_are_completion_transparent() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "debugger;",
+                expected_constants: vec![],
+                expected_instructions: vec![make_instructions(OpDebugger, &[])],
+            },
+            CompilerTestCase {
+                input: "1; debugger;",
+                expected_constants: vec![Object::Integer(1)],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpPop, &[]),
+                    make_instructions(OpDebugger, &[]),
+                ],
+            },
+            // The trailing debugger sits between the arm value and the jump, so
+            // the arm still completes with 1.
+            CompilerTestCase {
+                input: "if (true) { 1; debugger; }; 3333;",
+                expected_constants: vec![Object::Integer(1), Object::Integer(3333)],
+                expected_instructions: vec![
+                    make_instructions(OpTrue, &[]),
+                    make_instructions(OpJumpNotTruthy, &[11]),
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpDebugger, &[]),
+                    make_instructions(OpJump, &[12]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpPop, &[]),
+                    make_instructions(OpConst, &[1]),
+                    make_instructions(OpPop, &[]),
+                ],
+            },
+            // A debugger-only arm produces no value, so the arm completes with null.
+            CompilerTestCase {
+                input: "if (true) { debugger; }; 3333;",
+                expected_constants: vec![Object::Integer(3333)],
+                expected_instructions: vec![
+                    make_instructions(OpTrue, &[]),
+                    make_instructions(OpJumpNotTruthy, &[9]),
+                    make_instructions(OpDebugger, &[]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpJump, &[10]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpPop, &[]),
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpPop, &[]),
+                ],
+            },
+        ];
+
+        run_compiler_test(tests);
+    }
+
+    #[test]
     fn test_global_constants() {
         let tests = vec![
             CompilerTestCase {

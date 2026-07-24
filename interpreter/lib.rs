@@ -31,6 +31,11 @@ pub fn eval(node: Node, env: &Env) -> Result<Rc<Object>, EvalError> {
 fn eval_block_statements(statements: &Vec<Statement>, env: &Env) -> Result<Rc<Object>, EvalError> {
     let mut result = Rc::new(Object::Null);
     for statement in statements {
+        // `debugger` is completion-transparent: it neither produces nor
+        // clears the surrounding block's result.
+        if matches!(statement, Statement::Debugger(_)) {
+            continue;
+        }
         let val = eval_statement(statement, &Rc::clone(env))?;
         match *val {
             Object::ReturnValue(_) => return Ok(val),
@@ -69,6 +74,7 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
             return Ok(Rc::new(Object::Null));
         }
         Statement::Class(class) => eval_class_declaration(class, env),
+        Statement::Debugger(_) => Ok(Rc::new(Object::Null)),
         Statement::SetProperty(statement) => {
             let receiver = eval_expression(&statement.object, env)?;
             let value = eval_expression(&statement.value, env)?;

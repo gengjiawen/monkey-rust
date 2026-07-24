@@ -329,6 +329,10 @@ impl VM {
                     self.current_frame().ip += 1;
                     self.execute_new(num_args)?;
                 }
+                Opcode::OpDebugger => {
+                    // Recording debugger snapshots is the GC VM's job; here
+                    // the statement is a no-op with no stack effect.
+                }
             }
         }
         Ok(())

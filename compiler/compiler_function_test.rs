@@ -104,6 +104,101 @@ mod tests {
     }
 
     #[test]
+    fn trailing_debugger_keeps_the_functions_implicit_return() {
+        let tests = vec![
+            // The trailing debugger runs after the return value is decided, so
+            // the value stays on the stack across it.
+            CompilerTestCase {
+                input: "fn() { 1; debugger; }",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpDebugger, &[]),
+                            make_instructions(OpReturnValue, &[]),
+                        ])
+                        .data,
+                        num_locals: 0,
+                        num_parameters: 0,
+                    })),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpPop, &[0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "fn() { let x = 1; debugger; }",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpSetLocal, &[0]),
+                            make_instructions(OpDebugger, &[]),
+                            make_instructions(OpReturn, &[]),
+                        ])
+                        .data,
+                        num_locals: 1,
+                        num_parameters: 0,
+                    })),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpPop, &[0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "fn() { debugger; }",
+                expected_constants: vec![Object::CompiledFunction(Rc::from(
+                    object::CompiledFunction {
+                        name: String::new(),
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpDebugger, &[]),
+                            make_instructions(OpReturn, &[]),
+                        ])
+                        .data,
+                        num_locals: 0,
+                        num_parameters: 0,
+                    },
+                ))],
+                expected_instructions: vec![
+                    make_instructions(OpClosure, &[0, 0]),
+                    make_instructions(OpPop, &[0]),
+                ],
+            },
+            // After an explicit return the debugger is dead code; the body still
+            // ends with a fallback OpReturn.
+            CompilerTestCase {
+                input: "fn() { return 1; debugger; }",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::CompiledFunction(Rc::from(object::CompiledFunction {
+                        name: String::new(),
+                        instructions: concat_instructions(&vec![
+                            make_instructions(OpConst, &[0]),
+                            make_instructions(OpReturnValue, &[]),
+                            make_instructions(OpDebugger, &[]),
+                            make_instructions(OpReturn, &[]),
+                        ])
+                        .data,
+                        num_locals: 0,
+                        num_parameters: 0,
+                    })),
+                ],
+                expected_instructions: vec![
+                    make_instructions(OpClosure, &[1, 0]),
+                    make_instructions(OpPop, &[0]),
+                ],
+            },
+        ];
+        run_compiler_test(tests);
+    }
+
+    #[test]
     fn test_function_calls() {
         let tests = vec![
             CompilerTestCase {

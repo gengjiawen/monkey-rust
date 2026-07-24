@@ -613,6 +613,10 @@ impl GcVM {
                     self.current_frame().ip += 1;
                     self.execute_new(num_args)?;
                 }
+                Opcode::OpDebugger => {
+                    // No stack effect. Snapshot recording lands here once the
+                    // debugger runtime ships; until then it is a no-op.
+                }
             }
         }
         Ok(())

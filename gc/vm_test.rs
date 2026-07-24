@@ -417,6 +417,32 @@ mod tests {
     }
 
     #[test]
+    fn test_debugger_is_a_no_op_with_transparent_completion() {
+        run_gc_vm_tests(vec![
+            VmTestCase {
+                input: "1; debugger;",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { 1; debugger; }()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { let x = 1; debugger; }()",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "fn(x) { if (x) { 1; debugger; } }(true)",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "class Counter { constructor(start) { this.count = start; debugger; } value() { this.count; debugger; } } let counter = new Counter(41); counter.value() + 1;",
+                expected: Object::Integer(42),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_calling_functions_with_bindings() {
         run_gc_vm_tests(vec![
             VmTestCase {

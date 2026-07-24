@@ -30,6 +30,7 @@ const EQUIVALENCE_PROGRAMS: &[(&str, &str)] = &[
         r#"let h = {"a": 1, "b": 2}; let arr = push([h["a"], h["b"]], 3); first(arr) + last(arr) + len(arr)"#,
     ),
     ("string concat", r#""hello" + " " + "world""#),
+    ("debugger transparency", "let f = fn(n) { n * 2; debugger; }; debugger; f(21)"),
 ];
 
 #[test]

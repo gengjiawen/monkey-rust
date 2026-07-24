@@ -60,6 +60,7 @@ pub enum Statement {
     Return(ReturnStatement),
     Class(ClassDeclaration),
     SetProperty(SetPropertyStatement),
+    Debugger(DebuggerStatement),
     Expr(Expression),
 }
 
@@ -111,6 +112,12 @@ pub struct ReturnStatement {
     pub span: Span,
 }
 
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct DebuggerStatement {
+    pub span: Span,
+}
+
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -145,6 +152,7 @@ impl fmt::Display for Statement {
             Statement::SetProperty(set) => {
                 write!(f, "{}.{} = {};", set.object, set.property, set.value)
             }
+            Statement::Debugger(_) => write!(f, "debugger;"),
             Statement::Expr(expr) => write!(f, "{}", expr),
         }
     }
@@ -362,6 +370,7 @@ impl Statement {
             Statement::Return(statement) => &statement.span,
             Statement::Class(statement) => &statement.span,
             Statement::SetProperty(statement) => &statement.span,
+            Statement::Debugger(statement) => &statement.span,
             Statement::Expr(expression) => expression.span(),
         }
     }

@@ -374,6 +374,11 @@ fn e2e_programs_behave_like_the_interpreter() {
             "let f = fn(x) { puts(x); x };\nputs(f(1) < f(2));",
             "1\n2\ntrue\n",
         ),
+        (
+            "debugger_transparent",
+            "let f = fn(n) { n * 2; debugger; };\ndebugger;\nputs(f(21));",
+            "42\n",
+        ),
     ];
     for (name, source, expected) in corpus {
         let output = toolchain.cli_run(name, source, false);
