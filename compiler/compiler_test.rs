@@ -792,4 +792,63 @@ mod tests {
         let mut next = Compiler::new_with_state(first.symbol_table, first.constants);
         next.compile(&parse("answer + 1;").unwrap()).unwrap();
     }
+
+    #[test]
+    fn rejects_too_many_locals() {
+        // OpGetLocal/OpSetLocal use a u8 operand; index 256 would truncate.
+        let lets = (0..=256)
+            .map(|i| format!("let v{i} = {i};"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let input = format!("let f = fn() {{ {lets} v0 }}; f()");
+        let mut compiler = Compiler::new();
+        let err = compiler.compile(&parse(&input).unwrap()).unwrap_err();
+        assert!(
+            err.contains("too many locals") && err.contains("256"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn accepts_max_locals() {
+        // Indices 0..=255 still fit in a u8 operand.
+        let lets = (0..=255)
+            .map(|i| format!("let v{i} = {i};"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let input = format!("let f = fn() {{ {lets} v255 }}; f()");
+        let mut compiler = Compiler::new();
+        compiler.compile(&parse(&input).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn rejects_too_many_constants() {
+        let mut compiler = Compiler::new();
+        for i in 0..=u16::MAX as i64 {
+            compiler.add_constant(Object::Integer(i)).unwrap();
+        }
+        let err = compiler.add_constant(Object::Integer(0)).unwrap_err();
+        assert!(
+            err.contains("too many constants"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_call_arguments() {
+        let args = (0..256)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let input = format!("let f = fn() {{ 1 }}; f({args})");
+        let mut compiler = Compiler::new();
+        let err = compiler.compile(&parse(&input).unwrap()).unwrap_err();
+        assert!(
+            err.contains("too many call arguments"),
+            "unexpected error: {}",
+            err
+        );
+    }
 }

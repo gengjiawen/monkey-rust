@@ -234,6 +234,35 @@ pub struct EmittedInstruction {
 
 type CompileError = String;
 
+/// Bytecode operand widths are fixed (u8 / u16). Without these checks,
+/// `make_instructions` silently truncates oversized operands and the VM
+/// reads the wrong slot/constant — a silent miscompile.
+fn ensure_u8_operand(value: usize, what: &str) -> Result<(), CompileError> {
+    if value > u8::MAX as usize {
+        Err(format!(
+            "too many {}: {} exceeds limit of {}",
+            what,
+            value,
+            u8::MAX
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn ensure_u16_operand(value: usize, what: &str) -> Result<(), CompileError> {
+    if value > u16::MAX as usize {
+        Err(format!(
+            "too many {}: {} exceeds limit of {}",
+            what,
+            value,
+            u16::MAX
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CallableKind {
     Function,
@@ -318,9 +347,7 @@ impl Compiler {
                 // environment. Named recursion is provided by Function scope
                 // inside the function body, not by an uninitialized slot.
                 self.compile_expr(&let_statement.expr)?;
-                let symbol = self
-                    .symbol_table
-                    .define(let_statement.identifier.kind.to_string());
+                let symbol = self.define_symbol(let_statement.identifier.kind.to_string())?;
                 if symbol.scope == SymbolScope::Global {
                     self.emit_with_span(Opcode::OpSetGlobal, &[symbol.index], &let_statement.span);
                 } else {
@@ -342,13 +369,14 @@ impl Compiler {
                 return Ok(());
             }
             Statement::Class(class) => {
-                let symbol = self.symbol_table.define(class.name.name.clone());
-                let class_name = self.add_constant(Object::String(class.name.name.clone()));
+                let symbol = self.define_symbol(class.name.name.clone())?;
+                let class_name = self.add_constant(Object::String(class.name.name.clone()))?;
                 self.emit_with_span(OpClass, &[class_name], &class.span);
 
                 for method in &class.methods {
                     self.compile_method(&class.name.name, method)?;
-                    let method_name = self.add_constant(Object::String(method.name.name.clone()));
+                    let method_name =
+                        self.add_constant(Object::String(method.name.name.clone()))?;
                     let kind = match method.kind {
                         MethodKind::Method => 0,
                         MethodKind::Constructor => 1,
@@ -364,7 +392,8 @@ impl Compiler {
             Statement::SetProperty(statement) => {
                 self.compile_expr(&statement.object)?;
                 self.compile_expr(&statement.value)?;
-                let property = self.add_constant(Object::String(statement.property.name.clone()));
+                let property =
+                    self.add_constant(Object::String(statement.property.name.clone()))?;
                 self.emit_with_span(OpSetProperty, &[property], &statement.span);
                 self.emit_with_span(OpNull, &[], &statement.span);
                 self.emit_with_span(OpPop, &[], &statement.span);
@@ -379,7 +408,7 @@ impl Compiler {
                 let symbol = self.symbol_table.resolve(identifier.name.clone());
                 match symbol {
                     Some(symbol) => {
-                        self.load_symbol(&symbol, &identifier.span);
+                        self.load_symbol(&symbol, &identifier.span)?;
                     }
                     None => {
                         return Err(format!("Undefined variable '{}'", identifier.name));
@@ -389,7 +418,7 @@ impl Compiler {
             Expression::LITERAL(l) => match l {
                 Literal::Integer(i) => {
                     let int = Object::Integer(i.raw);
-                    let operands = vec![self.add_constant(int)];
+                    let operands = vec![self.add_constant(int)?];
                     self.emit_with_span(OpConst, &operands, &i.span);
                 }
                 Literal::Boolean(i) => {
@@ -401,13 +430,14 @@ impl Compiler {
                 }
                 Literal::String(s) => {
                     let string_object = Object::String(s.raw.clone());
-                    let operands = vec![self.add_constant(string_object)];
+                    let operands = vec![self.add_constant(string_object)?];
                     self.emit_with_span(OpConst, &operands, &s.span);
                 }
                 Literal::Array(array) => {
                     for element in array.elements.iter() {
                         self.compile_expr(element)?;
                     }
+                    ensure_u16_operand(array.elements.len(), "array elements")?;
                     self.emit_with_span(OpArray, &[array.elements.len()], &array.span);
                 }
                 Literal::Hash(hash) => {
@@ -415,7 +445,9 @@ impl Compiler {
                         self.compile_expr(key)?;
                         self.compile_expr(value)?;
                     }
-                    self.emit_with_span(OpHash, &[hash.elements.len() * 2], &hash.span);
+                    let pair_count = hash.elements.len() * 2;
+                    ensure_u16_operand(pair_count, "hash pairs")?;
+                    self.emit_with_span(OpHash, &[pair_count], &hash.span);
                 }
             },
             Expression::PREFIX(prefix) => {
@@ -473,7 +505,7 @@ impl Compiler {
                 let jump_pos = self.emit_with_span(OpJump, &[9527], &if_node.span);
 
                 let after_consequence_location = self.current_instruction().data.len();
-                self.change_operand(jump_not_truthy, after_consequence_location);
+                self.change_operand(jump_not_truthy, after_consequence_location)?;
 
                 if let Some(alternate) = &if_node.alternate {
                     self.compile_block_statement_as_value(alternate)?;
@@ -481,7 +513,7 @@ impl Compiler {
                     self.emit_with_span(OpNull, &[], &if_node.span);
                 }
                 let after_alternative_location = self.current_instruction().data.len();
-                self.change_operand(jump_pos, after_alternative_location);
+                self.change_operand(jump_pos, after_alternative_location)?;
             }
             Expression::Index(index) => {
                 self.compile_expr(&index.object)?;
@@ -496,7 +528,7 @@ impl Compiler {
                     self.symbol_table.define_function_name(f.name.clone());
                 }
                 for param in f.params.iter() {
-                    self.symbol_table.define(param.name.clone());
+                    self.define_symbol(param.name.clone())?;
                 }
                 self.compile_block_statement(&f.body)?;
                 if self.last_instruction_is(OpPop) {
@@ -510,7 +542,7 @@ impl Compiler {
                 let scoped_instructions = self.leave_scope();
                 self.callable_kinds.pop();
                 for x in free_symbols.clone() {
-                    self.load_symbol(&x, &function_span);
+                    self.load_symbol(&x, &function_span)?;
                 }
 
                 let compiled_function = Rc::from(object::CompiledFunction {
@@ -520,9 +552,11 @@ impl Compiler {
                     num_parameters: f.params.len(),
                 });
 
-                let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
+                let constant_index =
+                    self.add_constant(Object::CompiledFunction(compiled_function))?;
                 self.function_debug_info_mut()
                     .insert(constant_index, scoped_instructions.debug_info);
+                ensure_u8_operand(free_symbols.len(), "free variables")?;
                 let operands = vec![constant_index, free_symbols.len()];
                 self.emit_with_span(OpClosure, &operands, &function_span);
             }
@@ -531,6 +565,7 @@ impl Compiler {
                 for arg in fc.arguments.iter() {
                     self.compile_expr(arg)?;
                 }
+                ensure_u8_operand(fc.arguments.len(), "call arguments")?;
                 self.emit_with_span(OpCall, &[fc.arguments.len()], &fc.span);
             }
             Expression::This(this) => {
@@ -538,11 +573,11 @@ impl Compiler {
                     .symbol_table
                     .resolve("this".to_string())
                     .ok_or_else(|| "this is only available inside a method".to_string())?;
-                self.load_symbol(&symbol, &this.span);
+                self.load_symbol(&symbol, &this.span)?;
             }
             Expression::Property(property) => {
                 self.compile_expr(&property.object)?;
-                let name = self.add_constant(Object::String(property.property.name.clone()));
+                let name = self.add_constant(Object::String(property.property.name.clone()))?;
                 self.emit_with_span(OpGetProperty, &[name], &property.span);
             }
             Expression::New(new_expression) => {
@@ -552,10 +587,11 @@ impl Compiler {
                     .ok_or_else(|| {
                         format!("Undefined variable '{}'", new_expression.callee.name)
                     })?;
-                self.load_symbol(&symbol, &new_expression.callee.span);
+                self.load_symbol(&symbol, &new_expression.callee.span)?;
                 for argument in &new_expression.arguments {
                     self.compile_expr(argument)?;
                 }
+                ensure_u8_operand(new_expression.arguments.len(), "constructor arguments")?;
                 self.emit_with_span(OpNew, &[new_expression.arguments.len()], &new_expression.span);
             }
         }
@@ -563,7 +599,7 @@ impl Compiler {
         return Ok(());
     }
 
-    fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) {
+    fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) -> Result<(), CompileError> {
         match symbol.scope {
             SymbolScope::Global => {
                 self.emit_with_span(OpGetGlobal, &[symbol.index], span);
@@ -575,12 +611,15 @@ impl Compiler {
                 self.emit_with_span(OpGetBuiltin, &[symbol.index], span);
             }
             SymbolScope::Free => {
+                // Free vars are captured during resolve, outside define_symbol.
+                ensure_u8_operand(symbol.index, "free variables")?;
                 self.emit_with_span(OpGetFree, &[symbol.index], span);
             }
             SymbolScope::Function => {
                 self.emit_with_span(OpCurrentClosure, &[], span);
             }
         }
+        Ok(())
     }
 
     pub fn bytecode(&self) -> Bytecode {
@@ -592,9 +631,21 @@ impl Compiler {
         };
     }
 
-    pub fn add_constant(&mut self, obj: Object) -> usize {
+    fn define_symbol(&mut self, name: String) -> Result<Rc<Symbol>, CompileError> {
+        let symbol = self.symbol_table.define(name);
+        match symbol.scope {
+            SymbolScope::LOCAL => ensure_u8_operand(symbol.index, "locals")?,
+            SymbolScope::Global => ensure_u16_operand(symbol.index, "globals")?,
+            SymbolScope::Builtin | SymbolScope::Free | SymbolScope::Function => {}
+        }
+        Ok(symbol)
+    }
+
+    pub fn add_constant(&mut self, obj: Object) -> Result<usize, CompileError> {
+        let index = self.constants.len();
+        ensure_u16_operand(index, "constants")?;
         self.constants.push(Rc::new(obj));
-        return self.constants.len() - 1;
+        Ok(index)
     }
 
     pub fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
@@ -650,9 +701,9 @@ impl Compiler {
         };
         self.callable_kinds.push(callable_kind);
 
-        self.symbol_table.define("this".to_string());
+        self.define_symbol("this".to_string())?;
         for parameter in &method.params {
-            self.symbol_table.define(parameter.name.clone());
+            self.define_symbol(parameter.name.clone())?;
         }
         self.compile_block_statement(&method.body)?;
 
@@ -676,7 +727,7 @@ impl Compiler {
         let scoped_instructions = self.leave_scope();
         self.callable_kinds.pop();
         for symbol in &free_symbols {
-            self.load_symbol(symbol, &method_span);
+            self.load_symbol(symbol, &method_span)?;
         }
 
         let compiled_function = Rc::new(object::CompiledFunction {
@@ -685,9 +736,10 @@ impl Compiler {
             num_locals,
             num_parameters: method.params.len() + 1,
         });
-        let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
+        let constant_index = self.add_constant(Object::CompiledFunction(compiled_function))?;
         self.function_debug_info_mut()
             .insert(constant_index, scoped_instructions.debug_info);
+        ensure_u8_operand(free_symbols.len(), "free variables")?;
         self.emit_with_span(OpClosure, &[constant_index, free_symbols.len()], &method_span);
         Ok(())
     }
@@ -745,11 +797,13 @@ impl Compiler {
         self.scopes[self.scope_index].last_instruction.opcode = OpReturnValue;
     }
 
-    fn change_operand(&mut self, pos: usize, operand: usize) {
+    fn change_operand(&mut self, pos: usize, operand: usize) -> Result<(), CompileError> {
+        ensure_u16_operand(operand, "instructions")?;
         let op = Opcode::from_repr(self.current_instruction().data[pos])
             .expect("compiler emitted an unknown opcode");
         let ins = make_instructions(op, &[operand]);
         self.replace_instruction(pos, &ins);
+        Ok(())
     }
 
     fn current_instruction(&self) -> &Instructions {
