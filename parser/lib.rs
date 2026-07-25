@@ -73,6 +73,11 @@ impl<'a> Parser<'a> {
     pub fn parse_program(&mut self) -> Result<Program, ParseErrors> {
         let mut program = Program::new();
         while !self.current_token_is(&TokenKind::EOF) {
+            // a lone `;` is an empty statement, not the start of an expression
+            if self.current_token_is(&TokenKind::SEMICOLON) {
+                self.next_token();
+                continue;
+            }
             match self.parse_statement() {
                 Ok(stmt) => program.body.push(stmt),
                 Err(e) => self.errors.push(e),
@@ -432,6 +437,10 @@ impl<'a> Parser<'a> {
 
         while !self.current_token_is(&TokenKind::RBRACE) && !self.current_token_is(&TokenKind::EOF)
         {
+            if self.current_token_is(&TokenKind::SEMICOLON) {
+                self.next_token();
+                continue;
+            }
             let statement = match self.parse_statement() {
                 Ok(statement) => statement,
                 Err(error) => {
