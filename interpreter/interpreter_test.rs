@@ -21,6 +21,19 @@ mod tests {
         }
     }
 
+    fn apply_error_test(test_cases: &[(&str, &str)]) {
+        let env: Env = Rc::new(RefCell::new(Default::default()));
+        for (input, expected) in test_cases {
+            match parse(input) {
+                Ok(node) => match eval(node, &env) {
+                    Ok(evaluated) => panic!("expected `{}` to fail, got {}", input, evaluated),
+                    Err(e) => assert_eq!(&e.to_string(), expected),
+                },
+                Err(e) => panic!("parse error: {}", e[0]),
+            }
+        }
+    }
+
     #[test]
     fn test_integer_expressions() {
         let test_case = [
@@ -209,13 +222,28 @@ mod tests {
             ("push([], 1)", "[1]"),
         ];
         apply_test(&test_case);
-        // let illegal_cases = [
-        //     "len(1)",
-        //     r#"len("one", "two")"#,
-        //     "first(1)",
-        //     "last(1)",
-        //     "push(1, 1)"
-        // ];
+    }
+
+    #[test]
+    fn test_builtin_errors_stop_evaluation() {
+        let test_case = [
+            ("len(1)", "builtin len not supported for for type 1"),
+            (r#"len("one", "two")"#, "builtin len expected 1 argument, got 2"),
+            ("first(1)", "builtin first not supported for for type 1"),
+            ("last(1)", "builtin last not supported for for type 1"),
+            ("rest(1)", "builtin rest not supported for for type 1"),
+            ("push(1, 1)", "builtin push not supported for for type 1"),
+            // a failed builtin must abort the program instead of flowing on as a value
+            ("if (len(1)) { 10 } else { 20 }", "builtin len not supported for for type 1"),
+            ("len(1) == len(1)", "builtin len not supported for for type 1"),
+            ("len(1); 42", "builtin len not supported for for type 1"),
+            ("let broken = len(1); broken", "builtin len not supported for for type 1"),
+            (
+                "let identity = fn(x) { x }; identity(len(1))",
+                "builtin len not supported for for type 1",
+            ),
+        ];
+        apply_error_test(&test_case);
     }
 
     #[test]

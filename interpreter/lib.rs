@@ -294,7 +294,16 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Result<Rc<Objec
             let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(env)))?;
             return unwrap_return(evaluated);
         }
-        Object::Builtin(b) => Ok(b(args.to_vec())),
+        Object::Builtin(b) => {
+            let result = b(args.to_vec());
+            // Builtins report failures as Object::Error values. Every other runtime
+            // failure here is an Err, so lift them instead of letting an error keep
+            // flowing as an ordinary value.
+            match &*result {
+                Object::Error(message) => Err(message.clone()),
+                _ => Ok(result),
+            }
+        }
         Object::BoundMethod(bound) => {
             apply_method(&bound.method, &bound.receiver, args, &bound.name)
         }
