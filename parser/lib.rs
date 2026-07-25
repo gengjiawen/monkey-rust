@@ -706,6 +706,10 @@ impl<'a> Parser<'a> {
             if self.current_token_is(&TokenKind::EOF) {
                 return Err(format!("expected '}}' after class {}", class_name.name));
             }
+            // methods need no separator, but a `;` between them is harmless
+            if self.current_token_is(&TokenKind::SEMICOLON) {
+                continue;
+            }
 
             let method_name = match &self.current_token.kind {
                 TokenKind::IDENTIFIER {

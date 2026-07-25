@@ -247,11 +247,33 @@ connect();"#;
     }
 
     #[test]
+    fn skips_semicolons_between_class_members() {
+        verify_program(&[
+            ("class A { foo() {}; bar() {} }", "class A {foo() {}bar() {}}"),
+            ("class A { foo() {}; }", "class A {foo() {}}"),
+            ("class A { constructor() {}; foo() {} }", "class A {constructor() {}foo() {}}"),
+            ("class A { ;; foo() {} }", "class A {foo() {}}"),
+            ("class A { ; }", "class A {}"),
+        ]);
+
+        let input = "class A { foo() {}; bar() {} }";
+        let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
+        let Statement::Class(class) = &program.body[0] else {
+            panic!("expected class declaration")
+        };
+        assert_eq!(class.methods.len(), 2);
+        assert_eq!(class.methods[1].name.name, "bar");
+        assert_eq!(&input[class.span.start..class.span.end], input);
+    }
+
+    #[test]
     fn rejects_invalid_class_and_assignment_forms_without_panicking() {
         for (input, expected) in [
             ("class A { constructor() {} constructor() {} }", "more than one constructor"),
             ("class A { method() {} method() {} }", "duplicate method"),
             ("class A { let value = 1; }", "expected method definition"),
+            ("class A { method() {}; method() {} }", "duplicate method"),
+            ("class A { method() {};", "expected '}' after class"),
             ("fn() { class A {} }", "only allowed at top level"),
             ("new A", "requires an argument list"),
             ("value = 1", "only instance property assignment"),
