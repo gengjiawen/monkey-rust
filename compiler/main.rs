@@ -9,12 +9,49 @@ use std::rc::Rc;
 
 use parser::parse;
 
+struct Repl {
+    symbol_table: SymbolTable,
+    constants: Vec<Rc<Object>>,
+    globals: Vec<Rc<Object>>,
+}
+
+impl Repl {
+    fn new() -> Self {
+        // Seed the persistent state from Compiler::new() so builtins like `len`
+        // stay resolvable; new_with_state replaces the symbol table wholesale.
+        let bootstrap = Compiler::new();
+        let null = Rc::new(Object::Null);
+        Self {
+            symbol_table: bootstrap.symbol_table,
+            constants: bootstrap.constants,
+            globals: vec![null; compiler::vm::GLOBAL_SIZE],
+        }
+    }
+
+    fn eval_line(&mut self, input: &str) -> Result<String, String> {
+        let program = parse(input).map_err(|errors| errors[0].clone())?;
+
+        let mut compiler =
+            Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
+        let compiled = compiler.compile(&program).map(|bytecode| {
+            let mut vm = VM::new_with_global_store(bytecode, std::mem::take(&mut self.globals));
+            vm.run();
+            let output = vm
+                .last_popped_stack_elm()
+                .map_or_else(String::new, |o| o.to_string());
+            self.globals = vm.globals;
+            output
+        });
+
+        self.symbol_table = compiler.symbol_table;
+        self.constants = compiler.constants;
+        return compiled;
+    }
+}
+
 fn main() {
     println!("Welcome to monkey compiler by gengjiawen");
-    let mut constants = vec![];
-    let mut symbol_table = SymbolTable::new();
-    let null = Rc::new(Object::Null);
-    let mut globals = vec![null; compiler::vm::GLOBAL_SIZE];
+    let mut repl = Repl::new();
     loop {
         print!("> ");
         io::stdout().flush().unwrap();
@@ -26,29 +63,12 @@ fn main() {
             std::process::exit(0);
         }
 
-        let program = match parse(&input) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("{}", e[0]);
-                continue;
-            }
-        };
-
-        let mut compiler = Compiler::new_with_state(symbol_table, constants);
-
-        match compiler.compile(&program) {
-            Ok(bytecodes) => {
-                let mut vm = VM::new_with_global_store(bytecodes, globals);
-                vm.run();
-                println!("{}", vm.last_popped_stack_elm().unwrap());
-                globals = vm.globals;
-            }
-            Err(e) => {
-                println!("{}", e);
-            }
-        };
-
-        symbol_table = compiler.symbol_table;
-        constants = compiler.constants;
+        match repl.eval_line(&input) {
+            Ok(output) => println!("{}", output),
+            Err(e) => println!("{}", e),
+        }
     }
 }
+
+#[cfg(test)]
+mod repl_test;
