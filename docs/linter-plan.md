@@ -258,20 +258,22 @@ let h2 = {keyA: 1, keyB: 2};
 
 #### `builtin-arity`（error）
 
-v0 **只检查 `len` 必须恰好取 1 个参数**，且仅当这个名字未被用户绑定遮蔽时
-检查。`puts` 可变参不查；`print` 是 `puts` 的别名（`object/builtins.rs` 中复用
-同一个函数），同样不查。
+检查所有定参 builtin 的参数个数：`len`/`first`/`last`/`rest` 恰好 1 个，
+`push` 恰好 2 个，且仅当这个名字未被用户绑定遮蔽时检查。`puts` 可变参不查；
+`print` 是 `puts` 的别名（`object/builtins.rs` 中复用同一个函数），同样不查。
 
-不能把 `first`/`last`/`rest`/`push` 放进同一条确定性规则：GC VM 会严格检查它们
-的参数个数，而 interpreter 实现会忽略多余参数，缺少参数时甚至可能 panic。例如
-interpreter 中 `first([1], [2])` 得 `1`、`rest([1], [2])` 得 `[]`、
-`push([1], 2, 3)` 得 `[1, 3]`。这些调用应先归入 v1 的
-`backend-divergent-builtin-arity`，或先统一 runtime 行为后再扩展本规则。
+早期版本只查 `len`：当时 GC VM 会严格检查 `first`/`last`/`rest`/`push` 的参数
+个数，而 interpreter 会忽略多余参数（`first([1], [2])` 得 `1`、`push([1], 2, 3)`
+得 `[1, 3]`），缺少参数时甚至 panic。现在两边都走 `object/builtins.rs` 的
+`check_arity`，措辞也一致，因此这些 builtin 已并入本规则。
 
 ```
 // ✗ 两个后端都产生 "builtin len expected 1 argument, got 2" 错误对象/值；
 //    这不等同于 runner 报 runtime failure，也不保证立即中止执行。
 let n = len([1], [2]);
+
+// ✗ 同理：push 恰好取 2 个参数
+let xs = push([1], 2, 3);
 
 // ✓ 不报：len 已被用户遮蔽（改由 no-shadowed-builtin 报警）
 let len = fn(a, b) { 42; };
@@ -342,8 +344,6 @@ let d = 1 == true;
 - `no-self-compare`：把 `x == x` / `x != x` 作为高度可疑的自比较报告，但不宣称
   恒真/恒假。例如 `let x = []; x == x` 在 interpreter 中是 `true`，GC VM 则拒绝
   该比较。
-- `backend-divergent-builtin-arity`：在 runtime 行为统一前，报告
-  `first`/`last`/`rest`/`push` 的错误参数个数。
 - `no-empty-block`：`if (ready) {}` 空分支。
 
 ### 明确不做的规则
@@ -413,8 +413,7 @@ JSON 格式给编辑器集成与脚本消费。
 
 - **v0**：结构化 wasm analyzer API、包骨架、walker/scope、上表 9 条规则、CLI、
   测试与 CI，以及 playground 的 Lint 按钮接入。
-- **v1**：VS Code extension 接入；`backend-divergent-rebinding`
-  与 `backend-divergent-builtin-arity` 等进阶规则。
+- **v1**：VS Code extension 接入；`backend-divergent-rebinding` 等进阶规则。
 - **v2**：行内禁用指令（`// monkey-lint-disable-next-line <rule>`——
   `parse_lossless` 不含注释，需对原始 source 做行级扫描，不改 parser）；
   `--fix`（基于 span 的文本编辑，不走 printer，避免重排无关代码）。

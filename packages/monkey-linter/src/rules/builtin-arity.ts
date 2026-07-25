@@ -4,20 +4,24 @@ import { walk } from '../walk'
 
 /**
  * Builtins whose arity *both* backends reject identically, regardless of the
- * argument types. Only `len` qualifies for v0:
+ * argument types. Every fixed-arity builtin qualifies: each one routes through
+ * `check_arity` in `object/builtins.rs` (interpreter and bytecode VM) and
+ * through the matching guards in `call_builtin_with_output` (`gc/value.rs`),
+ * so a wrong count is an error value on both sides.
  *
- *   - `len` errors cleanly on any count other than 1 in the interpreter
- *     (`args.len() != 1`) and in the GC VM (`call_builtin_with_output`).
- *   - `first` / `last` / `rest` / `push` diverge: the interpreter indexes
- *     `args[0]` (and `args.last()`) directly, so too *many* arguments are
- *     silently ignored and too *few* panic rather than returning an error,
- *     while the VM returns a clean arity error. Flagging them would be unsound
- *     against the interpreter, so they are intentionally excluded until the
- *     backends converge.
- *   - `puts` / `print` are variadic.
+ * `first` / `last` / `rest` / `push` used to be excluded because the
+ * interpreter indexed `args[0]` directly — extra arguments were silently
+ * ignored and a short call panicked instead of erroring. That divergence was
+ * fixed, so they are checked here too.
+ *
+ * `puts` / `print` stay out: they are variadic.
  */
 const FIXED_ARITY: Record<string, number> = {
   len: 1,
+  first: 1,
+  last: 1,
+  rest: 1,
+  push: 2,
 }
 
 export const builtinArity: Rule = {

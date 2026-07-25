@@ -183,12 +183,27 @@ describe('builtin-arity', () => {
   )
 
   it.each([
+    'first();',
+    'first([1], [2]);',
+    'last([1], [2]);',
+    'rest([1], [2]);',
+    'push([1]);',
+    'push([1], 2, 3);',
+  ])('flags a wrong-arity array builtin call: %s', (source) => {
+    expect(rulesOf(source)).toEqual(['builtin-arity'])
+  })
+
+  it.each([
     'len("hi");',
     'len([1, 2]);',
-    // first/last/rest/push are not checked: the interpreter's loose arity
-    // handling diverges from the VM's.
-    'first([1], [2]);',
-    'push([1]);',
+    'first([1]);',
+    'last([1]);',
+    'rest([1]);',
+    'push([1], 2);',
+    // puts and its print alias are variadic, so no count is wrong.
+    'puts();',
+    'puts(1, 2, 3);',
+    'print(1, 2, 3);',
   ])('stays quiet otherwise: %s', (source) => {
     expect(rulesOf(source)).not.toContain('builtin-arity')
   })
