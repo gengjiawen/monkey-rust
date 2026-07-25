@@ -33,9 +33,21 @@ describe('compact printer', () => {
     )
   })
 
-  it('preserves lossless integer and string spelling', () => {
-    expect(print('9007199254740993; 9223372036854775807; "line\nbreak"')).toBe(
-      '9007199254740993;9223372036854775807;"line\nbreak";'
+  it('preserves lossless integer spelling', () => {
+    expect(print('9007199254740993; 9223372036854775807')).toBe(
+      '9007199254740993;9223372036854775807;'
     )
+  })
+
+  it('escapes string literals so the output stays on one line', () => {
+    // A raw newline in the source becomes a `\n` escape, which parses back to
+    // the same value without breaking the string across lines.
+    expect(print('"line\nbreak"')).toBe('"line\\nbreak";')
+    expect(print('"tab\tsep"')).toBe('"tab\\tsep";')
+  })
+
+  it('escapes quotes and backslashes so the output re-parses', () => {
+    expect(print('"say \\"hi\\""')).toBe('"say \\"hi\\"";')
+    expect(print('"back\\\\slash"')).toBe('"back\\\\slash";')
   })
 })

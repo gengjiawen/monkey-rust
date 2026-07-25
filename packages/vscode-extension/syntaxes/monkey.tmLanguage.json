@@ -30,7 +30,16 @@
           "name": "string.quoted.double.monkey",
           "begin": "\"",
           "end": "\"",
-          "patterns": []
+          "patterns": [
+            {
+              "name": "constant.character.escape.monkey",
+              "match": "\\\\[ntr\"\\\\]"
+            },
+            {
+              "name": "invalid.illegal.unknown-escape.monkey",
+              "match": "\\\\."
+            }
+          ]
         }
       ]
     },

@@ -24,6 +24,14 @@ describe('Prettier Plugin Monkey', () => {
     expect(await format(input)).toBe(expected)
   })
 
+  it('re-escapes string literals so formatting is idempotent', async () => {
+    // The lexer decodes escapes, so the printer has to encode them again.
+    const input = 'let  x= "a\\nb\\tc \\"q\\" \\\\";'
+    const expected = 'let x = "a\\nb\\tc \\"q\\" \\\\";\n'
+    expect(await format(input)).toBe(expected)
+    expect(await format(expected)).toBe(expected)
+  })
+
   it('formats binary expressions', async () => {
     const input = 'let x=1+2*3;'
     const expected = 'let x = 1 + (2 * 3);\n'

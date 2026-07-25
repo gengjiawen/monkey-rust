@@ -123,7 +123,7 @@ function renderExpression(expression: Expression): PrintedExpression {
     case 'Boolean':
       return primary(String(expression.raw))
     case 'String':
-      return primary(`"${expression.raw}"`)
+      return primary(`"${escapeString(expression.raw)}"`)
     case 'Array':
       return primary(`[${expression.elements.map(printExpression).join(',')}]`)
     case 'Hash':
@@ -215,6 +215,20 @@ function renderFunction(expression: FunctionDeclaration): PrintedExpression {
 
 function primary(code: string): PrintedExpression {
   return { code, precedence: Precedence.Primary }
+}
+
+const stringEscapes: Record<string, string> = {
+  '\\': '\\\\',
+  '"': '\\"',
+  '\n': '\\n',
+  '\t': '\\t',
+  '\r': '\\r',
+}
+
+// The lexer decodes escape sequences, so `raw` holds the decoded value and has
+// to be re-encoded for the printed source to parse back to the same string.
+function escapeString(value: string): string {
+  return value.replace(/[\\"\n\t\r]/g, (char) => stringEscapes[char])
 }
 
 function operatorFor(kind: string): string {

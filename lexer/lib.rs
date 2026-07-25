@@ -100,8 +100,8 @@ impl<'a> Lexer<'a> {
                     },
                     kind: match string {
                         Some(value) => TokenKind::STRING(value),
-                        // Unterminated literal: report the whole literal as a
-                        // single ILLEGAL token instead of accepting it.
+                        // Unterminated literal or unknown escape: report the whole
+                        // literal as a single ILLEGAL token instead of accepting it.
                         None => TokenKind::ILLEGAL,
                     },
                 };
@@ -197,30 +197,51 @@ impl<'a> Lexer<'a> {
         return (pos, self.position, x);
     }
 
-    /// Reads a string literal starting at the opening `"`. Returns `None` when
-    /// the input ends before a closing quote, in which case the span still
-    /// covers everything scanned so the caller can emit one ILLEGAL token for
-    /// the whole literal.
+    /// Reads a string literal starting at the opening `"`, decoding escape
+    /// sequences into the value they denote. Returns `None` when the literal is
+    /// malformed, in which case the span still covers everything scanned so the
+    /// caller can emit one ILLEGAL token for the whole literal.
     fn read_string(&mut self) -> (usize, usize, Option<String>) {
         let pos = self.position;
+        let mut value = String::new();
+        let mut valid = true;
+
         loop {
             self.read_char();
-            if self.ch == '"' || self.ch == '\u{0}' {
-                break;
+            match self.ch {
+                '"' => {
+                    // consume the end "
+                    self.read_char();
+                    break;
+                }
+                // The input ended before a closing quote.
+                '\u{0}' => {
+                    valid = false;
+                    break;
+                }
+                '\\' => {
+                    self.read_char();
+                    match self.ch {
+                        'n' => value.push('\n'),
+                        't' => value.push('\t'),
+                        'r' => value.push('\r'),
+                        '"' => value.push('"'),
+                        '\\' => value.push('\\'),
+                        // A trailing backslash right before EOF.
+                        '\u{0}' => {
+                            valid = false;
+                            break;
+                        }
+                        // Unknown escape: keep scanning to the closing quote so a
+                        // single token covers the literal and lexing resumes cleanly.
+                        _ => valid = false,
+                    }
+                }
+                c => value.push(c),
             }
         }
 
-        let value = if self.ch == '"' {
-            let x = self.input[pos + 1..self.position].to_string();
-            // consume the end "
-            self.read_char();
-            Some(x)
-        } else {
-            // The input ended before a closing quote.
-            None
-        };
-
-        return (pos, self.position, value);
+        return (pos, self.position, if valid { Some(value) } else { None });
     }
 }
 

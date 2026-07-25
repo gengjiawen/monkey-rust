@@ -451,7 +451,7 @@ impl fmt::Display for Literal {
             Literal::String(StringType {
                 raw: s,
                 ..
-            }) => write!(f, "\"{}\"", s),
+            }) => write!(f, "\"{}\"", escape_string(s)),
             Literal::Array(Array {
                 elements: e,
                 ..
@@ -470,6 +470,25 @@ impl fmt::Display for Literal {
             }
         }
     }
+}
+
+/// Re-encodes a decoded string value as source text. The lexer turns escape
+/// sequences into the characters they denote, so printing a literal back has to
+/// undo that or the output would not re-parse.
+pub fn escape_string(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for c in value.chars() {
+        match c {
+            '\n' => escaped.push_str("\\n"),
+            '\t' => escaped.push_str("\\t"),
+            '\r' => escaped.push_str("\\r"),
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            _ => escaped.push(c),
+        }
+    }
+
+    return escaped;
 }
 
 fn format_statements(statements: &[Statement]) -> String {

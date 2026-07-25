@@ -178,6 +178,20 @@ mod tests {
     }
 
     #[test]
+    fn test_string_escapes() {
+        let test_case = [
+            (r#""a\nb""#, "a\nb"),
+            (r#""a\tb""#, "a\tb"),
+            (r#""say \"hi\"""#, "say \"hi\""),
+            (r#""back\\slash""#, "back\\slash"),
+            // Escapes count as the single character they denote.
+            (r#"len("a\nb")"#, "3"),
+            (r#""a\n" + "b""#, "a\nb"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_builtin_functions() {
         let test_case = [
             (r#"len("")"#, "0"),

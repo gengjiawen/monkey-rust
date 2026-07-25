@@ -365,6 +365,30 @@ mod tests {
     }
 
     #[test]
+    fn test_string_escapes() {
+        let tests = vec![
+            VmTestCase {
+                input: r#""a\nb""#,
+                expected: Object::String("a\nb".to_string()),
+            },
+            VmTestCase {
+                input: r#""say \"hi\"""#,
+                expected: Object::String("say \"hi\"".to_string()),
+            },
+            VmTestCase {
+                input: r#""back\\slash""#,
+                expected: Object::String("back\\slash".to_string()),
+            },
+            VmTestCase {
+                input: r#"len("a\tb")"#,
+                expected: Object::Integer(3),
+            },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
     fn test_arrays() {
         fn map_vec_to_object(vec: Vec<i64>) -> Object {
             let array = vec

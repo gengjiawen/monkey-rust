@@ -448,6 +448,20 @@ function printInnerComments(node: ASTNode): Doc[] {
   return comments
 }
 
+const stringEscapes: Record<string, string> = {
+  '\\': '\\\\',
+  '"': '\\"',
+  '\n': '\\n',
+  '\t': '\\t',
+  '\r': '\\r',
+}
+
+// The lexer decodes escape sequences, so `raw` holds the decoded value and has
+// to be re-encoded for the printed source to parse back to the same string.
+function escapeString(value: string): string {
+  return value.replace(/[\\"\n\t\r]/g, (char) => stringEscapes[char])
+}
+
 function printLiteral(
   node: Literal,
   path: AstPath,
@@ -461,7 +475,7 @@ function printLiteral(
       return String((node as BooleanLiteral).raw)
     case 'String': {
       const str = (node as StringLiteral).raw
-      return `"${str}"`
+      return `"${escapeString(str)}"`
     }
     case 'Array':
       return printArrayLiteral(node as ArrayLiteral, path, print, options)

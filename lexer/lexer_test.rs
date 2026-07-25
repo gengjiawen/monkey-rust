@@ -60,6 +60,29 @@ mod tests {
         assert_eq!(token.span.end, r#""你好""#.len());
     }
 
+    fn first_token(input: &str) -> Token {
+        Lexer::new(input).next_token()
+    }
+
+    #[test]
+    fn decodes_string_escape_sequences() {
+        let token = first_token(r#""a\nb\tc\r\\d\"e""#);
+
+        assert_eq!(token.kind, TokenKind::STRING("a\nb\tc\r\\d\"e".to_string()));
+    }
+
+    #[test]
+    fn escaped_quote_does_not_terminate_string() {
+        let input = r#""say \"hi\"";"#;
+        let mut lexer = Lexer::new(input);
+
+        let string = lexer.next_token();
+        assert_eq!(string.kind, TokenKind::STRING(r#"say "hi""#.to_string()));
+        assert_eq!(string.span.start, 0);
+        assert_eq!(string.span.end, input.len() - 1);
+        assert_eq!(lexer.next_token().kind, TokenKind::SEMICOLON);
+    }
+
     #[test]
     fn unterminated_string_is_illegal() {
         let input = r#"let x = "unterminated"#;
@@ -71,6 +94,28 @@ mod tests {
         assert_eq!(string.span.start, 8);
         assert_eq!(string.span.end, input.len());
         assert_eq!(tokens.last().unwrap().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn unterminated_string_with_escaped_closing_quote_is_illegal() {
+        // The trailing quote is escaped, so the literal never actually closes.
+        assert_eq!(first_token(r#""oops\""#).kind, TokenKind::ILLEGAL);
+        // A backslash immediately before EOF is not a complete escape either.
+        assert_eq!(first_token(r#""oops\"#).kind, TokenKind::ILLEGAL);
+    }
+
+    #[test]
+    fn unknown_escape_is_illegal_and_lexing_resumes() {
+        let input = r#""a\qb"; let x = 5"#;
+        let mut lexer = Lexer::new(input);
+
+        let string = lexer.next_token();
+        assert_eq!(string.kind, TokenKind::ILLEGAL);
+        assert_eq!(string.span.start, 0);
+        // The whole literal is one token, so the following tokens still line up.
+        assert_eq!(string.span.end, 6);
+        assert_eq!(lexer.next_token().kind, TokenKind::SEMICOLON);
+        assert_eq!(lexer.next_token().kind, TokenKind::LET);
     }
 
     #[test]

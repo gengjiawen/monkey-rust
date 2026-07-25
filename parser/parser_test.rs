@@ -147,6 +147,24 @@ mod tests {
     }
 
     #[test]
+    fn string_literal_escapes_round_trip() {
+        // The lexer decodes escapes, so printing a literal has to re-encode them
+        // for the output to parse back into the same value.
+        let test_case = [
+            (r#""a\nb";"#, r#""a\nb""#),
+            (r#""say \"hi\"";"#, r#""say \"hi\"""#),
+            (r#""back\\slash";"#, r#""back\\slash""#),
+            (r#""tab\tsep";"#, r#""tab\tsep""#),
+        ];
+        verify_program(&test_case);
+
+        for (input, _) in test_case {
+            let printed = parse(input).unwrap().to_string();
+            assert_eq!(parse(&printed).unwrap().to_string(), printed);
+        }
+    }
+
+    #[test]
     fn unterminated_string_is_a_parse_error() {
         assert!(parse(r#"let x = "unterminated"#).is_err());
     }
