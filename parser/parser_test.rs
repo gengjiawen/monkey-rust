@@ -147,6 +147,11 @@ mod tests {
     }
 
     #[test]
+    fn unterminated_string_is_a_parse_error() {
+        assert!(parse(r#"let x = "unterminated"#).is_err());
+    }
+
+    #[test]
     fn test_array_literal_expression() {
         let test_case = [("[]", "[]"), ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)]")];
         verify_program(&test_case);
