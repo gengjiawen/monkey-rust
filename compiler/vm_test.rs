@@ -16,7 +16,8 @@ pub fn run_vm_tests(tests: Vec<VmTestCase>) {
         let bytecodes = compiler.compile(&program).unwrap();
         println!("ins {} for input {}", bytecodes.instructions.string(), t.input);
         let mut vm = VM::new(bytecodes);
-        vm.run();
+        vm.run_checked()
+            .unwrap_or_else(|error| panic!("VM error for {:?}: {}", t.input, error));
         let got = vm.last_popped_stack_elm().unwrap();
         let expected_argument = t.expected;
         test_constants(&[expected_argument], &vec![got]);
@@ -27,29 +28,19 @@ pub fn run_vm_tests(tests: Vec<VmTestCase>) {
 mod tests {
     use object::Object;
     use std::collections::HashMap;
-    use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::rc::Rc;
 
     use crate::compiler::Compiler;
-    use crate::vm::VM;
+    use crate::vm::{VmRuntimeError, VmRuntimeErrorKind, VM};
     use crate::vm_test::{run_vm_tests, VmTestCase};
     use parser::parse;
 
-    fn vm_panic_message(input: &str) -> String {
+    fn vm_runtime_error(input: &str) -> VmRuntimeError {
         let program = parse(input).unwrap();
         let mut compiler = Compiler::new();
         let bytecode = compiler.compile(&program).unwrap();
         let mut vm = VM::new(bytecode);
-        let panic = catch_unwind(AssertUnwindSafe(|| vm.run())).expect_err("VM should panic");
-        panic
-            .downcast_ref::<String>()
-            .cloned()
-            .or_else(|| {
-                panic
-                    .downcast_ref::<&str>()
-                    .map(|message| (*message).to_string())
-            })
-            .unwrap_or_else(|| "non-string panic".to_string())
+        vm.run_checked().expect_err("VM should return an error")
     }
 
     #[test]
@@ -544,29 +535,98 @@ mod tests {
     }
 
     #[test]
+    fn runtime_errors_are_returned_instead_of_panicking() {
+        let cases = [
+            ("1 + \"a\";", VmRuntimeErrorKind::Type, "unsupported binary operation for 1 and a"),
+            (
+                "let add = fn(a, b) { a + b; }; add(1);",
+                VmRuntimeErrorKind::Call,
+                "wrong number of arguments: want=2, got=1",
+            ),
+            ("1();", VmRuntimeErrorKind::Call, "calling non-closure"),
+            (
+                "true > false;",
+                VmRuntimeErrorKind::Type,
+                "unsupported comparison for true and false",
+            ),
+            ("-\"a\";", VmRuntimeErrorKind::Type, "unsupported type for negation OpMinus: a"),
+            ("1[0];", VmRuntimeErrorKind::Index, "unsupported index operation for 1 with 0"),
+            ("{[]: 1};", VmRuntimeErrorKind::Index, "hash key must be hashable, got []"),
+            ("1 / 0;", VmRuntimeErrorKind::Arithmetic, "division by zero"),
+            (
+                "9223372036854775807 + 1;",
+                VmRuntimeErrorKind::Arithmetic,
+                "integer overflow in addition",
+            ),
+            (
+                "let recurse = fn() { recurse(); }; recurse();",
+                VmRuntimeErrorKind::Stack,
+                "frame limit exceeded",
+            ),
+        ];
+
+        for (input, kind, message) in cases {
+            let error = vm_runtime_error(input);
+            assert_eq!(error.kind, kind, "input: {input}");
+            assert_eq!(error.message, message, "input: {input}");
+        }
+    }
+
+    #[test]
+    fn legacy_run_retains_runtime_error_without_panicking() {
+        let program = parse("1 + \"a\";").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+        let mut vm = VM::new(bytecode);
+
+        vm.run();
+
+        let error = vm.last_error().expect("legacy run should retain its error");
+        assert_eq!(error.kind, VmRuntimeErrorKind::Type);
+        assert_eq!(error.message, "unsupported binary operation for 1 and a");
+    }
+
+    #[test]
     fn class_runtime_errors_use_user_visible_arity() {
         let cases = [
             (
                 "class Empty {} new Empty(1);",
+                VmRuntimeErrorKind::Call,
                 "wrong number of arguments for Empty.constructor: want=0, got=1",
             ),
             (
                 "class Point { constructor(x) {} } new Point();",
+                VmRuntimeErrorKind::Call,
                 "wrong number of arguments for Point.constructor: want=1, got=0",
             ),
             (
                 "class Counter { increment(amount) { amount; } } new Counter().increment();",
+                VmRuntimeErrorKind::Call,
                 "wrong number of arguments for Counter.increment: want=1, got=0",
             ),
-            ("class Empty {} Empty();", "class Empty must be constructed with new"),
-            ("let factory = fn() {}; new factory();", "cannot construct [closure function]"),
-            ("class Empty {} new Empty().missing;", "property 'missing' does not exist on Empty"),
-            ("1.value;", "cannot read property 'value' of 1"),
-            ("1.value = 2;", "cannot set property 'value' of 1"),
+            (
+                "class Empty {} Empty();",
+                VmRuntimeErrorKind::Call,
+                "class Empty must be constructed with new",
+            ),
+            (
+                "let factory = fn() {}; new factory();",
+                VmRuntimeErrorKind::Call,
+                "cannot construct [closure function]",
+            ),
+            (
+                "class Empty {} new Empty().missing;",
+                VmRuntimeErrorKind::Property,
+                "property 'missing' does not exist on Empty",
+            ),
+            ("1.value;", VmRuntimeErrorKind::Property, "cannot read property 'value' of 1"),
+            ("1.value = 2;", VmRuntimeErrorKind::Property, "cannot set property 'value' of 1"),
         ];
 
-        for (input, expected) in cases {
-            assert_eq!(vm_panic_message(input), expected, "input: {input}");
+        for (input, kind, expected) in cases {
+            let error = vm_runtime_error(input);
+            assert_eq!(error.kind, kind, "input: {input}");
+            assert_eq!(error.message, expected, "input: {input}");
         }
     }
 }

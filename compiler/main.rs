@@ -33,18 +33,23 @@ impl Repl {
 
         let mut compiler =
             Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
-        let compiled = compiler.compile(&program).map(|bytecode| {
+        let compiled = compiler.compile(&program).and_then(|bytecode| {
             let mut vm = VM::new_with_global_store(bytecode, std::mem::take(&mut self.globals));
-            vm.run();
+            let run_result = vm.run_checked().map_err(|error| error.to_string());
             let output = vm
                 .last_popped_stack_elm()
                 .map_or_else(String::new, |o| o.to_string());
+            // The VM owns the persistent store while it runs. Take it back even
+            // when execution fails so the next REPL line starts from valid state.
             self.globals = vm.globals;
-            output
+            run_result?;
+            Ok(output)
         });
 
-        self.symbol_table = compiler.symbol_table;
-        self.constants = compiler.constants;
+        if compiled.is_ok() {
+            self.symbol_table = compiler.symbol_table;
+            self.constants = compiler.constants;
+        }
         return compiled;
     }
 }
