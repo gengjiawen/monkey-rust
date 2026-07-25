@@ -98,7 +98,12 @@ impl<'a> Lexer<'a> {
                         start,
                         end,
                     },
-                    kind: TokenKind::STRING(string),
+                    kind: match string {
+                        Some(value) => TokenKind::STRING(value),
+                        // Unterminated literal: report the whole literal as a
+                        // single ILLEGAL token instead of accepting it.
+                        None => TokenKind::ILLEGAL,
+                    },
                 };
             }
             _ => {
@@ -192,8 +197,12 @@ impl<'a> Lexer<'a> {
         return (pos, self.position, x);
     }
 
-    fn read_string(&mut self) -> (usize, usize, String) {
-        let pos = self.position + 1;
+    /// Reads a string literal starting at the opening `"`. Returns `None` when
+    /// the input ends before a closing quote, in which case the span still
+    /// covers everything scanned so the caller can emit one ILLEGAL token for
+    /// the whole literal.
+    fn read_string(&mut self) -> (usize, usize, Option<String>) {
+        let pos = self.position;
         loop {
             self.read_char();
             if self.ch == '"' || self.ch == '\u{0}' {
@@ -201,13 +210,17 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let x = self.input[pos..self.position].to_string();
-
-        // consume the end "
-        if self.ch == '"' {
+        let value = if self.ch == '"' {
+            let x = self.input[pos + 1..self.position].to_string();
+            // consume the end "
             self.read_char();
-        }
-        return (pos - 1, self.position, x);
+            Some(x)
+        } else {
+            // The input ended before a closing quote.
+            None
+        };
+
+        return (pos, self.position, value);
     }
 }
 

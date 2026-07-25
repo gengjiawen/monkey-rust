@@ -61,6 +61,19 @@ mod tests {
     }
 
     #[test]
+    fn unterminated_string_is_illegal() {
+        let input = r#"let x = "unterminated"#;
+        let mut lexer = Lexer::new(input);
+        let tokens = test_token_set(&mut lexer);
+        let string = &tokens[3];
+
+        assert_eq!(string.kind, TokenKind::ILLEGAL);
+        assert_eq!(string.span.start, 8);
+        assert_eq!(string.span.end, input.len());
+        assert_eq!(tokens.last().unwrap().kind, TokenKind::EOF);
+    }
+
+    #[test]
     fn test_lexer_array() {
         test_lexer_common("array", "[3]");
     }
