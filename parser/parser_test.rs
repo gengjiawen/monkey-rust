@@ -230,6 +230,23 @@ connect();"#;
     }
 
     #[test]
+    fn skips_empty_statements() {
+        verify_program(&[
+            ("class A {};", "class A {}"),
+            (";;5", "5"),
+            ("5;;", "5"),
+            ("let x = 1;;", "let x = 1;"),
+            (";", ""),
+            (";;;", ""),
+            ("fn() { 1;; }", "fn () { 1 }"),
+            ("if (true) { ; } else { ;; }", "if true {  } else {  }"),
+        ]);
+
+        let Node::Program(program) = parse(";;5;;").unwrap() else { panic!("expected program") };
+        assert_eq!(program.body.len(), 1);
+    }
+
+    #[test]
     fn rejects_invalid_class_and_assignment_forms_without_panicking() {
         for (input, expected) in [
             ("class A { constructor() {} constructor() {} }", "more than one constructor"),
