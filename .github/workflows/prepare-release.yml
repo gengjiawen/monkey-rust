@@ -12,7 +12,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
-      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "yarn && pnpx ts-node scripts/bump_cargo_packages.ts"
+      # Node strips the script's types itself; ts-node cannot load TypeScript 7,
+      # which dropped the compiler API it depends on.
+      - run: docker run -v $PWD:/pwd -w /pwd gengjiawen/node-build bash -c "node scripts/bump_cargo_packages.ts"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: 'chore: prepare rust packages'

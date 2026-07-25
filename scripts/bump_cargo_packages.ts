@@ -8,7 +8,7 @@ type PackageJson = {
   [key: string]: unknown
 }
 
-const rootPath = join(__dirname, '..')
+const rootPath = join(import.meta.dirname, '..')
 
 function repoPath(...parts: string[]) {
   return join(rootPath, ...parts)
