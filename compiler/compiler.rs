@@ -376,13 +376,13 @@ impl Compiler {
             }
             Statement::Class(class) => {
                 let symbol = self.define_symbol(class.name.name.clone())?;
-                let class_name = self.add_constant(Object::String(class.name.name.clone()))?;
+                let class_name = self.try_add_constant(Object::String(class.name.name.clone()))?;
                 self.emit_with_span(OpClass, &[class_name], &class.span);
 
                 for method in &class.methods {
                     self.compile_method(&class.name.name, method)?;
                     let method_name =
-                        self.add_constant(Object::String(method.name.name.clone()))?;
+                        self.try_add_constant(Object::String(method.name.name.clone()))?;
                     let kind = match method.kind {
                         MethodKind::Method => 0,
                         MethodKind::Constructor => 1,
@@ -399,7 +399,7 @@ impl Compiler {
                 self.compile_expr(&statement.object)?;
                 self.compile_expr(&statement.value)?;
                 let property =
-                    self.add_constant(Object::String(statement.property.name.clone()))?;
+                    self.try_add_constant(Object::String(statement.property.name.clone()))?;
                 self.emit_with_span(OpSetProperty, &[property], &statement.span);
                 self.emit_with_span(OpNull, &[], &statement.span);
                 self.emit_with_span(OpPop, &[], &statement.span);
@@ -424,7 +424,7 @@ impl Compiler {
             Expression::LITERAL(l) => match l {
                 Literal::Integer(i) => {
                     let int = Object::Integer(i.raw);
-                    let operands = vec![self.add_constant(int)?];
+                    let operands = vec![self.try_add_constant(int)?];
                     self.emit_with_span(OpConst, &operands, &i.span);
                 }
                 Literal::Boolean(i) => {
@@ -436,7 +436,7 @@ impl Compiler {
                 }
                 Literal::String(s) => {
                     let string_object = Object::String(s.raw.clone());
-                    let operands = vec![self.add_constant(string_object)?];
+                    let operands = vec![self.try_add_constant(string_object)?];
                     self.emit_with_span(OpConst, &operands, &s.span);
                 }
                 Literal::Array(array) => {
@@ -451,9 +451,12 @@ impl Compiler {
                         self.compile_expr(key)?;
                         self.compile_expr(value)?;
                     }
-                    let pair_count = hash.elements.len() * 2;
-                    ensure_u16_count(pair_count, "hash pairs")?;
-                    self.emit_with_span(OpHash, &[pair_count], &hash.span);
+                    // OpHash counts keys and values, so the encodable operand is
+                    // always even and the last usable one is u16::MAX - 1. Check
+                    // the pair count the user actually wrote, not the doubled
+                    // operand, or the message reports twice the real limit.
+                    ensure_count(hash.elements.len(), u16::MAX as usize / 2, "hash pairs")?;
+                    self.emit_with_span(OpHash, &[hash.elements.len() * 2], &hash.span);
                 }
             },
             Expression::PREFIX(prefix) => {
@@ -547,6 +550,11 @@ impl Compiler {
                 let free_symbols = self.symbol_table.free_symbols.clone();
                 let scoped_instructions = self.leave_scope();
                 self.callable_kinds.pop();
+                // Checked before the loads so the count is the only free-variable
+                // limit a user can hit. OpGetFree's u8 slot allows one more than
+                // OpClosure's u8 count does, and reporting that larger number
+                // would name a limit no closure can actually reach.
+                ensure_u8_count(free_symbols.len(), "free variables")?;
                 for x in free_symbols.clone() {
                     self.load_symbol(&x, &function_span)?;
                 }
@@ -559,10 +567,9 @@ impl Compiler {
                 });
 
                 let constant_index =
-                    self.add_constant(Object::CompiledFunction(compiled_function))?;
+                    self.try_add_constant(Object::CompiledFunction(compiled_function))?;
                 self.function_debug_info_mut()
                     .insert(constant_index, scoped_instructions.debug_info);
-                ensure_u8_count(free_symbols.len(), "free variables")?;
                 let operands = vec![constant_index, free_symbols.len()];
                 self.emit_with_span(OpClosure, &operands, &function_span);
             }
@@ -583,7 +590,7 @@ impl Compiler {
             }
             Expression::Property(property) => {
                 self.compile_expr(&property.object)?;
-                let name = self.add_constant(Object::String(property.property.name.clone()))?;
+                let name = self.try_add_constant(Object::String(property.property.name.clone()))?;
                 self.emit_with_span(OpGetProperty, &[name], &property.span);
             }
             Expression::New(new_expression) => {
@@ -605,6 +612,9 @@ impl Compiler {
         return Ok(());
     }
 
+    /// Only the Free arm can fail: locals and globals were bounded by
+    /// `define_symbol`, builtins come from a fixed table, and Function is
+    /// always slot 0.
     fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) -> Result<(), CompileError> {
         match symbol.scope {
             SymbolScope::Global => {
@@ -617,15 +627,19 @@ impl Compiler {
                 self.emit_with_span(OpGetBuiltin, &[symbol.index], span);
             }
             SymbolScope::Free => {
-                // Free vars are captured during resolve, outside define_symbol.
-                ensure_u8_index(symbol.index, "free variables")?;
+                // Free slots are assigned by resolve() while the body compiles,
+                // so this fires long before the capture list is emitted. Check
+                // it against OpClosure's u8 *count*, which caps at 255, not
+                // against OpGetFree's u8 slot, which would allow one more than
+                // any closure can actually carry.
+                ensure_u8_count(symbol.index + 1, "free variables")?;
                 self.emit_with_span(OpGetFree, &[symbol.index], span);
             }
             SymbolScope::Function => {
                 self.emit_with_span(OpCurrentClosure, &[], span);
             }
         }
-        Ok(())
+        return Ok(());
     }
 
     pub fn bytecode(&self) -> Bytecode {
@@ -644,17 +658,23 @@ impl Compiler {
             SymbolScope::Global => ensure_u16_index(symbol.index, "globals")?,
             // Builtin indexes come from a fixed compile-time table well under
             // u8::MAX, Function is always 0, and Free is assigned by resolve()
-            // rather than here — checked in load_symbol instead.
+            // rather than here — bounded by the OpClosure capture count.
             SymbolScope::Builtin | SymbolScope::Free | SymbolScope::Function => {}
         }
         Ok(symbol)
     }
 
-    pub fn add_constant(&mut self, obj: Object) -> Result<usize, CompileError> {
-        let index = self.constants.len();
-        ensure_u16_index(index, "constants")?;
+    /// Kept infallible for the published 1.1.0 signature. Prefer
+    /// [`Compiler::try_add_constant`], which rejects a pool too large for
+    /// `OpConst`'s u16 operand instead of handing back an index that truncates.
+    pub fn add_constant(&mut self, obj: Object) -> usize {
         self.constants.push(Rc::new(obj));
-        Ok(index)
+        return self.constants.len() - 1;
+    }
+
+    pub fn try_add_constant(&mut self, obj: Object) -> Result<usize, CompileError> {
+        ensure_u16_index(self.constants.len(), "constants")?;
+        return Ok(self.add_constant(obj));
     }
 
     pub fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
@@ -735,6 +755,7 @@ impl Compiler {
         let free_symbols = self.symbol_table.free_symbols.clone();
         let scoped_instructions = self.leave_scope();
         self.callable_kinds.pop();
+        ensure_u8_count(free_symbols.len(), "free variables")?;
         for symbol in &free_symbols {
             self.load_symbol(symbol, &method_span)?;
         }
@@ -745,10 +766,9 @@ impl Compiler {
             num_locals,
             num_parameters: method.params.len() + 1,
         });
-        let constant_index = self.add_constant(Object::CompiledFunction(compiled_function))?;
+        let constant_index = self.try_add_constant(Object::CompiledFunction(compiled_function))?;
         self.function_debug_info_mut()
             .insert(constant_index, scoped_instructions.debug_info);
-        ensure_u8_count(free_symbols.len(), "free variables")?;
         self.emit_with_span(OpClosure, &[constant_index, free_symbols.len()], &method_span);
         Ok(())
     }

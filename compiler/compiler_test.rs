@@ -840,12 +840,22 @@ mod tests {
     fn rejects_too_many_constants() {
         let mut compiler = Compiler::new();
         for i in 0..=u16::MAX as i64 {
-            compiler.add_constant(Object::Integer(i)).unwrap();
+            compiler.try_add_constant(Object::Integer(i)).unwrap();
         }
         assert_eq!(
-            compiler.add_constant(Object::Integer(0)).unwrap_err(),
+            compiler.try_add_constant(Object::Integer(0)).unwrap_err(),
             "too many constants: 65537 exceeds the maximum of 65536"
         );
+    }
+
+    #[test]
+    fn add_constant_keeps_its_published_signature() {
+        // monkey-compiler 1.1.0 ships `add_constant -> usize`. Changing it to a
+        // Result would break downstream source builds, so the checked variant
+        // is additive and this call has to keep type-checking as written.
+        let mut compiler = Compiler::new();
+        let index: usize = compiler.add_constant(Object::Integer(1));
+        assert_eq!(index, 0);
     }
 
     #[test]
@@ -882,29 +892,50 @@ mod tests {
 
     #[test]
     fn rejects_too_many_hash_pairs() {
-        // OpHash counts keys and values, so the limit is hit at half as many
-        // entries as an array of the same operand width.
+        // OpHash's operand counts keys and values, so it is always even and the
+        // real ceiling is 32767 pairs. The error has to name that, not the
+        // doubled operand, or it advertises a limit twice what exists.
         let entries = comma_list(u16::MAX as usize / 2 + 1, |i| format!("{i}: true"));
         let input = format!("{{{entries}}}");
         assert_eq!(
             compile_error(&input),
-            "too many hash pairs: 65536 exceeds the maximum of 65535"
+            "too many hash pairs: 32768 exceeds the maximum of 32767"
         );
     }
 
     #[test]
+    fn accepts_max_hash_pairs() {
+        let entries = comma_list(u16::MAX as usize / 2, |i| format!("{i}: true"));
+        let mut compiler = Compiler::new();
+        compiler
+            .compile(&parse(&format!("{{{entries}}}")).unwrap())
+            .unwrap();
+    }
+
+    #[test]
     fn rejects_too_many_free_variables() {
-        // The enclosing function stays at exactly 256 locals, the most a u8
-        // slot operand allows, so it is the OpClosure free count that overflows.
+        // OpGetFree's u8 slot could address 256 captures but OpClosure's u8
+        // count stops at 255, so 255 is the only reachable limit and every
+        // path has to report it. 256 locals is the most a u8 slot allows, so
+        // the enclosing frame is legal and only the capture count overflows.
         let lets = repeat_joined(256, |i| format!("let v{i} = {i};"));
-        let sum = (0..256)
+        let names = (0..256)
             .map(|i| format!("v{i}"))
             .collect::<Vec<_>>()
             .join(" + ");
-        let input = format!("let mk = fn() {{ {lets} fn() {{ {sum} }} }}; mk()()");
+        let expected = "too many free variables: 256 exceeds the maximum of 255";
+
         assert_eq!(
-            compile_error(&input),
-            "too many free variables: 256 exceeds the maximum of 255"
+            compile_error(&format!("let mk = fn() {{ {lets} fn() {{ {names} }} }};")),
+            expected
+        );
+        // Same limit through a middle frame contributing a local of its own,
+        // which is the shape that used to report a maximum of 256 instead.
+        assert_eq!(
+            compile_error(&format!(
+                "let mk = fn() {{ {lets} fn() {{ let w = 0; fn() {{ {names} + w }} }} }};"
+            )),
+            expected
         );
     }
 

@@ -327,6 +327,13 @@ lazy_static! {
     };
 }
 
+/// # Panics
+///
+/// If an operand does not fit its opcode's fixed width. `Compiler` rejects
+/// those with a `CompileError` before reaching here, so a panic means the
+/// caller built the instruction by hand. The alternative — truncating with
+/// `as u8` / `as u16` — is a silent miscompile, so this is checked in release
+/// too rather than left to `debug_assert!`.
 pub fn make_instructions(op: Opcode, operands: &[usize]) -> Instructions {
     let mut instructions = Vec::new();
     instructions.push(op as u8);
@@ -335,7 +342,7 @@ pub fn make_instructions(op: Opcode, operands: &[usize]) -> Instructions {
     for (o, w) in operands.iter().zip(widths) {
         match w {
             2 => {
-                debug_assert!(
+                assert!(
                     *o <= u16::MAX as usize,
                     "{:?} operand {} does not fit in 2 bytes; the compiler must \
                      reject it before emitting rather than truncate it here",
@@ -345,7 +352,7 @@ pub fn make_instructions(op: Opcode, operands: &[usize]) -> Instructions {
                 instructions.write_u16::<BigEndian>(*o as u16).unwrap();
             }
             1 => {
-                debug_assert!(
+                assert!(
                     *o <= u8::MAX as usize,
                     "{:?} operand {} does not fit in 1 byte; the compiler must \
                      reject it before emitting rather than truncate it here",
