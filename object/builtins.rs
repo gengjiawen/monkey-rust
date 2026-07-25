@@ -64,12 +64,27 @@ lazy_static! {
 //     .into_iter()
 //     .collect();
 
+/// Reject a call whose argument count does not match the builtin's arity,
+/// mirroring the checks the gc runtime performs in `gc/value.rs`. Returns the
+/// `Object::Error` the builtin should hand back, or `None` when the call is
+/// well-formed. Every fixed-arity builtin must call this before touching
+/// `args[..]`, otherwise a short call indexes out of bounds and panics.
+fn check_arity(name: &str, args: &[Rc<Object>], expected: usize) -> Option<Rc<Object>> {
+    if args.len() == expected {
+        return None;
+    }
+    Some(Rc::from(Object::Error(format!(
+        "builtin {} expected {} argument{}, got {}",
+        name,
+        expected,
+        if expected == 1 { "" } else { "s" },
+        args.len()
+    ))))
+}
+
 pub fn len(args: Vec<Rc<Object>>) -> Rc<Object> {
-    if args.len() != 1 {
-        return Rc::from(Object::Error(format!(
-            "builtin len expected 1 argument, got {}",
-            args.len()
-        )));
+    if let Some(error) = check_arity("len", &args, 1) {
+        return error;
     }
     Rc::from(match &*args[0] {
         Object::String(s) => Object::Integer(s.len() as i64),
@@ -84,6 +99,9 @@ pub fn puts(args: Vec<Rc<Object>>) -> Rc<Object> {
 }
 
 pub fn first(args: Vec<Rc<Object>>) -> Rc<Object> {
+    if let Some(error) = check_arity("first", &args, 1) {
+        return error;
+    }
     match &*args[0] {
         Object::Array(s) => match s.first() {
             Some(obj) => Rc::clone(obj),
@@ -94,6 +112,9 @@ pub fn first(args: Vec<Rc<Object>>) -> Rc<Object> {
 }
 
 pub fn last(args: Vec<Rc<Object>>) -> Rc<Object> {
+    if let Some(error) = check_arity("last", &args, 1) {
+        return error;
+    }
     match &*args[0] {
         Object::Array(s) => match s.last() {
             Some(obj) => Rc::clone(obj),
@@ -104,6 +125,9 @@ pub fn last(args: Vec<Rc<Object>>) -> Rc<Object> {
 }
 
 pub fn rest(args: Vec<Rc<Object>>) -> Rc<Object> {
+    if let Some(error) = check_arity("rest", &args, 1) {
+        return error;
+    }
     match &*args[0] {
         Object::Array(s) => {
             let len = s.len();
@@ -118,12 +142,13 @@ pub fn rest(args: Vec<Rc<Object>>) -> Rc<Object> {
 }
 
 pub fn push(args: Vec<Rc<Object>>) -> Rc<Object> {
-    let array = args.first().unwrap();
-    let obj = Rc::clone(args.last().unwrap());
-    match &**array {
+    if let Some(error) = check_arity("push", &args, 2) {
+        return error;
+    }
+    match &*args[0] {
         Object::Array(s) => {
             let mut new_array = s.clone();
-            new_array.push(obj);
+            new_array.push(Rc::clone(&args[1]));
             return Rc::new(Object::Array(new_array));
         }
         o => Rc::new(Object::Error(format!("builtin push not supported for for type {}", o))),

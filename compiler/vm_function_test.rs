@@ -213,4 +213,38 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
+    #[test]
+    fn test_builtin_arity_errors() {
+        // Same wording as the gc VM (gc/vm_test.rs) and the interpreter: a
+        // wrong argument count is an error value, never a panic or a call that
+        // quietly ignores the extra arguments.
+        let tests = vec![
+            VmTestCase {
+                input: "first();",
+                expected: Object::Error("builtin first expected 1 argument, got 0".to_string()),
+            },
+            VmTestCase {
+                input: "first([1], [2]);",
+                expected: Object::Error("builtin first expected 1 argument, got 2".to_string()),
+            },
+            VmTestCase {
+                input: "last([1], [2]);",
+                expected: Object::Error("builtin last expected 1 argument, got 2".to_string()),
+            },
+            VmTestCase {
+                input: "rest([1], [2]);",
+                expected: Object::Error("builtin rest expected 1 argument, got 2".to_string()),
+            },
+            VmTestCase {
+                input: "push([1]);",
+                expected: Object::Error("builtin push expected 2 arguments, got 1".to_string()),
+            },
+            VmTestCase {
+                input: "push([1], 2, 3);",
+                expected: Object::Error("builtin push expected 2 arguments, got 3".to_string()),
+            },
+        ];
+        run_vm_tests(tests);
+    }
 }

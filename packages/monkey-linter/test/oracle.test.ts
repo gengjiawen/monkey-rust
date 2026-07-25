@@ -54,8 +54,30 @@ describe('builtin-arity tracks the GC VM', () => {
     }
   )
 
+  it.each([
+    ['first();', 'expected 1 argument'],
+    ['first([1], [2]);', 'expected 1 argument'],
+    ['last([1], [2]);', 'expected 1 argument'],
+    ['rest([1], [2]);', 'expected 1 argument'],
+    ['push([1]);', 'expected 2 arguments'],
+    ['push([1], 2, 3);', 'expected 2 arguments'],
+  ])('flags %s, which the VM evaluates to an arity error', (source, wording) => {
+    expect(rulesOf(source)).toContain('builtin-arity')
+    const report = runGc(source)
+    expect(`${report.result ?? report.message ?? ''}`).toContain(wording)
+  })
+
   it('stays quiet for len("hi"), which the VM accepts', () => {
     expect(rulesOf('len("hi");')).not.toContain('builtin-arity')
     expect(runGc('len("hi");').result).toBe('2')
+  })
+
+  it.each([
+    ['first([1, 2]);', '1'],
+    ['last([1, 2]);', '2'],
+    ['push([1], 2);', '[1, 2]'],
+  ])('stays quiet for %s, which the VM accepts', (source, expected) => {
+    expect(rulesOf(source)).not.toContain('builtin-arity')
+    expect(runGc(source).result).toBe(expected)
   })
 })
