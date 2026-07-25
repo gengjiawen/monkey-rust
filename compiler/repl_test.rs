@@ -71,3 +71,33 @@ fn repl_survives_a_parse_error() {
         .expect("REPL should still evaluate after a parse error");
     assert_eq!(result, "2");
 }
+
+#[test]
+fn repl_reports_runtime_errors_and_keeps_running() {
+    let mut repl = Repl::new();
+    let error = repl
+        .eval_line("1 + \"a\";")
+        .expect_err("mixed operand types should fail");
+    assert_eq!(error, "unsupported binary operation for 1 and a");
+
+    let result = repl
+        .eval_line("1 + 1;")
+        .expect("REPL should still evaluate after a runtime error");
+    assert_eq!(result, "2");
+}
+
+#[test]
+fn repl_does_not_commit_bindings_from_a_failed_line() {
+    let mut repl = Repl::new();
+    repl.eval_line("let leaked = 1; 1 + \"a\";")
+        .expect_err("line should fail at runtime");
+
+    let error = repl
+        .eval_line("leaked;")
+        .expect_err("failed line must not commit its symbol table");
+    assert!(
+        error.to_lowercase().contains("undefined variable 'leaked'"),
+        "expected an undefined-variable error, got: {:?}",
+        error
+    );
+}
