@@ -219,6 +219,29 @@ mod tests {
     }
 
     #[test]
+    fn test_array_builtin_arity_errors() {
+        // A wrong argument count must produce an error, not a panic and not a
+        // silently truncated call. `push` used to read args.first()/args.last(),
+        // so `push([1])` appended the array to itself and `push([1], 2, 3)`
+        // dropped the middle argument; `first`/`last`/`rest` indexed args[0]
+        // unchecked and panicked when called with none. The gc VM already
+        // rejected all of these, with the wording pinned here.
+        let test_case = [
+            ("first()", "builtin first expected 1 argument, got 0"),
+            ("first([1], [2])", "builtin first expected 1 argument, got 2"),
+            ("last()", "builtin last expected 1 argument, got 0"),
+            ("last([1], [2])", "builtin last expected 1 argument, got 2"),
+            ("rest()", "builtin rest expected 1 argument, got 0"),
+            ("rest([1], [2])", "builtin rest expected 1 argument, got 2"),
+            ("push()", "builtin push expected 2 arguments, got 0"),
+            ("push([1])", "builtin push expected 2 arguments, got 1"),
+            ("push([1], 2, 3)", "builtin push expected 2 arguments, got 3"),
+            ("len()", "builtin len expected 1 argument, got 0"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_hash_index_expressions() {
         let test_case = [
             (r#"{"foo": 5}["foo"]"#, "5"),

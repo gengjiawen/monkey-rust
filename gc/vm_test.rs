@@ -533,6 +533,38 @@ mod tests {
     }
 
     #[test]
+    fn test_builtin_arity_errors() {
+        // The gc VM has always rejected these; pinning them here keeps the
+        // three backends from drifting apart again (see object/builtins.rs).
+        run_gc_vm_tests(vec![
+            VmTestCase {
+                input: "first();",
+                expected: Object::Error("builtin first expected 1 argument, got 0".to_string()),
+            },
+            VmTestCase {
+                input: "first([1], [2]);",
+                expected: Object::Error("builtin first expected 1 argument, got 2".to_string()),
+            },
+            VmTestCase {
+                input: "last([1], [2]);",
+                expected: Object::Error("builtin last expected 1 argument, got 2".to_string()),
+            },
+            VmTestCase {
+                input: "rest([1], [2]);",
+                expected: Object::Error("builtin rest expected 1 argument, got 2".to_string()),
+            },
+            VmTestCase {
+                input: "push([1]);",
+                expected: Object::Error("builtin push expected 2 arguments, got 1".to_string()),
+            },
+            VmTestCase {
+                input: "push([1], 2, 3);",
+                expected: Object::Error("builtin push expected 2 arguments, got 3".to_string()),
+            },
+        ]);
+    }
+
+    #[test]
     fn builtin_call_releases_callee_args_and_stack_temporaries() {
         let program = parse("len([1, 2, 3]);").unwrap();
         let mut compiler = Compiler::new();
