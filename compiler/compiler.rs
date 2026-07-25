@@ -237,30 +237,36 @@ type CompileError = String;
 /// Bytecode operand widths are fixed (u8 / u16). Without these checks,
 /// `make_instructions` silently truncates oversized operands and the VM
 /// reads the wrong slot/constant — a silent miscompile.
-fn ensure_u8_operand(value: usize, what: &str) -> Result<(), CompileError> {
-    if value > u8::MAX as usize {
-        Err(format!(
-            "too many {}: {} exceeds limit of {}",
-            what,
-            value,
-            u8::MAX
-        ))
-    } else {
-        Ok(())
+///
+/// The `_count` and `_index` variants exist so the numbers in the error text
+/// are always counts of things the user wrote. Passing a zero-based operand
+/// index to a `_count` helper would report `256 exceeds ... 255` for what is
+/// really the 257th local.
+fn ensure_count(count: usize, max: usize, what: &str) -> Result<(), CompileError> {
+    if count > max {
+        return Err(format!("too many {}: {} exceeds the maximum of {}", what, count, max));
     }
+    return Ok(());
 }
 
-fn ensure_u16_operand(value: usize, what: &str) -> Result<(), CompileError> {
-    if value > u16::MAX as usize {
-        Err(format!(
-            "too many {}: {} exceeds limit of {}",
-            what,
-            value,
-            u16::MAX
-        ))
-    } else {
-        Ok(())
-    }
+/// For operands that hold a count directly (call arguments, array elements).
+fn ensure_u8_count(count: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(count, u8::MAX as usize, what);
+}
+
+fn ensure_u16_count(count: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(count, u16::MAX as usize, what);
+}
+
+/// For operands that hold a zero-based index (locals, globals, constants).
+/// `index` items already exist, so the one being added is number `index + 1`
+/// and the encodable maximum is one more than the largest index.
+fn ensure_u8_index(index: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(index + 1, u8::MAX as usize + 1, what);
+}
+
+fn ensure_u16_index(index: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(index + 1, u16::MAX as usize + 1, what);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -437,7 +443,7 @@ impl Compiler {
                     for element in array.elements.iter() {
                         self.compile_expr(element)?;
                     }
-                    ensure_u16_operand(array.elements.len(), "array elements")?;
+                    ensure_u16_count(array.elements.len(), "array elements")?;
                     self.emit_with_span(OpArray, &[array.elements.len()], &array.span);
                 }
                 Literal::Hash(hash) => {
@@ -446,7 +452,7 @@ impl Compiler {
                         self.compile_expr(value)?;
                     }
                     let pair_count = hash.elements.len() * 2;
-                    ensure_u16_operand(pair_count, "hash pairs")?;
+                    ensure_u16_count(pair_count, "hash pairs")?;
                     self.emit_with_span(OpHash, &[pair_count], &hash.span);
                 }
             },
@@ -556,7 +562,7 @@ impl Compiler {
                     self.add_constant(Object::CompiledFunction(compiled_function))?;
                 self.function_debug_info_mut()
                     .insert(constant_index, scoped_instructions.debug_info);
-                ensure_u8_operand(free_symbols.len(), "free variables")?;
+                ensure_u8_count(free_symbols.len(), "free variables")?;
                 let operands = vec![constant_index, free_symbols.len()];
                 self.emit_with_span(OpClosure, &operands, &function_span);
             }
@@ -565,7 +571,7 @@ impl Compiler {
                 for arg in fc.arguments.iter() {
                     self.compile_expr(arg)?;
                 }
-                ensure_u8_operand(fc.arguments.len(), "call arguments")?;
+                ensure_u8_count(fc.arguments.len(), "call arguments")?;
                 self.emit_with_span(OpCall, &[fc.arguments.len()], &fc.span);
             }
             Expression::This(this) => {
@@ -591,7 +597,7 @@ impl Compiler {
                 for argument in &new_expression.arguments {
                     self.compile_expr(argument)?;
                 }
-                ensure_u8_operand(new_expression.arguments.len(), "constructor arguments")?;
+                ensure_u8_count(new_expression.arguments.len(), "constructor arguments")?;
                 self.emit_with_span(OpNew, &[new_expression.arguments.len()], &new_expression.span);
             }
         }
@@ -612,7 +618,7 @@ impl Compiler {
             }
             SymbolScope::Free => {
                 // Free vars are captured during resolve, outside define_symbol.
-                ensure_u8_operand(symbol.index, "free variables")?;
+                ensure_u8_index(symbol.index, "free variables")?;
                 self.emit_with_span(OpGetFree, &[symbol.index], span);
             }
             SymbolScope::Function => {
@@ -634,8 +640,11 @@ impl Compiler {
     fn define_symbol(&mut self, name: String) -> Result<Rc<Symbol>, CompileError> {
         let symbol = self.symbol_table.define(name);
         match symbol.scope {
-            SymbolScope::LOCAL => ensure_u8_operand(symbol.index, "locals")?,
-            SymbolScope::Global => ensure_u16_operand(symbol.index, "globals")?,
+            SymbolScope::LOCAL => ensure_u8_index(symbol.index, "locals")?,
+            SymbolScope::Global => ensure_u16_index(symbol.index, "globals")?,
+            // Builtin indexes come from a fixed compile-time table well under
+            // u8::MAX, Function is always 0, and Free is assigned by resolve()
+            // rather than here — checked in load_symbol instead.
             SymbolScope::Builtin | SymbolScope::Free | SymbolScope::Function => {}
         }
         Ok(symbol)
@@ -643,7 +652,7 @@ impl Compiler {
 
     pub fn add_constant(&mut self, obj: Object) -> Result<usize, CompileError> {
         let index = self.constants.len();
-        ensure_u16_operand(index, "constants")?;
+        ensure_u16_index(index, "constants")?;
         self.constants.push(Rc::new(obj));
         Ok(index)
     }
@@ -739,7 +748,7 @@ impl Compiler {
         let constant_index = self.add_constant(Object::CompiledFunction(compiled_function))?;
         self.function_debug_info_mut()
             .insert(constant_index, scoped_instructions.debug_info);
-        ensure_u8_operand(free_symbols.len(), "free variables")?;
+        ensure_u8_count(free_symbols.len(), "free variables")?;
         self.emit_with_span(OpClosure, &[constant_index, free_symbols.len()], &method_span);
         Ok(())
     }
@@ -798,7 +807,15 @@ impl Compiler {
     }
 
     fn change_operand(&mut self, pos: usize, operand: usize) -> Result<(), CompileError> {
-        ensure_u16_operand(operand, "instructions")?;
+        // Jump operands are byte offsets into the enclosing instruction stream,
+        // not a count of anything the user wrote, so they get their own message.
+        if operand > u16::MAX as usize {
+            return Err(format!(
+                "compiled code too large: jump target at byte {} is outside the {}-byte range of a jump operand",
+                operand,
+                u16::MAX
+            ));
+        }
         let op = Opcode::from_repr(self.current_instruction().data[pos])
             .expect("compiler emitted an unknown opcode");
         let ins = make_instructions(op, &[operand]);

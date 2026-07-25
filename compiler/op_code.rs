@@ -335,9 +335,23 @@ pub fn make_instructions(op: Opcode, operands: &[usize]) -> Instructions {
     for (o, w) in operands.iter().zip(widths) {
         match w {
             2 => {
+                debug_assert!(
+                    *o <= u16::MAX as usize,
+                    "{:?} operand {} does not fit in 2 bytes; the compiler must \
+                     reject it before emitting rather than truncate it here",
+                    op,
+                    o
+                );
                 instructions.write_u16::<BigEndian>(*o as u16).unwrap();
             }
             1 => {
+                debug_assert!(
+                    *o <= u8::MAX as usize,
+                    "{:?} operand {} does not fit in 1 byte; the compiler must \
+                     reject it before emitting rather than truncate it here",
+                    op,
+                    o
+                );
                 instructions.write_u8(*o as u8).unwrap();
             }
             _ => {

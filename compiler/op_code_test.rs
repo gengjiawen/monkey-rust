@@ -106,4 +106,22 @@ mod tests {
 
         assert_eq!(concatted, expected);
     }
+
+    // `make_instructions` truncates with `as u8` / `as u16`, which turns an
+    // oversized operand into a silent miscompile. The compiler is expected to
+    // reject those before emitting; these asserts are the backstop that turns
+    // a future missed call site into a loud failure instead.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "OpGetLocal operand 256 does not fit in 1 byte")]
+    fn make_instructions_rejects_an_oversized_u8_operand() {
+        make_instructions(OpGetLocal, &[256]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "OpConst operand 65536 does not fit in 2 bytes")]
+    fn make_instructions_rejects_an_oversized_u16_operand() {
+        make_instructions(OpConst, &[65536]);
+    }
 }
