@@ -234,6 +234,41 @@ pub struct EmittedInstruction {
 
 type CompileError = String;
 
+/// Bytecode operand widths are fixed (u8 / u16). Without these checks,
+/// `make_instructions` silently truncates oversized operands and the VM
+/// reads the wrong slot/constant — a silent miscompile.
+///
+/// The `_count` and `_index` variants exist so the numbers in the error text
+/// are always counts of things the user wrote. Passing a zero-based operand
+/// index to a `_count` helper would report `256 exceeds ... 255` for what is
+/// really the 257th local.
+fn ensure_count(count: usize, max: usize, what: &str) -> Result<(), CompileError> {
+    if count > max {
+        return Err(format!("too many {}: {} exceeds the maximum of {}", what, count, max));
+    }
+    return Ok(());
+}
+
+/// For operands that hold a count directly (call arguments, array elements).
+fn ensure_u8_count(count: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(count, u8::MAX as usize, what);
+}
+
+fn ensure_u16_count(count: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(count, u16::MAX as usize, what);
+}
+
+/// For operands that hold a zero-based index (locals, globals, constants).
+/// `index` items already exist, so the one being added is number `index + 1`
+/// and the encodable maximum is one more than the largest index.
+fn ensure_u8_index(index: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(index + 1, u8::MAX as usize + 1, what);
+}
+
+fn ensure_u16_index(index: usize, what: &str) -> Result<(), CompileError> {
+    return ensure_count(index + 1, u16::MAX as usize + 1, what);
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CallableKind {
     Function,
@@ -318,9 +353,7 @@ impl Compiler {
                 // environment. Named recursion is provided by Function scope
                 // inside the function body, not by an uninitialized slot.
                 self.compile_expr(&let_statement.expr)?;
-                let symbol = self
-                    .symbol_table
-                    .define(let_statement.identifier.kind.to_string());
+                let symbol = self.define_symbol(let_statement.identifier.kind.to_string())?;
                 if symbol.scope == SymbolScope::Global {
                     self.emit_with_span(Opcode::OpSetGlobal, &[symbol.index], &let_statement.span);
                 } else {
@@ -342,13 +375,14 @@ impl Compiler {
                 return Ok(());
             }
             Statement::Class(class) => {
-                let symbol = self.symbol_table.define(class.name.name.clone());
-                let class_name = self.add_constant(Object::String(class.name.name.clone()));
+                let symbol = self.define_symbol(class.name.name.clone())?;
+                let class_name = self.try_add_constant(Object::String(class.name.name.clone()))?;
                 self.emit_with_span(OpClass, &[class_name], &class.span);
 
                 for method in &class.methods {
                     self.compile_method(&class.name.name, method)?;
-                    let method_name = self.add_constant(Object::String(method.name.name.clone()));
+                    let method_name =
+                        self.try_add_constant(Object::String(method.name.name.clone()))?;
                     let kind = match method.kind {
                         MethodKind::Method => 0,
                         MethodKind::Constructor => 1,
@@ -364,7 +398,8 @@ impl Compiler {
             Statement::SetProperty(statement) => {
                 self.compile_expr(&statement.object)?;
                 self.compile_expr(&statement.value)?;
-                let property = self.add_constant(Object::String(statement.property.name.clone()));
+                let property =
+                    self.try_add_constant(Object::String(statement.property.name.clone()))?;
                 self.emit_with_span(OpSetProperty, &[property], &statement.span);
                 self.emit_with_span(OpNull, &[], &statement.span);
                 self.emit_with_span(OpPop, &[], &statement.span);
@@ -379,7 +414,7 @@ impl Compiler {
                 let symbol = self.symbol_table.resolve(identifier.name.clone());
                 match symbol {
                     Some(symbol) => {
-                        self.load_symbol(&symbol, &identifier.span);
+                        self.load_symbol(&symbol, &identifier.span)?;
                     }
                     None => {
                         return Err(format!("Undefined variable '{}'", identifier.name));
@@ -389,7 +424,7 @@ impl Compiler {
             Expression::LITERAL(l) => match l {
                 Literal::Integer(i) => {
                     let int = Object::Integer(i.raw);
-                    let operands = vec![self.add_constant(int)];
+                    let operands = vec![self.try_add_constant(int)?];
                     self.emit_with_span(OpConst, &operands, &i.span);
                 }
                 Literal::Boolean(i) => {
@@ -401,13 +436,14 @@ impl Compiler {
                 }
                 Literal::String(s) => {
                     let string_object = Object::String(s.raw.clone());
-                    let operands = vec![self.add_constant(string_object)];
+                    let operands = vec![self.try_add_constant(string_object)?];
                     self.emit_with_span(OpConst, &operands, &s.span);
                 }
                 Literal::Array(array) => {
                     for element in array.elements.iter() {
                         self.compile_expr(element)?;
                     }
+                    ensure_u16_count(array.elements.len(), "array elements")?;
                     self.emit_with_span(OpArray, &[array.elements.len()], &array.span);
                 }
                 Literal::Hash(hash) => {
@@ -415,6 +451,11 @@ impl Compiler {
                         self.compile_expr(key)?;
                         self.compile_expr(value)?;
                     }
+                    // OpHash counts keys and values, so the encodable operand is
+                    // always even and the last usable one is u16::MAX - 1. Check
+                    // the pair count the user actually wrote, not the doubled
+                    // operand, or the message reports twice the real limit.
+                    ensure_count(hash.elements.len(), u16::MAX as usize / 2, "hash pairs")?;
                     self.emit_with_span(OpHash, &[hash.elements.len() * 2], &hash.span);
                 }
             },
@@ -473,7 +514,7 @@ impl Compiler {
                 let jump_pos = self.emit_with_span(OpJump, &[9527], &if_node.span);
 
                 let after_consequence_location = self.current_instruction().data.len();
-                self.change_operand(jump_not_truthy, after_consequence_location);
+                self.change_operand(jump_not_truthy, after_consequence_location)?;
 
                 if let Some(alternate) = &if_node.alternate {
                     self.compile_block_statement_as_value(alternate)?;
@@ -481,7 +522,7 @@ impl Compiler {
                     self.emit_with_span(OpNull, &[], &if_node.span);
                 }
                 let after_alternative_location = self.current_instruction().data.len();
-                self.change_operand(jump_pos, after_alternative_location);
+                self.change_operand(jump_pos, after_alternative_location)?;
             }
             Expression::Index(index) => {
                 self.compile_expr(&index.object)?;
@@ -496,7 +537,7 @@ impl Compiler {
                     self.symbol_table.define_function_name(f.name.clone());
                 }
                 for param in f.params.iter() {
-                    self.symbol_table.define(param.name.clone());
+                    self.define_symbol(param.name.clone())?;
                 }
                 self.compile_block_statement(&f.body)?;
                 if self.last_instruction_is(OpPop) {
@@ -509,8 +550,13 @@ impl Compiler {
                 let free_symbols = self.symbol_table.free_symbols.clone();
                 let scoped_instructions = self.leave_scope();
                 self.callable_kinds.pop();
+                // Checked before the loads so the count is the only free-variable
+                // limit a user can hit. OpGetFree's u8 slot allows one more than
+                // OpClosure's u8 count does, and reporting that larger number
+                // would name a limit no closure can actually reach.
+                ensure_u8_count(free_symbols.len(), "free variables")?;
                 for x in free_symbols.clone() {
-                    self.load_symbol(&x, &function_span);
+                    self.load_symbol(&x, &function_span)?;
                 }
 
                 let compiled_function = Rc::from(object::CompiledFunction {
@@ -520,7 +566,8 @@ impl Compiler {
                     num_parameters: f.params.len(),
                 });
 
-                let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
+                let constant_index =
+                    self.try_add_constant(Object::CompiledFunction(compiled_function))?;
                 self.function_debug_info_mut()
                     .insert(constant_index, scoped_instructions.debug_info);
                 let operands = vec![constant_index, free_symbols.len()];
@@ -531,6 +578,7 @@ impl Compiler {
                 for arg in fc.arguments.iter() {
                     self.compile_expr(arg)?;
                 }
+                ensure_u8_count(fc.arguments.len(), "call arguments")?;
                 self.emit_with_span(OpCall, &[fc.arguments.len()], &fc.span);
             }
             Expression::This(this) => {
@@ -538,11 +586,11 @@ impl Compiler {
                     .symbol_table
                     .resolve("this".to_string())
                     .ok_or_else(|| "this is only available inside a method".to_string())?;
-                self.load_symbol(&symbol, &this.span);
+                self.load_symbol(&symbol, &this.span)?;
             }
             Expression::Property(property) => {
                 self.compile_expr(&property.object)?;
-                let name = self.add_constant(Object::String(property.property.name.clone()));
+                let name = self.try_add_constant(Object::String(property.property.name.clone()))?;
                 self.emit_with_span(OpGetProperty, &[name], &property.span);
             }
             Expression::New(new_expression) => {
@@ -552,10 +600,11 @@ impl Compiler {
                     .ok_or_else(|| {
                         format!("Undefined variable '{}'", new_expression.callee.name)
                     })?;
-                self.load_symbol(&symbol, &new_expression.callee.span);
+                self.load_symbol(&symbol, &new_expression.callee.span)?;
                 for argument in &new_expression.arguments {
                     self.compile_expr(argument)?;
                 }
+                ensure_u8_count(new_expression.arguments.len(), "constructor arguments")?;
                 self.emit_with_span(OpNew, &[new_expression.arguments.len()], &new_expression.span);
             }
         }
@@ -563,7 +612,10 @@ impl Compiler {
         return Ok(());
     }
 
-    fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) {
+    /// Only the Free arm can fail: locals and globals were bounded by
+    /// `define_symbol`, builtins come from a fixed table, and Function is
+    /// always slot 0.
+    fn load_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) -> Result<(), CompileError> {
         match symbol.scope {
             SymbolScope::Global => {
                 self.emit_with_span(OpGetGlobal, &[symbol.index], span);
@@ -575,12 +627,19 @@ impl Compiler {
                 self.emit_with_span(OpGetBuiltin, &[symbol.index], span);
             }
             SymbolScope::Free => {
+                // Free slots are assigned by resolve() while the body compiles,
+                // so this fires long before the capture list is emitted. Check
+                // it against OpClosure's u8 *count*, which caps at 255, not
+                // against OpGetFree's u8 slot, which would allow one more than
+                // any closure can actually carry.
+                ensure_u8_count(symbol.index + 1, "free variables")?;
                 self.emit_with_span(OpGetFree, &[symbol.index], span);
             }
             SymbolScope::Function => {
                 self.emit_with_span(OpCurrentClosure, &[], span);
             }
         }
+        return Ok(());
     }
 
     pub fn bytecode(&self) -> Bytecode {
@@ -592,9 +651,30 @@ impl Compiler {
         };
     }
 
+    fn define_symbol(&mut self, name: String) -> Result<Rc<Symbol>, CompileError> {
+        let symbol = self.symbol_table.define(name);
+        match symbol.scope {
+            SymbolScope::LOCAL => ensure_u8_index(symbol.index, "locals")?,
+            SymbolScope::Global => ensure_u16_index(symbol.index, "globals")?,
+            // Builtin indexes come from a fixed compile-time table well under
+            // u8::MAX, Function is always 0, and Free is assigned by resolve()
+            // rather than here — bounded by the OpClosure capture count.
+            SymbolScope::Builtin | SymbolScope::Free | SymbolScope::Function => {}
+        }
+        Ok(symbol)
+    }
+
+    /// Kept infallible for the published 1.1.0 signature. Prefer
+    /// [`Compiler::try_add_constant`], which rejects a pool too large for
+    /// `OpConst`'s u16 operand instead of handing back an index that truncates.
     pub fn add_constant(&mut self, obj: Object) -> usize {
         self.constants.push(Rc::new(obj));
         return self.constants.len() - 1;
+    }
+
+    pub fn try_add_constant(&mut self, obj: Object) -> Result<usize, CompileError> {
+        ensure_u16_index(self.constants.len(), "constants")?;
+        return Ok(self.add_constant(obj));
     }
 
     pub fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
@@ -650,9 +730,9 @@ impl Compiler {
         };
         self.callable_kinds.push(callable_kind);
 
-        self.symbol_table.define("this".to_string());
+        self.define_symbol("this".to_string())?;
         for parameter in &method.params {
-            self.symbol_table.define(parameter.name.clone());
+            self.define_symbol(parameter.name.clone())?;
         }
         self.compile_block_statement(&method.body)?;
 
@@ -675,8 +755,9 @@ impl Compiler {
         let free_symbols = self.symbol_table.free_symbols.clone();
         let scoped_instructions = self.leave_scope();
         self.callable_kinds.pop();
+        ensure_u8_count(free_symbols.len(), "free variables")?;
         for symbol in &free_symbols {
-            self.load_symbol(symbol, &method_span);
+            self.load_symbol(symbol, &method_span)?;
         }
 
         let compiled_function = Rc::new(object::CompiledFunction {
@@ -685,7 +766,7 @@ impl Compiler {
             num_locals,
             num_parameters: method.params.len() + 1,
         });
-        let constant_index = self.add_constant(Object::CompiledFunction(compiled_function));
+        let constant_index = self.try_add_constant(Object::CompiledFunction(compiled_function))?;
         self.function_debug_info_mut()
             .insert(constant_index, scoped_instructions.debug_info);
         self.emit_with_span(OpClosure, &[constant_index, free_symbols.len()], &method_span);
@@ -745,11 +826,21 @@ impl Compiler {
         self.scopes[self.scope_index].last_instruction.opcode = OpReturnValue;
     }
 
-    fn change_operand(&mut self, pos: usize, operand: usize) {
+    fn change_operand(&mut self, pos: usize, operand: usize) -> Result<(), CompileError> {
+        // Jump operands are byte offsets into the enclosing instruction stream,
+        // not a count of anything the user wrote, so they get their own message.
+        if operand > u16::MAX as usize {
+            return Err(format!(
+                "compiled code too large: jump target at byte {} is outside the {}-byte range of a jump operand",
+                operand,
+                u16::MAX
+            ));
+        }
         let op = Opcode::from_repr(self.current_instruction().data[pos])
             .expect("compiler emitted an unknown opcode");
         let ins = make_instructions(op, &[operand]);
         self.replace_instruction(pos, &ins);
+        Ok(())
     }
 
     fn current_instruction(&self) -> &Instructions {

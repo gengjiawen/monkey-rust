@@ -792,4 +792,165 @@ mod tests {
         let mut next = Compiler::new_with_state(first.symbol_table, first.constants);
         next.compile(&parse("answer + 1;").unwrap()).unwrap();
     }
+
+    // Operand-width limits. Each of these programs used to compile into
+    // truncated bytecode that read the wrong slot at runtime, so every check
+    // below is asserted on its full message: the numbers are the contract.
+    fn compile_error(input: &str) -> String {
+        let mut compiler = Compiler::new();
+        return compiler
+            .compile(&parse(input).unwrap())
+            .expect_err("expected the program to be rejected");
+    }
+
+    fn repeat_joined(count: usize, item: impl Fn(usize) -> String) -> String {
+        return (0..count).map(item).collect::<Vec<_>>().join(" ");
+    }
+
+    fn comma_list(count: usize, item: impl Fn(usize) -> String) -> String {
+        return (0..count).map(item).collect::<Vec<_>>().join(", ");
+    }
+
+    #[test]
+    fn rejects_too_many_locals() {
+        // OpGetLocal/OpSetLocal use a u8 operand; index 256 would truncate.
+        let lets = repeat_joined(257, |i| format!("let v{i} = {i};"));
+        let input = format!("let f = fn() {{ {lets} v0 }}; f()");
+        assert_eq!(compile_error(&input), "too many locals: 257 exceeds the maximum of 256");
+    }
+
+    #[test]
+    fn accepts_max_locals() {
+        // Indices 0..=255 still fit in a u8 operand.
+        let lets = repeat_joined(256, |i| format!("let v{i} = {i};"));
+        let input = format!("let f = fn() {{ {lets} v255 }}; f()");
+        let mut compiler = Compiler::new();
+        compiler.compile(&parse(&input).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn rejects_too_many_globals() {
+        // Booleans emit OpTrue rather than a constant, so this hits the global
+        // limit without tripping the constant-pool limit first.
+        let lets = repeat_joined(u16::MAX as usize + 2, |i| format!("let g{i} = true;"));
+        assert_eq!(compile_error(&lets), "too many globals: 65537 exceeds the maximum of 65536");
+    }
+
+    #[test]
+    fn rejects_too_many_constants() {
+        let mut compiler = Compiler::new();
+        for i in 0..=u16::MAX as i64 {
+            compiler.try_add_constant(Object::Integer(i)).unwrap();
+        }
+        assert_eq!(
+            compiler.try_add_constant(Object::Integer(0)).unwrap_err(),
+            "too many constants: 65537 exceeds the maximum of 65536"
+        );
+    }
+
+    #[test]
+    fn add_constant_keeps_its_published_signature() {
+        // monkey-compiler 1.1.0 ships `add_constant -> usize`. Changing it to a
+        // Result would break downstream source builds, so the checked variant
+        // is additive and this call has to keep type-checking as written.
+        let mut compiler = Compiler::new();
+        let index: usize = compiler.add_constant(Object::Integer(1));
+        assert_eq!(index, 0);
+    }
+
+    #[test]
+    fn rejects_too_many_call_arguments() {
+        let args = comma_list(256, |i| i.to_string());
+        let input = format!("let f = fn() {{ 1 }}; f({args})");
+        assert_eq!(
+            compile_error(&input),
+            "too many call arguments: 256 exceeds the maximum of 255"
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_constructor_arguments() {
+        // OpNew carries the argument count in a u8, like OpCall.
+        let args = comma_list(256, |i| i.to_string());
+        let input = format!("class C {{ constructor() {{ 1 }} }} new C({args})");
+        assert_eq!(
+            compile_error(&input),
+            "too many constructor arguments: 256 exceeds the maximum of 255"
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_array_elements() {
+        // Booleans keep the constant pool out of it, as in the globals case.
+        let elements = comma_list(u16::MAX as usize + 1, |_| "true".to_string());
+        let input = format!("[{elements}]");
+        assert_eq!(
+            compile_error(&input),
+            "too many array elements: 65536 exceeds the maximum of 65535"
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_hash_pairs() {
+        // OpHash's operand counts keys and values, so it is always even and the
+        // real ceiling is 32767 pairs. The error has to name that, not the
+        // doubled operand, or it advertises a limit twice what exists.
+        let entries = comma_list(u16::MAX as usize / 2 + 1, |i| format!("{i}: true"));
+        let input = format!("{{{entries}}}");
+        assert_eq!(
+            compile_error(&input),
+            "too many hash pairs: 32768 exceeds the maximum of 32767"
+        );
+    }
+
+    #[test]
+    fn accepts_max_hash_pairs() {
+        let entries = comma_list(u16::MAX as usize / 2, |i| format!("{i}: true"));
+        let mut compiler = Compiler::new();
+        compiler
+            .compile(&parse(&format!("{{{entries}}}")).unwrap())
+            .unwrap();
+    }
+
+    #[test]
+    fn rejects_too_many_free_variables() {
+        // OpGetFree's u8 slot could address 256 captures but OpClosure's u8
+        // count stops at 255, so 255 is the only reachable limit and every
+        // path has to report it. 256 locals is the most a u8 slot allows, so
+        // the enclosing frame is legal and only the capture count overflows.
+        let lets = repeat_joined(256, |i| format!("let v{i} = {i};"));
+        let names = (0..256)
+            .map(|i| format!("v{i}"))
+            .collect::<Vec<_>>()
+            .join(" + ");
+        let expected = "too many free variables: 256 exceeds the maximum of 255";
+
+        assert_eq!(
+            compile_error(&format!("let mk = fn() {{ {lets} fn() {{ {names} }} }};")),
+            expected
+        );
+        // Same limit through a middle frame contributing a local of its own,
+        // which is the shape that used to report a maximum of 256 instead.
+        assert_eq!(
+            compile_error(&format!(
+                "let mk = fn() {{ {lets} fn() {{ let w = 0; fn() {{ {names} + w }} }} }};"
+            )),
+            expected
+        );
+    }
+
+    #[test]
+    fn rejects_code_larger_than_the_jump_range() {
+        // Jump operands are u16 byte offsets. A branch whose body pushes the
+        // landing site past 65535 has to be rejected, not silently retargeted.
+        let body = repeat_joined(20000, |i| format!("{};", i % 9));
+        let input = format!("if (true) {{ {body} 1 }} else {{ 2 }}");
+        let err = compile_error(&input);
+        assert!(
+            err.starts_with("compiled code too large: jump target at byte ")
+                && err.ends_with("is outside the 65535-byte range of a jump operand"),
+            "unexpected error: {}",
+            err
+        );
+    }
 }
