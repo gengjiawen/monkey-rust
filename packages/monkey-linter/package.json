@@ -1,6 +1,6 @@
 {
   "name": "@gengjiawen/monkey-lint",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A static linter for the Monkey programming language",
   "main": "dist/node.js",
   "browser": "dist/index.mjs",
@@ -32,7 +32,7 @@
     "url": "https://github.com/gengjiawen/monkey-rust"
   },
   "dependencies": {
-    "@gengjiawen/monkey-wasm": "workspace:^1.1.0"
+    "@gengjiawen/monkey-wasm": "^1.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
