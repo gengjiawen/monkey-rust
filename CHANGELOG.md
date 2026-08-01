@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.2.0](https://github.com/gengjiawen/monkey-rust/compare/v1.1.0...v1.2.0) (2026-07-26)
+
+
+### Features
+
+* add Monkey linter (@gengjiawen/monkey-lint) ([#301](https://github.com/gengjiawen/monkey-rust/issues/301)) ([03cccfe](https://github.com/gengjiawen/monkey-rust/commit/03cccfea1aeafa99a3e0d96c56065d8ec385c953))
+* add Monkey source minifier ([#298](https://github.com/gengjiawen/monkey-rust/issues/298)) ([add042a](https://github.com/gengjiawen/monkey-rust/commit/add042aa8b0e8fb9f9b917725f72c063c95f7a32))
+* **gc:** runtime error kinds, output capture, and wrapping arithmetic ([#299](https://github.com/gengjiawen/monkey-rust/issues/299)) ([ffd62b1](https://github.com/gengjiawen/monkey-rust/commit/ffd62b1922717db117829a4e82e784a3030994e9))
+* **playground:** make the ARM64 pane beginner-friendly with hover docs, highlighting, and a reading guide ([#296](https://github.com/gengjiawen/monkey-rust/issues/296)) ([5488498](https://github.com/gengjiawen/monkey-rust/commit/548849845f721affb0509fd69f761aa855a55d26))
+
+
+### Bug Fixes
+
+* **compiler:** balance valueless if arms ([#304](https://github.com/gengjiawen/monkey-rust/issues/304)) ([ff1cd1f](https://github.com/gengjiawen/monkey-rust/commit/ff1cd1fc0bbd384a724eea1ffe92555f9a3c076a))
+* **compiler:** keep builtins resolvable in the REPL ([#310](https://github.com/gengjiawen/monkey-rust/issues/310)) ([cc1ee69](https://github.com/gengjiawen/monkey-rust/commit/cc1ee697040331bbee37759660a9cadac08c40dd))
+* **compiler:** reject operands that exceed bytecode widths ([#317](https://github.com/gengjiawen/monkey-rust/issues/317)) ([d1be2fe](https://github.com/gengjiawen/monkey-rust/commit/d1be2fec46be5f9a2a4bcb45dd547213abd8bcdf))
+* **compiler:** return classic VM runtime errors ([#316](https://github.com/gengjiawen/monkey-rust/issues/316)) ([9432b62](https://github.com/gengjiawen/monkey-rust/commit/9432b62ad76aae495d03a59162288b430a7ff0fd))
+* **interpreter:** stop evaluation when a builtin fails ([#309](https://github.com/gengjiawen/monkey-rust/issues/309)) ([7316b15](https://github.com/gengjiawen/monkey-rust/commit/7316b15e8b5bcb0c7a976d4e124a91ce2da76816))
+* **lexer:** emit ILLEGAL for unterminated string literals ([#315](https://github.com/gengjiawen/monkey-rust/issues/315)) ([2742775](https://github.com/gengjiawen/monkey-rust/commit/2742775398de15398ebe2200b7c8cf96f1c15d2f))
+* **object:** validate builtin arity for first/last/rest/push ([#311](https://github.com/gengjiawen/monkey-rust/issues/311)) ([04c85c0](https://github.com/gengjiawen/monkey-rust/commit/04c85c0b6632deb9047bde32d58588b1ecf834d3))
+* **parser:** allow semicolons between class members ([#313](https://github.com/gengjiawen/monkey-rust/issues/313)) ([8407510](https://github.com/gengjiawen/monkey-rust/commit/8407510627a906bbec969e5a147435a3d1059ffa))
+* **parser:** treat a stray semicolon as an empty statement ([#312](https://github.com/gengjiawen/monkey-rust/issues/312)) ([dcc64a7](https://github.com/gengjiawen/monkey-rust/commit/dcc64a7a40ac4a40ae8350f35b33b117d45383cf))
+* **playground:** increase theme/GitHub button spacing ([#295](https://github.com/gengjiawen/monkey-rust/issues/295)) ([7a2dc9a](https://github.com/gengjiawen/monkey-rust/commit/7a2dc9ad4c7e955788ab81048f7be16577c8d1b1))
+* **playground:** let output tabs scroll instead of collapsing on mobile ([#303](https://github.com/gengjiawen/monkey-rust/issues/303)) ([14568ab](https://github.com/gengjiawen/monkey-rust/commit/14568abb298bbc6f20bd029fc44a154f0566feb6))
+
 ## [1.1.0](https://github.com/gengjiawen/monkey-rust/compare/v1.0.0...v1.1.0) (2026-07-21)
 
 

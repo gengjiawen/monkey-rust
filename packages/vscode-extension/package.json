@@ -2,7 +2,7 @@
   "name": "monkey-extension",
   "displayName": "Monkey Language",
   "description": "Syntax highlighting, diagnostics, and commands for Monkey language.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "gengjiawen",
   "icon": "images/icon.png",
   "private": true,
