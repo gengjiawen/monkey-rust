@@ -32,6 +32,7 @@ Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **inf
 - **Wasm**: A WebAssembly target, thus run monkey on browser is directly supported.
 - **Prettier Plugin**: Format Monkey source code with [Prettier](https://prettier.io/) via `prettier-plugin-monkey`.
 - **Minifier** ([`@gengjiawen/monkey-minifier`](packages/monkey-minifier/README.md)): A semantics-preserving source-to-source minifier powered by the Rust/Wasm parser, with compact printing, identifier mangling, constant folding and propagation, dead `let` elimination, and Node/browser/CLI APIs.
+- **Linter** ([`@gengjiawen/monkey-lint`](packages/monkey-linter/README.md)): A static linter powered by the Rust/Wasm parser, whose AST rules are anchored to both backends — a construct is only flagged when the tree-walking interpreter and the GC bytecode VM agree it is wrong or useless — with per-rule severity overrides and Node/browser/CLI APIs.
 - **VS Code Extension**: First-class editor support with syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
 - bytecode viewer from source
 - **GC** ([`monkey-gc`](gc/README.md)): alternate bytecode VM with QuickJS-style refcounting and three-phase cycle collection (`gc_decref` → `gc_scan` → `gc_free_cycles`) on a `GcHeap`, so cyclic object graphs can be reclaimed without changing `object` or the default `Rc` VM.
