@@ -2,8 +2,10 @@
 
 ![Rust](https://github.com/gengjiawen/monkey-rust/actions/workflows/rust.yml/badge.svg?branch=main&event=push)
 [![monkey-interpreter](https://img.shields.io/crates/v/monkey-interpreter)](https://crates.io/crates/monkey-interpreter)
-[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-wasm)](https://www.npmjs.com/package/@gengjiawen/monkey-wasm)
+[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-wasm?label=@gengjiawen/monkey-wasm)](https://www.npmjs.com/package/@gengjiawen/monkey-wasm)
 [![npm version](https://img.shields.io/npm/v/prettier-plugin-monkey?label=prettier-plugin-monkey)](https://www.npmjs.com/package/prettier-plugin-monkey)
+[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-minifier?label=@gengjiawen/monkey-minifier)](https://www.npmjs.com/package/@gengjiawen/monkey-minifier)
+[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-lint?label=@gengjiawen/monkey-lint)](https://www.npmjs.com/package/@gengjiawen/monkey-lint)
 
 An interpreter and compiler for the Monkey programming language written in Rust
 
