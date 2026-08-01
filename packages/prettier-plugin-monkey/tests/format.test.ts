@@ -24,6 +24,20 @@ describe('Prettier Plugin Monkey', () => {
     expect(await format(input)).toBe(expected)
   })
 
+  it('formats debugger statements', async () => {
+    const input = 'let x=1;debugger;let f=fn(){x;debugger;};'
+    const expected = `let x = 1;
+debugger;
+let f = fn() {
+  x
+  debugger;
+};
+`
+    const output = await format(input)
+    expect(output).toBe(expected)
+    expect(await format(output)).toBe(output)
+  })
+
   it('formats binary expressions', async () => {
     const input = 'let x=1+2*3;'
     const expected = 'let x = 1 + (2 * 3);\n'

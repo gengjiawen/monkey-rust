@@ -15,12 +15,13 @@ use object::{CompiledFunction, Object};
 use parser::lexer::token::Span;
 use strum::IntoEnumIterator;
 
-use crate::compiler::{Bytecode, DebugInfo, PcSpan};
+use crate::compiler::{BindingDebugInfo, Bytecode, DebugInfo, PcSpan};
 use crate::op_code::{read_operands, Instructions, Opcode, DEFINITIONS};
 
 /// Bump when the container layout changes (header, sections, tags, varint
 /// rules). Bytecode ABI changes are covered by the fingerprint instead.
-pub const FORMAT_VERSION: u8 = 1;
+/// v2: debug info carries local bindings and free names per function.
+pub const FORMAT_VERSION: u8 = 2;
 
 pub(crate) const MAGIC: [u8; 4] = *b"MBC\0";
 pub(crate) const FLAG_HAS_DEBUG_INFO: u8 = 0b0000_0001;
@@ -67,6 +68,28 @@ pub enum SnapshotError {
     DebugPcOutOfRange {
         pc: usize,
         len: usize,
+    },
+    /// Local binding slots must be strictly increasing (hence unique).
+    DebugSlotNotIncreasing {
+        slot: usize,
+    },
+    /// A local binding names a slot the function does not have.
+    DebugSlotOutOfRange {
+        slot: usize,
+        num_locals: usize,
+    },
+    /// Main's debug info must not carry local bindings or free names; its
+    /// bindings are the globals, which live outside the container.
+    DebugMainBindingsNotEmpty,
+    /// A debug-bearing snapshot must describe every function targeted by an
+    /// `OpClosure`, otherwise its capture count cannot be validated.
+    MissingFunctionDebugInfo(usize),
+    /// An `OpClosure`'s free count disagrees with the target function's
+    /// `free_names` metadata.
+    DebugFreeCountMismatch {
+        constant_index: usize,
+        operand: usize,
+        free_names: usize,
     },
 }
 
@@ -209,6 +232,15 @@ fn write_debug_info(out: &mut Vec<u8>, debug_info: &DebugInfo) {
         write_uleb128(out, pc_span.span.start as u64);
         write_uleb128(out, pc_span.span.end as u64);
     }
+    write_uleb128(out, debug_info.local_bindings.len() as u64);
+    for binding in &debug_info.local_bindings {
+        write_uleb128(out, binding.slot as u64);
+        write_string(out, &binding.name);
+    }
+    write_uleb128(out, debug_info.free_names.len() as u64);
+    for name in &debug_info.free_names {
+        write_string(out, name);
+    }
 }
 
 fn write_string(out: &mut Vec<u8>, value: &str) {
@@ -313,13 +345,15 @@ pub fn read_bytecode(buf: &[u8]) -> Result<Bytecode, SnapshotError> {
         return Err(SnapshotError::TrailingBytes);
     }
 
-    validate_instruction_stream("main", &main_instructions, &constants)?;
+    let closure_debug = has_debug.then_some(&function_debug_info);
+    validate_instruction_stream("main", &main_instructions, &constants, closure_debug)?;
     for (index, constant) in constants.iter().enumerate() {
         if let Object::CompiledFunction(function) = constant.as_ref() {
             validate_instruction_stream(
                 &format!("constant {}", index),
                 &function.instructions,
                 &constants,
+                closure_debug,
             )?;
         }
     }
@@ -361,15 +395,21 @@ fn read_debug_section(
     main_len: usize,
 ) -> Result<(DebugInfo, HashMap<usize, DebugInfo>), SnapshotError> {
     let main_debug = read_debug_info(reader, main_len)?;
+    if !main_debug.local_bindings.is_empty() || !main_debug.free_names.is_empty() {
+        return Err(SnapshotError::DebugMainBindingsNotEmpty);
+    }
     let entry_count = reader.read_count()?;
     let mut function_debug_info = HashMap::with_capacity(entry_count);
     for _ in 0..entry_count {
         let constant_index = reader.read_usize()?;
-        let function_len = match constants.get(constant_index).map(Rc::as_ref) {
-            Some(Object::CompiledFunction(function)) => function.instructions.len(),
+        let (function_len, num_locals) = match constants.get(constant_index).map(Rc::as_ref) {
+            Some(Object::CompiledFunction(function)) => {
+                (function.instructions.len(), function.num_locals)
+            }
             _ => return Err(SnapshotError::DebugIndexNotFunction(constant_index)),
         };
         let debug_info = read_debug_info(reader, function_len)?;
+        validate_local_bindings(&debug_info.local_bindings, num_locals)?;
         if function_debug_info
             .insert(constant_index, debug_info)
             .is_some()
@@ -378,6 +418,31 @@ fn read_debug_section(
         }
     }
     Ok((main_debug, function_debug_info))
+}
+
+/// Slots must be strictly increasing (hence unique) and inside the frame's
+/// local window. The compiler emits one binding per slot; the reader only
+/// requires what later consumers rely on.
+fn validate_local_bindings(
+    bindings: &[BindingDebugInfo],
+    num_locals: usize,
+) -> Result<(), SnapshotError> {
+    let mut previous: Option<usize> = None;
+    for binding in bindings {
+        if previous.is_some_and(|previous| binding.slot <= previous) {
+            return Err(SnapshotError::DebugSlotNotIncreasing {
+                slot: binding.slot,
+            });
+        }
+        if binding.slot >= num_locals {
+            return Err(SnapshotError::DebugSlotOutOfRange {
+                slot: binding.slot,
+                num_locals,
+            });
+        }
+        previous = Some(binding.slot);
+    }
+    Ok(())
 }
 
 fn read_debug_info(
@@ -413,8 +478,25 @@ fn read_debug_info(
         });
         previous = Some(pc);
     }
+    let binding_count = reader.read_count()?;
+    let mut local_bindings = Vec::with_capacity(binding_count);
+    for _ in 0..binding_count {
+        let slot = reader.read_usize()?;
+        let name = reader.read_string()?;
+        local_bindings.push(BindingDebugInfo {
+            name,
+            slot,
+        });
+    }
+    let free_count = reader.read_count()?;
+    let mut free_names = Vec::with_capacity(free_count);
+    for _ in 0..free_count {
+        free_names.push(reader.read_string()?);
+    }
     Ok(DebugInfo {
         pc_spans,
+        local_bindings,
+        free_names,
     })
 }
 
@@ -426,10 +508,15 @@ fn read_debug_info(
 /// Deliberately not checked here: stack depth, operand runtime types,
 /// local/free index validity. Those depend on execution state and are the
 /// VM's defensive checks (L3).
+///
+/// With `debug` present, every `OpClosure`'s free count is also checked
+/// against the target function's `free_names` metadata, so two sites cannot
+/// construct the same constant inconsistently.
 fn validate_instruction_stream(
     stream: &str,
     instructions: &[u8],
     constants: &[Rc<Object>],
+    debug: Option<&HashMap<usize, DebugInfo>>,
 ) -> Result<(), SnapshotError> {
     let len = instructions.len();
     let mut is_boundary = vec![false; len + 1];
@@ -476,6 +563,18 @@ fn validate_instruction_stream(
                         offset,
                         format!("OpClosure needs a function constant at index {}", index),
                     ));
+                }
+                if let Some(debug) = debug {
+                    let info = debug
+                        .get(&index)
+                        .ok_or(SnapshotError::MissingFunctionDebugInfo(index))?;
+                    if operands[1] != info.free_names.len() {
+                        return Err(SnapshotError::DebugFreeCountMismatch {
+                            constant_index: index,
+                            operand: operands[1],
+                            free_names: info.free_names.len(),
+                        });
+                    }
                 }
             }
             Opcode::OpClass | Opcode::OpMethod | Opcode::OpGetProperty | Opcode::OpSetProperty => {

@@ -102,7 +102,8 @@ export function childrenOf(node: ASTNode): ASTNode[] {
       return [expression.callee, ...expression.arguments]
     }
     default:
-      // Leaves: IDENTIFIER, Integer, Boolean, String, ThisExpression.
+      // Leaves: IDENTIFIER, Integer, Boolean, String, ThisExpression,
+      // DebuggerStatement.
       return []
   }
 }

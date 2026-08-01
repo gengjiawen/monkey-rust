@@ -417,6 +417,32 @@ mod tests {
     }
 
     #[test]
+    fn test_debugger_is_a_no_op_with_transparent_completion() {
+        run_gc_vm_tests(vec![
+            VmTestCase {
+                input: "1; debugger;",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { 1; debugger; }()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { let x = 1; debugger; }()",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "fn(x) { if (x) { 1; debugger; } }(true)",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "class Counter { constructor(start) { this.count = start; debugger; } value() { this.count; debugger; } } let counter = new Counter(41); counter.value() + 1;",
+                expected: Object::Integer(42),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_calling_functions_with_bindings() {
         run_gc_vm_tests(vec![
             VmTestCase {
@@ -610,6 +636,67 @@ mod tests {
         vm.run();
 
         assert_eq!(vm.export_last_result(), Some(Object::Integer(42)));
+    }
+
+    #[test]
+    fn op_set_global_marks_the_slot_initialized() {
+        let program = parse("let a = 1; let b = 2;").unwrap();
+        let mut compiler = Compiler::new();
+        let bytecode = compiler.compile(&program).unwrap();
+        let mut vm = GcVM::new(bytecode);
+
+        assert!(!vm.globals_initialized()[0]);
+        vm.run();
+        assert_eq!(vm.globals_initialized()[..3], [true, true, false]);
+    }
+
+    #[test]
+    fn load_bytecode_keeps_global_initialized_bits() {
+        let bootstrap = {
+            let mut compiler = Compiler::new();
+            compiler.compile(&parse("").unwrap()).unwrap()
+        };
+        let mut vm = GcVM::new(bootstrap);
+
+        let mut compiler = Compiler::new();
+        let bytecode = compiler
+            .compile(&parse("let answer = 42;").unwrap())
+            .unwrap();
+        vm.load_bytecode(bytecode);
+        vm.run();
+        assert!(vm.globals_initialized()[0]);
+
+        let mut compiler = Compiler::new_with_state(compiler.symbol_table, compiler.constants);
+        let bytecode = compiler.compile(&parse("answer;").unwrap()).unwrap();
+        vm.load_bytecode(bytecode);
+        // The REPL reuses one VM across lines, so the bit written by the
+        // previous line must survive the reload to keep slot 0 presentable.
+        assert!(vm.globals_initialized()[0]);
+        vm.run();
+        assert_eq!(vm.export_last_result(), Some(Object::Integer(42)));
+    }
+
+    #[test]
+    fn frames_premark_only_parameter_slots_initialized() {
+        use crate::frame::Frame;
+        use crate::value::GcClosure;
+
+        let program = parse("").unwrap();
+        let mut compiler = Compiler::new();
+        let mut vm = GcVM::new(compiler.compile(&program).unwrap());
+        let func = alloc_value(vm.heap_mut(), Value::Null);
+        let closure = GcClosure {
+            func,
+            free: vec![],
+        };
+
+        // Two parameters and one `let` slot: only the parameters arrive
+        // initialized, the `let` slot waits for its OpSetLocal.
+        let frame = Frame::new(closure.clone(), vec![], 0, 3, 2);
+        assert_eq!(frame.initialized, vec![true, true, false]);
+
+        let main_frame = Frame::new(closure, vec![], 0, 0, 0);
+        assert!(main_frame.initialized.is_empty());
     }
 
     #[test]

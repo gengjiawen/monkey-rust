@@ -66,6 +66,8 @@ function printStatement(statement: Statement): string {
       return printClass(statement)
     case 'SetPropertyStatement':
       return printSetProperty(statement)
+    case 'DebuggerStatement':
+      return 'debugger;'
     default:
       return `${printExpression(statement)};`
   }

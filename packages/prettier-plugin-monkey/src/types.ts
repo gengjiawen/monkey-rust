@@ -88,6 +88,10 @@ export interface SetPropertyStatement extends ASTNode {
   value: ASTNode
 }
 
+export interface DebuggerStatement extends ASTNode {
+  type: 'DebuggerStatement'
+}
+
 export interface Identifier extends ASTNode {
   type: 'IDENTIFIER'
   name: string

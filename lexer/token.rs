@@ -69,6 +69,7 @@ pub enum TokenKind {
     CLASS,
     THIS,
     NEW,
+    DEBUGGER,
 }
 
 pub fn lookup_identifier(identifier: &str) -> TokenKind {
@@ -83,6 +84,7 @@ pub fn lookup_identifier(identifier: &str) -> TokenKind {
         "class" => TokenKind::CLASS,
         "this" => TokenKind::THIS,
         "new" => TokenKind::NEW,
+        "debugger" => TokenKind::DEBUGGER,
         _ => TokenKind::IDENTIFIER {
             name: identifier.to_string(),
         },
@@ -129,6 +131,7 @@ impl fmt::Display for TokenKind {
             TokenKind::CLASS => write!(f, "class"),
             TokenKind::THIS => write!(f, "this"),
             TokenKind::NEW => write!(f, "new"),
+            TokenKind::DEBUGGER => write!(f, "debugger"),
         }
     }
 }

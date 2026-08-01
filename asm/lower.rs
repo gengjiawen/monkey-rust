@@ -38,6 +38,17 @@ pub struct LowerError {
     pub span: Option<(usize, usize)>,
 }
 
+/// How a lowered statement affects its block's completion value (design
+/// §10.2): expression statements leave the value in `x0`, most statements
+/// leave none, and `debugger` is transparent — it emits no instructions, so
+/// whatever completion `x0` held before it flows through unchanged.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StatementCompletion {
+    Value,
+    Empty,
+    Transparent,
+}
+
 impl std::fmt::Display for LowerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.message)
@@ -89,11 +100,14 @@ pub fn lower_node(
         epilogues: vec![exit_label.clone()],
     };
 
-    let mut last_leaves_value = false;
+    let mut completion = StatementCompletion::Empty;
     for statement in &program.body {
-        last_leaves_value = lowerer.lower_statement(statement)?;
+        let statement_completion = lowerer.lower_statement(statement)?;
+        if statement_completion != StatementCompletion::Transparent {
+            completion = statement_completion;
+        }
     }
-    if !last_leaves_value {
+    if completion != StatementCompletion::Value {
         // A program ending in a non-expression statement results in `null`
         // (design §10.2).
         lowerer.emitter.without_span(|emitter| {
@@ -155,14 +169,17 @@ impl<'a> Lowerer<'a> {
         self.symbols = outer;
     }
 
-    /// Lowers one statement. Returns whether it leaves the statement value
-    /// in `x0` (only expression statements do; blocks and the program use
-    /// this for their `null` completion rule).
-    fn lower_statement(&mut self, statement: &Statement) -> Result<bool, LowerError> {
+    /// Lowers one statement and reports how it affects the enclosing block's
+    /// completion value in `x0` (blocks and the program use this for their
+    /// `null` completion rule).
+    fn lower_statement(
+        &mut self,
+        statement: &Statement,
+    ) -> Result<StatementCompletion, LowerError> {
         match statement {
             Statement::Let(let_statement) => {
                 self.lower_let(let_statement)?;
-                Ok(false)
+                Ok(StatementCompletion::Empty)
             }
             Statement::Return(return_statement) => {
                 let comment = format!("return {}", self.snippet(return_statement.argument.span()));
@@ -177,15 +194,21 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&span, |emitter| {
                     emitter.ins(&format!("b {}", target));
                 });
-                Ok(true)
+                Ok(StatementCompletion::Value)
             }
             Statement::Expr(expression) => {
                 self.lower_expression(expression)?;
-                Ok(true)
+                Ok(StatementCompletion::Value)
             }
             Statement::Class(class) => {
                 self.lower_class(class)?;
-                Ok(false)
+                Ok(StatementCompletion::Empty)
+            }
+            Statement::Debugger(_) => {
+                // The AOT build never records snapshots, and `brk` would trap
+                // for real under differential testing — emit nothing.
+                self.emitter.comment("debugger (no-op in AOT build)");
+                Ok(StatementCompletion::Transparent)
             }
             Statement::SetProperty(set) => {
                 let comment = self.snippet(&set.span);
@@ -205,7 +228,7 @@ impl<'a> Lowerer<'a> {
                     emitter.load_imm64("x2", name_len, "");
                     emitter.call_runtime("rt_set_property", "");
                 });
-                Ok(false)
+                Ok(StatementCompletion::Empty)
             }
         }
     }
@@ -230,13 +253,17 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Block completion value (design §10.2 and the interpreter): the value
-    /// of the last expression statement, otherwise `null`.
+    /// of the last expression statement, otherwise `null`. Transparent
+    /// statements (`debugger`) keep the completion decided before them.
     fn lower_block_value(&mut self, block: &BlockStatement) -> Result<(), LowerError> {
-        let mut leaves_value = false;
+        let mut completion = StatementCompletion::Empty;
         for statement in &block.body {
-            leaves_value = self.lower_statement(statement)?;
+            let statement_completion = self.lower_statement(statement)?;
+            if statement_completion != StatementCompletion::Transparent {
+                completion = statement_completion;
+            }
         }
-        if !leaves_value {
+        if completion != StatementCompletion::Value {
             self.emitter.without_span(|emitter| {
                 emitter.load_imm64("x0", NULL_VALUE, "empty/valueless block: null");
             });

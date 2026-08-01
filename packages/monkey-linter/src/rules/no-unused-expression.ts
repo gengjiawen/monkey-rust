@@ -27,8 +27,17 @@ export const noUnusedExpression: Rule = {
       statements: Statement[],
       tailObserved: boolean
     ): void => {
+      // `debugger` is completion-transparent: the statement before a trailing
+      // run of debuggers is the block's observed tail.
+      let tailIndex = statements.length - 1
+      while (
+        tailIndex >= 0 &&
+        statements[tailIndex].type === 'DebuggerStatement'
+      ) {
+        tailIndex -= 1
+      }
       statements.forEach((statement, index) => {
-        const observed = index === statements.length - 1 && tailObserved
+        const observed = index === tailIndex && tailObserved
         checkStatement(statement, observed)
       })
     }
@@ -49,6 +58,8 @@ export const noUnusedExpression: Rule = {
         case 'SetPropertyStatement':
           descend(statement.object, true)
           descend(statement.value, true)
+          return
+        case 'DebuggerStatement':
           return
         default:
           if (!observed && isPure(statement)) {

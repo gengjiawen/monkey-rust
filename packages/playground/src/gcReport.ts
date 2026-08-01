@@ -165,11 +165,11 @@ export interface WitnessPathStep {
   relation: EdgeRelation
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function readNumber(
+export function readNumber(
   record: Record<string, unknown>,
   key: string,
   path: string
@@ -202,7 +202,7 @@ function readCatalogId(
   return id
 }
 
-function readString(
+export function readString(
   record: Record<string, unknown>,
   key: string,
   path: string
@@ -214,7 +214,7 @@ function readString(
   return value
 }
 
-function readRecord(
+export function readRecord(
   record: Record<string, unknown>,
   key: string,
   path: string
@@ -300,7 +300,7 @@ function readGlobalRoots(
   })
 }
 
-function uniqueIds<T>(
+export function uniqueIds<T>(
   values: readonly T[],
   idOf: (value: T) => number,
   path: string,
@@ -439,7 +439,7 @@ export function isCandidateRelatedEdge(
   return candidateIds.has(edge.fromId) || candidateIds.has(edge.toId)
 }
 
-function readEdgeRelation(value: unknown, path: string): EdgeRelation {
+export function readEdgeRelation(value: unknown, path: string): EdgeRelation {
   if (!isRecord(value)) {
     throw new Error(`${path} must be an object`)
   }
@@ -880,7 +880,7 @@ function readReport(value: unknown): GcCollectionReport {
   }
 }
 
-function readSpan(value: unknown): SourceSpan | null {
+export function readSpan(value: unknown): SourceSpan | null {
   if (value === null) {
     return null
   }

@@ -67,11 +67,16 @@ export interface SetPropertyStatement extends ASTNode {
   value: Expression
 }
 
+export interface DebuggerStatement extends ASTNode {
+  type: 'DebuggerStatement'
+}
+
 export type Statement =
   | LetStatement
   | ReturnStatement
   | ClassDeclaration
   | SetPropertyStatement
+  | DebuggerStatement
   | Expression
 
 export interface Identifier extends ASTNode {

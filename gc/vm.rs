@@ -1,13 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
 use byteorder::{BigEndian, ByteOrder};
-use compiler::compiler::{Bytecode, DebugInfo};
+use compiler::compiler::{BindingDebugInfo, Bytecode, DebugInfo};
 use compiler::op_code::Opcode;
 use object::builtins::{BuiltIns, BuiltinId};
 use object::Object;
 use parser::lexer::token::Span;
 use serde::Serialize;
 
+use crate::debugger::{collect_hit, DebuggerHit, HitContext, MAX_DEBUGGER_HITS};
 use crate::frame::Frame;
 use crate::report::{
     empty_value_kind_counts, select_global_roots, summarize_gc_object, GcCollectionReport,
@@ -93,13 +94,21 @@ pub struct GcVM {
     stack: Vec<GcRef>,
     sp: usize,
     globals: Vec<GcRef>,
-    global_names: Vec<(String, usize)>,
+    global_bindings: Vec<BindingDebugInfo>,
+    /// One flag per global slot: set once `OpSetGlobal` writes it, so the
+    /// debugger can tell a never-executed `let`'s prefilled null from a real
+    /// null value. Kept across `load_bytecode` like the globals themselves.
+    globals_initialized: Vec<bool>,
     frames: Vec<Frame>,
     frame_index: usize,
     null: GcRef,
     last_popped: GcRef,
     main_debug_info: DebugInfo,
     function_debug_info: HashMap<GcRef, DebugInfo>,
+    debugger_hits: Vec<DebuggerHit>,
+    /// Hits past `MAX_DEBUGGER_HITS` are counted, not recorded, so a
+    /// `debugger;` in a hot loop cannot grow memory without bound.
+    dropped_debugger_hits: usize,
     output: Option<String>,
 }
 
@@ -146,6 +155,8 @@ impl GcVM {
             },
             main_instructions,
             0,
+            0,
+            0,
         );
 
         let empty_frame = Frame::new(
@@ -154,6 +165,8 @@ impl GcVM {
                 free: vec![],
             },
             vec![],
+            0,
+            0,
             0,
         );
 
@@ -170,13 +183,16 @@ impl GcVM {
             stack,
             sp: 0,
             globals,
-            global_names: Vec::new(),
+            global_bindings: Vec::new(),
+            globals_initialized: vec![false; GLOBAL_SIZE],
             frames,
             frame_index: 1,
             null,
             last_popped,
             main_debug_info,
             function_debug_info,
+            debugger_hits: Vec::new(),
+            dropped_debugger_hits: 0,
             output: None,
         }
     }
@@ -242,6 +258,8 @@ impl GcVM {
             },
             main_instructions,
             0,
+            0,
+            0,
         );
         let empty_frame = Frame::new(
             GcClosure {
@@ -250,10 +268,17 @@ impl GcVM {
             },
             vec![],
             0,
+            0,
+            0,
         );
         self.frames = vec![empty_frame; MAX_FRAMES];
         self.frames[0] = main_frame;
         self.frame_index = 1;
+
+        // Hits describe the program that recorded them; a new program starts
+        // clean. Globals and their initialized bits survive, as above.
+        self.debugger_hits.clear();
+        self.dropped_debugger_hits = 0;
     }
 
     pub fn heap(&self) -> &GcHeap {
@@ -274,22 +299,64 @@ impl GcVM {
         self.output.as_mut().map(std::mem::take).unwrap_or_default()
     }
 
-    /// Record which global slot each source-level global name refers to, so
-    /// reports can state the named root set (see `GlobalRoot`).
-    pub fn set_global_names(&mut self, names: Vec<(String, usize)>) {
-        self.global_names = names;
+    /// Record the compiler's global definition ledger (slot order, rebindings
+    /// included), used by GC reports for the named root set (see `GlobalRoot`)
+    /// and by debugger snapshots for slot names.
+    pub fn set_global_bindings(&mut self, bindings: Vec<BindingDebugInfo>) {
+        self.global_bindings = bindings;
+    }
+
+    /// One flag per global slot: has `OpSetGlobal` written it? Debugger
+    /// snapshots use this to tell a user-assigned null from a never-run `let`.
+    pub fn globals_initialized(&self) -> &[bool] {
+        &self.globals_initialized
+    }
+
+    /// Drain recorded `debugger;` snapshots plus the count of hits dropped
+    /// after `MAX_DEBUGGER_HITS`. Recording resumes from zero afterwards.
+    pub fn take_debugger_hits(&mut self) -> (Vec<DebuggerHit>, usize) {
+        let dropped = std::mem::take(&mut self.dropped_debugger_hits);
+        return (std::mem::take(&mut self.debugger_hits), dropped);
+    }
+
+    fn record_debugger_hit(&mut self) {
+        if self.debugger_hits.len() >= MAX_DEBUGGER_HITS {
+            self.dropped_debugger_hits += 1;
+            return;
+        }
+        let hit = collect_hit(HitContext {
+            heap: &self.heap,
+            frames: &self.frames[..self.frame_index],
+            stack: &self.stack,
+            sp: self.sp,
+            globals: &self.globals,
+            global_bindings: &self.global_bindings,
+            globals_initialized: &self.globals_initialized,
+            main_debug_info: &self.main_debug_info,
+            function_debug_info: &self.function_debug_info,
+            index: self.debugger_hits.len() + 1,
+        });
+        self.debugger_hits.push(hit);
     }
 
     pub fn collect_garbage(&mut self) -> GcCollectionReport {
         // Read the named global slots before collecting. Named slots are VM
         // roots, so every object listed here survives the cycle collector.
-        let global_roots = self
-            .global_names
-            .iter()
-            .filter(|(_, index)| *index < self.globals.len())
-            .map(|(name, index)| GlobalRoot {
-                name: name.clone(),
-                object_id: self.globals[*index].0,
+        // Reports show one root per visible name — for a rebound name the
+        // highest slot wins, matching what source-level code can still read —
+        // sorted by name for determinism.
+        let mut visible: HashMap<&str, usize> = HashMap::new();
+        for binding in &self.global_bindings {
+            visible.insert(binding.name.as_str(), binding.slot);
+        }
+        let mut named: Vec<(&str, usize)> = visible.into_iter().collect();
+        named.sort_unstable();
+        let global_roots = named
+            .into_iter()
+            .filter(|(_, slot)| *slot < self.globals.len())
+            .map(|(name, slot)| GlobalRoot {
+                name: name.to_string(),
+                object_id: self.globals[slot].0,
             })
             .collect();
         let before_kinds = self.heap.value_kinds_by_id();
@@ -449,6 +516,7 @@ impl GcVM {
                     let value = self.pop_owned()?;
                     self.heap.free(self.globals[global_index]);
                     self.globals[global_index] = value;
+                    self.globals_initialized[global_index] = true;
                 }
                 Opcode::OpArray => {
                     let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -521,6 +589,11 @@ impl GcVM {
                     let value = self.pop_owned()?;
                     self.heap.free(self.stack[slot]);
                     self.stack[slot] = value;
+                    // get_mut: hostile bytecode can index past num_locals; the
+                    // write above is bounded by STACK_SIZE, the bitset is not.
+                    if let Some(flag) = self.current_frame().initialized.get_mut(local_index) {
+                        *flag = true;
+                    }
                 }
                 Opcode::OpGetLocal => {
                     let local_index = ins[ip + 1] as usize;
@@ -612,6 +685,10 @@ impl GcVM {
                     let num_args = ins[ip + 1] as usize;
                     self.current_frame().ip += 1;
                     self.execute_new(num_args)?;
+                }
+                Opcode::OpDebugger => {
+                    // No stack effect; completion semantics stay transparent.
+                    self.record_debugger_hit();
                 }
             }
         }
@@ -977,14 +1054,21 @@ impl GcVM {
             ));
         }
 
-        let frame = Frame::new(closure, compiled.instructions, self.sp - num_args);
         // checked_add: num_locals comes from bytecode, so it can be an
-        // arbitrary usize, not just a compiler-emitted small count.
-        let next_sp = frame
-            .base_pointer
+        // arbitrary usize, not just a compiler-emitted small count. Validate
+        // it before Frame::new allocates the per-local initialized bitset.
+        let base_pointer = self.sp - num_args;
+        let next_sp = base_pointer
             .checked_add(compiled.num_locals)
             .filter(|next_sp| *next_sp <= STACK_SIZE)
             .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack limit exceeded"))?;
+        let frame = Frame::new(
+            closure,
+            compiled.instructions,
+            base_pointer,
+            compiled.num_locals,
+            compiled.num_parameters,
+        );
         self.sp = next_sp;
         self.push_frame(frame)
     }

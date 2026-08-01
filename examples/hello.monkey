@@ -38,3 +38,13 @@ let newAdder = fn(a, b) {
 let adder = newAdder(1, 2);
 
 adder(8); // => 11
+// The `debugger` statement is transparent in every backend, and the
+// playground's Debugger tab records a snapshot at each hit: the call
+// stack with named slots on the left, the heap objects they reference
+// on the right.
+let makePoint = fn(x, y) {
+  let p = [x, y];
+  debugger;
+  p;
+};
+makePoint(3, 2); // => [3, 2]

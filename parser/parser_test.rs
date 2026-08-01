@@ -34,6 +34,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_debugger_statement() {
+        let debugger_tests = [
+            ("debugger", "debugger;"),
+            ("debugger;", "debugger;"),
+            ("1; debugger;", "1debugger;"),
+            ("fn() { debugger; }", "fn () { debugger; }"),
+        ];
+
+        verify_program(&debugger_tests);
+
+        let input = "let a = 1; debugger;";
+        let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
+        let Statement::Debugger(statement) = &program.body[1] else {
+            panic!("expected debugger statement")
+        };
+        assert_eq!(&input[statement.span.start..statement.span.end], "debugger;");
+    }
+
+    #[test]
     fn test_parse_prefix_expression() {
         let let_tests = [
             ("-15;", "(-15)"),
@@ -285,6 +304,8 @@ connect();"#;
             ("let value = object.field = 1", "only allowed as a statement"),
             ("1 + ;", "no prefix function"),
             ("fn() { 1 + ; }", "no prefix function"),
+            ("let x = debugger;", "no prefix function"),
+            ("1 + debugger;", "no prefix function"),
         ] {
             let errors = parse(input).unwrap_err();
             assert!(

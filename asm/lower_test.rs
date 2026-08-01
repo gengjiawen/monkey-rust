@@ -80,6 +80,15 @@ fn snapshot_return_paths() {
 }
 
 #[test]
+fn snapshot_debugger_transparency() {
+    // `debugger` lowers to a comment only, so the completion already in `x0`
+    // (here `n * 2`) flows through it unchanged.
+    insta::assert_snapshot!(assembly(
+        "let f = fn(n) { n * 2; debugger; };\ndebugger;\nputs(f(21));"
+    ));
+}
+
+#[test]
 fn snapshot_boxed_integer_literal() {
     // i64::MAX exceeds the SMI range: materialize + rt_box_int.
     insta::assert_snapshot!(assembly("9223372036854775807;"));

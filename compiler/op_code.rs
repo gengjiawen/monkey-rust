@@ -66,6 +66,7 @@ pub enum Opcode {
     OpNew,
     // Appended to preserve the byte values of all existing opcodes.
     OpLessThan,
+    OpDebugger,
 }
 
 lazy_static! {
@@ -321,6 +322,13 @@ lazy_static! {
             OpcodeDefinition {
                 name: "OpNew",
                 operand_width: vec![1],
+            },
+        );
+        m.insert(
+            Opcode::OpDebugger,
+            OpcodeDefinition {
+                name: "OpDebugger",
+                operand_width: vec![],
             },
         );
         return m;

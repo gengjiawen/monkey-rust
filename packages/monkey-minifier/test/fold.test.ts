@@ -59,6 +59,20 @@ describe('constant folding and conservative DCE', () => {
     )
   })
 
+  it('treats debugger as an undeletable, completion-transparent statement', () => {
+    // The statement before a trailing run of debuggers decides the block's
+    // value, so the trailing-let barrier must look through the suffix.
+    expect(
+      optimize('let f = fn() { 42; let unused = 1; debugger; }; f();')
+    ).toBe('let f=fn(){42;let unused=1;debugger;};f();')
+    // A debugger-only arm yields null; collapsing `if (true) { debugger; }` to
+    // its body would let the preceding value leak through as the result.
+    expect(optimize('1; if (true) { debugger; };')).toBe(
+      '1;if(true){debugger;};'
+    )
+    expect(optimize('debugger; 42;')).toBe('debugger;42;')
+  })
+
   it('keeps a stack-sensitive callable local layout intact', () => {
     const source = `
       let f = fn() {

@@ -481,6 +481,44 @@ mod tests {
     }
 
     #[test]
+    fn test_debugger_is_a_no_op_with_transparent_completion() {
+        run_vm_tests(vec![
+            VmTestCase {
+                input: "debugger;",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "1; debugger;",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { 1; debugger; }()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { let x = 1; debugger; }()",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "fn() { return 2; debugger; }()",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "fn(x) { if (x) { 1; debugger; } }(true)",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "if (true) { debugger; }",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "class Counter { constructor(start) { this.count = start; debugger; } value() { this.count; debugger; } } let counter = new Counter(41); counter.value() + 1;",
+                expected: Object::Integer(42),
+            },
+        ]);
+    }
+
+    #[test]
     fn test_class_semantics() {
         run_vm_tests(vec![
             VmTestCase {

@@ -81,6 +81,7 @@ impl Validator {
                 self.validate_expression(&statement.object)?;
                 self.validate_expression(&statement.value)
             }
+            Statement::Debugger(_) => Ok(()),
             Statement::Expr(expression) => self.validate_expression(expression),
         }
     }

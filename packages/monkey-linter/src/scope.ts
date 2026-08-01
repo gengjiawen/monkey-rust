@@ -140,6 +140,8 @@ function analyzeStatement(
       analyzeExpression(statement.object, scope, analysis, context)
       analyzeExpression(statement.value, scope, analysis, context)
       return
+    case 'DebuggerStatement':
+      return
     default:
       analyzeExpression(statement, scope, analysis, context)
   }

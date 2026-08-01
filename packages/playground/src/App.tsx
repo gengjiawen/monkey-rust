@@ -13,6 +13,8 @@ import { buildArm64 } from './arm64Runner'
 import { Arm64View, type Arm64BuildState } from './Arm64View'
 import { AstTreeView } from './AstTreeView'
 import { type BytecodeDebugView, spanForBytecodeCursor } from './bytecodeDebug'
+import { runDebugger } from './debuggerRunner'
+import { DebuggerView, type DebuggerPanelState } from './DebuggerView'
 import { Editor, type EditorHandle } from './Editor'
 import { GcReportView, type GcPanelState } from './GcReportView'
 import type { SourceSpan } from './gcReport'
@@ -130,9 +132,37 @@ last();
 puts(s);
 `.trimStart(),
   },
+  {
+    // Two debugger hits: one inside makePoint with three live frames, one
+    // in sum after makePoint returned but its array is still reachable.
+    label: 'Debugger',
+    code: `
+let makePoint = fn(x, y) {
+  let p = [x, y];
+  debugger;
+  p;
+};
+
+let sum = fn(a, b) {
+  let total = a + b;
+  let point = makePoint(total, b);
+  debugger;
+  total;
+};
+
+sum(1, 2);
+`.trimStart(),
+  },
 ]
 
-type OutputView = 'ast' | 'bytecode' | 'gc' | 'snapshot' | 'arm64' | 'minify'
+type OutputView =
+  | 'ast'
+  | 'bytecode'
+  | 'gc'
+  | 'snapshot'
+  | 'arm64'
+  | 'minify'
+  | 'debugger'
 
 const panelClass =
   'flex min-h-0 min-w-0 h-full flex-col overflow-hidden bg-(--color-background)'
@@ -170,6 +200,10 @@ function App() {
   const [isFormatting, setIsFormatting] = useState(false)
   const [gcState, setGcState] = useState<GcPanelState>({ status: 'idle' })
   const gcRequestId = useRef(0)
+  const [debuggerState, setDebuggerState] = useState<DebuggerPanelState>({
+    status: 'idle',
+  })
+  const debuggerRequestId = useRef(0)
   const [stripDebug, setStripDebug] = useState(false)
   const [snapshotBuild, setSnapshotBuild] = useState<SnapshotBuildState>({
     status: 'idle',
@@ -329,6 +363,8 @@ function App() {
       minifyRequestId.current += 1
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
+      debuggerRequestId.current += 1
+      setDebuggerState({ status: 'idle' })
       invalidateSnapshot()
     },
     [code, invalidateSnapshot]
@@ -383,6 +419,8 @@ function App() {
       setSelection(null)
       gcRequestId.current += 1
       setGcState({ status: 'idle' })
+      debuggerRequestId.current += 1
+      setDebuggerState({ status: 'idle' })
       invalidateSnapshot()
       compileCode(formatted)
     } catch (error) {
@@ -447,6 +485,8 @@ function App() {
     setSelection(null)
     gcRequestId.current += 1
     setGcState({ status: 'idle' })
+    debuggerRequestId.current += 1
+    setDebuggerState({ status: 'idle' })
     invalidateSnapshot()
     minifyRequestId.current += 1
     setCode(snippets[index].code)
@@ -455,6 +495,7 @@ function App() {
   useEffect(
     () => () => {
       gcRequestId.current += 1
+      debuggerRequestId.current += 1
       minifyActive.current = false
       minifyRequestId.current += 1
     },
@@ -474,6 +515,26 @@ function App() {
     } catch (error) {
       if (gcRequestId.current === requestId) {
         setGcState({
+          status: 'invalid',
+          message: getErrorMessage(error),
+        })
+      }
+    }
+  }, [code])
+
+  const runDebuggerProgram = useCallback(async () => {
+    const requestId = debuggerRequestId.current + 1
+    debuggerRequestId.current = requestId
+    setDebuggerState({ status: 'running' })
+
+    try {
+      const result = await runDebugger(code)
+      if (debuggerRequestId.current === requestId) {
+        setDebuggerState(result)
+      }
+    } catch (error) {
+      if (debuggerRequestId.current === requestId) {
+        setDebuggerState({
           status: 'invalid',
           message: getErrorMessage(error),
         })
@@ -520,6 +581,17 @@ function App() {
   )
 
   const handleErrorSpanSelect = highlightSourceSpan
+
+  const handleDebuggerSpanSelect = useCallback(
+    (span: SourceSpan | null) => {
+      if (span === null) {
+        editorRef.current?.clearHighlight()
+        return
+      }
+      highlightSourceSpan(span)
+    },
+    [highlightSourceSpan]
+  )
 
   const handleBytecodeSelection = useCallback(
     (selection: { from: number; to: number }) => {
@@ -580,7 +652,9 @@ function App() {
   }, [arm64Build, code, outputView, selection])
 
   useEffect(() => {
-    if (outputView !== 'bytecode') {
+    // DebuggerView owns its span lifecycle, including clearing idle/running
+    // states. Do not clear after its mount effect restores Hit 1.
+    if (outputView !== 'bytecode' && outputView !== 'debugger') {
       editorRef.current?.clearHighlight()
     }
   }, [outputView])
@@ -687,6 +761,9 @@ function App() {
               <SegmentedControl.Item value="minify">
                 Minify
               </SegmentedControl.Item>
+              <SegmentedControl.Item value="debugger">
+                Debugger
+              </SegmentedControl.Item>
             </SegmentedControl.Root>
           </div>
           {outputView === 'gc' ? (
@@ -722,6 +799,15 @@ function App() {
               Mangle names
             </label>
           ) : null}
+          {outputView === 'debugger' ? (
+            <Button
+              size="2"
+              onClick={runDebuggerProgram}
+              loading={debuggerState.status === 'running'}
+            >
+              Run
+            </Button>
+          ) : null}
         </div>
         <div className={editorFrameClass}>
           {outputView === 'ast' && astData !== null ? (
@@ -738,6 +824,14 @@ function App() {
               <GcReportView
                 state={gcState}
                 onErrorSpanSelect={handleErrorSpanSelect}
+              />
+            </div>
+          ) : null}
+          {outputView === 'debugger' ? (
+            <div className="min-h-0 flex-1 overflow-auto bg-(--gray-1) p-4.5">
+              <DebuggerView
+                state={debuggerState}
+                onSpanSelect={handleDebuggerSpanSelect}
               />
             </div>
           ) : null}

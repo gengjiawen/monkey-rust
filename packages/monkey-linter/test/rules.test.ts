@@ -84,6 +84,9 @@ describe('no-unused-expression', () => {
     ['let f = fn() { 1; 2; }; f();', 1],
     // Non-tail statement inside an if branch (branch tail is the return value).
     ['let f = fn(flag) { if (flag) { 1; flag; } else { 2; } }; f(true);', 1],
+    // `debugger` is completion-transparent: `2` is still the observed tail,
+    // while `1` stays a discarded non-tail expression.
+    ['let f = fn() { 1; 2; debugger; }; f();', 1],
   ])('flags a discarded pure expression: %s', (source, count) => {
     expect(rulesOf(source)).toEqual(
       Array.from({ length: count }, () => 'no-unused-expression')
@@ -101,6 +104,9 @@ describe('no-unused-expression', () => {
     // missing property), so v0 leaves them alone.
     'let xs = [1, 2]; xs[5]; puts(xs);',
     'class P { constructor() { this.v = 1; } } let p = new P(); p.v; puts(p);',
+    // A tail expression stays observed through a trailing run of debuggers.
+    'let f = fn(x) { x; debugger; }; f(1);',
+    'let x = 1; x; debugger; debugger;',
   ])('stays quiet otherwise: %s', (source) => {
     expect(rulesOf(source)).not.toContain('no-unused-expression')
   })
@@ -142,6 +148,8 @@ describe('no-unreachable-code', () => {
     'let f = fn() { return 1; 2; }; f();',
     // Only the first statement after the return is reported.
     'let f = fn() { return 1; puts(2); puts(3); }; f();',
+    // Transparency does not resurrect code: a debugger after return is dead.
+    'let f = fn() { return 1; debugger; }; f();',
   ])('flags a statement after return: %s', (source) => {
     expect(rulesOf(source)).toEqual(['no-unreachable-code'])
   })
