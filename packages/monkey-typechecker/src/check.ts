@@ -1042,9 +1042,9 @@ function operatorMessage(operator: string, left: Type, right: Type): string {
 }
 
 /**
- * Checks a parsed and validated program. Behavior on a tree that has not been
- * through `analyze_lossless` is undefined, which is why this is not exported
- * from the package entry points.
+ * Checks a parsed and validated program. This is a public low-level API, but
+ * behavior on a tree that has not been through parse and validation is
+ * undefined; most callers should use `check` instead.
  */
 export function checkProgram(
   program: Program,

@@ -1,6 +1,6 @@
 # Monkey Type System 设计提案
 
-> 状态：Proposal，未实现。已按四轮设计评审修订：擦除边界与声明例外、字段初始化模型、null-stripping、对拍范围、AST JSON 兼容性（首轮）；equality 矩阵、union 消解、拒绝方法名赋值、completion 返回推导、索引与泛型实例化（次轮）；any 操作规则、equality 跨 class 修正、字段收集冲突与依赖降级、crates.io 发布影响、builtin 类型名遮蔽、API 收敛（三轮）；同名 class 的声明 identity、`this` alias 字段收集、any 运算结果完备性、builtin 泛型的 any 约束与测试语料（四轮）。
+> 状态：已实现（PR #326，待合并）。设计经过四轮评审修订：擦除边界与声明例外、字段初始化模型、null-stripping、对拍范围、AST JSON 兼容性（首轮）；equality 矩阵、union 消解、拒绝方法名赋值、completion 返回推导、索引与泛型实例化（次轮）；any 操作规则、equality 跨 class 修正、字段收集冲突与依赖降级、crates.io 发布影响、builtin 类型名遮蔽、API 收敛（三轮）；同名 class 的声明 identity、`this` alias 字段收集、any 运算结果完备性、builtin 泛型的 any 约束与测试语料（四轮）。
 >
 > 核心结论：Monkey 增加 TypeScript 风格的可选类型标注语法（`let x: int = 5`、`fn(a: int): int`）。Rust 侧只有 lexer/parser/AST 参与——解析标注并随 JSON AST 导出；类型检查器是新的 TypeScript 包 `packages/monkey-typechecker`，通过 WASM 消费 AST，属于纯建议性静态分析。四个执行后端（interpreter、默认 VM、GcVM、asm）执行**类型擦除**语义：标注不改变任何运行时行为，带标注与去标注的同一程序必须产生逐字节相同的 instructions 与 constants（擦除边界与声明例外见 6.1）。
 >
@@ -442,7 +442,7 @@ arity 静态检查（`puts`/`print` 变长豁免），与 linter 的 `builtin-ar
 
 - 函数字面量：参数取标注（缺省 `any`）；返回类型取标注，否则从 body 按 **completion 模型**推导。block 自底向上归纳 `{ returnTypes, fallthrough }`：`return e;` 将 `e` 的类型记入 returnTypes，其后同 block 语句**不可达**、不参与推导；`if` 语句两分支都必 return 时其后同样不可达；可 fallthrough 的 block 值 = 尾表达式语句的类型（尾语句非表达式语句时为 `null`；尾 `if` 无 `else` 时并入 `null`）。函数返回类型 = join(全部可达 `return` 的类型，可达的 fallthrough 类型)。因此 `fn(): int { return 1; "s"; }` 推导为 `int`（尾串不可达，不误报 `int | string`）；`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 推导为 `int | string`（fallthrough 可达，对标注 `int` 正确报 `type-mismatch`）。guard 写法 `fn(flag: bool): int { if (flag) { return 1; } }` 推导为 `int?`：只可能 fallthrough 的隐式 `null` 并入 join 而不是单独与标注比对，依 7.5 的乐观 null 策略对标注 `int` 放行；`fn(): int { }`（body 无任何 `return`）没有可并入的返回路径，仍报 `type-mismatch`。Monkey 无循环，结构归纳一遍即定，无需不动点。
 - 调用：callee 静态类型必须是 `Fn`、`Any` 或 bound method；arity 严格相等；实参逐个 assignable。callee 为 `Any` 时实参不检查。callee 为 union 时按 7.1 的消解规则：全体成员可调用、arity 一致、实参对每个成员都合法，返回类型取各成员返回的 join。
-- 闭包捕获自由变量的类型即其定义处绑定类型；checker 无需区分 interpreter 的按引用捕获与 compiler 的按值捕获（无重赋值语义下二者对类型不可观测）。
+- 闭包捕获自由变量在定义处的**绑定 identity**；同一作用域后续同名 `let` 创建新绑定，不改写旧闭包。interpreter 通过递归快照声明时的环境 frame（其中的运行时值仍共享）实现这一语义，compiler/VM 通过不同 local/free symbol slot 实现。两条执行路径由 re-`let` 回归锁定，避免出现 checker 仍按旧类型检查、interpreter 却读到新类型值的跨后端分歧。
 - **递归**：`let f = fn(...)` 的命名回填使 `f` 在 body 内可见。若返回类型已标注，body 内 `f` 具有完整类型；未标注时 body 内自调用的返回类型按 `any` 处理（不做不动点迭代），推导继续。即：未标注的递归函数得到 `fn(...): any`，标注返回类型即可获得精确检查。fibonacci 例子未标注时全程 `any` 静默，标注 `: int` 后获得完整校验。
 
 ### 7.8 class
@@ -603,7 +603,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 - union 消解：`let f = if (c) { fn(x: int): int { x; } } else { fn(x: string): string { x; } }; f(1);` 报错；`let xs = if (c) { [1] } else { ["a"] }; xs[0];` 通过且类型为 `(int | string)?`。两例都由分支推导内部 union，不依赖 v1 尚未支持的 union 用户语法。
 - any 与 builtin 泛型：`any + true`、`any + [1]` 通过且结果为 `any`；`let c = true; let x: any = 0; let y = if (c) { 1 } else { "s" }; x + y;` 按 RHS 的内部 union 成员检查，结果为 `int | string`；`first(x)`（`x: any`）结果为 `any`，`push(x, 1)` 结果为 `[any]`。
 - 返回推导 completion：`return` 后不可达语句不参与 join（`fn(): int { return 1; "s"; }` 零诊断）；条件 return 与 fallthrough 合并（`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 报 `type-mismatch`）。
-- **对拍（oracle）测试**：套用 minifier 的 differential test 模式，但正向断言只对 **sound 子集语料**成立——全量标注、接口处无 `any`、不依赖 null-stripping（不对可空值直接运算）、不读取可能未初始化的字段。该语料上 checker 零 error ⇒ interpreter 与 GcVM 运行不出现 type/arity/property 类 runtime error。gradual 语料（含 `any` 边界、null-stripping、字段初始化盲区）单独归类，只做反向断言：checker 报 error 的用例抽样验证运行时确实可触发对应错误。
+- **对拍（oracle）测试**：套用 minifier 的 differential test 模式，但正向断言只对 **sound 子集语料**成立——全量标注、接口处无 `any`、不依赖 null-stripping（不对可空值直接运算）、不读取可能未初始化的字段。TypeScript oracle 使用 WASM 暴露的 GcVM runner，断言该语料上 checker 零 error ⇒ GcVM 不出现 type/arity/property 类 runtime error；tree-walking interpreter 由 Rust 侧同语义回归覆盖，特别锁定闭包捕获后 re-`let` 的 binding identity。gradual 语料（含 `any` 边界、null-stripping、字段初始化盲区）单独归类，只做反向断言：checker 报 error 的用例抽样验证运行时确实可触发对应错误。
 
 ### 12.4 工具链
 
