@@ -77,7 +77,10 @@ let f = fn() {
   "bbbbbbbbbbbbbbbbbbbb",
 ];
 `
-    const output = await format(input, { printWidth: 20, trailingComma: 'all' })
+    const output = await format(input, {
+      printWidth: 20,
+      trailingComma: 'all',
+    })
     expect(output).toBe(expected)
   })
 
@@ -295,6 +298,91 @@ class Node {
 
     expect(() => parse(firstFormat, {})).not.toThrow()
     expect(firstFormat).toBe(secondFormat)
+  })
+
+  it.each([
+    [
+      `let xs: [
+  // element
+  int
+] = [1];`,
+      `let xs: [
+  // element
+  int
+] = [1];
+`,
+    ],
+    [
+      `let f = fn(value: [
+  // parameter element
+  int
+]) { value; };`,
+      `let f = fn(
+  value: [
+    // parameter element
+    int
+  ]
+) {
+  value
+};
+`,
+    ],
+    [
+      `let callback: fn(
+  // input type
+  int
+): bool = fn(value) { value; };`,
+      `let callback: fn(
+  // input type
+  int
+): bool = fn(value) {
+  value
+};
+`,
+    ],
+    [
+      `let make = fn():
+  // result type
+  [int] { []; };`,
+      `let make = fn():
+  // result type
+  [int] {
+  []
+};
+`,
+    ],
+    [
+      `let maybe: (fn(
+  // optional input type
+  int
+): bool)? = null;`,
+      `let maybe: (fn(
+  // optional input type
+  int
+): bool)? = null;
+`,
+    ],
+    [
+      `let table: {
+  // key type
+  string:
+  // value type
+  [int]
+} = {};`,
+      `let table: {
+  // key type
+  string:
+    // value type
+    [int]
+} = {};
+`,
+    ],
+  ])('preserves comments inside type annotations', async (input, expected) => {
+    const output = await format(input)
+
+    expect(output).toBe(expected)
+    expect(() => parse(output, {})).not.toThrow()
+    expect(await format(output)).toBe(output)
   })
 
   it('wraps long annotated parameter lists', async () => {

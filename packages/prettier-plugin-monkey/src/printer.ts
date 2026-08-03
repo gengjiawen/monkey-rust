@@ -1,5 +1,4 @@
 import { doc, util, type AstPath, type Doc, type Options } from 'prettier'
-import { printTypeAnnotation } from './types'
 import type {
   Program,
   BlockStatement,
@@ -27,6 +26,12 @@ import type {
   ThisExpression,
   PropertyExpression,
   NewExpression,
+  TypeAnnotation,
+  NamedType,
+  ArrayType,
+  HashType,
+  FunctionType,
+  OptionalType,
 } from './types'
 
 const { group, indent, line, softline, hardline, join, ifBreak } = doc.builders
@@ -67,6 +72,16 @@ export function print(
       return printIdentifier(node as Identifier)
     case 'Param':
       return printParam(node as Param, path, print)
+    case 'NamedType':
+      return (node as NamedType).name
+    case 'ArrayType':
+      return printArrayType(node as ArrayType, path, print)
+    case 'HashType':
+      return printHashType(node as HashType, path, print)
+    case 'FunctionType':
+      return printFunctionType(node as FunctionType, path, print)
+    case 'OptionalType':
+      return printOptionalType(node as OptionalType, path, print)
     case 'UnaryExpression':
       return printUnaryExpression(node as UnaryExpression, path, print, options)
     case 'BinaryExpression':
@@ -174,7 +189,10 @@ function printLetStatement(
   options: Options
 ): Doc {
   const annotation = node.type_annotation
-    ? `: ${printTypeAnnotation(node.type_annotation)}`
+    ? printTypeAfterColon(
+        node.type_annotation,
+        path.call(print, 'type_annotation')
+      )
     : ''
 
   return group([
@@ -259,13 +277,13 @@ function printMethodDefinition(
   return group([
     path.call(print, 'name'),
     printDelimitedList(path, print, 'params'),
-    printReturnType(node.return_type),
+    printReturnType(node.return_type, path, print),
     ' ',
     path.call(print, 'body'),
   ])
 }
 
-/** `p` or `p: int`. Annotations print inline; they never break. */
+/** `p` or `p: int`. */
 function printParam(
   node: Param,
   path: AstPath,
@@ -274,14 +292,85 @@ function printParam(
   return [
     path.call(print, 'name'),
     node.type_annotation
-      ? `: ${printTypeAnnotation(node.type_annotation)}`
+      ? printTypeAfterColon(
+          node.type_annotation,
+          path.call(print, 'type_annotation')
+        )
       : '',
   ]
 }
 
 /** `: int` after a parameter list, or nothing when the return type is absent. */
-function printReturnType(annotation: MethodDefinition['return_type']): Doc {
-  return annotation ? `: ${printTypeAnnotation(annotation)}` : ''
+function printReturnType(
+  annotation: TypeAnnotation | null | undefined,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return annotation
+    ? printTypeAfterColon(annotation, path.call(print, 'return_type'))
+    : ''
+}
+
+function printTypeAfterColon(annotation: TypeAnnotation, typeDoc: Doc): Doc {
+  const hasLeadingLineComment = (annotation as ASTNode).comments?.some(
+    (comment) => comment.leading && comment.type === 'CommentLine'
+  )
+  return hasLeadingLineComment
+    ? [':', indent([hardline, typeDoc])]
+    : [': ', typeDoc]
+}
+
+function printArrayType(
+  node: ArrayType,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    '[',
+    indent([softline, path.call(print, 'element')]),
+    softline,
+    ']',
+  ])
+}
+
+function printHashType(
+  node: HashType,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    '{',
+    indent([
+      softline,
+      path.call(print, 'key'),
+      printTypeAfterColon(node.value, path.call(print, 'value')),
+    ]),
+    softline,
+    '}',
+  ])
+}
+
+function printFunctionType(
+  node: FunctionType,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return group([
+    'fn',
+    printDelimitedList(path, print, 'params'),
+    printTypeAfterColon(node.return_type, path.call(print, 'return_type')),
+  ])
+}
+
+function printOptionalType(
+  node: OptionalType,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  const inner = path.call(print, 'inner')
+  return node.inner.type === 'FunctionType'
+    ? group(['(', inner, ')?'])
+    : [inner, '?']
 }
 
 function printSetPropertyStatement(
@@ -371,7 +460,7 @@ function printFunctionDeclaration(
   return group([
     'fn',
     printDelimitedList(path, print, 'params'),
-    printReturnType(node.return_type),
+    printReturnType(node.return_type, path, print),
     ' ',
     path.call(print, 'body'),
   ])
