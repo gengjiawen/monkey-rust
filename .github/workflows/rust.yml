@@ -39,6 +39,13 @@ jobs:
         run: cd wasm && wasm-pack build --release --scope=gengjiawen
       - name: Run wasm tests
         run: cd wasm && wasm-pack test --node
+      # Every JS package below reads the AST through this one, and they import
+      # it by name, so its declarations have to exist before they build.
+      - name: Build and test shared AST types
+        run: |
+          pnpm install --filter @gengjiawen/monkey-ast-types --frozen-lockfile
+          pnpm --filter @gengjiawen/monkey-ast-types build
+          pnpm --filter @gengjiawen/monkey-ast-types test
       - name: Build and test minifier
         run: |
           pnpm install --filter @gengjiawen/monkey-minifier... --frozen-lockfile
@@ -53,6 +60,11 @@ jobs:
           pnpm --filter @gengjiawen/monkey-lint test:browser
           pnpm --filter @gengjiawen/monkey-lint test:node
           pnpm --filter @gengjiawen/monkey-lint test
+      - name: Build and test type checker
+        run: |
+          pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile
+          pnpm --filter @gengjiawen/monkey-typechecker build
+          pnpm --filter @gengjiawen/monkey-typechecker test
       - name: Run playground tests
         run: |
           pnpm install --filter monkey-playground... --frozen-lockfile

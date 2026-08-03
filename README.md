@@ -6,6 +6,8 @@
 [![npm version](https://img.shields.io/npm/v/prettier-plugin-monkey?label=prettier-plugin-monkey)](https://www.npmjs.com/package/prettier-plugin-monkey)
 [![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-minifier?label=@gengjiawen/monkey-minifier)](https://www.npmjs.com/package/@gengjiawen/monkey-minifier)
 [![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-lint?label=@gengjiawen/monkey-lint)](https://www.npmjs.com/package/@gengjiawen/monkey-lint)
+[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-typechecker?label=@gengjiawen/monkey-typechecker)](https://www.npmjs.com/package/@gengjiawen/monkey-typechecker)
+[![npm version](https://img.shields.io/npm/v/@gengjiawen/monkey-ast-types?label=@gengjiawen/monkey-ast-types)](https://www.npmjs.com/package/@gengjiawen/monkey-ast-types)
 
 An interpreter and compiler for the Monkey programming language written in Rust
 
@@ -33,7 +35,9 @@ Monkey has a C-like syntax, supports **variable bindings**, **prefix** and **inf
 - **Prettier Plugin**: Format Monkey source code with [Prettier](https://prettier.io/) via `prettier-plugin-monkey`.
 - **Minifier** ([`@gengjiawen/monkey-minifier`](packages/monkey-minifier/README.md)): A semantics-preserving source-to-source minifier powered by the Rust/Wasm parser, with compact printing, identifier mangling, constant folding and propagation, dead `let` elimination, and Node/browser/CLI APIs.
 - **Linter** ([`@gengjiawen/monkey-lint`](packages/monkey-linter/README.md)): A static linter powered by the Rust/Wasm parser, whose AST rules are anchored to both backends — a construct is only flagged when the tree-walking interpreter and the GC bytecode VM agree it is wrong or useless — with per-rule severity overrides and Node/browser/CLI APIs.
-- **VS Code Extension**: First-class editor support with syntax highlighting, snippets, WASM-powered diagnostics, AST preview, and bytecode compilation commands.
+- **Types** ([`@gengjiawen/monkey-typechecker`](packages/monkey-typechecker/README.md)): Optional TypeScript-style annotations on `let` bindings, parameters and return positions (`let x: int = 5`, `fn(a: int): int`, plus `[T]`, `{K: V}`, `fn(A): R` and `T?`), erased by every backend so annotated and unannotated programs compile to identical bytecode; the gradual checker on top infers the rest and is anchored to measured runtime behaviour rather than to soundness ([design doc](docs/type-system-design.md)).
+- **AST types** ([`@gengjiawen/monkey-ast-types`](packages/monkey-ast-types/README.md)): The single TypeScript definition of the JSON tree the Wasm parser emits, shared by the minifier, linter, prettier plugin and type checker.
+- **VS Code Extension**: First-class editor support with syntax highlighting, snippets, WASM-powered parser and type diagnostics, AST preview, and bytecode compilation commands.
 - bytecode viewer from source
 - **GC** ([`monkey-gc`](gc/README.md)): alternate bytecode VM with QuickJS-style refcounting and three-phase cycle collection (`gc_decref` → `gc_scan` → `gc_free_cycles`) on a `GcHeap`, so cyclic object graphs can be reclaimed without changing `object` or the default `Rc` VM.
 - **Bytecode snapshots** (`.mbc`): QuickJS-style ahead-of-time compilation, mirroring `qjsc` — `monkey-gc compile foo.monkey` serializes the compiled bytecode to a `.mbc` file and `monkey-gc run foo.mbc` executes it without the parser/compiler, treating the file as untrusted input behind a three-layer validation model ([design doc](docs/bytecode-snapshot-design.md)).

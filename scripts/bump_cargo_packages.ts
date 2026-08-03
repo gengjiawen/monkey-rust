@@ -109,12 +109,37 @@ try {
       '@gengjiawen/monkey-lint',
       `workspace:^${nextVersion}`
     ) || playgroundChanged
+  playgroundChanged =
+    syncDependencyRange(
+      playground,
+      'playground',
+      '@gengjiawen/monkey-typechecker',
+      `workspace:^${nextVersion}`
+    ) || playgroundChanged
 
   if (playgroundChanged) {
     writePackageJson(playgroundPkgPath, playground)
   }
 } catch (e) {
   console.warn('Failed to update playground dependency:', e)
+}
+
+// Also keep monkey-ast-types in sync. It has no dependencies of its own; the
+// minifier, linter, prettier plugin and type checker all depend on it, so it is
+// bumped first.
+try {
+  const astTypesPkgPath = repoPath(
+    'packages',
+    'monkey-ast-types',
+    'package.json'
+  )
+  const astTypes = readPackageJson(astTypesPkgPath)
+
+  if (syncPackageVersion(astTypes, 'monkey-ast-types', nextVersion)) {
+    writePackageJson(astTypesPkgPath, astTypes)
+  }
+} catch (e) {
+  console.warn('Failed to update monkey-ast-types version:', e)
 }
 
 // Also keep prettier-plugin-monkey package version and wasm dependency in sync
@@ -135,6 +160,13 @@ try {
       prettierPlugin,
       'prettier-plugin-monkey',
       '@gengjiawen/monkey-wasm',
+      `^${nextVersion}`
+    ) || prettierPluginChanged
+  prettierPluginChanged =
+    syncDependencyRange(
+      prettierPlugin,
+      'prettier-plugin-monkey',
+      '@gengjiawen/monkey-ast-types',
       `^${nextVersion}`
     ) || prettierPluginChanged
 
@@ -168,6 +200,13 @@ try {
       '@gengjiawen/monkey-wasm',
       `^${nextVersion}`
     ) || minifierChanged
+  minifierChanged =
+    syncDependencyRange(
+      minifier,
+      'monkey-minifier',
+      '@gengjiawen/monkey-ast-types',
+      `^${nextVersion}`
+    ) || minifierChanged
 
   if (minifierChanged) {
     writePackageJson(minifierPkgPath, minifier)
@@ -192,12 +231,55 @@ try {
       '@gengjiawen/monkey-wasm',
       `^${nextVersion}`
     ) || linterChanged
+  linterChanged =
+    syncDependencyRange(
+      linter,
+      'monkey-lint',
+      '@gengjiawen/monkey-ast-types',
+      `^${nextVersion}`
+    ) || linterChanged
 
   if (linterChanged) {
     writePackageJson(linterPkgPath, linter)
   }
 } catch (e) {
   console.warn('Failed to update monkey-lint dependency:', e)
+}
+
+// Also keep monkey-typechecker package version and its dependencies in sync,
+// using a registry-compatible range for the same publish reason as the linter.
+try {
+  const typecheckerPkgPath = repoPath(
+    'packages',
+    'monkey-typechecker',
+    'package.json'
+  )
+  const typechecker = readPackageJson(typecheckerPkgPath)
+  let typecheckerChanged = false
+
+  typecheckerChanged =
+    syncPackageVersion(typechecker, 'monkey-typechecker', nextVersion) ||
+    typecheckerChanged
+  typecheckerChanged =
+    syncDependencyRange(
+      typechecker,
+      'monkey-typechecker',
+      '@gengjiawen/monkey-wasm',
+      `^${nextVersion}`
+    ) || typecheckerChanged
+  typecheckerChanged =
+    syncDependencyRange(
+      typechecker,
+      'monkey-typechecker',
+      '@gengjiawen/monkey-ast-types',
+      `^${nextVersion}`
+    ) || typecheckerChanged
+
+  if (typecheckerChanged) {
+    writePackageJson(typecheckerPkgPath, typechecker)
+  }
+} catch (e) {
+  console.warn('Failed to update monkey-typechecker dependency:', e)
 }
 
 // Also keep vscode-extension package version in sync
