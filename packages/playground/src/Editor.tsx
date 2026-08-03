@@ -20,6 +20,7 @@ import {
 import { lintGutter } from '@codemirror/lint'
 
 import { runMonkeyLint } from './lint'
+import { runMonkeyTypeCheck } from './typecheck'
 
 interface HighlightRange {
   from: number
@@ -113,6 +114,8 @@ export interface EditorHandle {
   clearHighlight: () => void
   /** Lint the current document and show the diagnostics panel. */
   runLint: () => Promise<void>
+  /** Type check the current document and show the diagnostics panel. */
+  runTypeCheck: () => Promise<void>
 }
 
 function showHighlightRanges(view: EditorView, ranges: HighlightRange[]) {
@@ -201,6 +204,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         const view = viewRef.current
         if (!view) return
         await runMonkeyLint(view)
+      },
+      async runTypeCheck() {
+        const view = viewRef.current
+        if (!view) return
+        await runMonkeyTypeCheck(view)
       },
     }),
     []

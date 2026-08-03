@@ -32,6 +32,7 @@ const {
   highlightRangesMock,
   clearHighlightMock,
   runLintMock,
+  runTypeCheckMock,
   formatMock,
   minifyMock,
   sourceEditorHooks,
@@ -54,6 +55,7 @@ const {
   highlightRangesMock: vi.fn(),
   clearHighlightMock: vi.fn(),
   runLintMock: vi.fn(async () => {}),
+  runTypeCheckMock: vi.fn(async () => {}),
   formatMock: vi.fn(),
   minifyMock: vi.fn(),
   // The mock editor below is a plain <textarea>, which cannot reproduce every
@@ -116,6 +118,7 @@ vi.mock('../Editor', () => ({
       highlightRanges(): void
       clearHighlight(): void
       runLint(): Promise<void>
+      runTypeCheck(): Promise<void>
     }>
   ) {
     useImperativeHandle(ref, () => ({
@@ -123,6 +126,7 @@ vi.mock('../Editor', () => ({
       highlightRanges: highlightRangesMock,
       clearHighlight: clearHighlightMock,
       runLint: runLintMock,
+      runTypeCheck: runTypeCheckMock,
     }))
 
     if (!extra?.readOnly) {
@@ -427,6 +431,7 @@ beforeEach(() => {
   highlightRangesMock.mockClear()
   clearHighlightMock.mockClear()
   runLintMock.mockClear()
+  runTypeCheckMock.mockClear()
   sourceEditorHooks.onChange = undefined
   sourceEditorHooks.onSelectionChange = undefined
   outputEditorHooks.onSelectionChange = undefined
@@ -474,6 +479,43 @@ describe('Lint', () => {
     await user.click(screen.getByRole('button', { name: 'Lint' }))
 
     expect(runLintMock).toHaveBeenCalledTimes(1)
+    expect(runTypeCheckMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('Types', () => {
+  it('type checks the source editor when the toolbar button is pressed', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Types' }))
+
+    expect(runTypeCheckMock).toHaveBeenCalledTimes(1)
+    expect(runLintMock).not.toHaveBeenCalled()
+  })
+
+  it('loads the Types demo snippet from the dropdown', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Types demo' }))
+
+    expect(screen.getByLabelText('Source editor')).toHaveValue(
+      'let greeting: string = "hello";\n' +
+        'let sizes: [int] = [1, 2, 3];\n' +
+        'let ages: {string: int} = {"anna": 24};\n' +
+        '\n' +
+        'let repeat = fn(text: string, times: int): string {\n' +
+        '  if (times < 1) { return ""; }\n' +
+        '  text + repeat(text, times - 1);\n' +
+        '};\n' +
+        '\n' +
+        'let shout: int = greeting;   // type-mismatch\n' +
+        'repeat(greeting, greeting);  // type-mismatch\n' +
+        'repeat(greeting);            // arity-mismatch\n' +
+        'sizes[0] + greeting;         // operator-type\n'
+    )
   })
 })
 

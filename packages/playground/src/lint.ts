@@ -1,13 +1,15 @@
-import {
-  openLintPanel,
-  setDiagnostics,
-  type Diagnostic,
-} from '@codemirror/lint'
+import type { Diagnostic } from '@codemirror/lint'
 import type { EditorView } from '@codemirror/view'
 
-import { utf8ByteSpanToUtf16 } from './sourceSpan'
+import {
+  editorSpan,
+  runDiagnostics,
+  type DiagnosticsProvider,
+} from './diagnosticsPanel'
 
 type LintModule = typeof import('../../monkey-linter/src/index')
+
+const lintTool = { name: 'monkey-lint', subject: 'Linter' }
 
 let lintModulePromise: Promise<LintModule> | null = null
 
@@ -26,10 +28,7 @@ export async function monkeyLintDiagnostics(
 ): Promise<Diagnostic[]> {
   const { lint } = await loadLintModule()
   return lint(source).diagnostics.map((diagnostic) => {
-    const span =
-      diagnostic.span === undefined
-        ? { start: 0, end: 0 }
-        : utf8ByteSpanToUtf16(source, diagnostic.span)
+    const span = editorSpan(source, diagnostic.span)
     return {
       from: span.start,
       to: span.end,
@@ -40,40 +39,10 @@ export async function monkeyLintDiagnostics(
   })
 }
 
-type DiagnosticsProvider = (source: string) => Promise<Diagnostic[]>
-
-function lintFailureDiagnostic(error: unknown): Diagnostic {
-  const message = error instanceof Error ? error.message : String(error)
-  return {
-    from: 0,
-    to: 0,
-    severity: 'error',
-    source: 'monkey-lint',
-    message: `Linter failed: ${message}`,
-  }
-}
-
-/**
- * Lint the current document once and surface the results as squiggles plus
- * the diagnostics panel below the editor. Results are discarded when the
- * document changes during the run; accepted ranges follow subsequent edits
- * but are only refreshed by the next run.
- */
+/** Lint the current document and show the results in the diagnostics panel. */
 export async function runMonkeyLint(
   view: EditorView,
   diagnosticsProvider: DiagnosticsProvider = monkeyLintDiagnostics
 ): Promise<void> {
-  const state = view.state
-  let diagnostics: Diagnostic[]
-  try {
-    diagnostics = await diagnosticsProvider(state.doc.toString())
-  } catch (error) {
-    console.error('monkey-lint failed:', error)
-    diagnostics = [lintFailureDiagnostic(error)]
-  }
-
-  if (view.state.doc !== state.doc) return
-
-  view.dispatch(setDiagnostics(view.state, diagnostics))
-  openLintPanel(view)
+  return runDiagnostics(view, diagnosticsProvider, lintTool)
 }

@@ -133,6 +133,26 @@ puts(s);
 `.trimStart(),
   },
   {
+    // Annotations are erased before compilation, so this still runs; press
+    // Types to see what the checker makes of the last four lines.
+    label: 'Types demo',
+    code: `
+let greeting: string = "hello";
+let sizes: [int] = [1, 2, 3];
+let ages: {string: int} = {"anna": 24};
+
+let repeat = fn(text: string, times: int): string {
+  if (times < 1) { return ""; }
+  text + repeat(text, times - 1);
+};
+
+let shout: int = greeting;   // type-mismatch
+repeat(greeting, greeting);  // type-mismatch
+repeat(greeting);            // arity-mismatch
+sizes[0] + greeting;         // operator-type
+`.trimStart(),
+  },
+  {
     // Two debugger hits: one inside makePoint with three live frames, one
     // in sum after makePoint returned but its array is still reachable.
     label: 'Debugger',
@@ -437,6 +457,10 @@ function App() {
     void editorRef.current?.runLint()
   }, [])
 
+  const runTypeCheck = useCallback(() => {
+    void editorRef.current?.runTypeCheck()
+  }, [])
+
   useEffect(() => {
     debouncedCompile(code)
   }, [code, debouncedCompile])
@@ -703,6 +727,9 @@ function App() {
             </Button>
             <Button size="2" onClick={runLint}>
               Lint
+            </Button>
+            <Button size="2" onClick={runTypeCheck}>
+              Types
             </Button>
             <Select.Root
               size="2"
