@@ -41,7 +41,9 @@ impl Parser<'_> {
                 end: self.current_token.span.end,
             };
             annotation = match annotation {
-                already @ TypeAnnotation::Optional(_) => already,
+                // Already optional: only the cover span grows to swallow the
+                // extra `?`, so tooling that slices spans sees `T??`, not `T?`.
+                already @ TypeAnnotation::Optional(_) => with_span(already, span),
                 inner => TypeAnnotation::Optional(OptionalType {
                     inner: Box::new(inner),
                     span,

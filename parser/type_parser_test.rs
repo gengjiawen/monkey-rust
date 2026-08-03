@@ -145,8 +145,11 @@ mod tests {
 
     #[test]
     fn double_question_normalizes() {
-        let annotation = let_annotation("let a: int?? = 1;");
+        let input = "let a: int?? = 1;";
+        let annotation = let_annotation(input);
         assert_eq!(annotation.to_string(), "int?");
+        // Normalized to a single node, but the span still covers both `?`s.
+        assert_eq!(slice(input, annotation.span()), "int??");
         let TypeAnnotation::Optional(optional) = annotation else {
             panic!("expected an optional type")
         };
