@@ -1,7 +1,7 @@
 {
-  "name": "prettier-plugin-monkey",
+  "name": "@gengjiawen/monkey-ast-types",
   "version": "1.2.0",
-  "description": "Prettier plugin for Monkey programming language",
+  "description": "Shared TypeScript definitions for the Monkey AST JSON emitted by @gengjiawen/monkey-wasm",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -11,11 +11,9 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "prettier",
-    "plugin",
     "monkey",
-    "monkeylang",
-    "formatter"
+    "ast",
+    "types"
   ],
   "author": "gengjiawen <technicalcute@gmail.com>",
   "license": "MIT",
@@ -23,21 +21,13 @@
     "type": "git",
     "url": "https://github.com/gengjiawen/monkey-rust"
   },
-  "peerDependencies": {
-    "prettier": "^3.0.0"
-  },
-  "dependencies": {
-    "@gengjiawen/monkey-ast-types": "^1.2.0",
-    "@gengjiawen/monkey-wasm": "^1.2.0"
-  },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "prettier": "^3.0.0",
+    "@types/node": "^24.0.0",
     "typescript": "^7.0.2",
-    "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.1.10"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ]
 }
