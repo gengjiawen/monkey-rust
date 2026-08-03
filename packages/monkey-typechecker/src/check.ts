@@ -65,6 +65,7 @@ import {
   optional,
   stripNull,
   type ClassId,
+  type ClassType,
   type FnType,
   type Type,
 } from './types'
@@ -257,6 +258,30 @@ class Checker {
     }
   }
 
+  /**
+   * The declared-return check for the value a body falls off the end with.
+   * A body that only *may* fall through — a guard clause like
+   * `if (c) { return 1; }` — completes with a bare `null` alongside real
+   * `return`s; under section 7.7's join the null folds into `T?` and the
+   * optimistic policy accepts it, so it is exempt here. A bare `null` with no
+   * returns anywhere is the function's entire result and still reports.
+   */
+  private checkFallthrough(frame: FunctionFrame, completion: Completion): void {
+    if (!frame.declaredReturn || !completion.reachable) {
+      return
+    }
+    if (completion.value.kind === 'null' && frame.returnTypes.length > 0) {
+      return
+    }
+    if (!assignable(completion.value, frame.declaredReturn)) {
+      this.reportMismatch(
+        completion.value,
+        frame.declaredReturn,
+        completion.span
+      )
+    }
+  }
+
   private checkSetProperty(statement: SetPropertyStatement): void {
     const receiver = this.inferExpression(statement.object)
     const value = this.inferExpression(statement.value)
@@ -428,17 +453,7 @@ class Checker {
     this.frames.pop()
     this.env.pop()
 
-    if (
-      signature.declaredReturn &&
-      completion.reachable &&
-      !assignable(completion.value, signature.declaredReturn)
-    ) {
-      this.reportMismatch(
-        completion.value,
-        signature.declaredReturn,
-        completion.span
-      )
-    }
+    this.checkFallthrough(frame, completion)
   }
 
   private constructorParams(info: ClassInfo): Type[] {
@@ -702,13 +717,7 @@ class Checker {
     this.frames.pop()
     this.env.pop()
 
-    if (
-      declaredReturn &&
-      completion.reachable &&
-      !assignable(completion.value, declaredReturn)
-    ) {
-      this.reportMismatch(completion.value, declaredReturn, completion.span)
-    }
+    this.checkFallthrough(frame, completion)
 
     const inferred = joinAll([
       ...frame.returnTypes,
@@ -749,13 +758,24 @@ class Checker {
     const arities = new Set(
       signatures.map((signature) => signature.params.length)
     )
-    if (arities.size > 1 || !arities.has(args.length)) {
-      const expected = [...arities].sort((a, b) => a - b)
+    if (arities.size > 1) {
+      const counts = [...arities].sort((a, b) => a - b)
       this.report(
         DIAGNOSTIC_CODES.arityMismatch,
-        `expected ${expected.join(' or ')} argument${
-          expected.length === 1 && expected[0] === 1 ? '' : 's'
-        }, got ${args.length}`,
+        `members of '${display(callee)}' disagree on arity (${counts.join(
+          ' vs '
+        )}); no call satisfies every member`,
+        spanOf(call)
+      )
+      return joinAll(signatures.map((signature) => signature.ret))
+    }
+    const arity = signatures[0]!.params.length
+    if (args.length !== arity) {
+      this.report(
+        DIAGNOSTIC_CODES.arityMismatch,
+        `expected ${arity} argument${arity === 1 ? '' : 's'}, got ${
+          args.length
+        }`,
         spanOf(call)
       )
       return joinAll(signatures.map((signature) => signature.ret))
@@ -906,11 +926,14 @@ class Checker {
     const args = expression.arguments.map((argument) =>
       this.inferExpression(argument)
     )
-    const callee = this.env.lookup(expression.callee.name)?.type ?? ANY
-    if (callee.kind === 'any') {
+    const callee = stripNull(
+      this.env.lookup(expression.callee.name)?.type ?? ANY
+    )
+    const candidates = members(callee)
+    if (candidates.some((member) => member.kind === 'any')) {
       return ANY
     }
-    if (callee.kind !== 'class') {
+    if (candidates.some((member) => member.kind !== 'class')) {
       this.report(
         DIAGNOSTIC_CODES.notConstructable,
         `cannot construct '${display(callee)}'`,
@@ -918,37 +941,72 @@ class Checker {
       )
       return ANY
     }
-    const info = this.classes.get(callee.id)
-    if (!info) {
+
+    // A union of classes is constructable under the same elimination rule as
+    // calls: every member must agree on constructor arity and accept every
+    // argument, and the result joins the instances.
+    const infos = candidates
+      .filter((member): member is ClassType => member.kind === 'class')
+      .map((member) => this.classes.get(member.id))
+    if (infos.some((info) => info === undefined)) {
       return ANY
     }
-    const params = this.constructorParams(info)
-    if (args.length !== params.length) {
+    const classes = infos as ClassInfo[]
+    const result = joinAll(
+      classes.map((info) => instanceOf(info.id, info.name))
+    )
+
+    const arities = new Set(
+      classes.map((info) => this.constructorParams(info).length)
+    )
+    if (arities.size > 1) {
+      const counts = [...arities].sort((a, b) => a - b)
       this.report(
         DIAGNOSTIC_CODES.arityMismatch,
-        `${info.name} constructor expects ${params.length} argument${
-          params.length === 1 ? '' : 's'
+        `constructors of '${display(callee)}' disagree on arity (${counts.join(
+          ' vs '
+        )}); no call satisfies every member`,
+        spanOf(expression)
+      )
+      return result
+    }
+    const arity = this.constructorParams(classes[0]!).length
+    if (args.length !== arity) {
+      this.report(
+        DIAGNOSTIC_CODES.arityMismatch,
+        `${display(callee)} constructor expects ${arity} argument${
+          arity === 1 ? '' : 's'
         }, got ${args.length}`,
         spanOf(expression)
       )
-      return instanceOf(info.id, info.name)
+      return result
     }
     args.forEach((argument, index) => {
-      if (!assignable(argument, params[index]!)) {
-        this.reportMismatch(
-          argument,
-          params[index]!,
-          spanOf(expression.arguments[index])
-        )
+      for (const info of classes) {
+        const expected = this.constructorParams(info)[index]!
+        if (!assignable(argument, expected)) {
+          this.reportMismatch(
+            argument,
+            expected,
+            spanOf(expression.arguments[index])
+          )
+          return
+        }
       }
     })
-    return instanceOf(info.id, info.name)
+    return result
   }
 
   private reportMismatch(from: Type, to: Type, span: Span): void {
+    const fromText = display(from)
+    const toText = display(to)
+    // Two nominal types can share a name (a class shadowing another); without
+    // the hint the message reads "'A' is not assignable to 'A'".
+    const hint =
+      fromText === toText ? ' (same name, different declaration)' : ''
     this.report(
       DIAGNOSTIC_CODES.typeMismatch,
-      `type '${display(from)}' is not assignable to type '${display(to)}'`,
+      `type '${fromText}' is not assignable to type '${toText}'${hint}`,
       span
     )
   }
@@ -979,9 +1037,6 @@ function operatorMessage(operator: string, left: Type, right: Type): string {
   const operands = `'${display(left)} ${operator} ${display(right)}'`
   if (operator === '+') {
     return `operator '+' expects 'int + int' or 'string + string', got ${operands}`
-  }
-  if (operator === '<' || operator === '>') {
-    return `operator '${operator}' expects 'int ${operator} int', got ${operands}`
   }
   return `operator '${operator}' expects 'int ${operator} int', got ${operands}`
 }

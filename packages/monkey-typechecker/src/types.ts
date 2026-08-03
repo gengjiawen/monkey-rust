@@ -267,7 +267,15 @@ export function display(type: Type): string {
       if (rest.length === 0) {
         return 'null'
       }
-      const text = rest.map(display).join(' | ')
+      // A function member's `: ret` would bleed into the `|` list, so it is
+      // parenthesized whenever it has neighbors.
+      const text = rest
+        .map((member) =>
+          rest.length > 1 && member.kind === 'fn'
+            ? `(${display(member)})`
+            : display(member)
+        )
+        .join(' | ')
       if (rest.length === type.members.length) {
         return text
       }

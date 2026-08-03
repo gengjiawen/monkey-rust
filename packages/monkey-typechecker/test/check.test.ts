@@ -412,6 +412,29 @@ describe('functions', () => {
     clean('let f = fn(flag: bool): int { if (flag) { return 1; } 2; };')
   })
 
+  it('accepts a guard clause whose only fallthrough is the implicit null', () => {
+    // The body joins to `int?`; the optimistic null policy accepts it, same
+    // as the expression-valued `fn(): int { if (flag) { 1 } }`.
+    clean('let f = fn(flag: bool): int { if (flag) { return 1; } };')
+    // Without an annotation the inferred type still remembers the null path.
+    clean(
+      'let f = fn(flag: bool) { if (flag) { return 1; } }; let a: int? = f(true);'
+    )
+    expect(
+      codes(
+        'let f = fn(flag: bool) { if (flag) { return 1; } }; let a: string = f(true);'
+      )
+    ).toEqual(['type-mismatch'])
+  })
+
+  it('reports a union callee whose members disagree on arity', () => {
+    const source =
+      'let c = true; let f = if (c) { fn(x: int): int { x } } else { fn(): int { 1 } }; f(1);'
+    expect(only(source).message).toBe(
+      "members of '(fn(int): int) | (fn(): int)' disagree on arity (0 vs 1); no call satisfies every member"
+    )
+  })
+
   it('closes over the defining type of a free variable', () => {
     clean('let a: int = 1; let f = fn(): int { a }; f();')
     expect(codes('let a: string = "s"; let f = fn(): int { a };')).toEqual([
@@ -461,6 +484,33 @@ describe('classes', () => {
     expect(only('let f = fn(a: int): int { a }; new f();').message).toBe(
       "cannot construct 'fn(int): int'"
     )
+  })
+
+  it('accepts a guard clause in a method body', () => {
+    clean(
+      'class C { constructor() { this.x = 1; } get(flag: bool): int { if (flag) { return this.x; } } }'
+    )
+  })
+
+  it('constructs a union of classes when every member agrees', () => {
+    const union =
+      'class A { constructor(v: int) { this.v = v; } } class B { constructor(v: int) { this.v = v; } } let c = true; let Type = if (c) { A } else { B };'
+    clean(`${union} let o = new Type(1); let x: int = o.v;`)
+    expect(codes(`${union} new Type("s");`)).toEqual(['type-mismatch'])
+  })
+
+  it('reports a union of classes whose constructors disagree on arity', () => {
+    const source =
+      'class A { constructor(v: int) { this.v = v; } } class B { constructor() { this.v = 1; } } let c = true; let Type = if (c) { A } else { B }; new Type(1);'
+    expect(only(source).message).toBe(
+      "constructors of 'A | B' disagree on arity (0 vs 1); no call satisfies every member"
+    )
+  })
+
+  it('strips null from an optional class before constructing', () => {
+    // An else-less `if` folds null into the class value; the optimistic
+    // policy strips it, mirroring calls on an optional function.
+    clean('class A {} let c = true; let Type = if (c) { A }; new Type();')
   })
 
   it('types a field read and a method call', () => {
@@ -561,7 +611,9 @@ describe('classes', () => {
   it('gives a shadowing class a fresh identity', () => {
     const source =
       'class A { constructor() { this.x = 1; } } let Old = A; class A { constructor() { this.y = 2; } } let a: A = new Old();'
-    expect(codes(source)).toEqual(['type-mismatch'])
+    expect(only(source).message).toBe(
+      "type 'A' is not assignable to type 'A' (same name, different declaration)"
+    )
   })
 
   it('warns when a class shadows a builtin type name', () => {
