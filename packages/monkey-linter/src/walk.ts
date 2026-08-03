@@ -12,6 +12,7 @@ import type {
   LetStatement,
   MethodDefinition,
   NewExpression,
+  Param,
   Program,
   PropertyExpression,
   ReturnStatement,
@@ -39,9 +40,10 @@ function visit(node: ASTNode, parent: ASTNode | null, enter: WalkVisitor): void 
 }
 
 /**
- * Child AST nodes in source order. The `Let` identifier is a lexer `Token`
- * (not an AST node) and is intentionally excluded — `identifierName()` reads it
- * directly. Operator tokens are likewise skipped.
+ * Child AST nodes in source order. Operator tokens are not nodes and are
+ * skipped. Type annotations are skipped too: every backend erases them, so a
+ * lint rule that reasons about runtime behavior must never see one. A `Param`
+ * yields its name and stops there.
  */
 export function childrenOf(node: ASTNode): ASTNode[] {
   switch (node.type) {
@@ -49,8 +51,12 @@ export function childrenOf(node: ASTNode): ASTNode[] {
       return (node as Program).body
     case 'BlockStatement':
       return (node as BlockStatement).body
-    case 'Let':
-      return [(node as LetStatement).expr]
+    case 'Let': {
+      const statement = node as LetStatement
+      return [statement.identifier, statement.expr]
+    }
+    case 'Param':
+      return [(node as Param).name]
     case 'ReturnStatement':
       return [(node as ReturnStatement).argument]
     case 'ClassDeclaration': {

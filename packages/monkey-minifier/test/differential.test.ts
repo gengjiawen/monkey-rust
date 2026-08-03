@@ -59,3 +59,39 @@ describe('GC VM differential semantics', () => {
     expect(observe(optimized)).toEqual(observe(source))
   })
 })
+
+// Every backend erases type annotations, so the minifier must too: annotating a
+// program may not change a single byte of its output. Each pair is the same
+// program written with and without annotations.
+const annotated: [string, string][] = [
+  ['let a: int = 1; a;', 'let a = 1; a;'],
+  ['let a: [int]? = [1]; a;', 'let a = [1]; a;'],
+  ['let f: fn(int): int = fn(n: int): int { n * 2 }; f(21);', 'let f = fn(n) { n * 2 }; f(21);'],
+  ['fn(a: int, b): int { a + b }(1, 2);', 'fn(a, b) { a + b }(1, 2);'],
+  [
+    'class Box { constructor(v: int) { this.v = v; } get(): int { this.v } } new Box(1).get();',
+    'class Box { constructor(v) { this.v = v; } get() { this.v } } new Box(1).get();',
+  ],
+  [
+    'let m: {string: [int]} = {"a": [1]}; let g: fn(): null = fn(): null { puts(m) }; g();',
+    'let m = {"a": [1]}; let g = fn() { puts(m) }; g();',
+  ],
+]
+
+describe('type annotations are erased', () => {
+  it.each(annotated)('minifies %s exactly like its erased twin', (withTypes, without) => {
+    expect(minify(withTypes).code).toBe(minify(without).code)
+  })
+
+  it.each(annotated)('runs %s exactly like its erased twin', (withTypes, without) => {
+    expect(observe(minify(withTypes).code)).toEqual(observe(without))
+  })
+
+  it('never emits a colon outside a hash literal', () => {
+    const { code } = minify(
+      'let a: {string: int}? = {"k": 1}; let f = fn(x: int): int { x }; f(1);',
+      { fold: false, mangle: false }
+    )
+    expect(code).toBe('let a={"k":1};let f=fn(x){x;};f(1);')
+  })
+})

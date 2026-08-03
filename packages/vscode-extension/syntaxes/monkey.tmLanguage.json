@@ -7,6 +7,9 @@
     { "include": "#numbers" },
     { "include": "#class-declarations" },
     { "include": "#method-declarations" },
+    { "include": "#let-annotations" },
+    { "include": "#parameter-annotations" },
+    { "include": "#return-type-annotations" },
     { "include": "#properties" },
     { "include": "#keywords" },
     { "include": "#operators" },
@@ -56,12 +59,98 @@
     "method-declarations": {
       "patterns": [
         {
-          "match": "\\b((?!if\\b|fn\\b)[a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\([^)]*\\)\\s*\\{)",
+          "match": "\\b((?!if\\b|fn\\b)[a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\([^)]*\\)\\s*(?::[^{;=]*)?\\{)",
           "captures": {
             "1": { "name": "entity.name.function.member.monkey" }
           }
         }
       ]
+    },
+    "let-annotations": {
+      "begin": "\\b(let)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(:)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.monkey" },
+        "2": { "name": "variable.other.monkey" },
+        "3": { "name": "keyword.operator.type.annotation.monkey" }
+      },
+      "end": "(?==)|(?=;)|$",
+      "patterns": [{ "include": "#type" }]
+    },
+    "parameter-annotations": {
+      "comment": "Anchored on `(` or `,` so a hash literal's `key: value` never matches.",
+      "begin": "(?<=[(,])\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*(:)",
+      "beginCaptures": {
+        "1": { "name": "variable.parameter.monkey" },
+        "2": { "name": "keyword.operator.type.annotation.monkey" }
+      },
+      "end": "(?=[,)])|$",
+      "patterns": [{ "include": "#type" }]
+    },
+    "return-type-annotations": {
+      "begin": "(\\))\\s*(:)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.monkey" },
+        "2": { "name": "keyword.operator.type.annotation.monkey" }
+      },
+      "end": "(?=[{,);=])|$",
+      "patterns": [{ "include": "#type" }]
+    },
+    "type": {
+      "comment": "The type sub-grammar: docs/type-system-design.md section 5.",
+      "patterns": [
+        { "include": "#function-type" },
+        { "include": "#array-type" },
+        { "include": "#hash-type" },
+        { "include": "#grouped-type" },
+        {
+          "name": "keyword.operator.type.optional.monkey",
+          "match": "\\?"
+        },
+        {
+          "comment": "Punctuation inside a type: a hash's `:`, a function type's return `:` and its parameter separators.",
+          "name": "keyword.operator.monkey",
+          "match": "[:,]"
+        },
+        {
+          "name": "support.type.primitive.monkey",
+          "match": "\\b(int|bool|string|any|null)\\b"
+        },
+        {
+          "name": "entity.name.type.monkey",
+          "match": "[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "function-type": {
+      "begin": "\\b(fn)\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "storage.type.function.monkey" },
+        "2": { "name": "keyword.operator.monkey" }
+      },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "patterns": [{ "include": "#type" }]
+    },
+    "array-type": {
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "end": "\\]",
+      "endCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "patterns": [{ "include": "#type" }]
+    },
+    "hash-type": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "patterns": [{ "include": "#type" }]
+    },
+    "grouped-type": {
+      "begin": "\\(",
+      "beginCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "keyword.operator.monkey" } },
+      "patterns": [{ "include": "#type" }]
     },
     "properties": {
       "patterns": [

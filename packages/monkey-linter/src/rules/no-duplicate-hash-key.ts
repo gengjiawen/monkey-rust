@@ -57,7 +57,7 @@ function literalKeyIdentity(key: Expression): string | undefined {
 function describeKey(key: Expression): string {
   switch (key.type) {
     case 'Integer':
-      return (key as IntegerLiteral).raw
+      return String((key as IntegerLiteral).raw)
     case 'Boolean':
       return String((key as BooleanLiteral).raw)
     case 'String':

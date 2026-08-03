@@ -1,4 +1,5 @@
 import { doc, util, type AstPath, type Doc, type Options } from 'prettier'
+import { printTypeAnnotation } from './types'
 import type {
   Program,
   BlockStatement,
@@ -21,6 +22,7 @@ import type {
   ASTNode,
   ClassDeclaration,
   MethodDefinition,
+  Param,
   SetPropertyStatement,
   ThisExpression,
   PropertyExpression,
@@ -63,6 +65,8 @@ export function print(
       return 'debugger;'
     case 'IDENTIFIER':
       return printIdentifier(node as Identifier)
+    case 'Param':
+      return printParam(node as Param, path, print)
     case 'UnaryExpression':
       return printUnaryExpression(node as UnaryExpression, path, print, options)
     case 'BinaryExpression':
@@ -169,9 +173,18 @@ function printLetStatement(
   print: (path: AstPath) => Doc,
   options: Options
 ): Doc {
-  const identifierName = (node.identifier.kind as any).value?.name || ''
+  const annotation = node.type_annotation
+    ? `: ${printTypeAnnotation(node.type_annotation)}`
+    : ''
 
-  return group(['let ', identifierName, ' = ', path.call(print, 'expr'), ';'])
+  return group([
+    'let ',
+    node.identifier.name,
+    annotation,
+    ' = ',
+    path.call(print, 'expr'),
+    ';',
+  ])
 }
 
 function printReturnStatement(
@@ -246,9 +259,29 @@ function printMethodDefinition(
   return group([
     path.call(print, 'name'),
     printDelimitedList(path, print, 'params'),
+    printReturnType(node.return_type),
     ' ',
     path.call(print, 'body'),
   ])
+}
+
+/** `p` or `p: int`. Annotations print inline; they never break. */
+function printParam(
+  node: Param,
+  path: AstPath,
+  print: (path: AstPath) => Doc
+): Doc {
+  return [
+    path.call(print, 'name'),
+    node.type_annotation
+      ? `: ${printTypeAnnotation(node.type_annotation)}`
+      : '',
+  ]
+}
+
+/** `: int` after a parameter list, or nothing when the return type is absent. */
+function printReturnType(annotation: MethodDefinition['return_type']): Doc {
+  return annotation ? `: ${printTypeAnnotation(annotation)}` : ''
 }
 
 function printSetPropertyStatement(
@@ -338,6 +371,7 @@ function printFunctionDeclaration(
   return group([
     'fn',
     printDelimitedList(path, print, 'params'),
+    printReturnType(node.return_type),
     ' ',
     path.call(print, 'body'),
   ])
