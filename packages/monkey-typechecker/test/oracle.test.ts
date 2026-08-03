@@ -45,6 +45,7 @@ const sound = [
   'let fib = fn(n: int): int { if (n < 2) { return n; } fib(n - 1) + fib(n - 2) }; puts(fib(10));',
   'let h: {string: int} = {"a": 1, "b": 2}; let v: int? = h["a"]; puts(v);',
   'let adder = fn(a: int): fn(int): int { fn(b: int): int { a + b } }; puts(adder(1)(2));',
+  'let captured: int = 1; let read: fn(): int = fn(): int { captured + 1 }; let captured: string = "later"; puts(read());',
   'class Point { constructor(x: int, y: int) { this.x = x; this.y = y; } sum(): int { this.x + this.y } } let p = new Point(1, 2); puts(p.sum());',
   'class Counter { constructor() { this.n = 0; } bump(k: int): int { this.n + k } } puts(new Counter().bump(2));',
   'let sizes = fn(a: [int], b: [string]): int { len(a) + len(b) }; puts(sizes([1], ["x", "y"]));',

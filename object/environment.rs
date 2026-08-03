@@ -36,6 +36,20 @@ impl Environment {
         self.store.insert(name, val);
     }
 
+    /// Capture the bindings visible at a declaration site.
+    ///
+    /// Values remain shared, but every environment frame is copied so a later
+    /// `let` with the same name cannot rewrite what an existing closure sees.
+    pub fn snapshot(&self) -> Self {
+        Self {
+            store: self.store.clone(),
+            outer: self
+                .outer
+                .as_ref()
+                .map(|outer| Rc::new(RefCell::new(outer.borrow().snapshot()))),
+        }
+    }
+
     pub fn visible_names(&self) -> Vec<String> {
         let mut names = self
             .outer

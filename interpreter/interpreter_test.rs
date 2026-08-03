@@ -214,6 +214,35 @@ mod tests {
     }
 
     #[test]
+    fn test_closures_capture_binding_identity() {
+        let test_case = [
+            (
+                r#"let captured: int = 1;
+let read: fn(): int = fn(): int { captured + 1; };
+let captured: string = "later";
+read();"#,
+                "2",
+            ),
+            (
+                r#"let outer_value = 1;
+let make_reader = fn() { fn() { outer_value; }; };
+let nested_reader = make_reader();
+let outer_value = 2;
+nested_reader();"#,
+                "1",
+            ),
+            (
+                r#"let factorial = fn(n) {
+  if (n == 0) { 1 } else { n * factorial(n - 1) }
+};
+factorial(5);"#,
+                "120",
+            ),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_string_concatenation() {
         let test_case = [
             (r#""Hello" + " " + "World!""#, "Hello World!"),
@@ -375,6 +404,21 @@ trace.order;"#,
                 "1234",
             ),
         ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_class_methods_capture_the_declared_class_binding() {
+        let test_case = [(
+            r#"class CapturedClass {
+  make() { new CapturedClass(); }
+  value() { 1; }
+}
+let old_instance = new CapturedClass();
+class CapturedClass { value() { 2; } }
+old_instance.make().value();"#,
+            "1",
+        )];
         apply_test(&test_case);
     }
 
