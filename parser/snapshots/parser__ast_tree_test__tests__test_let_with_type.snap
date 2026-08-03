@@ -1,6 +1,6 @@
 ---
 source: parser/ast_tree_test.rs
-expression: let a = 3
+expression: "let a: int? = 3"
 ---
 {
   "Program": {
@@ -16,24 +16,38 @@ expression: let a = 3
             "end": 5
           }
         },
-        "type_annotation": null,
+        "type_annotation": {
+          "type": "OptionalType",
+          "inner": {
+            "type": "NamedType",
+            "name": "int",
+            "span": {
+              "start": 7,
+              "end": 10
+            }
+          },
+          "span": {
+            "start": 7,
+            "end": 11
+          }
+        },
         "expr": {
           "type": "Integer",
           "raw": 3,
           "span": {
-            "start": 8,
-            "end": 9
+            "start": 14,
+            "end": 15
           }
         },
         "span": {
           "start": 0,
-          "end": 9
+          "end": 15
         }
       }
     ],
     "span": {
       "start": 0,
-      "end": 9
+      "end": 15
     }
   }
 }

@@ -2,6 +2,8 @@ pub mod ast;
 mod ast_tree_test;
 mod parser_test;
 mod precedences;
+mod type_parser;
+mod type_parser_test;
 pub mod validation;
 
 pub extern crate lexer;
@@ -108,13 +110,18 @@ impl<'a> Parser<'a> {
         let start = self.current_token.span.start;
         self.next_token();
 
-        let name = self.current_token.clone();
         let identifier_name = match &self.current_token.kind {
             TokenKind::IDENTIFIER {
                 name,
             } => name.to_string(),
             _ => return Err(format!("{} not an identifier", self.current_token)),
         };
+        let name = IDENTIFIER {
+            name: identifier_name.clone(),
+            span: self.current_token.span.clone(),
+        };
+
+        let type_annotation = self.parse_optional_type_annotation()?;
 
         self.expect_peek(&TokenKind::ASSIGN)?;
         self.next_token();
@@ -135,6 +142,7 @@ impl<'a> Parser<'a> {
 
         return Ok(Statement::Let(Let {
             identifier: name,
+            type_annotation,
             expr: value,
             span: Span {
                 start,
@@ -491,6 +499,8 @@ impl<'a> Parser<'a> {
         self.expect_peek(&TokenKind::LPAREN)?;
 
         let params = self.parse_fn_parameters()?;
+        // Function *literals* may omit the return type; the checker infers it.
+        let return_type = self.parse_optional_type_annotation()?;
 
         self.expect_peek(&TokenKind::LBRACE)?;
 
@@ -500,6 +510,7 @@ impl<'a> Parser<'a> {
 
         Ok(Expression::FUNCTION(FunctionDeclaration {
             params,
+            return_type,
             body: function_body,
             span: Span {
                 start,
@@ -509,7 +520,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn parse_fn_parameters(&mut self) -> Result<Vec<IDENTIFIER>, ParseError> {
+    fn parse_fn_parameters(&mut self) -> Result<Vec<Param>, ParseError> {
         let mut params = Vec::new();
         if self.peek_token_is(&TokenKind::RPAREN) {
             self.next_token();
@@ -517,41 +528,47 @@ impl<'a> Parser<'a> {
         }
 
         self.next_token();
-
-        match &self.current_token.kind {
-            TokenKind::IDENTIFIER {
-                name,
-            } => params.push(IDENTIFIER {
-                name: name.clone(),
-                span: self.current_token.span.clone(),
-            }),
-            token => {
-                return Err(format!("expected function params  to be an identifier, got {}", token))
-            }
-        }
+        params.push(self.parse_fn_parameter()?);
 
         while self.peek_token_is(&TokenKind::COMMA) {
             self.next_token();
             self.next_token();
-            match &self.current_token.kind {
-                TokenKind::IDENTIFIER {
-                    name,
-                } => params.push(IDENTIFIER {
-                    name: name.clone(),
-                    span: self.current_token.span.clone(),
-                }),
-                token => {
-                    return Err(format!(
-                        "expected function params  to be an identifier, got {}",
-                        token
-                    ))
-                }
-            }
+            params.push(self.parse_fn_parameter()?);
         }
 
         self.expect_peek(&TokenKind::RPAREN)?;
 
         return Ok(params);
+    }
+
+    fn parse_fn_parameter(&mut self) -> Result<Param, ParseError> {
+        let name = match &self.current_token.kind {
+            TokenKind::IDENTIFIER {
+                name,
+            } => IDENTIFIER {
+                name: name.clone(),
+                span: self.current_token.span.clone(),
+            },
+            token => {
+                return Err(format!("expected function params  to be an identifier, got {}", token))
+            }
+        };
+
+        let start = name.span.start;
+        let type_annotation = self.parse_optional_type_annotation()?;
+        let end = match &type_annotation {
+            Some(annotation) => annotation.span().end,
+            None => name.span.end,
+        };
+
+        Ok(Param {
+            name,
+            type_annotation,
+            span: Span {
+                start,
+                end,
+            },
+        })
     }
 
     fn parse_fn_call_expression(
@@ -756,6 +773,12 @@ impl<'a> Parser<'a> {
 
             self.expect_peek(&TokenKind::LPAREN)?;
             let params = self.parse_fn_parameters()?;
+            // A constructor's "return value" is always the receiver instance,
+            // mirroring the existing "constructor cannot return a value" rule.
+            if kind == MethodKind::Constructor && self.peek_token_is(&TokenKind::COLON) {
+                return Err("constructor cannot have a return type annotation".to_string());
+            }
+            let return_type = self.parse_optional_type_annotation()?;
             self.expect_peek(&TokenKind::LBRACE)?;
             let body = self.parse_block_statement()?;
             let method_end = body.span.end;
@@ -763,6 +786,7 @@ impl<'a> Parser<'a> {
                 kind,
                 name: method_name,
                 params,
+                return_type,
                 body,
                 span: Span {
                     start: method_start,

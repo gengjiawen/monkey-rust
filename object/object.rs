@@ -5,7 +5,7 @@ use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use parser::ast::{BlockStatement, IDENTIFIER};
+use parser::ast::{BlockStatement, Param};
 
 #[macro_use]
 extern crate lazy_static;
@@ -30,7 +30,7 @@ pub enum Object {
     Hash(HashMap<Rc<Object>, Rc<Object>>),
     Null,
     ReturnValue(Rc<Object>),
-    Function(Vec<IDENTIFIER>, BlockStatement, Env),
+    Function(Vec<Param>, BlockStatement, Env),
     Builtin(BuiltinFunc),
     Error(String),
     CompiledFunction(Rc<CompiledFunction>),

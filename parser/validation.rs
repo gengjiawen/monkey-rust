@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use lexer::token::{Span, TokenKind};
+use lexer::token::Span;
 
 use crate::ast::*;
 
@@ -57,14 +57,11 @@ impl Validator {
     fn validate_statement(&mut self, statement: &Statement) -> Result<(), ValidationError> {
         match statement {
             Statement::Let(statement) => {
-                let name = match &statement.identifier.kind {
-                    TokenKind::IDENTIFIER {
-                        name,
-                    } => name.clone(),
-                    _ => unreachable!("parser only creates let statements with identifiers"),
-                };
                 self.validate_expression(&statement.expr)?;
-                self.scopes.last_mut().unwrap().insert(name);
+                self.scopes
+                    .last_mut()
+                    .unwrap()
+                    .insert(statement.identifier.name.clone());
                 Ok(())
             }
             Statement::Return(statement) => {
@@ -112,7 +109,7 @@ impl Validator {
             method
                 .params
                 .iter()
-                .map(|parameter| parameter.name.clone())
+                .map(|parameter| parameter.name.name.clone())
                 .collect(),
         );
 
@@ -130,7 +127,7 @@ impl Validator {
         let mut scope = function
             .params
             .iter()
-            .map(|parameter| parameter.name.clone())
+            .map(|parameter| parameter.name.name.clone())
             .collect::<HashSet<_>>();
         if !function.name.is_empty() {
             // A directly let-bound function gets its binding name from the

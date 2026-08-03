@@ -65,12 +65,7 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
         }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
-            if let TokenKind::IDENTIFIER {
-                name,
-            } = &id.kind
-            {
-                env.borrow_mut().set(name.clone(), obj);
-            }
+            env.borrow_mut().set(id.name.clone(), obj);
             return Ok(Rc::new(Object::Null));
         }
         Statement::Class(class) => eval_class_declaration(class, env),
@@ -294,7 +289,7 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Result<Rc<Objec
             let mut env = Environment::new_enclosed_environment(env);
 
             params.iter().enumerate().for_each(|(i, param)| {
-                env.set(param.name.clone(), args[i].clone());
+                env.set(param.name.name.clone(), args[i].clone());
             });
 
             let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(env)))?;
@@ -341,7 +336,7 @@ fn apply_method(
     let mut call_env = Environment::new_enclosed_environment(declaration_env);
     call_env.set("this".to_string(), Rc::new(Object::Instance(Rc::clone(receiver))));
     for (parameter, argument) in params.iter().zip(args) {
-        call_env.set(parameter.name.clone(), Rc::clone(argument));
+        call_env.set(parameter.name.name.clone(), Rc::clone(argument));
     }
     let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(call_env)))?;
     unwrap_return(evaluated)

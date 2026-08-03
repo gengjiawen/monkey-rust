@@ -9,29 +9,35 @@ expression: "let my_func = fn(x) { x };"
       {
         "type": "Let",
         "identifier": {
-          "kind": {
-            "type": "IDENTIFIER",
-            "value": {
-              "name": "my_func"
-            }
-          },
+          "type": "IDENTIFIER",
+          "name": "my_func",
           "span": {
             "start": 4,
             "end": 11
           }
         },
+        "type_annotation": null,
         "expr": {
           "type": "FunctionDeclaration",
           "params": [
             {
-              "type": "IDENTIFIER",
-              "name": "x",
+              "type": "Param",
+              "name": {
+                "type": "IDENTIFIER",
+                "name": "x",
+                "span": {
+                  "start": 17,
+                  "end": 18
+                }
+              },
+              "type_annotation": null,
               "span": {
                 "start": 17,
                 "end": 18
               }
             }
           ],
+          "return_type": null,
           "body": {
             "type": "BlockStatement",
             "body": [

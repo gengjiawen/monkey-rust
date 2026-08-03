@@ -174,6 +174,33 @@ mod tests {
     }
 
     #[test]
+    fn test_annotated_function_object() {
+        // The tree-walking interpreter keeps the parameter list it was built
+        // from, so printing a function shows its annotations. This is the one
+        // declared exception to type erasure: see docs/type-system-design.md
+        // section 6.1.
+        let test_case = [
+            ("fn(x: int): int { x + 2; };", "fn(x: int) { (x + 2) }"),
+            ("fn(x: [int]?, y): bool { x; };", "fn(x: [int]?, y) { x }"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_annotations_do_not_change_results() {
+        let test_case = [
+            ("let add = fn(x: int, y: int): int { x + y; }; add(5, 5);", "10"),
+            ("let xs: [int] = [1, 2, 3]; xs[1]", "2"),
+            ("let m: {string: int} = {\"a\": 1}; m[\"a\"]", "1"),
+            (
+                "let apply = fn(f: fn(int): int, v: int): int { f(v) }; apply(fn(n: int): int { n * 2 }, 4)",
+                "8",
+            ),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_function_application() {
         let test_case = [
             ("let identity = fn(x) { x; }; identity(5);", "5"),

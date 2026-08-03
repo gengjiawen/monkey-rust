@@ -50,6 +50,7 @@ pub enum TokenKind {
     SEMICOLON,
     COLON,
     DOT,
+    QUESTION, // ? — only meaningful in type position (`T?`)
 
     LPAREN,
     RPAREN,
@@ -128,6 +129,7 @@ impl fmt::Display for TokenKind {
             TokenKind::EOF => write!(f, "EOF"),
             TokenKind::COLON => write!(f, ":"),
             TokenKind::DOT => write!(f, "."),
+            TokenKind::QUESTION => write!(f, "?"),
             TokenKind::CLASS => write!(f, "class"),
             TokenKind::THIS => write!(f, "this"),
             TokenKind::NEW => write!(f, "new"),

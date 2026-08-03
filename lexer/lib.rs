@@ -90,6 +90,7 @@ impl<'a> Lexer<'a> {
             '[' => TokenKind::LBRACKET,
             ':' => TokenKind::COLON,
             '.' => TokenKind::DOT,
+            '?' => TokenKind::QUESTION,
             ']' => TokenKind::RBRACKET,
             '"' => {
                 let (start, end, string) = self.read_string();

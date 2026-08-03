@@ -177,3 +177,30 @@ fn bit_flipped_snapshots_never_panic_the_vm() {
         }
     }
 }
+
+/// Type annotations never reach the GcVM: it runs the same bytecode either
+/// way, and its closures have no source text to leak (design §6).
+#[test]
+fn type_annotations_are_erased_before_execution() {
+    let pairs = [
+        (
+            "let add = fn(a: int, b: int): int { a + b }; add(20, 22)",
+            "let add = fn(a, b) { a + b }; add(20, 22)",
+        ),
+        (
+            "class Point { constructor(x: int, y: int) { this.x = x; this.y = y; } sum(): int { return this.x + this.y; } } new Point(20, 22).sum()",
+            "class Point { constructor(x, y) { this.x = x; this.y = y; } sum() { return this.x + this.y; } } new Point(20, 22).sum()",
+        ),
+    ];
+
+    for (annotated, erased) in pairs {
+        let with_types = run_bytecode(compile_source(annotated).unwrap(), usize::MAX).unwrap();
+        let without_types = run_bytecode(compile_source(erased).unwrap(), usize::MAX).unwrap();
+        assert_eq!(with_types, without_types, "results differ for {}", annotated);
+        assert_eq!(with_types, "42");
+    }
+
+    let closure =
+        run_bytecode(compile_source("fn(x: int?): [string] { x }").unwrap(), usize::MAX).unwrap();
+    assert_eq!(closure, "[closure function]");
+}
