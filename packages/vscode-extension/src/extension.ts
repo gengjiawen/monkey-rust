@@ -2,11 +2,18 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import * as vscode from 'vscode'
 
+import {
+  checkWithAnalyzer,
+  type TypeDiagnostic,
+} from '@gengjiawen/monkey-typechecker'
+
+import { utf8ByteOffsetToUtf16 } from './spans'
+
 // Only the exports the extension actually calls, so adding a new wasm export
 // never breaks the handwritten binding object below.
 type MonkeyWasm = Pick<
   typeof import('@gengjiawen/monkey-wasm'),
-  'parse' | 'compile'
+  'parse' | 'compile' | 'analyze_lossless'
 >
 type MonkeyWasmBindings = MonkeyWasm & {
   __wbg_set_wasm: (wasm: Record<string, unknown>) => void
@@ -51,6 +58,7 @@ async function createWasmBindings(): Promise<MonkeyWasm> {
   return {
     parse: bindings.parse,
     compile: bindings.compile,
+    analyze_lossless: bindings.analyze_lossless,
   }
 }
 
@@ -63,6 +71,42 @@ function loadWasm(): Promise<MonkeyWasm> {
 
 let diagnosticsCollection: vscode.DiagnosticCollection
 
+function toRange(
+  doc: vscode.TextDocument,
+  text: string,
+  span: TypeDiagnostic['span']
+): vscode.Range {
+  if (!span) {
+    // A parser error the Rust side could not attribute to a token; mark the
+    // first character so the squiggle is still visible.
+    return new vscode.Range(
+      new vscode.Position(0, 0),
+      new vscode.Position(0, 1)
+    )
+  }
+  return new vscode.Range(
+    doc.positionAt(utf8ByteOffsetToUtf16(text, span.start)),
+    doc.positionAt(utf8ByteOffsetToUtf16(text, span.end))
+  )
+}
+
+function toDiagnostic(
+  doc: vscode.TextDocument,
+  text: string,
+  diagnostic: TypeDiagnostic
+): vscode.Diagnostic {
+  const converted = new vscode.Diagnostic(
+    toRange(doc, text, diagnostic.span),
+    diagnostic.message,
+    diagnostic.severity === 'warning'
+      ? vscode.DiagnosticSeverity.Warning
+      : vscode.DiagnosticSeverity.Error
+  )
+  converted.source = 'monkey'
+  converted.code = diagnostic.code
+  return converted
+}
+
 export function activate(context: vscode.ExtensionContext) {
   diagnosticsCollection = vscode.languages.createDiagnosticCollection('monkey')
   context.subscriptions.push(diagnosticsCollection)
@@ -73,13 +117,18 @@ export function activate(context: vscode.ExtensionContext) {
   if (diagnosticsEnabled) {
     const validate = async (doc: vscode.TextDocument) => {
       if (doc.languageId !== 'monkey') return
+      const text = doc.getText()
       try {
-        const text = doc.getText()
         const mod = await loadWasm()
-        // parse returns JSON AST string on success
-        mod.parse(text)
-        diagnosticsCollection.set(doc.uri, [])
+        // The checker reports parse and validation failures as data, with the
+        // span the Rust side recorded, so both land in the same list.
+        const { diagnostics } = checkWithAnalyzer(mod.analyze_lossless, text)
+        diagnosticsCollection.set(
+          doc.uri,
+          diagnostics.map((diagnostic) => toDiagnostic(doc, text, diagnostic))
+        )
       } catch (e: any) {
+        // Only reachable when the wasm module itself fails to load.
         const message = typeof e?.message === 'string' ? e.message : String(e)
         const diag = new vscode.Diagnostic(
           new vscode.Range(
@@ -89,6 +138,7 @@ export function activate(context: vscode.ExtensionContext) {
           message,
           vscode.DiagnosticSeverity.Error
         )
+        diag.source = 'monkey'
         diagnosticsCollection.set(doc.uri, [diag])
       }
     }

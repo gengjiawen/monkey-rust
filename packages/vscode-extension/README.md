@@ -12,7 +12,8 @@ Repo: https://github.com/gengjiawen/monkey-rust
 - **Syntax highlighting** for `.monkey` files.
 - **Language-aware editing** with bracket matching, comment toggling, and auto-closing pairs.
 - **Snippets** for common Monkey constructs such as `let`, `fn`, and `if`.
-- **WASM-powered diagnostics** that report parser errors while editing.
+- **WASM-powered diagnostics** that report parser and type errors while editing,
+  underlining the exact offending token.
 - **AST preview** for inspecting the parsed JSON tree of the active file.
 - **Bytecode compilation** for viewing compiler output from the active file.
 
