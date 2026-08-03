@@ -387,7 +387,7 @@ let x: int = if (c) { 1 } else { "a" };
 - 操作数为 `Union`：先套用 7.1 的 union 消解通用规则（null-stripping 后逐成员检查，结果取各成员结果的 join），再对每个具体成员组合应用上面的 `Any` 规则。例如 `(int | string) + int` 报错——运行时可能命中 `string + int`，所有后端都会报错；`any + (int | string)` 得 `int | string`；`any + (int | bool)` 因 `any + bool` 的结果为 `any`，join 后坍缩为 `any`；而 `int? + 1` 剥离 `null` 后按 `int + int` 通过。
 - `==` / `!=` 不复用 assignability，使用独立的 **equality 矩阵**（null-stripping 后判定，任一侧 `Any` 豁免）：
   - 可比较类别：`int`、`bool`、`string`、`null`、`Class`、`Instance`。两侧同类别 → 通过，结果 `bool`。`Instance` 与 `Class` 按 identity 比较且**不要求同名 class**——GcVM 的匹配臂只看类别（对任意 Instance/Instance 直接 identity，不检查所属 class），`new A() == new B()` 在四个后端都合法、恒 `false`，checker 如实放行（要提示可日后作为 lint 规则）。
-  - **`Array` / `Hash` / `Fn` 一律拒绝**，报 `invalid-comparison`。运行时依据（`gc/vm.rs` 的 `execute_comparison`）：GcVM 只支持标量、`null` 与 class/instance/bound method，`[1] == [1]` 是 runtime error；而 interpreter 与默认 VM 走 `Object::PartialEq` 结构比较、asm 深比较/恒等——同一表达式三种行为，静态拒绝是唯一能对齐最严后端（GcVM）的选择。`Fn` 另有一层：静态类型无法区分 closure（GcVM 报错）与 bound method（GcVM identity 合法），只能保守全拒。
+  - **`Array` / `Hash` / `Fn` 一律拒绝**，报 `invalid-comparison`，且该拒绝**优先于 `Any` 豁免**——`[1] == x` 在 `x: any` 时照报：GcVM 对数组/哈希/函数操作数不论另一侧是什么都会报错，已知一侧是容器就足以断定。运行时依据（`gc/vm.rs` 的 `execute_comparison`）：GcVM 只支持标量、`null` 与 class/instance/bound method，`[1] == [1]` 是 runtime error；而 interpreter 与默认 VM 走 `Object::PartialEq` 结构比较、asm 深比较/恒等——同一表达式三种行为，静态拒绝是唯一能对齐最严后端（GcVM）的选择。`Fn` 另有一层：静态类型无法区分 closure（GcVM 报错）与 bound method（GcVM identity 合法），只能保守全拒。
   - 类别不同 → `mixed-equality`：GcVM 报错、其余后端静默 `false`，checker 对齐更严格的 GcVM，同时实现了 linter-plan 里提议的 `backend-divergent-comparison`。
 - `if` 条件不限制类型（运行时 truthiness 对一切值有定义，仅 `false` 与 `null` 为假）。
 
@@ -395,7 +395,7 @@ let x: int = if (c) { 1 } else { "a" };
 
 - `array[i]`：目标 `[T]` 时下标静态类型必须为 `int`（`any` 豁免），否则 `invalid-index`（运行时 `index operator not supported`）。
 - `hash[k]`：目标 `{K: V}` 时下标须可哈希且 assignable 到 `K`，否则 `invalid-index`。注意异型 key（`{"x": 1}[1]`）运行时**不报错**、恒 miss 返回 `null`——此处 checker 严于运行时（与 7.8 拒绝未知属性同一取向：几乎总是拼写/类型错误），确需动态 key 时把目标或下标标 `any`。
-- 目标为其他具体类型（`string`、`int`、`Fn` 等）→ `invalid-index`（运行时同样报错）；目标或下标为 `any` 时豁免，结果 `any`。
+- 目标为其他具体类型（`string`、`int`、`Fn` 等）→ `invalid-index`（运行时同样报错）。`any` 豁免的结果类型分两种：目标为 `any` → 结果 `any`（不是 `any?`——运行时形状未知，包一层可空毫无信息量）；目标具体、仅下标为 `any` → 豁免下标检查，结果仍按 7.5 的表取 `T?` / `V?`（`{string: int}` 配 `any` 下标 → `int?`）。
 
 ### 7.5 null 策略
 
@@ -436,11 +436,11 @@ arity 静态检查（`puts`/`print` 变长豁免），与 linter 的 `builtin-ar
 
 **泛型实例化**：收集 `T` 在全部约束位点上的实参类型，`T = join(所有约束)`，再回代校验非泛型结构。因此 `push([1], "a")` 合法：`T = int | string`，结果 `[int | string]`——对齐运行时的异构数组语义（`builtins.rs` 的 `push` 不检查元素类型）；`push(1, "a")` 报 `type-mismatch`（第一参不是数组）。`len` 的实参须为 `string`、数组或 `any`。
 
-`any` 命中含类型变量的结构约束时，该结构内无法从运行时形状观察到的类型变量约束为 `any`；调用结束后仍未约束的内部类型变量也默认实例化为 `any`。因此 `first(x)` / `last(x)` / `rest(x)` 在 `x: any` 时返回 `any`（`Union(Any, Null)` 按 7.1 坍缩为 `Any`），`push(x, 1)` 在 `x: any` 时令 `T = join(any, int) = any`，结果为 `[any]`，不能仅从第二参推成 `[int]`。这一规则只负责泛型变量实例化；非泛型外壳仍按统一 `any` 豁免通过。
+`any` 命中含类型变量的结构约束时，该结构内无法从运行时形状观察到的类型变量约束为 `any`；调用结束后仍未约束的内部类型变量也默认实例化为 `any`。因此 `first(x)` / `last(x)` 在 `x: any` 时返回 `any`（`Union(Any, Null)` 按 7.1 坍缩为 `Any`），`rest(x)` 返回 `[any]?`（`T` 实例化为 `any`，非泛型的数组外壳与可空外壳都保留），`push(x, 1)` 在 `x: any` 时令 `T = join(any, int) = any`，结果为 `[any]`，不能仅从第二参推成 `[int]`。这一规则只负责泛型变量实例化；非泛型外壳仍按统一 `any` 豁免通过。
 
 ### 7.7 函数、闭包与递归
 
-- 函数字面量：参数取标注（缺省 `any`）；返回类型取标注，否则从 body 按 **completion 模型**推导。block 自底向上归纳 `{ returnTypes, fallthrough }`：`return e;` 将 `e` 的类型记入 returnTypes，其后同 block 语句**不可达**、不参与推导；`if` 语句两分支都必 return 时其后同样不可达；可 fallthrough 的 block 值 = 尾表达式语句的类型（尾语句非表达式语句时为 `null`；尾 `if` 无 `else` 时并入 `null`）。函数返回类型 = join(全部可达 `return` 的类型，可达的 fallthrough 类型)。因此 `fn(): int { return 1; "s"; }` 推导为 `int`（尾串不可达，不误报 `int | string`）；`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 推导为 `int | string`（fallthrough 可达，对标注 `int` 正确报 `type-mismatch`）。Monkey 无循环，结构归纳一遍即定，无需不动点。
+- 函数字面量：参数取标注（缺省 `any`）；返回类型取标注，否则从 body 按 **completion 模型**推导。block 自底向上归纳 `{ returnTypes, fallthrough }`：`return e;` 将 `e` 的类型记入 returnTypes，其后同 block 语句**不可达**、不参与推导；`if` 语句两分支都必 return 时其后同样不可达；可 fallthrough 的 block 值 = 尾表达式语句的类型（尾语句非表达式语句时为 `null`；尾 `if` 无 `else` 时并入 `null`）。函数返回类型 = join(全部可达 `return` 的类型，可达的 fallthrough 类型)。因此 `fn(): int { return 1; "s"; }` 推导为 `int`（尾串不可达，不误报 `int | string`）；`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 推导为 `int | string`（fallthrough 可达，对标注 `int` 正确报 `type-mismatch`）。guard 写法 `fn(flag: bool): int { if (flag) { return 1; } }` 推导为 `int?`：只可能 fallthrough 的隐式 `null` 并入 join 而不是单独与标注比对，依 7.5 的乐观 null 策略对标注 `int` 放行；`fn(): int { }`（body 无任何 `return`）没有可并入的返回路径，仍报 `type-mismatch`。Monkey 无循环，结构归纳一遍即定，无需不动点。
 - 调用：callee 静态类型必须是 `Fn`、`Any` 或 bound method；arity 严格相等；实参逐个 assignable。callee 为 `Any` 时实参不检查。callee 为 union 时按 7.1 的消解规则：全体成员可调用、arity 一致、实参对每个成员都合法，返回类型取各成员返回的 join。
 - 闭包捕获自由变量的类型即其定义处绑定类型；checker 无需区分 interpreter 的按引用捕获与 compiler 的按值捕获（无重赋值语义下二者对类型不可观测）。
 - **递归**：`let f = fn(...)` 的命名回填使 `f` 在 body 内可见。若返回类型已标注，body 内 `f` 具有完整类型；未标注时 body 内自调用的返回类型按 `any` 处理（不做不动点迭代），推导继续。即：未标注的递归函数得到 `fn(...): any`，标注返回类型即可获得精确检查。fibonacci 例子未标注时全程 `any` 静默，标注 `: int` 后获得完整校验。
@@ -456,7 +456,7 @@ arity 静态检查（`puts`/`print` 变长豁免），与 linter 的 `builtin-ar
 
 **Pass 2 —— 检查**：
 
-- `new C(args)`：callee 静态类型为 `Class(classId, C)` 时按该 identity 的 constructor 签名检查 arity 与实参（缺省 constructor 即零参）；为 `Any` 时不检查。class 作为值传递（`let Type = Point;`）会完整保留 `ClassId`，`new Type(...)` 照常获得相同 identity 的 `Instance`。
+- `new C(args)`：callee 静态类型为 `Class(classId, C)` 时按该 identity 的 constructor 签名检查 arity 与实参（缺省 constructor 即零参）；为 `Any` 时不检查；为 union 时按 7.1 消解（与 7.7 的调用规则同构）：剥离 `null` 后全体成员须为 class、constructor arity 一致、实参对每个成员都合法，结果为各成员 `Instance` 的 join，任一成员不是 class 则报 `not-constructable`。class 作为值传递（`let Type = Point;`）会完整保留 `ClassId`，`new Type(...)` 照常获得相同 identity 的 `Instance`。
 - `expr.prop` 读取：receiver 为 `Instance(classId, C)` 时，在该 identity 的 property map 中让 `prop` 依"字段优先于方法"的运行时顺序解析；字段命中得字段类型，方法命中得绑定后的 `Fn` 类型；两者皆无 → `unknown-property` 诊断（对应运行时 MissingProperty）。receiver 为 `Any` → 结果 `Any`。receiver 为其他具体类型 → 诊断（运行时必错）。receiver 为 union → 按 7.1 消解（每个成员分别解析该属性，结果取 join）。
 - `expr.prop = value;` 写入：receiver 同上。`prop` **先查方法集合**：命中方法名 → `assign-to-method` 诊断（pass 1 的字段集合已排除方法名，保证此分支可达）；再查字段：命中 → 校验 assignable。运行时语义是字段只 shadow **该实例**的方法（`set_property` 直接写实例 fields），class 级 property map 表示不了单实例 shadow：把 map 中该项改成 join 会污染其他实例的类型，不改又漏报被 shadow 实例后续的 `a.value()`。v1 直接拒绝（这几乎总是失误）；确需 shadow 把 receiver 标 `any`，实例级精化列入延后（见 15.1）。**不在 map 中 → `unknown-property` 诊断**。运行时允许外部创建新字段，但这几乎总是拼写错误；确需动态字段时把 receiver 标为 `any`。
 - `this` 的类型：方法/constructor 及其嵌套 `fn` 内为携带当前 `ClassId` 的 `Instance`（lexical capture 与运行时一致）；简单 alias 保留同一类型与上文的 alias 标记。
@@ -496,7 +496,7 @@ packages/monkey-typechecker/
 export interface TypeDiagnostic {
   code: string // kebab-case，如 "type-mismatch"
   message: string
-  span: { start: number; end: number } // UTF-8 byte offset，与 AST span 同制
+  span?: { start: number; end: number } // UTF-8 byte offset，与 AST span 同制；个别失败无 span
   severity: 'error' | 'warning'
 }
 
@@ -504,21 +504,21 @@ export interface CheckOptions {
   // v1 为空；strictNull 等未来选项在此扩展
 }
 
-export type CheckResult =
-  | { status: 'ok'; diagnostics: TypeDiagnostic[] } // 类型检查已运行，diagnostics 可为空
-  | {
-      status: 'error'
-      stage: 'parse' | 'validation'
-      message: string
-      span?: { start: number; end: number }
-    } // analyze_lossless envelope 原样透传
+export interface CheckResult {
+  diagnostics: TypeDiagnostic[] // 空数组即通过
+}
 
-export function checkSource(source: string, options?: CheckOptions): CheckResult
-// checkProgram(program, options) 仅包内与测试使用，不从入口导出：
-// 它假设输入已通过 parse + validation，对未验证的 AST 行为未定义。
+// 双入口共享同一实现：包根供 browser/bundler（wasm 由宿主打包），
+// `./node` 在运行时经 WebAssembly API 同步实例化同一份 wasm。
+export function check(source: string, options?: CheckOptions): CheckResult
+
+// 进阶入口：
+// checkWithAnalyzer(analyze, source, options) 注入自备的 analyze_lossless 绑定；
+// checkProgram(program, options) 跳过 analyze，输入必须已过 parse + validation，
+// 对未验证的树行为未定义。
 ```
 
-`checkSource` 内部调用 `analyze_lossless`：parse error / validation error 原样透传（各自已有 envelope），两者干净时才运行类型检查。因此 checker 全程可假设：identifier 必然可解析、`this` 位置合法、class 无重复成员。
+`check` 内部调用 `analyze_lossless`：parse / validation 失败**折叠为单条诊断**（code 为 `parse-error` / `validation-error`，message 原样透传，span 若有则保留）并停止检查——单一 envelope 让 playground / 编辑器只处理一种结果形态，不必分支。两者干净时才运行类型检查，因此 checker 全程可假设：identifier 必然可解析、`this` 位置合法、class 无重复成员。
 
 ### 8.3 作用域语义对齐
 
@@ -566,6 +566,8 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 | `reserved-type-name` | class 名与 builtin 类型名同名（warning：运行时合法，但其实例类型无法在标注中引用） | `class 'int' shadows a builtin type name; annotations cannot refer to it`                                               |
 | `invalid-hash-key`   | hash key 类型不可哈希                                                              | `type '[int]' cannot be used as a hash key`                                                                             |
 | `invalid-index`      | 索引目标/下标类型错误                                                              | `type 'string' is not indexable`                                                                                        |
+| `parse-error`        | 源码未通过 parse（8.2 的折叠规则，message 来自 parser）                            | `expected a type, got: start: 7, end: 8, kind: =`                                                                       |
+| `validation-error`   | 源码未通过 validation（同上，message 来自 validation.rs）                          | `undefined variable 'nope'`                                                                                             |
 
 信息风格对齐现有 runtime error 词汇（`is not assignable`、`wrong number of arguments` 等），使同一问题的静态诊断与运行时报错可以相互印证。code 集合视为半稳定 API：playground/vscode 按 code 分类展示，新增只追加。
 
