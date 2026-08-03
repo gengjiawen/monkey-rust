@@ -31,8 +31,3 @@ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 )
 
 npx --yes pnpm@11.5.1 install --frozen-lockfile
-
-# The playground pulls in the linter, minifier and type checker as sources, and
-# each of them re-exports @gengjiawen/monkey-ast-types by name, so that package
-# has to be compiled before Next can resolve it.
-npx --yes pnpm@11.5.1 --filter @gengjiawen/monkey-ast-types build

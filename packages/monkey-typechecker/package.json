@@ -27,7 +27,6 @@
     "url": "https://github.com/gengjiawen/monkey-rust"
   },
   "dependencies": {
-    "@gengjiawen/monkey-ast-types": "^1.2.0",
     "@gengjiawen/monkey-wasm": "^1.2.0"
   },
   "devDependencies": {

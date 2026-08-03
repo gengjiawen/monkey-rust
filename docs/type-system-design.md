@@ -531,7 +531,7 @@ export function check(source: string, options?: CheckOptions): CheckResult
 
 ### 8.4 AST 类型来源
 
-checker 不再手写第四份 AST mirror。前置工作是把 linter / minifier / prettier-plugin 各自的 `src/types.ts` 收敛为共享包 `packages/monkey-ast-types`（linter 的文件头注释已在抱怨"这是第三份拷贝"），checker 直接依赖该包。
+checker 不再手写第四份 AST mirror。AST 节点定义随 wasm 包本体发布：`wasm/src/ast_types.d.ts` 经 `typescript_custom_section` 追加进生成的 `monkey_wasm.d.ts`，linter / minifier / prettier-plugin / checker 都从 `@gengjiawen/monkey-wasm` 做 `import type`，类型与 parser 构建天然同版本。
 
 ## 9. 工具链与生态影响
 
@@ -539,8 +539,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 
 | 消费方                   | 需要的改动                                                                                                                                                                                                                   |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `wasm`                   | 无新 export；`wasm-pack build` 重建 `wasm/pkg`（AGENTS.md：playground 消费的是 pkg 而非 Rust source）                                                                                                                        |
-| `monkey-ast-types`（新） | 新节点定义的唯一权威                                                                                                                                                                                                         |
+| `wasm`                   | 新增 `src/ast_types.d.ts`，经 `typescript_custom_section` 并入生成的 d.ts，是新节点定义的唯一权威；`wasm-pack build` 重建 `wasm/pkg`（AGENTS.md：playground 消费的是 pkg 而非 Rust source）                                  |
 | `monkey-linter`          | walker/scope 安全跳过 `TypeAnnotation` 子树；不新增规则                                                                                                                                                                      |
 | `monkey-minifier`        | **剥离**全部标注（对体积是纯收益；printer 不需要学会打印类型）；differential test 保证剥离前后运行结果一致（语料排除函数值的 source-reflective 渲染/比较，同 6.1 边界——剥离标注本身就会改变 interpreter 对函数值的 Display） |
 | `prettier-plugin-monkey` | printer 打印标注：`let x: int = 5;`（`:` 后一空格）、`fn(a: int): int`、长类型跟随现有参数换行组；format 两次幂等、格式化结果可再 parse                                                                                      |
@@ -618,7 +617,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 
 **Phase 0 — 本设计文档**：`docs: add type system design doc`（即本文）。
 
-**Phase 1 — 共享 AST 类型包**：`refactor: extract shared monkey-ast-types package`。收敛三份 `types.ts`，迁移 linter/minifier/prettier import，零行为变化。
+**Phase 1 — 共享 AST 类型**：`refactor(wasm): ship the AST typings with the wasm package`。把三份手写 `types.ts` 收敛为 `wasm/src/ast_types.d.ts`，随 `@gengjiawen/monkey-wasm` 生成的 d.ts 发布，linter/minifier/prettier 改为 `import type`，零行为变化。
 
 **Phase 2 — Rust 语法**：
 
@@ -627,7 +626,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 
 **Phase 3 — wasm 与工具链同步**：
 
-- `chore(wasm): rebuild with type annotation AST` + `monkey-ast-types` 更新；
+- `chore(wasm): rebuild with type annotation AST`（含 `ast_types.d.ts` 更新）；
 - `feat(minifier): strip type annotations`；
 - `feat(prettier-plugin): print type annotations`；
 - `feat(vscode): highlight type annotations`（grammar）。
@@ -655,8 +654,8 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 | shared object                | `object/object.rs`（`Object::Function` 的 params 形状）                                                                                                 |
 | interpreter / compiler / asm | `interpreter/lib.rs`、`compiler/compiler.rs`、`compiler/symbol_table.rs`、`asm/lower.rs` 的机械适配；`compiler/vm.rs`、`gc/` 零改动                     |
 | 擦除测试                     | `compiler/compiler_test.rs`（bytecode 恒等）、各后端 e2e                                                                                                |
-| WASM                         | `wasm/src/lib.rs` 无新 export；重建 `wasm/pkg`                                                                                                          |
-| 共享 AST types               | 新增 `packages/monkey-ast-types`；linter/minifier/prettier 迁移 import                                                                                  |
+| WASM                         | `wasm/src/ast_types.{rs,d.ts}`（typescript_custom_section）；重建 `wasm/pkg`                                                                            |
+| 共享 AST types               | `wasm/src/ast_types.d.ts` 并入 wasm pkg 的 d.ts；linter/minifier/prettier 迁移 import                                                                   |
 | checker                      | 新增 `packages/monkey-typechecker` 全部                                                                                                                 |
 | minifier                     | `src/printer.ts`（剥离）、differential tests                                                                                                            |
 | prettier                     | `src/printer.ts`、fixtures/tests                                                                                                                        |

@@ -25,7 +25,7 @@ import type {
   Statement,
   TypeAnnotation,
   UnaryExpression,
-} from '@gengjiawen/monkey-ast-types'
+} from '@gengjiawen/monkey-wasm'
 
 import {
   BUILTIN_SIGNATURES,

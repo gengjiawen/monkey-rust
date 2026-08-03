@@ -1,18 +1,24 @@
-// AST node definitions live in `@gengjiawen/monkey-ast-types`, shared with the
-// minifier, the prettier plugin and the type checker. Re-exported here so rules
-// keep importing from one place; the linter's own data model follows below. The
-// helpers are listed by name so bundlers see a static re-export instead of
-// having to resolve the CommonJS star at runtime.
-export type * from '@gengjiawen/monkey-ast-types'
-export {
-  identifierName,
-  isTypeAnnotation,
-  printTypeAnnotation,
-  setIdentifierName,
-  tokenType,
-} from '@gengjiawen/monkey-ast-types'
+// The AST node definitions ship inside `@gengjiawen/monkey-wasm` itself:
+// wasm/src/ast_types.d.ts is appended to the generated declarations, so the
+// tree described there is always the one the linked parser build emits.
+// Re-exported here so rules keep importing from one place; the accessors and
+// the linter's own data model follow below.
+export type * from '@gengjiawen/monkey-wasm'
 
-import type { Program, Span } from '@gengjiawen/monkey-ast-types'
+import type {
+  LetStatement,
+  Program,
+  Span,
+  Token,
+} from '@gengjiawen/monkey-wasm'
+
+export function identifierName(statement: LetStatement): string {
+  return statement.identifier.name
+}
+
+export function tokenType(token: Token): string {
+  return token.kind.type
+}
 
 // --- Linter data model (docs/linter-plan.md) --------------------------------
 

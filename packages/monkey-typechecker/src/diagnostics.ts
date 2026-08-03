@@ -1,4 +1,4 @@
-import type { Span } from '@gengjiawen/monkey-ast-types'
+import type { Span } from '@gengjiawen/monkey-wasm'
 
 export type TypeSeverity = 'error' | 'warning'
 

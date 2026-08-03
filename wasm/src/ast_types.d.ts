@@ -1,12 +1,13 @@
-// The single source of truth for the shape of the JSON the Monkey wasm parser
-// emits. The linter, minifier, prettier plugin and type checker all decode the
-// same tree, so the node definitions live here instead of being copied into
-// each package.
+// The shape of the JSON tree `parse` and `analyze_lossless` emit. wasm-bindgen
+// appends this file to the generated `monkey_wasm.d.ts` (see ast_types.rs), so
+// the package that ships the parser also ships the types for its output, and
+// the two can never drift apart. The linter, minifier, prettier plugin and
+// type checker all import these instead of keeping their own copies.
 //
-// Two wasm entries produce this tree and they differ in exactly one place:
-// `analyze_lossless` keeps integer literals as their source text, while the
-// plain `parse` entry has already turned them into JS numbers. `raw` is typed
-// for both; call `String(...)` when you need the text.
+// The two entries differ in exactly one place: `analyze_lossless` keeps
+// integer literals as their source text, while the plain `parse` entry has
+// already turned them into JS numbers. `raw` is typed for both; call
+// `String(...)` when you need the text.
 
 export interface Span {
   start: number
@@ -246,52 +247,3 @@ export type TypeAnnotation =
   | HashType
   | FunctionType
   | OptionalType
-
-const TYPE_ANNOTATION_TYPES = new Set([
-  'NamedType',
-  'ArrayType',
-  'HashType',
-  'FunctionType',
-  'OptionalType',
-])
-
-/** True for the five annotation nodes, which no runtime tool needs to walk. */
-export function isTypeAnnotation(node: ASTNode): node is TypeAnnotation {
-  return TYPE_ANNOTATION_TYPES.has(node.type)
-}
-
-/** Renders an annotation back to source; the result re-parses identically. */
-export function printTypeAnnotation(annotation: TypeAnnotation): string {
-  switch (annotation.type) {
-    case 'NamedType':
-      return annotation.name
-    case 'ArrayType':
-      return `[${printTypeAnnotation(annotation.element)}]`
-    case 'HashType': {
-      const key = printTypeAnnotation(annotation.key)
-      return `{${key}: ${printTypeAnnotation(annotation.value)}}`
-    }
-    case 'FunctionType': {
-      const params = annotation.params.map(printTypeAnnotation).join(', ')
-      return `fn(${params}): ${printTypeAnnotation(annotation.return_type)}`
-    }
-    case 'OptionalType':
-      // `fn(int): int?` would read the `?` as part of the return type, so a
-      // nullable function type needs its grouping back.
-      return annotation.inner.type === 'FunctionType'
-        ? `(${printTypeAnnotation(annotation.inner)})?`
-        : `${printTypeAnnotation(annotation.inner)}?`
-  }
-}
-
-export function identifierName(statement: LetStatement): string {
-  return statement.identifier.name
-}
-
-export function setIdentifierName(statement: LetStatement, name: string): void {
-  statement.identifier.name = name
-}
-
-export function tokenType(token: Token): string {
-  return token.kind.type
-}

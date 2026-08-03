@@ -1,4 +1,4 @@
-import type { Program, Span } from '@gengjiawen/monkey-ast-types'
+import type { Program, Span } from '@gengjiawen/monkey-wasm'
 
 import { checkProgram, type CheckOptions } from './check'
 import {

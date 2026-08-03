@@ -1,3 +1,4 @@
+mod ast_types;
 mod utils;
 
 use crate::utils::set_panic_hook;

@@ -1,19 +1,11 @@
-// AST node definitions live in `@gengjiawen/monkey-ast-types`, shared with the
-// linter, the minifier and the type checker. The plugin adds the two things
-// only a formatter needs: comments, which the parser recovers separately, and
-// the narrower token kinds the printer switches on. The helpers are listed by
-// name so bundlers see a static re-export instead of having to resolve the
-// CommonJS star at runtime.
-export type * from '@gengjiawen/monkey-ast-types'
-export {
-  identifierName,
-  isTypeAnnotation,
-  printTypeAnnotation,
-  setIdentifierName,
-  tokenType,
-} from '@gengjiawen/monkey-ast-types'
+// The AST node definitions ship inside `@gengjiawen/monkey-wasm` itself:
+// wasm/src/ast_types.d.ts is appended to the generated declarations. The
+// plugin adds the two things only a formatter needs: comments, which the
+// parser recovers separately, and the narrower token kinds the printer
+// switches on.
+export type * from '@gengjiawen/monkey-wasm'
 
-import type { Span } from '@gengjiawen/monkey-ast-types'
+import type { Span } from '@gengjiawen/monkey-wasm'
 
 export interface MonkeyComment {
   type: 'CommentLine' | 'CommentBlock'

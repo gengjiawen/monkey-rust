@@ -24,23 +24,8 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/monkey-ast-types:
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.13.3
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.10(@types/node@24.13.3)(jsdom@29.1.1)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0))
-
   packages/monkey-linter:
     dependencies:
-      '@gengjiawen/monkey-ast-types':
-        specifier: ^1.2.0
-        version: link:../monkey-ast-types
       '@gengjiawen/monkey-wasm':
         specifier: ^1.2.0
         version: link:../../wasm/pkg
@@ -66,9 +51,6 @@ importers:
 
   packages/monkey-minifier:
     dependencies:
-      '@gengjiawen/monkey-ast-types':
-        specifier: ^1.2.0
-        version: link:../monkey-ast-types
       '@gengjiawen/monkey-wasm':
         specifier: ^1.2.0
         version: link:../../wasm/pkg
@@ -94,9 +76,6 @@ importers:
 
   packages/monkey-typechecker:
     dependencies:
-      '@gengjiawen/monkey-ast-types':
-        specifier: ^1.2.0
-        version: link:../monkey-ast-types
       '@gengjiawen/monkey-wasm':
         specifier: ^1.2.0
         version: link:../../wasm/pkg
@@ -240,9 +219,6 @@ importers:
 
   packages/prettier-plugin-monkey:
     dependencies:
-      '@gengjiawen/monkey-ast-types':
-        specifier: ^1.2.0
-        version: link:../monkey-ast-types
       '@gengjiawen/monkey-wasm':
         specifier: ^1.2.0
         version: link:../../wasm/pkg
