@@ -32,7 +32,11 @@ export function walk(program: Program, enter: WalkVisitor): void {
   visit(program, null, enter)
 }
 
-function visit(node: ASTNode, parent: ASTNode | null, enter: WalkVisitor): void {
+function visit(
+  node: ASTNode,
+  parent: ASTNode | null,
+  enter: WalkVisitor
+): void {
   enter(node, parent)
   for (const child of childrenOf(node)) {
     visit(child, node, enter)
@@ -56,7 +60,7 @@ export function childrenOf(node: ASTNode): ASTNode[] {
       return [statement.identifier, statement.expr]
     }
     case 'Param':
-      return [(node as Param).name]
+      return [(node as Param).identifier]
     case 'ReturnStatement':
       return [(node as ReturnStatement).argument]
     case 'ClassDeclaration': {

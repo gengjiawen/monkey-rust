@@ -11,7 +11,7 @@ expression: "fn(x: int, y: [string]): bool { x };"
         "params": [
           {
             "type": "Param",
-            "name": {
+            "identifier": {
               "type": "IDENTIFIER",
               "name": "x",
               "span": {
@@ -34,7 +34,7 @@ expression: "fn(x: int, y: [string]): bool { x };"
           },
           {
             "type": "Param",
-            "name": {
+            "identifier": {
               "type": "IDENTIFIER",
               "name": "y",
               "span": {

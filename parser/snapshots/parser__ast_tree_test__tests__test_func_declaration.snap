@@ -11,7 +11,7 @@ expression: "fn(x) { x };"
         "params": [
           {
             "type": "Param",
-            "name": {
+            "identifier": {
               "type": "IDENTIFIER",
               "name": "x",
               "span": {

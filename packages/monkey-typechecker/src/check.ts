@@ -440,7 +440,7 @@ class Checker {
     const signature = info.methods.get(method.name.name)!
     this.env.push()
     method.params.forEach((param, index) => {
-      this.env.define(param.name.name, signature.params[index] ?? ANY)
+      this.env.define(param.identifier.name, signature.params[index] ?? ANY)
     })
     const frame: FunctionFrame = {
       returnTypes: [],
@@ -706,7 +706,7 @@ class Checker {
       this.env.define(selfName, fnOf(params, declaredReturn ?? ANY))
     }
     node.params.forEach((param, index) => {
-      this.env.define(param.name.name, params[index] ?? ANY)
+      this.env.define(param.identifier.name, params[index] ?? ANY)
     })
 
     const frame: FunctionFrame = { returnTypes: [], declaredReturn }

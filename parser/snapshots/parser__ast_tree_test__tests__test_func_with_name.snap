@@ -22,7 +22,7 @@ expression: "let my_func = fn(x) { x };"
           "params": [
             {
               "type": "Param",
-              "name": {
+              "identifier": {
                 "type": "IDENTIFIER",
                 "name": "x",
                 "span": {

@@ -206,9 +206,13 @@ function defineParameter(
 ): void {
   // The binding is the name only: a `p: int` parameter must report on `p`, not
   // on the annotation the compiler erases.
-  const binding = createBinding(analysis, 'parameter', parameter.name.name)
-  binding.declaration = parameter.name
-  binding.nameSpan = parameter.name.span
+  const binding = createBinding(
+    analysis,
+    'parameter',
+    parameter.identifier.name
+  )
+  binding.declaration = parameter.identifier
+  binding.nameSpan = parameter.identifier.span
   define(scope, binding)
 }
 

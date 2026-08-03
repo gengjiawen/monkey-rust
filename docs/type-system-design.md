@@ -243,7 +243,7 @@ pub struct Let {
 }
 
 pub struct Param {                               // 新增
-    pub name: IDENTIFIER,
+    pub identifier: IDENTIFIER,
     pub type_annotation: Option<TypeAnnotation>,
     pub span: Span,
 }
@@ -268,7 +268,7 @@ pub struct MethodDefinition {
 
 `Let.identifier: Token` 是 `ast.rs` 里注释多年的历史遗留（"rust can't do precise type with enum"）。本次下游 JSON shape 反正要同步，是把它重构为 `IDENTIFIER` 的最便宜时机，随 2a 一并完成。
 
-`Object::Function` 内嵌 `Vec<IDENTIFIER>` params，随 `Param` 机械更新（interpreter 绑参、compiler 定义 symbol 处取 `param.name`）。
+`Object::Function` 内嵌 `Vec<IDENTIFIER>` params，随 `Param` 机械更新（interpreter 绑参、compiler 定义 symbol 处取 `param.identifier`）。
 
 ### 5.3 序列化
 
@@ -304,14 +304,14 @@ parser test 对每种类型节点执行 `&input[span.start..span.end]` 精确切
 
 ### 6.2 各后端实际改动
 
-| 后端                       | 改动                                     | 原因                                                 |
-| -------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| interpreter                | 机械（绑参处取 `param.name`）            | `Object::Function` 内嵌 params                       |
-| compiler                   | 机械（定义 symbol 处取 `param.name`）    | 遍历 AST                                             |
-| 默认 VM (`compiler/vm.rs`) | **零**                                   | 只消费 bytecode 与 `CompiledFunction`，标注到不了 VM |
-| GcVM (`gc/vm.rs`)          | **零**                                   | 同上                                                 |
-| asm (`asm/lower.rs`)       | 机械（match 新 AST 形状，忽略标注）      | 直接遍历 AST                                         |
-| `parser/validation.rs`     | 机械（遍历骨架适配 `Param`；不校验类型） | 类型语义完全归 TS checker                            |
+| 后端                       | 改动                                        | 原因                                                 |
+| -------------------------- | ------------------------------------------- | ---------------------------------------------------- |
+| interpreter                | 机械（绑参处取 `param.identifier`）         | `Object::Function` 内嵌 params                       |
+| compiler                   | 机械（定义 symbol 处取 `param.identifier`） | 遍历 AST                                             |
+| 默认 VM (`compiler/vm.rs`) | **零**                                      | 只消费 bytecode 与 `CompiledFunction`，标注到不了 VM |
+| GcVM (`gc/vm.rs`)          | **零**                                      | 同上                                                 |
+| asm (`asm/lower.rs`)       | 机械（match 新 AST 形状，忽略标注）         | 直接遍历 AST                                         |
+| `parser/validation.rs`     | 机械（遍历骨架适配 `Param`；不校验类型）    | 类型语义完全归 TS checker                            |
 
 ## 7. 类型检查语义
 

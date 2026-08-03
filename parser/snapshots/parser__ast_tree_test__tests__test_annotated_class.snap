@@ -31,7 +31,7 @@ expression: "class Point { constructor(x: int) { this.x = x; } norm(): int { 1 }
             "params": [
               {
                 "type": "Param",
-                "name": {
+                "identifier": {
                   "type": "IDENTIFIER",
                   "name": "x",
                   "span": {

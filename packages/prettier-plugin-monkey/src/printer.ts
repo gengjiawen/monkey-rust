@@ -290,7 +290,7 @@ function printParam(
   print: (path: AstPath) => Doc
 ): Doc {
   return [
-    path.call(print, 'name'),
+    path.call(print, 'identifier'),
     node.type_annotation
       ? printTypeAfterColon(
           node.type_annotation,

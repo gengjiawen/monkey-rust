@@ -308,7 +308,7 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Result<Rc<Objec
             let mut env = Environment::new_enclosed_environment(env);
 
             params.iter().enumerate().for_each(|(i, param)| {
-                env.set(param.name.name.clone(), args[i].clone());
+                env.set(param.identifier.name.clone(), args[i].clone());
             });
 
             let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(env)))?;
@@ -355,7 +355,7 @@ fn apply_method(
     let mut call_env = Environment::new_enclosed_environment(declaration_env);
     call_env.set("this".to_string(), Rc::new(Object::Instance(Rc::clone(receiver))));
     for (parameter, argument) in params.iter().zip(args) {
-        call_env.set(parameter.name.name.clone(), Rc::clone(argument));
+        call_env.set(parameter.identifier.name.clone(), Rc::clone(argument));
     }
     let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(call_env)))?;
     unwrap_return(evaluated)

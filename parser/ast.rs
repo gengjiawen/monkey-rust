@@ -112,7 +112,7 @@ pub struct Let {
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
 #[serde(tag = "type")]
 pub struct Param {
-    pub name: IDENTIFIER,
+    pub identifier: IDENTIFIER,
     pub type_annotation: Option<TypeAnnotation>,
     pub span: Span,
 }
@@ -120,8 +120,8 @@ pub struct Param {
 impl fmt::Display for Param {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.type_annotation {
-            Some(annotation) => write!(f, "{}: {}", self.name, annotation),
-            None => write!(f, "{}", self.name),
+            Some(annotation) => write!(f, "{}: {}", self.identifier, annotation),
+            None => write!(f, "{}", self.identifier),
         }
     }
 }

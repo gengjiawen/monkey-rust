@@ -109,7 +109,7 @@ impl Validator {
             method
                 .params
                 .iter()
-                .map(|parameter| parameter.name.name.clone())
+                .map(|parameter| parameter.identifier.name.clone())
                 .collect(),
         );
 
@@ -127,7 +127,7 @@ impl Validator {
         let mut scope = function
             .params
             .iter()
-            .map(|parameter| parameter.name.name.clone())
+            .map(|parameter| parameter.identifier.name.clone())
             .collect::<HashSet<_>>();
         if !function.name.is_empty() {
             // A directly let-bound function gets its binding name from the

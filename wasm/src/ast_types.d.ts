@@ -101,7 +101,7 @@ export interface Identifier extends ASTNode {
 /** A function or method parameter: a name plus its optional annotation. */
 export interface Param extends ASTNode {
   type: 'Param'
-  name: Identifier
+  identifier: Identifier
   type_annotation?: TypeAnnotation | null
 }
 

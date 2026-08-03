@@ -182,7 +182,7 @@ mod tests {
         let (params, _) = function(input);
         assert_eq!(slice(input, &params[0].span), "a: int");
         assert_eq!(slice(input, &params[1].span), "b");
-        assert_eq!(slice(input, &params[0].name.span), "a");
+        assert_eq!(slice(input, &params[0].identifier.span), "a");
     }
 
     #[test]

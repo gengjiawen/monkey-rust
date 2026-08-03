@@ -542,7 +542,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_parameter(&mut self) -> Result<Param, ParseError> {
-        let name = match &self.current_token.kind {
+        let identifier = match &self.current_token.kind {
             TokenKind::IDENTIFIER {
                 name,
             } => IDENTIFIER {
@@ -554,15 +554,15 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let start = name.span.start;
+        let start = identifier.span.start;
         let type_annotation = self.parse_optional_type_annotation()?;
         let end = match &type_annotation {
             Some(annotation) => annotation.span().end,
-            None => name.span.end,
+            None => identifier.span.end,
         };
 
         Ok(Param {
-            name,
+            identifier,
             type_annotation,
             span: Span {
                 start,

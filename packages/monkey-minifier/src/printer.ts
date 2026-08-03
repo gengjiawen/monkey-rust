@@ -85,7 +85,7 @@ function printClass(statement: ClassDeclaration): string {
 
 function printMethod(method: MethodDefinition): string {
   return `${method.name.name}(${method.params
-    .map((param) => param.name.name)
+    .map((param) => param.identifier.name)
     .join(',')})${printBlock(method.body)}`
 }
 
@@ -209,7 +209,7 @@ function renderBinary(expression: BinaryExpression): PrintedExpression {
 function renderFunction(expression: FunctionDeclaration): PrintedExpression {
   return {
     code: `fn(${expression.params
-      .map((param) => param.name.name)
+      .map((param) => param.identifier.name)
       .join(',')})${printBlock(expression.body)}`,
     precedence: Precedence.Lowest,
   }

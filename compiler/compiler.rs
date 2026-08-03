@@ -571,7 +571,7 @@ impl Compiler {
                     self.symbol_table.define_function_name(f.name.clone());
                 }
                 for param in f.params.iter() {
-                    self.define_symbol(param.name.name.clone())?;
+                    self.define_symbol(param.identifier.name.clone())?;
                 }
                 self.compile_function_body(&f.body, &function_span)?;
                 let num_locals = self.symbol_table.num_definitions;
@@ -824,7 +824,7 @@ impl Compiler {
 
         self.define_symbol("this".to_string())?;
         for parameter in &method.params {
-            self.define_symbol(parameter.name.name.clone())?;
+            self.define_symbol(parameter.identifier.name.clone())?;
         }
 
         match method.kind {
