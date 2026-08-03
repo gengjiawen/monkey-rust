@@ -1,7 +1,16 @@
 // AST node definitions live in `@gengjiawen/monkey-ast-types`, shared with the
 // minifier, the prettier plugin and the type checker. Re-exported here so rules
-// keep importing from one place; the linter's own data model follows below.
-export * from '@gengjiawen/monkey-ast-types'
+// keep importing from one place; the linter's own data model follows below. The
+// helpers are listed by name so bundlers see a static re-export instead of
+// having to resolve the CommonJS star at runtime.
+export type * from '@gengjiawen/monkey-ast-types'
+export {
+  identifierName,
+  isTypeAnnotation,
+  printTypeAnnotation,
+  setIdentifierName,
+  tokenType,
+} from '@gengjiawen/monkey-ast-types'
 
 import type { Program, Span } from '@gengjiawen/monkey-ast-types'
 
