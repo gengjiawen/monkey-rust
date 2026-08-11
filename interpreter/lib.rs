@@ -393,7 +393,10 @@ fn eval_prefix_bang(expr: &Object) -> Result<Rc<Object>, EvalError> {
 
 fn eval_prefix_minus(expr: &Object) -> Result<Rc<Object>, EvalError> {
     match *expr {
-        Object::Integer(i) => Ok(Rc::from(Object::Integer(-i))),
+        Object::Integer(i) => match i.checked_neg() {
+            Some(value) => Ok(Rc::from(Object::Integer(value))),
+            None => Err("integer overflow in negation".to_string()),
+        },
         _ => Err(format!("can't apply prefix minus operator: {}", expr)),
     }
 }
@@ -418,11 +421,27 @@ fn eval_infix(op: &Token, left: &Object, right: &Object) -> Result<Rc<Object>, E
 }
 
 fn eval_integer_infix(op: &Token, left: i64, right: i64) -> Result<Rc<Object>, EvalError> {
+    // Checked arithmetic so overflow and division by zero surface as runtime
+    // errors (same wording as the bytecode VM) instead of panicking in debug
+    // builds and wrapping in release builds.
     let result = match &op.kind {
-        TokenKind::PLUS => Object::Integer(left + right),
-        TokenKind::MINUS => Object::Integer(left - right),
-        TokenKind::ASTERISK => Object::Integer(left * right),
-        TokenKind::SLASH => Object::Integer(left / right),
+        TokenKind::PLUS => match left.checked_add(right) {
+            Some(value) => Object::Integer(value),
+            None => return Err("integer overflow in addition".to_string()),
+        },
+        TokenKind::MINUS => match left.checked_sub(right) {
+            Some(value) => Object::Integer(value),
+            None => return Err("integer overflow in subtraction".to_string()),
+        },
+        TokenKind::ASTERISK => match left.checked_mul(right) {
+            Some(value) => Object::Integer(value),
+            None => return Err("integer overflow in multiplication".to_string()),
+        },
+        TokenKind::SLASH if right == 0 => return Err("division by zero".to_string()),
+        TokenKind::SLASH => match left.checked_div(right) {
+            Some(value) => Object::Integer(value),
+            None => return Err("integer overflow in division".to_string()),
+        },
         TokenKind::LT => Object::Boolean(left < right),
         TokenKind::GT => Object::Boolean(left > right),
         TokenKind::EQ => Object::Boolean(left == right),
