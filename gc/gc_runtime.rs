@@ -193,17 +193,16 @@ impl GcRuntime {
         &mut self.objects[id].as_mut().expect("invalid GcId").header
     }
 
-    fn list_ptr(&mut self, kind: GcListKind) -> *mut GcList {
-        (match kind {
+    fn list_mut(&mut self, kind: GcListKind) -> &mut GcList {
+        match kind {
             GcListKind::GcObj => &mut self.gc_obj_list,
             GcListKind::Tmp => &mut self.tmp_obj_list,
             GcListKind::ZeroRef => &mut self.gc_zero_ref_count_list,
-        }) as *mut GcList
+        }
     }
 
     fn list_push_back(&mut self, kind: GcListKind, id: GcId) {
-        let list_ptr = self.list_ptr(kind);
-        let tail = unsafe { (*list_ptr).tail };
+        let tail = self.list_mut(kind).tail;
 
         {
             let header = self.header_mut(id);
@@ -220,17 +219,12 @@ impl GcRuntime {
         if let Some(tail_id) = tail {
             self.header_mut(tail_id).list_next = Some(id);
         } else {
-            unsafe {
-                (*list_ptr).head = Some(id);
-            }
+            self.list_mut(kind).head = Some(id);
         }
-        unsafe {
-            (*list_ptr).tail = Some(id);
-        }
+        self.list_mut(kind).tail = Some(id);
     }
 
     fn list_remove(&mut self, kind: GcListKind, id: GcId) {
-        let list_ptr = self.list_ptr(kind);
         let (prev, next) = {
             let header = self.header(id);
             debug_assert_eq!(header.list_kind, Some(kind), "object is not on the expected GC list");
@@ -239,16 +233,12 @@ impl GcRuntime {
 
         match prev {
             Some(p) => self.header_mut(p).list_next = next,
-            None => unsafe {
-                (*list_ptr).head = next;
-            },
+            None => self.list_mut(kind).head = next,
         }
 
         match next {
             Some(n) => self.header_mut(n).list_prev = prev,
-            None => unsafe {
-                (*list_ptr).tail = prev;
-            },
+            None => self.list_mut(kind).tail = prev,
         }
 
         let header = self.header_mut(id);
