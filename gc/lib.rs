@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 #[cfg(test)]
 mod debugger_test;
 #[cfg(test)]
