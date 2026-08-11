@@ -163,15 +163,14 @@ impl<'a> Lexer<'a> {
         if self.ch == '/' && self.peek_char() == '/' {
             self.read_char();
             self.read_char();
-            loop {
+            // Check before advancing so an empty comment (`//` directly
+            // followed by a newline) does not swallow the next line.
+            while self.ch != '\n' && self.ch != '\u{0}' {
                 self.read_char();
-                if self.ch == '\n' || self.ch == '\u{0}' {
-                    // consume the comments end
-                    if self.ch == '\n' {
-                        self.read_char();
-                    }
-                    break;
-                }
+            }
+            // consume the comments end
+            if self.ch == '\n' {
+                self.read_char();
             }
         }
     }

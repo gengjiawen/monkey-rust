@@ -1,0 +1,76 @@
+---
+source: lexer/lexer_test.rs
+expression: "//\nlet x = 5;\nx"
+---
+[
+  {
+    "kind": {
+      "type": "LET"
+    },
+    "span": {
+      "start": 3,
+      "end": 6
+    }
+  },
+  {
+    "kind": {
+      "type": "IDENTIFIER",
+      "value": {
+        "name": "x"
+      }
+    },
+    "span": {
+      "start": 7,
+      "end": 8
+    }
+  },
+  {
+    "kind": {
+      "type": "ASSIGN"
+    },
+    "span": {
+      "start": 9,
+      "end": 10
+    }
+  },
+  {
+    "kind": {
+      "type": "INT",
+      "value": 5
+    },
+    "span": {
+      "start": 11,
+      "end": 12
+    }
+  },
+  {
+    "kind": {
+      "type": "SEMICOLON"
+    },
+    "span": {
+      "start": 12,
+      "end": 13
+    }
+  },
+  {
+    "kind": {
+      "type": "IDENTIFIER",
+      "value": {
+        "name": "x"
+      }
+    },
+    "span": {
+      "start": 14,
+      "end": 15
+    }
+  },
+  {
+    "kind": {
+      "type": "EOF"
+    },
+    "span": {
+      "start": 15,
+      "end": 15
+    }
+  }
+]

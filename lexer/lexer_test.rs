@@ -130,6 +130,17 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_comment_keeps_next_line() {
+        // An empty `//` comment used to swallow the entire next line.
+        test_lexer_common("empty_comment_keeps_next_line", "//\nlet x = 5;\nx");
+    }
+
+    #[test]
+    fn test_empty_comment_at_eof() {
+        test_lexer_common("empty_comment_at_eof", "let x = 5;\n//");
+    }
+
+    #[test]
     fn test_lexer_complex() {
         test_lexer_common(
             "complex",
