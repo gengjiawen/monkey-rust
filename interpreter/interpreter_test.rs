@@ -266,6 +266,33 @@ mod tests {
     }
 
     #[test]
+    fn test_integer_arithmetic_errors() {
+        // Raw i64 arithmetic used to panic in debug builds (and wrap in
+        // release builds) for all of these; `1 / 0` and `i64::MIN / -1`
+        // panicked in release builds too. They must be runtime errors, with
+        // the same wording the bytecode VM uses.
+        let test_case = [
+            ("1 / 0;", "division by zero"),
+            ("9223372036854775807 + 1;", "integer overflow in addition"),
+            ("let m = -9223372036854775807 - 1; m - 1;", "integer overflow in subtraction"),
+            ("9223372036854775807 * 2;", "integer overflow in multiplication"),
+            ("let m = -9223372036854775807 - 1; m / -1;", "integer overflow in division"),
+            ("let m = -9223372036854775807 - 1; -m;", "integer overflow in negation"),
+        ];
+        apply_error_test(&test_case);
+    }
+
+    #[test]
+    fn test_integer_arithmetic_boundaries_still_evaluate() {
+        let test_case = [
+            ("9223372036854775807 + 0;", "9223372036854775807"),
+            ("-9223372036854775807 - 1;", "-9223372036854775808"),
+            ("(-9223372036854775807 - 1) / 1;", "-9223372036854775808"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_array_builtin_arity_errors() {
         // A wrong argument count must produce an error, not a panic and not a
         // silently truncated call. `push` used to read args.first()/args.last(),
