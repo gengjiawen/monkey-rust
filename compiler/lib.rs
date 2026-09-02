@@ -18,4 +18,6 @@ mod type_erasure_test;
 pub mod vm;
 mod vm_function_test;
 #[cfg(test)]
+mod vm_mutation_test;
+#[cfg(test)]
 mod vm_test;
