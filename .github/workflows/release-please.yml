@@ -80,29 +80,25 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
       - run: cd wasm && wasm-pack build --release --scope=gengjiawen
         if: ${{ steps.release.outputs.release_created }}
-      - run: npm publish --access public
-        working-directory: wasm/pkg
+      - run: scripts/npm-publish-if-needed.sh wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
-      - run: pnpm install --filter prettier-plugin-monkey... && pnpm --filter prettier-plugin-monkey run build
+      - run: pnpm install --filter prettier-plugin-monkey... --frozen-lockfile && pnpm --filter prettier-plugin-monkey run build
         if: ${{ steps.release.outputs.release_created }}
-      - run: npm publish --access public
-        working-directory: packages/prettier-plugin-monkey
+      - run: scripts/npm-publish-if-needed.sh packages/prettier-plugin-monkey
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
       - run: pnpm install --filter @gengjiawen/monkey-minifier... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-minifier run build
         if: ${{ steps.release.outputs.release_created }}
-      - run: npm publish --access public
-        working-directory: packages/monkey-minifier
+      - run: scripts/npm-publish-if-needed.sh packages/monkey-minifier
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
       - run: pnpm install --filter @gengjiawen/monkey-lint... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-lint run build
         if: ${{ steps.release.outputs.release_created }}
-      - run: npm publish --access public
-        working-directory: packages/monkey-linter
+      - run: scripts/npm-publish-if-needed.sh packages/monkey-linter
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
@@ -113,10 +109,9 @@ jobs:
         run: pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-typechecker run build
       - name: Publish Monkey typechecker
         if: ${{ steps.release.outputs.release_created }}
-        working-directory: packages/monkey-typechecker
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        run: npm publish --access public
+        run: scripts/npm-publish-if-needed.sh packages/monkey-typechecker
       - name: Publish VS Code extension to Open VSX
         if: ${{ steps.release.outputs.release_created }}
         working-directory: packages/vscode-extension
