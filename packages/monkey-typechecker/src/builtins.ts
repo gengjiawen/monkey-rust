@@ -49,7 +49,7 @@ export interface BuiltinSignature {
   variadic?: boolean
 }
 
-export const BUILTIN_SIGNATURES: Record<string, BuiltinSignature> = {
+const SIGNATURES: Record<string, BuiltinSignature> = {
   len: {
     params: [concrete(union([STRING, arrayOf(ANY)]))],
     ret: concrete(INT),
@@ -65,7 +65,15 @@ export const BUILTIN_SIGNATURES: Record<string, BuiltinSignature> = {
   push: { params: [arrayTemplate(T), T], ret: arrayTemplate(T) },
 }
 
-export const BUILTIN_NAMES = Object.keys(BUILTIN_SIGNATURES)
+/**
+ * Looked up by user-written identifiers, so a `Map` rather than the object:
+ * indexing the object with `toString` or `constructor` would hand back an
+ * `Object.prototype` method as if it were a builtin signature.
+ */
+export const BUILTIN_SIGNATURES: ReadonlyMap<string, BuiltinSignature> =
+  new Map(Object.entries(SIGNATURES))
+
+export const BUILTIN_NAMES = [...BUILTIN_SIGNATURES.keys()]
 
 /**
  * Gathers every type the argument forces onto `T`. An `any` argument reaching a

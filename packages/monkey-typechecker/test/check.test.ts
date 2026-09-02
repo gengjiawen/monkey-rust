@@ -1,9 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import {
+  analyze_lossless,
+  type FunctionCall,
+  type Identifier,
+  type Program,
+} from '@gengjiawen/monkey-wasm'
 import { describe, expect, it } from 'vitest'
 
-import { check } from '../src/node'
+import { check, checkProgram } from '../src/node'
 import type { TypeDiagnostic } from '../src/diagnostics'
 
 function codes(source: string): string[] {
@@ -346,6 +352,20 @@ describe('builtins', () => {
       'type-mismatch',
     ])
   })
+
+  it('does not mistake an Object.prototype method for a builtin', () => {
+    // Validation rejects `toString(1)` as an undefined variable, so only a
+    // tree handed straight to `checkProgram` can reach the signature lookup
+    // with such a name. It used to find `Object.prototype.toString` and throw.
+    const analyzed = JSON.parse(analyze_lossless('len(1);')) as {
+      status: 'ok'
+      program: Program
+    }
+    expect(analyzed.status).toBe('ok')
+    const call = analyzed.program.body[0] as FunctionCall
+    ;(call.callee as Identifier).name = 'toString'
+    expect(checkProgram(analyzed.program)).toEqual([])
+  })
 })
 
 // --- 7.7 functions, calls, recursion -----------------------------------------
@@ -675,6 +695,9 @@ describe('classes', () => {
     expect(diagnostic.message).toBe(
       "class 'int' shadows a builtin type name; annotations cannot refer to it"
     )
+    // Only the five builtin type names are reserved, not `Object.prototype`'s.
+    clean('class toString {} let t: toString = new toString();')
+    clean('class constructor {} let c: constructor = new constructor();')
   })
 
   it('exempts an any receiver', () => {
@@ -711,6 +734,15 @@ describe('annotations', () => {
     const diagnostic = only(source)
     expect(diagnostic.message).toBe("unknown type 'Pointt'")
     expect(slice(source, diagnostic)).toBe('Pointt')
+  })
+
+  it('treats an Object.prototype key as an unknown type name', () => {
+    for (const name of ['toString', 'constructor', 'hasOwnProperty']) {
+      const source = `let f = fn(x: ${name}) { x }; f(1);`
+      const diagnostic = only(source)
+      expect(diagnostic.code).toBe('unknown-type-name')
+      expect(slice(source, diagnostic)).toBe(name)
+    }
   })
 
   it('keeps builtin type names ahead of a class of the same name', () => {

@@ -30,6 +30,7 @@ import type {
 import {
   BUILTIN_SIGNATURES,
   instantiateBuiltin,
+  type BuiltinSignature,
   type InstantiatedBuiltin,
 } from './builtins'
 import {
@@ -74,13 +75,15 @@ export interface CheckOptions {
   // v1 has no options; `strictNull` and friends land here later.
 }
 
-const PRIMITIVE_TYPE_NAMES: Record<string, Type> = {
-  int: INT,
-  bool: BOOL,
-  string: STRING,
-  any: ANY,
-  null: NULL,
-}
+// A `Map`, so that `x: toString` is an unknown type rather than a lookup of
+// `Object.prototype.toString`.
+const PRIMITIVE_TYPE_NAMES: ReadonlyMap<string, Type> = new Map<string, Type>([
+  ['int', INT],
+  ['bool', BOOL],
+  ['string', STRING],
+  ['any', ANY],
+  ['null', NULL],
+])
 
 const EMPTY_SPAN: Span = { start: 0, end: 0 }
 
@@ -394,7 +397,7 @@ class Checker {
     // The class name is in scope for its own methods, so bind it first.
     this.env.define(declaration.name.name, classOf(info.id, info.name))
 
-    if (PRIMITIVE_TYPE_NAMES[info.name]) {
+    if (PRIMITIVE_TYPE_NAMES.has(info.name)) {
       this.report(
         DIAGNOSTIC_CODES.reservedTypeName,
         `class '${info.name}' shadows a builtin type name; annotations cannot refer to it`,
@@ -506,7 +509,7 @@ class Checker {
     switch (annotation.type) {
       case 'NamedType': {
         // Builtin names always win; a class may not take one over.
-        const primitive = PRIMITIVE_TYPE_NAMES[annotation.name]
+        const primitive = PRIMITIVE_TYPE_NAMES.get(annotation.name)
         if (primitive) {
           return primitive
         }
@@ -836,7 +839,7 @@ class Checker {
     if (this.env.lookup(name)) {
       return undefined
     }
-    const signature = BUILTIN_SIGNATURES[name]
+    const signature = BUILTIN_SIGNATURES.get(name)
     return signature ? { name, signature } : undefined
   }
 
@@ -1045,7 +1048,7 @@ class Checker {
 
 interface InstantiatedBuiltinRequest {
   name: string
-  signature: (typeof BUILTIN_SIGNATURES)[string]
+  signature: BuiltinSignature
 }
 
 function operatorText(token: { kind: { type: string } }): string {
