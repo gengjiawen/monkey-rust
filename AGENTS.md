@@ -37,6 +37,7 @@
 - PRs should include: concise description, affected crates/packages, rationale, and, if UI/behavior changes, examples or screenshots. Ensure CI passes (`cargo build/test`) and update snapshots/docs as needed.
 - Do not include version bumps or publish steps in regular PRs (maintainers handle releases).
 - Version syncing is handled by `scripts/bump_cargo_packages.ts`; when release versions need to change, update through this script instead of manually editing package versions.
+- When adding a new publishable package, order the release workflow so established packages publish first whenever dependencies allow. A new package's first-release, registry, or trusted-publisher failure should not block existing package releases.
 
 ## Architecture Overview
 
