@@ -87,13 +87,9 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
       # Ahead of the VS Code extension, which bundles the checker into its
       # diagnostics and so needs the built declarations.
-      - run: pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-typechecker run build
+      - name: Build Monkey typechecker
         if: ${{ steps.release.outputs.release_created }}
-      - run: npm publish --access public
-        working-directory: packages/monkey-typechecker
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-typechecker run build
       - run: pnpm install --filter prettier-plugin-monkey... && pnpm --filter prettier-plugin-monkey run build
         if: ${{ steps.release.outputs.release_created }}
       - run: npm publish --access public
@@ -101,16 +97,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
-      - name: Publish VS Code extension to Open VSX
-        if: ${{ steps.release.outputs.release_created }}
-        working-directory: packages/vscode-extension
-        env:
-          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
-        run: |
-          pnpm install --filter monkey-extension... --frozen-lockfile
-          rm -f *.vsix
-          pnpm run package
-          pnpm exec ovsx publish --skip-duplicate --pat "$OVSX_PAT" *.vsix
       - run: pnpm install --filter @gengjiawen/monkey-minifier... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-minifier run build
         if: ${{ steps.release.outputs.release_created }}
       - run: npm publish --access public
@@ -125,3 +111,21 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
+      # Keep this immediately ahead of the extension in release order while
+      # allowing the independent npm packages to publish first.
+      - name: Publish Monkey typechecker
+        if: ${{ steps.release.outputs.release_created }}
+        working-directory: packages/monkey-typechecker
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+        run: npm publish --access public
+      - name: Publish VS Code extension to Open VSX
+        if: ${{ steps.release.outputs.release_created }}
+        working-directory: packages/vscode-extension
+        env:
+          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
+        run: |
+          pnpm install --filter monkey-extension... --frozen-lockfile
+          rm -f *.vsix
+          pnpm run package
+          pnpm exec ovsx publish --skip-duplicate --pat "$OVSX_PAT" *.vsix
