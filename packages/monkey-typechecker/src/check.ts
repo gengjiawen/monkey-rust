@@ -137,6 +137,12 @@ class Checker {
   private currentClass: ClassInfo | undefined
   /** Nesting depth inside statements a `return` already made unreachable. */
   private deadCode = 0
+  /**
+   * Set once an expression in the current statement cannot complete: an `if`
+   * in expression position whose arms all `return`. Reset per statement by
+   * `checkStatements`, which treats such a statement like a `return`.
+   */
+  private diverged = false
 
   run(program: Program): void {
     this.collecting = true
@@ -163,6 +169,9 @@ class Checker {
   // --- Statements ----------------------------------------------------------
 
   private checkStatements(statements: Statement[]): Completion {
+    // A nested block's divergence is reported through its completion, never
+    // through the flag, so the enclosing statement's view is kept intact.
+    const outerDiverged = this.diverged
     let reachable = true
     let value: Type = NULL
     let span: Span = EMPTY_SPAN
@@ -177,12 +186,16 @@ class Checker {
         this.deadCode -= 1
         continue
       }
+      this.diverged = false
       const result = this.checkStatement(statement)
-      reachable = result.reachable
+      // `let x = if (c) { return 1; } else { return 2; };` never binds `x`:
+      // the block ends here exactly as it would after a `return`.
+      reachable = result.reachable && !this.diverged
       value = result.value
       span = result.span
     }
 
+    this.diverged = outerDiverged
     return { reachable, value, span }
   }
 
@@ -681,6 +694,11 @@ class Checker {
     }
 
     const reachable = consequent.reachable || (alternate?.reachable ?? true)
+    if (!reachable) {
+      // Sticky for the rest of the statement: once one operand cannot
+      // complete, neither can the expression around it.
+      this.diverged = true
+    }
     return { type: values.length === 0 ? NULL : joinAll(values), reachable }
   }
 

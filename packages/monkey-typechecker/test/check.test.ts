@@ -412,6 +412,35 @@ describe('functions', () => {
     clean('let f = fn(flag: bool): int { if (flag) { return 1; } 2; };')
   })
 
+  it('ends the block after an expression-position if that always returns', () => {
+    // The `let` never completes, so the tail is dead code — the same as the
+    // statement form of the `if`, and what the compiler and VM execute.
+    clean(
+      'let f = fn(c: bool): int { let x = if (c) { return 1; } else { return 2; }; "s" };'
+    )
+    clean(
+      'let f = fn(c: bool) { let x = if (c) { return 1; } else { return 2; }; "s" }; let a: int = f(true);'
+    )
+    clean(
+      'let f = fn(c: bool): int { len([if (c) { return 1; } else { return 2; }]); "s" };'
+    )
+    // An arm that falls through keeps the rest of the block live.
+    expect(
+      codes(
+        'let f = fn(c: bool): int { let x = if (c) { return 1; } else { 2 }; "s" };'
+      )
+    ).toEqual(['type-mismatch'])
+    // Divergence inside a nested block or closure stays there.
+    clean(
+      'let f = fn(c: bool): string { if (c) { let x = if (c) { return "a"; } else { return "b"; }; } "s" };'
+    )
+    expect(
+      codes(
+        'let f = fn(c: bool): int { let g = fn() { if (c) { return 1; } else { return 2; } }; "s" };'
+      )
+    ).toEqual(['type-mismatch'])
+  })
+
   it('accepts a guard clause whose only fallthrough is the implicit null', () => {
     // The body joins to `int?`; the optimistic null policy accepts it, same
     // as the expression-valued `fn(): int { if (flag) { 1 } }`.
