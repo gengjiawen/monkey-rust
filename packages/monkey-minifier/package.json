@@ -1,6 +1,6 @@
 {
   "name": "@gengjiawen/monkey-minifier",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A semantics-preserving source-to-source minifier for Monkey",
   "main": "dist/node.js",
   "browser": "dist/index.mjs",
@@ -31,7 +31,7 @@
     "url": "https://github.com/gengjiawen/monkey-rust"
   },
   "dependencies": {
-    "@gengjiawen/monkey-wasm": "^2.0.1"
+    "@gengjiawen/monkey-wasm": "^2.0.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
