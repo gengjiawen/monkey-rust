@@ -217,6 +217,13 @@ pub const DEFAULT_GC_THRESHOLD: usize = 256 * 1024;  // 256 KB
 - 触发后阈值上调为 `malloc_size + malloc_size/2`（与 QuickJS 一致）。
 - `set_gc_threshold(usize::MAX)` 可禁用自动 GC。
 
+`alloc_size` 是 slot 自身大小加上 `GcObject::heap_size()`——对象在自己结构体之外
+持有的字节（字符串内容、数组与 map 存储）。只按 slot 计费会让 `"a" + "a"` 无论翻倍
+多少次都不计成本，阈值和 §7.5 的内存预算都会失效。分配时记账的字节数存在
+`GcObjectEntry::alloc_size` 里：`free_gc` 会先把对象 `take()` 出来，届时已无法再测量
+payload，记住它才能让 alloc / free 严格对称。bytecode 不计入（编译期数据，运行中不会增长），
+就地增长的 instance 字段也不会重新计费。
+
 ### 5.7 重入保护
 
 ```rust
@@ -339,6 +346,11 @@ pub fn run_source_with_report(
     source: &str,
     instruction_budget: usize,
 ) -> Result<GcRunSuccess, GcRunError>;
+pub fn run_bytecode_with_limits(
+    bytecode: Bytecode,
+    instruction_budget: usize,
+    memory_budget: usize,
+) -> Result<String, GcRuntimeError>;
 
 // 手动控制
 let bytecode = Compiler::new().compile(&program)?;
@@ -347,6 +359,27 @@ vm.run_with_budget(DEFAULT_INSTRUCTION_BUDGET)?;
 let report = vm.collect_garbage();
 let result = vm.try_export_last_result()?;
 ```
+
+### 7.5 渲染与内存上限
+
+instruction budget 之外还有两处不受它约束的资源，playground 上都表现为卡死或崩溃：
+
+| 上限                       | 值      | 约束对象                                                                 |
+| -------------------------- | ------- | ------------------------------------------------------------------------ |
+| `MAX_VALUE_DISPLAY_CHARS`  | 64 KiB  | `value_to_string` 一次渲染的字符数（结果字符串、`puts`、运行时错误消息） |
+| `MAX_VALUE_DISPLAY_DEPTH`  | 64      | 渲染递归层数，超出的容器渲染为 `[…]` / `{…}`                             |
+| `DEFAULT_MEMORY_BUDGET`    | 256 MiB | 存活堆字节，每条指令检查一次                                             |
+
+渲染对共享结构是指数级的：`let a0 = [1]; let a1 = [a0, a0]; …` 每层只要 3 条指令，
+展开后却翻倍，18 层就是 1.8 MB、22 层要 20 秒；而且它发生在 `run_with_budget_classified`
+**返回之后**。递归又是按嵌套层数展开的，一个 10,000 指令的预算足够堆出约 3,300 层，
+足以打爆原生栈和 wasm 的 1 MiB 栈。两者都复用调试器的 `BoundedText`
+（`playground-debugger-plan` §5.3，现提到 `display.rs` 由两边共用）在追加时就地截断，因此不存在「先构造完整字符串再截断」。
+
+内存预算与 instruction budget 并列检查，超出即 `GcRuntimeErrorKind::MemoryLimit`
+（classified kind `memoryLimit`），不再是分配失败 abort 或 wasm `unreachable` trap。
+每条指令最多让存活堆翻一倍，所以按指令检查的超调是有界的，而所有分配点保持 infallible。
+`GcVM::set_memory_budget` 与 CLI 的 `--max-memory <bytes>` 可覆盖，`usize::MAX` 关闭该检查。
 
 `GcVM::collect_garbage()` 是公开的原子编排入口：它在 collection 前后调用 `GcHeap::snapshot()`，中间只调用一次 `GcHeap::run_gc_with_stats_bundle()`，并返回 `GcCollectionReport`。该 bundle diagnostics 路径会额外记录：
 
@@ -429,7 +462,8 @@ gc/
 ├── header.rs       # 对象头 + 类型 tag
 ├── list.rs         # 侵入式链表
 ├── malloc.rs       # 分配统计 + 阈值
-├── value.rs        # Value + import/export
+├── value.rs        # Value + import/export + 有界渲染
+├── display.rs      # BoundedText（渲染字符预算，值层与调试器共用）
 ├── report.rs       # Heap snapshot + collection diagnostics
 ├── frame.rs        # 调用帧
 ├── vm.rs           # GcVM

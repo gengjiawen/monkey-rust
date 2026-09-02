@@ -362,8 +362,11 @@ pub struct HeapView {
    两端节点均入选时才输出 edge。按稳定的 `EdgeRelation` 顺序截断并累计 omitted。
 7. 将完全 copy-out 的 `DebuggerHit` 推入 VM，继续执行下一条指令。
 
-有界摘要必须在构造过程中限深、限元素、限字符，不能先调用递归
-`value_to_string` 构造完整字符串再截断。默认常量：
+有界摘要必须在构造过程中限深、限元素、限字符，不能先构造完整字符串再截断。
+执行这一约束的 `BoundedText` 现位于 `gc/display.rs`：`value_to_string` 用同一个
+构建器，但预算大得多（`MAX_VALUE_DISPLAY_CHARS` 64 KiB / `MAX_VALUE_DISPLAY_DEPTH`
+64，见 `gc.md` §7.5），因此调试器仍需下面这组更紧的常量，不能改调 `value_to_string`。
+默认常量：
 
 ```rust
 const MAX_DEBUGGER_HITS: usize = 25;

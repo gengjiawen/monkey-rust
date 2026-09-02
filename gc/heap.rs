@@ -40,7 +40,7 @@ impl GcHeap {
     }
 
     pub fn alloc<O: GcObject>(&mut self, object: O, ty: GcObjectType) -> GcRef {
-        self.trigger_gc(std::mem::size_of::<O>());
+        self.trigger_gc(std::mem::size_of::<O>() + object.heap_size());
         GcRef(self.rt.add_gc_object(Box::new(object), ty))
     }
 

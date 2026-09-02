@@ -14,6 +14,7 @@ mod value_test;
 mod vm_test;
 
 pub mod debugger;
+pub mod display;
 pub mod frame;
 pub mod header;
 pub mod heap;
@@ -33,6 +34,7 @@ pub use debugger::{
     SlotView, StackSlotView, ValueView, MAX_DEBUGGER_DISPLAY_CHARS, MAX_DEBUGGER_EDGES,
     MAX_DEBUGGER_HITS, MAX_DEBUGGER_MEMBERS, MAX_DEBUGGER_OBJECTS, MAX_DEBUGGER_SUMMARY_DEPTH,
 };
+pub use display::BoundedText;
 pub use frame::Frame;
 pub use header::{GcId, GcObjectHeader, GcObjectType, GcPhase, RefCountHeader, RefCountId};
 pub use heap::{GcHeap, GcRef};
@@ -42,13 +44,17 @@ pub use report::{
     GcStatsBundle, GlobalRoot, HashKeyKind, HeapSnapshot, ObjectDecision, RestorationWitness,
     ScanStats, TrialDecision, TrialDeletionStats, ValueKindCounts, VisitedEdge,
 };
-pub use runner::{compile_source, run_bytecode, run_bytecode_with_output};
+pub use runner::{
+    compile_source, run_bytecode, run_bytecode_with_limits, run_bytecode_with_output,
+};
 pub use runtime::{GcObject, GcRuntime, MarkFunc};
 pub use value::{
     export_object, import_object, try_export_object, value_to_string, GcClosure, Value, ValueKind,
+    MAX_VALUE_DISPLAY_CHARS, MAX_VALUE_DISPLAY_DEPTH,
 };
 pub use vm::{
     GcClassifiedRuntimeError, GcRuntimeError, GcRuntimeErrorKind, GcVM, DEFAULT_INSTRUCTION_BUDGET,
+    DEFAULT_MEMORY_BUDGET,
 };
 
 use compiler::compiler::{Bytecode, Compiler};

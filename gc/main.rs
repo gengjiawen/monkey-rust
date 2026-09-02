@@ -1,8 +1,8 @@
 use compiler::compiler::{Bytecode, Compiler};
 use compiler::snapshot::{read_bytecode, write_bytecode};
 use compiler::symbol_table::SymbolTable;
-use gc::runner::{compile_source, run_bytecode};
-use gc::{GcRuntimeError, GcVM};
+use gc::runner::{compile_source, run_bytecode_with_limits};
+use gc::{GcRuntimeError, GcVM, DEFAULT_MEMORY_BUDGET};
 use object::Object;
 use parser::parse;
 use std::io::stdin;
@@ -14,7 +14,7 @@ const USAGE: &str = "\
 usage:
   monkey-gc                                                start the REPL
   monkey-gc compile <file.monkey> [-o <file.mbc>] [--strip]
-  monkey-gc run <file.monkey|file.mbc> [--max-instructions <n>]";
+  monkey-gc run <file.monkey|file.mbc> [--max-instructions <n>] [--max-memory <bytes>]";
 
 struct Repl {
     symbol_table: SymbolTable,
@@ -181,6 +181,7 @@ fn compile_command(args: &[String]) -> Result<(), CliError> {
 fn run_command(args: &[String]) -> Result<String, CliError> {
     let mut input: Option<PathBuf> = None;
     let mut budget = usize::MAX;
+    let mut memory_budget = DEFAULT_MEMORY_BUDGET;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -192,13 +193,22 @@ fn run_command(args: &[String]) -> Result<String, CliError> {
                     CliError::usage(format!("invalid instruction count `{}`", value))
                 })?;
             }
+            "--max-memory" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| CliError::usage("--max-memory needs a byte count"))?;
+                memory_budget = value
+                    .parse()
+                    .map_err(|_| CliError::usage(format!("invalid byte count `{}`", value)))?;
+            }
             _ if input.is_none() && !arg.starts_with('-') => input = Some(PathBuf::from(arg)),
             _ => return Err(CliError::usage(format!("unexpected argument `{}`", arg))),
         }
     }
     let input = input.ok_or_else(|| CliError::usage("run needs an input file"))?;
     let bytecode = load_bytecode(&input)?;
-    run_bytecode(bytecode, budget).map_err(|error| CliError::runtime(&error))
+    run_bytecode_with_limits(bytecode, budget, memory_budget)
+        .map_err(|error| CliError::runtime(&error))
 }
 
 /// Dispatch on the file extension (design doc §7): `.mbc` goes through the

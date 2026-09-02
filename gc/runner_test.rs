@@ -6,8 +6,10 @@ use compiler::op_code::{Instructions, Opcode};
 use compiler::snapshot::{read_bytecode, write_bytecode};
 use object::{CompiledFunction, Object};
 
-use crate::runner::{compile_source, run_bytecode, run_bytecode_with_output};
-use crate::{GcRunError, GcRunStage, GcRuntimeError, GcVM};
+use crate::runner::{
+    compile_source, run_bytecode, run_bytecode_with_limits, run_bytecode_with_output,
+};
+use crate::{GcRunError, GcRunStage, GcRuntimeError, GcVM, MAX_VALUE_DISPLAY_CHARS};
 
 /// Representative programs for direct-vs-snapshot equivalence (design doc
 /// §8): closure capture, recursion, class/instance, array/hash plus
@@ -64,6 +66,80 @@ fn instruction_budget_is_enforced() {
     let source = "let fib = fn(n) { if (n < 2) { n } else { fib(n - 1) + fib(n - 2) } }; fib(30)";
     let error = run_bytecode(compile_source(source).unwrap(), 10).unwrap_err();
     assert!(error.message.contains("instruction limit exceeded"), "got: {}", error.message);
+}
+
+/// `a{levels}` is a DAG: `levels` allocations, 2^levels leaves once expanded.
+fn shared_dag_program(levels: usize) -> String {
+    let mut program = String::from("let a0 = [1];\n");
+    for level in 1..=levels {
+        program.push_str(&format!("let a{level} = [a{}, a{}];\n", level - 1, level - 1));
+    }
+    program
+}
+
+#[test]
+fn the_reported_result_string_is_bounded() {
+    // 18 levels used to render 1.8 MB, 22 levels took 20 s — and this runs
+    // after the instruction budget has already been satisfied, on the
+    // playground's main thread.
+    let program = format!("{}a20;\n", shared_dag_program(20));
+    let success = crate::run_source_with_report(&program, 10_000).unwrap();
+    assert!(
+        success.result.chars().count() <= MAX_VALUE_DISPLAY_CHARS,
+        "result was {} chars",
+        success.result.chars().count()
+    );
+}
+
+#[test]
+fn puts_output_is_bounded() {
+    let program = format!("{}puts(a20);\n", shared_dag_program(20));
+    let (result, stdout) = run_bytecode_with_output(compile_source(&program).unwrap(), 10_000);
+    result.unwrap();
+    assert!(
+        stdout.chars().count() <= MAX_VALUE_DISPLAY_CHARS + 1,
+        "stdout was {} chars",
+        stdout.chars().count()
+    );
+}
+
+#[test]
+fn a_runtime_error_message_is_bounded() {
+    let program = format!("{}a20 + 1;\n", shared_dag_program(20));
+    let error = run_bytecode(compile_source(&program).unwrap(), 10_000).unwrap_err();
+    assert!(
+        error.message.chars().count() <= MAX_VALUE_DISPLAY_CHARS * 2 + 64,
+        "message was {} chars",
+        error.message.chars().count()
+    );
+}
+
+#[test]
+fn memory_budget_is_enforced() {
+    // The instruction budget does not bound memory: this doubles the live
+    // string every five instructions, so it used to abort the process with
+    // "memory allocation of 536870912 bytes failed" well inside 200
+    // instructions.
+    let source = r#"let f = fn(s) { f(s + s) }; f("a");"#;
+    let error =
+        run_bytecode_with_limits(compile_source(source).unwrap(), 200, 1 << 20).unwrap_err();
+    assert!(error.message.contains("memory limit exceeded"), "got: {}", error.message);
+}
+
+#[test]
+fn a_program_within_the_memory_budget_still_runs() {
+    let source = r#"let s = "a"; let s = s + s; let s = s + s; s;"#;
+    let result = run_bytecode_with_limits(compile_source(source).unwrap(), 1_000, 1 << 20).unwrap();
+    assert_eq!(result, "aaaa");
+}
+
+#[test]
+fn the_memory_budget_is_classified_separately_from_the_instruction_budget() {
+    let source = r#"let f = fn(s) { f(s + s) }; f("a");"#;
+    let mut vm = GcVM::new(compile_source(source).unwrap());
+    vm.set_memory_budget(1 << 20);
+    let error = vm.run_with_budget_classified(usize::MAX).unwrap_err();
+    assert_eq!(error.kind.as_str(), "memoryLimit");
 }
 
 #[test]

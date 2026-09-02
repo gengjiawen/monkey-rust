@@ -24,11 +24,21 @@ pub enum MarkFunc {
 pub trait GcObject: Any {
     fn trace(&self, visit: &mut dyn FnMut(GcId));
     fn on_free(&mut self, _rt: &mut GcRuntime) {}
+    /// Bytes this object owns beyond its own struct: string contents, vector
+    /// and map storage. The slot's fixed footprint is charged separately, so
+    /// an object with no owned allocations leaves this at 0.
+    fn heap_size(&self) -> usize {
+        0
+    }
 }
 
 struct GcObjectEntry {
     header: GcObjectHeader,
     object: Option<Box<dyn GcObject>>,
+    /// What `record_alloc` charged for this slot. `free_gc` takes the object
+    /// out before the slot is freed, so the payload size can no longer be
+    /// measured there; remembering it keeps alloc and free symmetric.
+    alloc_size: usize,
 }
 
 struct RefCountEntry {
@@ -268,7 +278,10 @@ impl GcRuntime {
         self.list_move(from, to, id);
     }
 
-    fn alloc_slot(&mut self, entry: GcObjectEntry) -> GcId {
+    fn alloc_slot(&mut self, mut entry: GcObjectEntry) -> GcId {
+        entry.alloc_size = std::mem::size_of::<GcObjectEntry>()
+            + entry.object.as_ref().map_or(0, |object| object.heap_size());
+        let charged = entry.alloc_size;
         let id = if let Some(id) = self.free_slots.pop() {
             self.objects[id] = Some(entry);
             id
@@ -277,14 +290,15 @@ impl GcRuntime {
             self.objects.push(Some(entry));
             id
         };
-        self.malloc_state
-            .record_alloc(std::mem::size_of::<GcObjectEntry>());
+        self.malloc_state.record_alloc(charged);
         id
     }
 
     fn free_slot(&mut self, id: GcId) {
-        self.malloc_state
-            .record_free(std::mem::size_of::<GcObjectEntry>());
+        let charged = self.objects[id]
+            .as_ref()
+            .map_or(std::mem::size_of::<GcObjectEntry>(), |entry| entry.alloc_size);
+        self.malloc_state.record_free(charged);
         self.objects[id] = None;
         self.free_slots.push(id);
     }
@@ -295,6 +309,7 @@ impl GcRuntime {
         let id = self.alloc_slot(GcObjectEntry {
             header: GcObjectHeader::new(gc_obj_type, 1),
             object: Some(object),
+            alloc_size: 0,
         });
         self.list_push_back(GcListKind::GcObj, id);
         id
