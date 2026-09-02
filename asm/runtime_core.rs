@@ -309,18 +309,18 @@ pub fn hash_key<S: ValueStore>(store: &S, value: Value) -> Option<HashKey> {
 pub fn hash_from_pairs<S: ValueStore>(store: &mut S, pairs: &[Value]) -> RuntimeResult<Value> {
     debug_assert_eq!(pairs.len() % 2, 0);
     let mut entries = HashMap::new();
-    for pair in pairs.chunks_exact(2) {
-        let key = match hash_key(store, pair[0]) {
+    for &[key, value] in pairs.as_chunks::<2>().0 {
+        let key = match hash_key(store, key) {
             Some(key) => key,
             None => {
-                let shown = display(store, pair[0])?;
+                let shown = display(store, key)?;
                 return fail(
                     RuntimeErrorKind::InvalidHashKey,
                     format!("hash key must be hashable, got {}", shown),
                 );
             }
         };
-        entries.insert(key, pair[1]);
+        entries.insert(key, value);
     }
     Ok(store.alloc(HeapObject::Hash(entries)))
 }
