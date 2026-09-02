@@ -117,27 +117,19 @@ export function inferPrefix(operator: string, operand: Type): Type | null {
   return null
 }
 
-/** Types the GcVM's `execute_comparison` refuses outright. */
-const UNCOMPARABLE_KINDS = ['array', 'hash', 'fn']
-
-export type EqualityVerdict =
-  | { ok: true }
-  | { ok: false; reason: 'uncomparable'; type: Type }
-  | { ok: false; reason: 'mixed' }
+export type EqualityVerdict = { ok: true } | { ok: false; reason: 'mixed' }
 
 /**
  * `==` / `!=` do not reuse assignability; they follow the equality matrix of
- * section 7.4, which is pinned to the GcVM — the strictest backend.
+ * section 7.4. Equality is total in every backend — arrays and hashes compare
+ * structurally, closures and instances by identity, and operands of different
+ * types are simply unequal — so the only thing left to say about a comparison
+ * is whether its answer is already known at check time.
  */
 export function inferEquality(left: Type, right: Type): EqualityVerdict {
   const lefts = members(stripNull(left))
   const rights = members(stripNull(right))
 
-  for (const member of [...lefts, ...rights]) {
-    if (UNCOMPARABLE_KINDS.includes(member.kind)) {
-      return { ok: false, reason: 'uncomparable', type: member }
-    }
-  }
   for (const leftMember of lefts) {
     for (const rightMember of rights) {
       if (leftMember.kind === 'any' || rightMember.kind === 'any') {

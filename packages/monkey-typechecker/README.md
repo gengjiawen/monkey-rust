@@ -31,8 +31,7 @@ without a location). A parse or validation failure is reported as a single
 | -------------------- | ------------------------------------------------------------------------ |
 | `type-mismatch`      | an assignment, argument, field write or return value is incompatible     |
 | `operator-type`      | an operator's operands do not satisfy its signature                      |
-| `mixed-equality`     | `==` / `!=` compare different categories — GC VM raises, others do not   |
-| `invalid-comparison` | `==` / `!=` on an array, hash or function                                |
+| `mixed-equality`     | `==` / `!=` compare different categories, so the answer is already known (warning) |
 | `arity-mismatch`     | a call or `new` passes the wrong number of arguments                     |
 | `not-callable`       | the callee's static type is not a function                               |
 | `not-constructable`  | `new` is applied to something other than a class                         |

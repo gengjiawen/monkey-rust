@@ -527,6 +527,11 @@ native `runtime.rs` 对 `Invoke` 按 0–7 元数选择 `extern "C" fn` 签名�
 builtin error 和 HashMap Display 都存在差异。里程碑 0 必须先合入一个语义一致性 PR，三引擎与新后端
 共同遵守下面这张矩阵；在它完成前不得宣称完整差分通过，也不得用排除用例掩盖差异。
 
+**现状**：语义一致性 PR 的第 1、2、3、6（display 部分）项已合入，由
+`gc/backend_parity_test.rs` 把同一份语料同时喂给三个引擎并逐条对照本矩阵；矩阵之外仍在漂移的
+只剩错误消息措辞、第 4 项 builtin error、以及 interpreter 的 `let x = 5;` 求值与 `ReturnValue`
+泄漏——这三项在该测试的模块注释里逐条列了出来。
+
 | 主题               | 冻结语义                                                                                               |
 | ------------------ | ------------------------------------------------------------------------------------------------------ |
 | truthiness / `!`   | 只有 `false`、`null` 为假；`!v` 严格等于 `!truthy(v)`，因此 `!null == true`、`!0 == false`             |
@@ -544,12 +549,18 @@ identity 对象的地址只在单次引擎执行内部有意义，跨引擎测�
 
 语义一致性前置 PR 至少包含：
 
-1. interpreter、普通 VM、gc VM 全部改用 checked 整数运算和同一 `RuntimeErrorKind` 映射；
-2. 普通 VM/gc VM 的 bang 改为 truthiness 的逻辑反值；
-3. 三引擎实现上表的 aggregate/identity 相等规则；
-4. builtin 返回的 `Object::Error`/`Value::Error` 在调用边界立即转成终止型错误（已完成）；
-5. 保持 §13 已修复的 `define_function_name` 路径与重绑定求值顺序；
-6. 抽出共享的规范化 language display 与 observer value encoder。
+1. ✅ interpreter、普通 VM、gc VM 全部改用 checked 整数运算和同一 `RuntimeErrorKind` 映射；
+2. ✅ 普通 VM/gc VM 的 bang 改为 truthiness 的逻辑反值（`object::Object::is_truthy` /
+   `gc::Value::is_truthy` 是唯一定义，`if` 与 `!` 都走它）；
+3. ✅ 三引擎实现上表的 aggregate/identity 相等规则（gc 侧是 `gc::value::values_equal`）；
+4. ✅ builtin 返回的 `Object::Error`/`Value::Error` 在调用边界立即转成终止型错误；
+5. ✅ 保持 §13 已修复的 `define_function_name` 路径与重绑定求值顺序；
+6. 抽出共享的规范化 language display 与 observer value encoder（hash 的 `{k: v}` 与
+   `(rank, canonical bytes)` 键序已在 `object`/`gc` 两侧对齐，整体抽取仍待做）。
+
+依赖这些语义的上层工具同批更新：minifier 的常量折叠不再把溢出的算术折成回绕值（
+`packages/monkey-minifier/src/fold.ts`），typechecker 也不再因 GcVM 会报错而拒绝
+aggregate 相等（`invalid-comparison` 随之退役，`mixed-equality` 降为 warning）。
 
 ### 10.2 独立、带帧的观测协议
 

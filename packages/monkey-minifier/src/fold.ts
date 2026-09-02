@@ -13,6 +13,18 @@ import { analyzeScopes, type ScopeAnalysis } from './scope'
 const ZERO = BigInt(0)
 const NEGATIVE_ONE = BigInt(-1)
 const I64_MIN = -(BigInt(1) << BigInt(63))
+const I64_MAX = (BigInt(1) << BigInt(63)) - BigInt(1)
+
+/**
+ * Integer arithmetic is checked in every backend, so a program that overflows
+ * raises at runtime (gc/backend_parity_test.rs). Folding an overflowing
+ * expression to its wrapped value would turn that runtime error into a wrong
+ * answer, so the folder leaves the expression alone instead — the same reason
+ * `x / 0` is left alone.
+ */
+function checked(value: bigint): ConstantValue | null {
+  return value < I64_MIN || value > I64_MAX ? null : integer(value)
+}
 
 type ConstantValue =
   | { kind: 'integer'; value: bigint }
@@ -185,9 +197,7 @@ function evaluateConstant(expression: Expression): ConstantValue | null {
       }
       switch (tokenType(expression.op)) {
         case 'MINUS':
-          return operand.kind === 'integer'
-            ? { kind: 'integer', value: BigInt.asIntN(64, -operand.value) }
-            : null
+          return operand.kind === 'integer' ? checked(-operand.value) : null
         case 'BANG':
           return {
             kind: 'boolean',
@@ -217,11 +227,11 @@ function evaluateBinary(
   if (left.kind === 'integer' && right.kind === 'integer') {
     switch (operator) {
       case 'PLUS':
-        return integer(BigInt.asIntN(64, left.value + right.value))
+        return checked(left.value + right.value)
       case 'MINUS':
-        return integer(BigInt.asIntN(64, left.value - right.value))
+        return checked(left.value - right.value)
       case 'ASTERISK':
-        return integer(BigInt.asIntN(64, left.value * right.value))
+        return checked(left.value * right.value)
       case 'SLASH':
         if (
           right.value === ZERO ||

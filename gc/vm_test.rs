@@ -93,22 +93,6 @@ mod tests {
                 expected: Object::Integer(60),
             },
             VmTestCase {
-                input: "9223372036854775807 + 1",
-                expected: Object::Integer(i64::MIN),
-            },
-            VmTestCase {
-                input: "(0 - 9223372036854775807 - 1) - 1",
-                expected: Object::Integer(i64::MAX),
-            },
-            VmTestCase {
-                input: "9223372036854775807 * 2",
-                expected: Object::Integer(-2),
-            },
-            VmTestCase {
-                input: "-(0 - 9223372036854775807 - 1)",
-                expected: Object::Integer(i64::MIN),
-            },
-            VmTestCase {
                 input: "5 + 5 + 5 + 5 - 10",
                 expected: Object::Integer(10),
             },
@@ -573,16 +557,16 @@ mod tests {
         // The gc VM has always rejected these; pinning them here keeps the
         // three backends from drifting apart again (see object/builtins.rs).
         let tests = [
-            ("len(1);", "builtin len not supported for for type 1"),
+            ("len(1);", "builtin len not supported for type 1"),
             ("len(\"one\", \"two\");", "builtin len expected 1 argument, got 2"),
             ("first();", "builtin first expected 1 argument, got 0"),
-            ("first(1);", "builtin first not supported for for type 1"),
+            ("first(1);", "builtin first not supported for type 1"),
             ("first([1], [2]);", "builtin first expected 1 argument, got 2"),
-            ("last(1);", "builtin last not supported for for type 1"),
+            ("last(1);", "builtin last not supported for type 1"),
             ("last([1], [2]);", "builtin last expected 1 argument, got 2"),
-            ("rest(1);", "builtin rest not supported for for type 1"),
+            ("rest(1);", "builtin rest not supported for type 1"),
             ("rest([1], [2]);", "builtin rest expected 1 argument, got 2"),
-            ("push(1, 1);", "builtin push not supported for for type 1"),
+            ("push(1, 1);", "builtin push not supported for type 1"),
             ("push([1]);", "builtin push expected 2 arguments, got 1"),
             ("push([1], 2, 3);", "builtin push expected 2 arguments, got 3"),
         ];
@@ -613,7 +597,7 @@ mod tests {
             let error = gc_vm_runtime_error(input);
             assert_eq!(error.kind, GcRuntimeErrorKind::Call, "input: {:?}", input);
             assert_eq!(
-                error.message, "builtin len not supported for for type 1",
+                error.message, "builtin len not supported for type 1",
                 "input: {:?}",
                 input
             );
@@ -1220,12 +1204,21 @@ mod tests {
         assert_eq!(wide_stack.stage, crate::GcRunStage::Runtime);
         assert!(wide_stack.message.contains("stack limit exceeded"));
 
-        let division_overflow =
-            crate::run_source_with_report("(0 - 9223372036854775807 - 1) / (0 - 1);", 10_000)
-                .unwrap_err();
-        assert_eq!(division_overflow.stage, crate::GcRunStage::Runtime);
-        assert!(division_overflow
-            .message
-            .contains("integer overflow in division"));
+        // Arithmetic is checked, not wrapping: the interpreter and the bytecode
+        // VM raise on overflow, so this VM raises too, with the same wording
+        // (design §10.1, `backend_parity_test.rs`).
+        let overflows = [
+            ("9223372036854775807 + 1;", "integer overflow in addition"),
+            ("(0 - 9223372036854775807 - 1) - 1;", "integer overflow in subtraction"),
+            ("9223372036854775807 * 2;", "integer overflow in multiplication"),
+            ("(0 - 9223372036854775807 - 1) / (0 - 1);", "integer overflow in division"),
+            ("-(0 - 9223372036854775807 - 1);", "integer overflow in negation"),
+            ("1 / 0;", "division by zero"),
+        ];
+        for (input, expected) in overflows {
+            let error = crate::run_source_with_report(input, 10_000).unwrap_err();
+            assert_eq!(error.stage, crate::GcRunStage::Runtime, "for {}", input);
+            assert!(error.message.contains(expected), "for {}: {}", input, error.message);
+        }
     }
 }

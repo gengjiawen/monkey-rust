@@ -215,32 +215,30 @@ describe('equality', () => {
     clean('1 == 2; "a" != "b"; true == false;')
   })
 
-  it('rejects a mixed comparison', () => {
-    expect(only('1 == "a";').message).toBe(
-      "comparing 'int' with 'string' diverges across backends; GcVM raises a runtime error"
+  it('warns that a mixed comparison has a known answer', () => {
+    const mismatch = only('1 == "a";')
+    expect(mismatch.severity).toBe('warning')
+    expect(mismatch.message).toBe("comparing 'int' with 'string' is always false")
+    expect(only('1 != "a";').message).toBe(
+      "comparing 'int' with 'string' is always true"
     )
   })
 
-  it('rejects arrays, hashes and functions outright', () => {
-    expect(only('let xs: [int] = [1]; xs == xs;').message).toBe(
-      "values of type '[int]' cannot be compared; GcVM raises a runtime error"
-    )
-    expect(codes('let f: fn(): int = fn(): int { 1 }; f == f;')).toEqual([
-      'invalid-comparison',
-    ])
-    expect(codes('let h: {string: int} = {}; h == h;')).toEqual([
-      'invalid-comparison',
-    ])
+  it('allows arrays, hashes and functions', () => {
+    // Every backend compares these: arrays and hashes structurally, functions
+    // by identity (gc/backend_parity_test.rs).
+    clean('let xs: [int] = [1]; xs == xs;')
+    clean('let f: fn(): int = fn(): int { 1 }; f == f;')
+    clean('let h: {string: int} = {}; h == h;')
   })
 
   it('allows instances of different classes', () => {
     clean('class A {} class B {} new A() == new B();')
   })
 
-  it('exempts any on the scalar side only', () => {
+  it('exempts any on either side', () => {
     clean('let x: any = 0; x == "a"; x == 1;')
-    // An array operand is a GcVM runtime error whatever the other side is.
-    expect(codes('let x: any = 0; x == [1];')).toEqual(['invalid-comparison'])
+    clean('let x: any = 0; x == [1];')
   })
 
   it('strips null first', () => {

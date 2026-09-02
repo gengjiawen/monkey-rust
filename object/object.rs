@@ -88,8 +88,9 @@ impl fmt::Display for Object {
             ),
             Object::Hash(map) => write!(
                 f,
-                "[{}]",
-                map.iter()
+                "{{{}}}",
+                sorted_hash_entries(map.iter())
+                    .iter()
                     .map(|(k, v)| format!("{}: {}", k, v))
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -109,6 +110,39 @@ impl fmt::Display for Object {
                 write!(f, "[bound method {}.{}]", class_name, method.name)
             }
         }
+    }
+}
+
+/// Hash entries in the canonical order every backend renders them in:
+/// `(key type rank, canonical key bytes)` with integer=0, boolean=1, string=2
+/// (arm64 backend design §10.2). `HashMap` iteration order is unspecified and
+/// varies run to run, so a display that walked the map directly would print
+/// the same hash differently on two runs of the same program.
+fn sorted_hash_entries<'a>(
+    map: impl Iterator<Item = (&'a Rc<Object>, &'a Rc<Object>)>,
+) -> Vec<(&'a Rc<Object>, &'a Rc<Object>)> {
+    let mut entries = map.collect::<Vec<_>>();
+    entries.sort_by_key(|(key, _)| (hash_key_rank(key), hash_key_canonical_bytes(key)));
+    entries
+}
+
+fn hash_key_rank(key: &Object) -> u8 {
+    match key {
+        Object::Integer(_) => 0,
+        Object::Boolean(_) => 1,
+        Object::String(_) => 2,
+        // Unreachable for hashes the runtimes build: `is_hashable` rejects
+        // every other variant before it can become a key.
+        _ => 3,
+    }
+}
+
+fn hash_key_canonical_bytes(key: &Object) -> Vec<u8> {
+    match key {
+        Object::Integer(raw) => raw.to_string().into_bytes(),
+        Object::Boolean(raw) => raw.to_string().into_bytes(),
+        Object::String(raw) => raw.clone().into_bytes(),
+        other => other.to_string().into_bytes(),
     }
 }
 
@@ -173,6 +207,17 @@ impl PartialEq for Object {
 impl Eq for Object {}
 
 impl Object {
+    /// Frozen truthiness (arm64 backend design §10.1): only `false` and `null`
+    /// are falsy, and `!v` is exactly `!v.is_truthy()`. Every backend routes
+    /// both `if` and `!` through this one definition.
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Object::Boolean(value) => return *value,
+            Object::Null => return false,
+            _ => return true,
+        }
+    }
+
     pub fn is_hashable(&self) -> bool {
         match self {
             Object::Integer(_) | Object::Boolean(_) | Object::String(_) => return true,

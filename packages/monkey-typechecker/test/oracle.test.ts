@@ -49,6 +49,11 @@ const sound = [
   'class Point { constructor(x: int, y: int) { this.x = x; this.y = y; } sum(): int { this.x + this.y } } let p = new Point(1, 2); puts(p.sum());',
   'class Counter { constructor() { this.n = 0; } bump(k: int): int { this.n + k } } puts(new Counter().bump(2));',
   'let sizes = fn(a: [int], b: [string]): int { len(a) + len(b) }; puts(sizes([1], ["x", "y"]));',
+  // Equality is total in every backend, so none of these is a checker error
+  // and none of them fails at runtime (gc/backend_parity_test.rs).
+  'let xs: [int] = [1]; puts(xs == xs);',
+  'let h: {string: int} = {"a": 1}; puts(h == h);',
+  'let f: fn(): int = fn(): int { 1 }; puts(f == f);',
 ]
 
 /** Gradual programs the checker rejects and the GC VM also refuses to run. */
@@ -58,8 +63,6 @@ const rejected: [string, string][] = [
   ['let f = fn(a: int): int { a }; f(1, 2);', 'arity-mismatch'],
   ['let f = fn(a: int): int { a + 1 }; f("s");', 'type-mismatch'],
   ['let s: string = "a"; s[0];', 'invalid-index'],
-  ['let xs: [int] = [1]; xs == xs;', 'invalid-comparison'],
-  ['1 == "a";', 'mixed-equality'],
   ['let xs: [int] = [1]; {xs: 1};', 'invalid-hash-key'],
   [
     'class Point { constructor(x: int) { this.x = x; } } new Point(1, 2);',

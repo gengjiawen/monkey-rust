@@ -386,9 +386,8 @@ let x: int = if (c) { 1 } else { "a" };
 - **Any 操作规则**（统一豁免）：任一操作数为 `any` 时检查一律通过。结果类型：单一重载的运算符直接取其结果（`any - 1`、`any * any` → `int`；`any < 1` → `bool`；prefix `-` → `int`）；`+` 的另一侧为 `int` / `string` 时分别得到 `int` / `string`，另一侧为 `any` 或其他具体类型时降级为 `any`（`any + true`、`any + [1]` → `any`），保证统一豁免下结果类型完备。比较与 `!` 恒 `bool`。索引 `any[...]`、调用 `any(...)`、`new any(...)`、属性 `any.prop` 全部合法且结果 `any`（7.7/7.8 的 callee/receiver 条目是该规则的实例）。这条规则是 gradual 的落地面：hello.monkey 的 `getName(person)`、未标注 fibonacci 的 `x - 1` 与 `fibonacci(x-1) + fibonacci(x-2)` 全靠它零诊断。
 - 操作数为 `Union`：先套用 7.1 的 union 消解通用规则（null-stripping 后逐成员检查，结果取各成员结果的 join），再对每个具体成员组合应用上面的 `Any` 规则。例如 `(int | string) + int` 报错——运行时可能命中 `string + int`，所有后端都会报错；`any + (int | string)` 得 `int | string`；`any + (int | bool)` 因 `any + bool` 的结果为 `any`，join 后坍缩为 `any`；而 `int? + 1` 剥离 `null` 后按 `int + int` 通过。
 - `==` / `!=` 不复用 assignability，使用独立的 **equality 矩阵**（null-stripping 后判定，任一侧 `Any` 豁免）：
-  - 可比较类别：`int`、`bool`、`string`、`null`、`Class`、`Instance`。两侧同类别 → 通过，结果 `bool`。`Instance` 与 `Class` 按 identity 比较且**不要求同名 class**——GcVM 的匹配臂只看类别（对任意 Instance/Instance 直接 identity，不检查所属 class），`new A() == new B()` 在四个后端都合法、恒 `false`，checker 如实放行（要提示可日后作为 lint 规则）。
-  - **`Array` / `Hash` / `Fn` 一律拒绝**，报 `invalid-comparison`，且该拒绝**优先于 `Any` 豁免**——`[1] == x` 在 `x: any` 时照报：GcVM 对数组/哈希/函数操作数不论另一侧是什么都会报错，已知一侧是容器就足以断定。运行时依据（`gc/vm.rs` 的 `execute_comparison`）：GcVM 只支持标量、`null` 与 class/instance/bound method，`[1] == [1]` 是 runtime error；而 interpreter 与默认 VM 走 `Object::PartialEq` 结构比较、asm 深比较/恒等——同一表达式三种行为，静态拒绝是唯一能对齐最严后端（GcVM）的选择。`Fn` 另有一层：静态类型无法区分 closure（GcVM 报错）与 bound method（GcVM identity 合法），只能保守全拒。
-  - 类别不同 → `mixed-equality`：GcVM 报错、其余后端静默 `false`，checker 对齐更严格的 GcVM，同时实现了 linter-plan 里提议的 `backend-divergent-comparison`。
+  - **相等是全域的**：任意两个值都可比较，结果恒为 `bool`，永远不是类型错误。`int`、`bool`、`string`、`null` 按值比较；`Array`/`Hash` 递归结构比较且与迭代顺序无关；`Class`、`Instance`、bound method、closure 按 identity 比较（`new A() == new B()` 合法、恒 `false`，`Instance` 之间不要求同名 class）。四个后端在这点上已经对齐，运行时依据是 `gc/backend_parity_test.rs` 的差分语料。
+  - 类别不同 → `mixed-equality`，**warning 而非 error**：所有后端都静默返回 `false`（`!=` 返回 `true`），程序照常运行，只是这个答案通常不是作者想要的。任一侧 `any` 时豁免。
 - `if` 条件不限制类型（运行时 truthiness 对一切值有定义，仅 `false` 与 `null` 为假）。
 
 **索引**（合法性规则；结果类型见 7.5 的表）：
@@ -554,8 +553,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 | -------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `type-mismatch`      | assignable 失败（let 标注、实参、字段写入、返回值）                                | `type 'string' is not assignable to type 'int'`                                                                         |
 | `operator-type`      | 运算符操作数不满足 7.4                                                             | `operator '+' expects 'int + int' or 'string + string', got 'int + string'`                                             |
-| `mixed-equality`     | `==`/`!=` 两侧类别不同（见 7.4 equality 矩阵）                                     | `comparing 'int' with 'string' diverges across backends; GcVM raises a runtime error`                                   |
-| `invalid-comparison` | `==`/`!=` 操作数为 Array/Hash/Fn（GcVM 运行时报错，其余后端行为各异）              | `values of type '[int]' cannot be compared; GcVM raises a runtime error`                                                |
+| `mixed-equality`     | `==`/`!=` 两侧类别不同（见 7.4 equality 矩阵；warning）                            | `comparing 'int' with 'string' is always false`                                                                         |
 | `arity-mismatch`     | 调用/`new` 参数个数不符                                                            | `Point constructor expects 2 arguments, got 3`                                                                          |
 | `not-callable`       | callee 静态类型不可调用                                                            | `type 'int' is not callable`                                                                                            |
 | `not-constructable`  | `new` 的 callee 不是 class                                                         | `cannot construct 'fn(int): int'`                                                                                       |
@@ -598,7 +596,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 - 每条 7.x 规则的正反用例；重点回归：`examples/hello.monkey` 原样通过且**零诊断**（异构 hash 经 union + any 参数不触发误报）。
 - 递归：fibonacci 未标注静默、标注 `: int` 后对 `return "a"` 报 `type-mismatch`。
 - class：字段收集覆盖全部方法体（constructor 外赋值同样入 map，无 `T?` 提升）与 `this` 的简单/传递 alias（`let self = this; let other = self; other.x = 1;`）、未标注方法的跨方法返回降级 `any`（`this.value = this.make();`）、对方法名赋值报 `assign-to-method`（含方法体内 `this.<方法名> = ...`，验证字段收集的排除规则未吞掉该诊断）、字段间依赖降级（`this.y = this.x;` 得 `any`）、`unknown-property` 拼写捕获、`new` alias、同名 class shadowing 保留不同 `ClassId`（旧 class alias 的实例不能赋给新 class 标注）、`class int {}` 报 `reserved-type-name`。
-- equality：`xs == xs`（`xs: [int]`）与 `f == f`（`f: fn(): int`）报 `invalid-comparison`，配 GcVM 运行时报错的对照用例；跨类别报 `mixed-equality`；`new A() == new B()` 零诊断（四后端合法、恒 `false`）。
+- equality：`xs == xs`（`xs: [int]`）、`h == h`（`h: {string: int}`）与 `f == f`（`f: fn(): int`）零诊断，并由 oracle 语料确认运行时同样通过；跨类别报 `mixed-equality`（warning）；`new A() == new B()` 零诊断（四后端合法、恒 `false`）。
 - union 消解：`let f = if (c) { fn(x: int): int { x; } } else { fn(x: string): string { x; } }; f(1);` 报错；`let xs = if (c) { [1] } else { ["a"] }; xs[0];` 通过且类型为 `(int | string)?`。两例都由分支推导内部 union，不依赖 v1 尚未支持的 union 用户语法。
 - any 与 builtin 泛型：`any + true`、`any + [1]` 通过且结果为 `any`；`let c = true; let x: any = 0; let y = if (c) { 1 } else { "s" }; x + y;` 按 RHS 的内部 union 成员检查，结果为 `int | string`；`first(x)`（`x: any`）结果为 `any`，`push(x, 1)` 结果为 `[any]`。
 - 返回推导 completion：`return` 后不可达语句不参与 join（`fn(): int { return 1; "s"; }` 零诊断）；条件 return 与 fallthrough 合并（`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 报 `type-mismatch`）。

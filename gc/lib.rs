@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
 #[cfg(test)]
+mod backend_parity_test;
+#[cfg(test)]
 mod debugger_test;
 #[cfg(test)]
 mod gc_test;

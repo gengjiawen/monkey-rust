@@ -640,21 +640,16 @@ class Checker {
 
     if (EQUALITY_OPERATORS.includes(operator)) {
       const verdict = inferEquality(left, right)
-      if (!verdict.ok && verdict.reason === 'uncomparable') {
-        this.report(
-          DIAGNOSTIC_CODES.invalidComparison,
-          `values of type '${display(
-            verdict.type
-          )}' cannot be compared; GcVM raises a runtime error`,
-          spanOf(expression)
-        )
-      } else if (!verdict.ok) {
+      if (!verdict.ok) {
+        // A warning, not an error: the program runs, and every backend agrees
+        // on the answer. It is just an answer the author probably did not want.
         this.report(
           DIAGNOSTIC_CODES.mixedEquality,
           `comparing '${display(left)}' with '${display(
             right
-          )}' diverges across backends; GcVM raises a runtime error`,
-          spanOf(expression)
+          )}' is always ${operator === '==' ? 'false' : 'true'}`,
+          spanOf(expression),
+          'warning'
         )
       }
       return BOOL

@@ -301,10 +301,10 @@ frequency 和后续 slot 编号。任一 analysis 不确定时保留原 node。
 整数算术、字符串拼接、布尔/比较运算、前缀运算严格镜像 production GC VM，而
 不是 interpreter。整数从 lossless `raw` 用 `BigInt` 计算：
 
-- 加、减、乘和负号按 i64 two's-complement wrap，用
-  `BigInt.asIntN(64, value)`。GC VM 已显式使用
-  `wrapping_add/sub/mul/neg`；minifier 只 mirror 这项既有语义，本实现不需要修改
-  gc crate。
+- 加、减、乘和负号是 **checked** 的：结果落在 i64 之外时不 fold，保留原
+  expression，让运行时报出 `integer overflow in ...`。三个后端都用 checked 运算
+  （arm64 backend design §10.1、`gc/backend_parity_test.rs`），把溢出折成回绕值会
+  把一个 runtime error 换成一个错误答案。
 - division 使用 BigInt 的 truncation toward zero；divisor 为 0、以及
   `i64::MIN / -1` 都保留原 expression，让 VM 产生原来的 runtime error。
 - AST 没有 negative integer literal。负结果必须构造成
@@ -317,15 +317,14 @@ frequency 和后续 slot 编号。任一 analysis 不确定时保留原 node。
 下面是直接经过 `minify(source, { fold: true, mangle: false })` 的实际结果；这些
 program 没有 binding，因此单独展示的是 constant folding 效果：
 
-| Source                       | Output                  |
-| ---------------------------- | ----------------------- |
-| `40 + 2`                     | `42;`                   |
-| `"mon" + "key"`              | `"monkey";`             |
-| `if (true) { 1 } else { 2 }` | `1;`                    |
-| `9223372036854775807 + 2`    | `-9223372036854775807;` |
+| Source                       | Output      |
+| ---------------------------- | ----------- |
+| `40 + 2`                     | `42;`       |
+| `"mon" + "key"`              | `"monkey";` |
+| `if (true) { 1 } else { 2 }` | `1;`        |
 
-相反，`1 / 0` 和 `(-9223372036854775807 - 1) / -1` 会保留原 expression，让 GC
-VM 产生原有 runtime error。
+相反，`1 / 0`、`(-9223372036854775807 - 1) / -1` 和 `9223372036854775807 + 2` 这类
+会溢出的算术都保留原 expression，让运行时产生原有 runtime error。
 
 `if` 是 expression，而它的 branch 是任意 `BlockStatement`，语言又没有可打印的
 `null` literal，所以不能通用地拿 selected block 替换整个 `if`。v2 只 fold

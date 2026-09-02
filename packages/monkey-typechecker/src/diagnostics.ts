@@ -23,7 +23,6 @@ export const DIAGNOSTIC_CODES = {
   typeMismatch: 'type-mismatch',
   operatorType: 'operator-type',
   mixedEquality: 'mixed-equality',
-  invalidComparison: 'invalid-comparison',
   arityMismatch: 'arity-mismatch',
   notCallable: 'not-callable',
   notConstructable: 'not-constructable',

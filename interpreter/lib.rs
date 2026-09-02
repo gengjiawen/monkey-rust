@@ -114,11 +114,7 @@ fn eval_class_declaration(
 }
 
 fn is_truthy(obj: &Object) -> bool {
-    match obj {
-        Object::Null => return false,
-        Object::Boolean(false) => return false,
-        _ => true,
-    }
+    return obj.is_truthy();
 }
 
 fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, EvalError> {
@@ -398,11 +394,8 @@ fn eval_prefix(op: &Token, right: &Object) -> Result<Rc<Object>, EvalError> {
 }
 
 fn eval_prefix_bang(expr: &Object) -> Result<Rc<Object>, EvalError> {
-    match *expr {
-        Object::Null => Ok(Rc::new(Object::Boolean(true))),
-        Object::Boolean(b) => Ok(Rc::new(Object::Boolean(!b))),
-        _ => Ok(Rc::new(Object::Boolean(false))),
-    }
+    // `!v` is the logical inverse of truthiness, nothing more (design §10.1).
+    Ok(Rc::new(Object::Boolean(!is_truthy(expr))))
 }
 
 fn eval_prefix_minus(expr: &Object) -> Result<Rc<Object>, EvalError> {
