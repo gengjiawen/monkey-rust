@@ -400,6 +400,15 @@ describe('functions', () => {
     expect(codes('let f = fn(): int { };')).toEqual(['type-mismatch'])
   })
 
+  it('points an empty body at its braces', () => {
+    // There is no tail expression to blame, and {0, 0} is not an answer.
+    const source = 'let f = fn(): int { };'
+    expect(slice(source, only(source))).toBe('{ }')
+
+    const method = 'class A { m(): int {} }'
+    expect(slice(method, only(method))).toBe('{}')
+  })
+
   it('keeps unreachable statements out of the inferred return type', () => {
     clean('let f = fn(): int { return 1; "s"; };')
     clean('let f = fn() { return 1; "s"; }; let a: int = f();')

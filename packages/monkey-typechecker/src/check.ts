@@ -140,18 +140,18 @@ class Checker {
   /**
    * Set once an expression in the current statement cannot complete: an `if`
    * in expression position whose arms all `return`. Reset per statement by
-   * `checkStatements`, which treats such a statement like a `return`.
+   * `checkBlock`, which treats such a statement like a `return`.
    */
   private diverged = false
 
   run(program: Program): void {
     this.collecting = true
     this.env = new Env()
-    this.checkStatements(program.body)
+    this.checkBlock(program)
 
     this.collecting = false
     this.env = new Env()
-    this.checkStatements(program.body)
+    this.checkBlock(program)
   }
 
   private report(
@@ -168,15 +168,17 @@ class Checker {
 
   // --- Statements ----------------------------------------------------------
 
-  private checkStatements(statements: Statement[]): Completion {
+  private checkBlock(block: { body: Statement[]; span?: Span }): Completion {
     // A nested block's divergence is reported through its completion, never
     // through the flag, so the enclosing statement's view is kept intact.
     const outerDiverged = this.diverged
     let reachable = true
     let value: Type = NULL
-    let span: Span = EMPTY_SPAN
+    // An empty body is `null` with no statement to blame, so a fallthrough
+    // diagnostic points at the braces themselves.
+    let span: Span = spanOf(block)
 
-    for (const statement of statements) {
+    for (const statement of block.body) {
       if (!reachable) {
         // Statements after a `return` are still checked — a type error there is
         // still an error — but they contribute neither to the block's value nor
@@ -475,9 +477,7 @@ class Checker {
       declaredReturn: signature.declaredReturn,
     }
     this.frames.push(frame)
-    const completion = this.inFreshBody(() =>
-      this.checkStatements(method.body.body)
-    )
+    const completion = this.inFreshBody(() => this.checkBlock(method.body))
     this.frames.pop()
     this.env.pop()
 
@@ -709,7 +709,7 @@ class Checker {
    */
   private inBranch(block: BlockStatement): Completion {
     this.env.push()
-    const completion = this.checkStatements(block.body)
+    const completion = this.checkBlock(block)
     const bindings = this.env.popFrame()
     for (const [name, binding] of bindings) {
       const existing = this.env.lookup(name)
@@ -744,9 +744,7 @@ class Checker {
 
     const frame: FunctionFrame = { returnTypes: [], declaredReturn }
     this.frames.push(frame)
-    const completion = this.inFreshBody(() =>
-      this.checkStatements(node.body.body)
-    )
+    const completion = this.inFreshBody(() => this.checkBlock(node.body))
     this.frames.pop()
     this.env.pop()
 
