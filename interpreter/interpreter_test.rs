@@ -311,6 +311,12 @@ factorial(5);"#,
             // a failed builtin must abort the program instead of flowing on as a value
             ("if (len(1)) { 10 } else { 20 }", "builtin len not supported for for type 1"),
             ("len(1) == len(1)", "builtin len not supported for for type 1"),
+            ("len(1) + 1", "builtin len not supported for for type 1"),
+            ("[len(1), 2]", "builtin len not supported for for type 1"),
+            (
+                r#"if (len(1)) { "truthy" } else { "falsy" }"#,
+                "builtin len not supported for for type 1",
+            ),
             ("len(1); 42", "builtin len not supported for for type 1"),
             ("let broken = len(1); broken", "builtin len not supported for for type 1"),
             (

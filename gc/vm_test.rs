@@ -4,6 +4,7 @@ use parser::parse;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::vm::{GcClassifiedRuntimeError, GcRuntimeErrorKind};
 use crate::GcVM;
 
 pub struct VmTestCase<'a> {
@@ -26,6 +27,19 @@ pub fn run_gc_vm_tests(tests: Vec<VmTestCase>) {
             .unwrap_or_else(|| panic!("no result on stack for {:?}", test.input));
         assert_eq!(got, test.expected, "input: {:?}", test.input);
     }
+}
+
+/// Run `input` and return the runtime error it must raise.
+pub fn gc_vm_runtime_error(input: &str) -> GcClassifiedRuntimeError {
+    let program =
+        parse(input).unwrap_or_else(|errors| panic!("parse error for {:?}: {}", input, errors[0]));
+    let mut compiler = Compiler::new();
+    let bytecode = compiler
+        .compile(&program)
+        .unwrap_or_else(|error| panic!("compile error for {:?}: {}", input, error));
+    let mut vm = GcVM::new(bytecode);
+    vm.run_with_budget_classified(usize::MAX)
+        .expect_err("GC VM should return an error")
 }
 
 fn int_array(values: &[i64]) -> Object {
@@ -516,10 +530,6 @@ mod tests {
                 expected: Object::Integer(11),
             },
             VmTestCase {
-                input: "len(\"one\", \"two\");",
-                expected: Object::Error("builtin len expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
                 input: "len([1, 2, 3]);",
                 expected: Object::Integer(3),
             },
@@ -559,35 +569,55 @@ mod tests {
     }
 
     #[test]
-    fn test_builtin_arity_errors() {
+    fn test_builtin_failures_are_runtime_errors() {
         // The gc VM has always rejected these; pinning them here keeps the
         // three backends from drifting apart again (see object/builtins.rs).
-        run_gc_vm_tests(vec![
-            VmTestCase {
-                input: "first();",
-                expected: Object::Error("builtin first expected 1 argument, got 0".to_string()),
-            },
-            VmTestCase {
-                input: "first([1], [2]);",
-                expected: Object::Error("builtin first expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
-                input: "last([1], [2]);",
-                expected: Object::Error("builtin last expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
-                input: "rest([1], [2]);",
-                expected: Object::Error("builtin rest expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
-                input: "push([1]);",
-                expected: Object::Error("builtin push expected 2 arguments, got 1".to_string()),
-            },
-            VmTestCase {
-                input: "push([1], 2, 3);",
-                expected: Object::Error("builtin push expected 2 arguments, got 3".to_string()),
-            },
-        ]);
+        let tests = [
+            ("len(1);", "builtin len not supported for for type 1"),
+            ("len(\"one\", \"two\");", "builtin len expected 1 argument, got 2"),
+            ("first();", "builtin first expected 1 argument, got 0"),
+            ("first(1);", "builtin first not supported for for type 1"),
+            ("first([1], [2]);", "builtin first expected 1 argument, got 2"),
+            ("last(1);", "builtin last not supported for for type 1"),
+            ("last([1], [2]);", "builtin last expected 1 argument, got 2"),
+            ("rest(1);", "builtin rest not supported for for type 1"),
+            ("rest([1], [2]);", "builtin rest expected 1 argument, got 2"),
+            ("push(1, 1);", "builtin push not supported for for type 1"),
+            ("push([1]);", "builtin push expected 2 arguments, got 1"),
+            ("push([1], 2, 3);", "builtin push expected 2 arguments, got 3"),
+        ];
+
+        for (input, message) in tests {
+            let error = gc_vm_runtime_error(input);
+            assert_eq!(error.kind, GcRuntimeErrorKind::Call, "input: {:?}", input);
+            assert_eq!(error.message, message, "input: {:?}", input);
+        }
+    }
+
+    #[test]
+    fn a_failed_builtin_never_flows_on_as_a_value() {
+        // Before this was an Err, the error object was pushed on the stack and
+        // kept being used: `len(1) + 1` produced another error value, and the
+        // message was truthy, so `if (len(1))` took the consequent.
+        let tests = [
+            "len(1) + 1",
+            "[len(1), 2]",
+            "if (len(1)) { \"truthy\" } else { \"falsy\" }",
+            "len(1) == len(1)",
+            "len(1); 42",
+            "let broken = len(1); broken",
+            "let identity = fn(x) { x }; identity(len(1))",
+        ];
+
+        for input in tests {
+            let error = gc_vm_runtime_error(input);
+            assert_eq!(error.kind, GcRuntimeErrorKind::Call, "input: {:?}", input);
+            assert_eq!(
+                error.message, "builtin len not supported for for type 1",
+                "input: {:?}",
+                input
+            );
+        }
     }
 
     #[test]

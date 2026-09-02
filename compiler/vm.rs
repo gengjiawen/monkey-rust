@@ -588,6 +588,13 @@ impl VM {
         let args = self.stack[self.sp - num_args..self.sp].to_vec();
         let result = bt(args);
         self.sp = self.sp - num_args - 1;
+        // Builtins report failures as Object::Error values. Every other
+        // runtime failure here is an Err, so lift them the way the interpreter
+        // does; otherwise the message keeps flowing as an ordinary value and
+        // ends up as an operand, e.g. `len(1) + 1`.
+        if let Object::Error(message) = &*result {
+            return Err(VmRuntimeError::new(VmRuntimeErrorKind::Call, message.clone()));
+        }
         self.push(result)
     }
 

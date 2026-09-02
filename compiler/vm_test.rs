@@ -1,6 +1,6 @@
 use crate::compiler::Compiler;
 use crate::compiler_test::test_constants;
-use crate::vm::VM;
+use crate::vm::{VmRuntimeError, VM};
 use object::Object;
 use parser::parse;
 
@@ -24,6 +24,15 @@ pub fn run_vm_tests(tests: Vec<VmTestCase>) {
     }
 }
 
+/// Run `input` and return the runtime error it must raise.
+pub fn vm_runtime_error(input: &str) -> VmRuntimeError {
+    let program = parse(input).unwrap();
+    let mut compiler = Compiler::new();
+    let bytecode = compiler.compile(&program).unwrap();
+    let mut vm = VM::new(bytecode);
+    vm.run_checked().expect_err("VM should return an error")
+}
+
 #[cfg(test)]
 mod tests {
     use object::Object;
@@ -31,17 +40,9 @@ mod tests {
     use std::rc::Rc;
 
     use crate::compiler::Compiler;
-    use crate::vm::{VmRuntimeError, VmRuntimeErrorKind, VM};
-    use crate::vm_test::{run_vm_tests, VmTestCase};
+    use crate::vm::{VmRuntimeErrorKind, VM};
+    use crate::vm_test::{run_vm_tests, vm_runtime_error, VmTestCase};
     use parser::parse;
-
-    fn vm_runtime_error(input: &str) -> VmRuntimeError {
-        let program = parse(input).unwrap();
-        let mut compiler = Compiler::new();
-        let bytecode = compiler.compile(&program).unwrap();
-        let mut vm = VM::new(bytecode);
-        vm.run_checked().expect_err("VM should return an error")
-    }
 
     #[test]
     fn test_integer_arithmetic() {
