@@ -9,17 +9,14 @@ expression: let a = 3
       {
         "type": "Let",
         "identifier": {
-          "kind": {
-            "type": "IDENTIFIER",
-            "value": {
-              "name": "a"
-            }
-          },
+          "type": "IDENTIFIER",
+          "name": "a",
           "span": {
             "start": 4,
             "end": 5
           }
         },
+        "type_annotation": null,
         "expr": {
           "type": "Integer",
           "raw": 3,

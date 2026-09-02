@@ -1,0 +1,44 @@
+{
+  "name": "@gengjiawen/monkey-typechecker",
+  "version": "1.2.0",
+  "description": "A gradual type checker for the Monkey programming language",
+  "main": "dist/node.js",
+  "browser": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && esbuild src/index.ts --bundle --format=esm --platform=browser --target=es2020 --external:@gengjiawen/monkey-wasm --outfile=dist/index.mjs",
+    "test": "vitest run",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "monkey",
+    "typechecker",
+    "types",
+    "diagnostics"
+  ],
+  "author": "gengjiawen <technicalcute@gmail.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gengjiawen/monkey-rust"
+  },
+  "dependencies": {
+    "@gengjiawen/monkey-wasm": "^1.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.10"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

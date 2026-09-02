@@ -202,8 +202,13 @@ function analyzeMethod(
   const scope: Scope = { parent, names: new Map() }
   define(scope, createBinding(analysis, 'this', 'this', true))
   for (const parameter of method.params) {
-    const binding = createBinding(analysis, parameter.name, 'parameter', false)
-    binding.identifiers.push(parameter)
+    const binding = createBinding(
+      analysis,
+      parameter.identifier.name,
+      'parameter',
+      false
+    )
+    binding.identifiers.push(parameter.identifier)
     define(scope, binding)
   }
   analyzeStatements(method.body.body, scope, analysis, {
@@ -228,8 +233,13 @@ function analyzeFunction(
     define(scope, binding)
   }
   for (const parameter of declaration.params) {
-    const binding = createBinding(analysis, parameter.name, 'parameter', false)
-    binding.identifiers.push(parameter)
+    const binding = createBinding(
+      analysis,
+      parameter.identifier.name,
+      'parameter',
+      false
+    )
+    binding.identifiers.push(parameter.identifier)
     define(scope, binding)
   }
   // A body's own top-level `let`s run on every call, so conditionality does

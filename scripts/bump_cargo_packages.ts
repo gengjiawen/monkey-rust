@@ -109,6 +109,13 @@ try {
       '@gengjiawen/monkey-lint',
       `workspace:^${nextVersion}`
     ) || playgroundChanged
+  playgroundChanged =
+    syncDependencyRange(
+      playground,
+      'playground',
+      '@gengjiawen/monkey-typechecker',
+      `workspace:^${nextVersion}`
+    ) || playgroundChanged
 
   if (playgroundChanged) {
     writePackageJson(playgroundPkgPath, playground)
@@ -198,6 +205,35 @@ try {
   }
 } catch (e) {
   console.warn('Failed to update monkey-lint dependency:', e)
+}
+
+// Also keep monkey-typechecker package version and its dependencies in sync,
+// using a registry-compatible range for the same publish reason as the linter.
+try {
+  const typecheckerPkgPath = repoPath(
+    'packages',
+    'monkey-typechecker',
+    'package.json'
+  )
+  const typechecker = readPackageJson(typecheckerPkgPath)
+  let typecheckerChanged = false
+
+  typecheckerChanged =
+    syncPackageVersion(typechecker, 'monkey-typechecker', nextVersion) ||
+    typecheckerChanged
+  typecheckerChanged =
+    syncDependencyRange(
+      typechecker,
+      'monkey-typechecker',
+      '@gengjiawen/monkey-wasm',
+      `^${nextVersion}`
+    ) || typecheckerChanged
+
+  if (typecheckerChanged) {
+    writePackageJson(typecheckerPkgPath, typechecker)
+  }
+} catch (e) {
+  console.warn('Failed to update monkey-typechecker dependency:', e)
 }
 
 // Also keep vscode-extension package version in sync

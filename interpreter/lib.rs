@@ -65,12 +65,7 @@ fn eval_statement(statement: &Statement, env: &Env) -> Result<Rc<Object>, EvalEr
         }) => {
             let val = eval_expression(expr, &Rc::clone(env))?;
             let obj: Rc<Object> = Rc::clone(&val);
-            if let TokenKind::IDENTIFIER {
-                name,
-            } = &id.kind
-            {
-                env.borrow_mut().set(name.clone(), obj);
-            }
+            env.borrow_mut().set(id.name.clone(), obj);
             return Ok(Rc::new(Object::Null));
         }
         Statement::Class(class) => eval_class_declaration(class, env),
@@ -88,11 +83,15 @@ fn eval_class_declaration(
     declaration: &ClassDeclaration,
     env: &Env,
 ) -> Result<Rc<Object>, EvalError> {
+    let declaration_env = Rc::new(RefCell::new(env.borrow().snapshot()));
     let mut constructor = None;
     let mut methods = HashMap::new();
     for method in &declaration.methods {
-        let function =
-            Rc::new(Object::Function(method.params.clone(), method.body.clone(), Rc::clone(env)));
+        let function = Rc::new(Object::Function(
+            method.params.clone(),
+            method.body.clone(),
+            Rc::clone(&declaration_env),
+        ));
         match method.kind {
             MethodKind::Constructor => constructor = Some(function),
             MethodKind::Method => {
@@ -106,8 +105,11 @@ fn eval_class_declaration(
         constructor,
         methods,
     }));
-    env.borrow_mut()
-        .set(declaration.name.name.clone(), Rc::new(Object::Class(class)));
+    let class = Rc::new(Object::Class(class));
+    declaration_env
+        .borrow_mut()
+        .set(declaration.name.name.clone(), Rc::clone(&class));
+    env.borrow_mut().set(declaration.name.name.clone(), class);
     Ok(Rc::new(Object::Null))
 }
 
@@ -163,9 +165,21 @@ fn eval_expression(expression: &Expression, env: &Env) -> Result<Rc<Object>, Eva
         Expression::FUNCTION(FunctionDeclaration {
             params,
             body,
+            name,
             ..
         }) => {
-            return Ok(Rc::new(Object::Function(params.clone(), body.clone(), Rc::clone(env))));
+            let declaration_env = Rc::new(RefCell::new(env.borrow().snapshot()));
+            let function = Rc::new(Object::Function(
+                params.clone(),
+                body.clone(),
+                Rc::clone(&declaration_env),
+            ));
+            if !name.is_empty() {
+                declaration_env
+                    .borrow_mut()
+                    .set(name.clone(), Rc::clone(&function));
+            }
+            return Ok(function);
         }
         Expression::FunctionCall(FunctionCall {
             callee,
@@ -294,7 +308,7 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Result<Rc<Objec
             let mut env = Environment::new_enclosed_environment(env);
 
             params.iter().enumerate().for_each(|(i, param)| {
-                env.set(param.name.clone(), args[i].clone());
+                env.set(param.identifier.name.clone(), args[i].clone());
             });
 
             let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(env)))?;
@@ -341,7 +355,7 @@ fn apply_method(
     let mut call_env = Environment::new_enclosed_environment(declaration_env);
     call_env.set("this".to_string(), Rc::new(Object::Instance(Rc::clone(receiver))));
     for (parameter, argument) in params.iter().zip(args) {
-        call_env.set(parameter.name.clone(), Rc::clone(argument));
+        call_env.set(parameter.identifier.name.clone(), Rc::clone(argument));
     }
     let evaluated = eval_block_statements(&body.body, &Rc::new(RefCell::new(call_env)))?;
     unwrap_return(evaluated)

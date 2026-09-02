@@ -1,0 +1,148 @@
+---
+source: parser/ast_tree_test.rs
+expression: "let a: {string: [int]} = 1; let b: fn(fn(int): int, int): [string] = 2;"
+---
+{
+  "Program": {
+    "type": "Program",
+    "body": [
+      {
+        "type": "Let",
+        "identifier": {
+          "type": "IDENTIFIER",
+          "name": "a",
+          "span": {
+            "start": 4,
+            "end": 5
+          }
+        },
+        "type_annotation": {
+          "type": "HashType",
+          "key": {
+            "type": "NamedType",
+            "name": "string",
+            "span": {
+              "start": 8,
+              "end": 14
+            }
+          },
+          "value": {
+            "type": "ArrayType",
+            "element": {
+              "type": "NamedType",
+              "name": "int",
+              "span": {
+                "start": 17,
+                "end": 20
+              }
+            },
+            "span": {
+              "start": 16,
+              "end": 21
+            }
+          },
+          "span": {
+            "start": 7,
+            "end": 22
+          }
+        },
+        "expr": {
+          "type": "Integer",
+          "raw": 1,
+          "span": {
+            "start": 25,
+            "end": 26
+          }
+        },
+        "span": {
+          "start": 0,
+          "end": 27
+        }
+      },
+      {
+        "type": "Let",
+        "identifier": {
+          "type": "IDENTIFIER",
+          "name": "b",
+          "span": {
+            "start": 32,
+            "end": 33
+          }
+        },
+        "type_annotation": {
+          "type": "FunctionType",
+          "params": [
+            {
+              "type": "FunctionType",
+              "params": [
+                {
+                  "type": "NamedType",
+                  "name": "int",
+                  "span": {
+                    "start": 41,
+                    "end": 44
+                  }
+                }
+              ],
+              "return_type": {
+                "type": "NamedType",
+                "name": "int",
+                "span": {
+                  "start": 47,
+                  "end": 50
+                }
+              },
+              "span": {
+                "start": 38,
+                "end": 50
+              }
+            },
+            {
+              "type": "NamedType",
+              "name": "int",
+              "span": {
+                "start": 52,
+                "end": 55
+              }
+            }
+          ],
+          "return_type": {
+            "type": "ArrayType",
+            "element": {
+              "type": "NamedType",
+              "name": "string",
+              "span": {
+                "start": 59,
+                "end": 65
+              }
+            },
+            "span": {
+              "start": 58,
+              "end": 66
+            }
+          },
+          "span": {
+            "start": 35,
+            "end": 66
+          }
+        },
+        "expr": {
+          "type": "Integer",
+          "raw": 2,
+          "span": {
+            "start": 69,
+            "end": 70
+          }
+        },
+        "span": {
+          "start": 28,
+          "end": 71
+        }
+      }
+    ],
+    "span": {
+      "start": 0,
+      "end": 71
+    }
+  }
+}

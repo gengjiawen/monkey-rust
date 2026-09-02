@@ -174,6 +174,33 @@ mod tests {
     }
 
     #[test]
+    fn test_annotated_function_object() {
+        // The tree-walking interpreter keeps the parameter list it was built
+        // from, so printing a function shows its annotations. This is the one
+        // declared exception to type erasure: see docs/type-system-design.md
+        // section 6.1.
+        let test_case = [
+            ("fn(x: int): int { x + 2; };", "fn(x: int) { (x + 2) }"),
+            ("fn(x: [int]?, y): bool { x; };", "fn(x: [int]?, y) { x }"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_annotations_do_not_change_results() {
+        let test_case = [
+            ("let add = fn(x: int, y: int): int { x + y; }; add(5, 5);", "10"),
+            ("let xs: [int] = [1, 2, 3]; xs[1]", "2"),
+            ("let m: {string: int} = {\"a\": 1}; m[\"a\"]", "1"),
+            (
+                "let apply = fn(f: fn(int): int, v: int): int { f(v) }; apply(fn(n: int): int { n * 2 }, 4)",
+                "8",
+            ),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
     fn test_function_application() {
         let test_case = [
             ("let identity = fn(x) { x; }; identity(5);", "5"),
@@ -182,6 +209,35 @@ mod tests {
             ("let add = fn(x, y) { x + y; }; add(5, 5);", "10"),
             ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", "20"),
             ("fn(x) { x; }(5)", "5"),
+        ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_closures_capture_binding_identity() {
+        let test_case = [
+            (
+                r#"let captured: int = 1;
+let read: fn(): int = fn(): int { captured + 1; };
+let captured: string = "later";
+read();"#,
+                "2",
+            ),
+            (
+                r#"let outer_value = 1;
+let make_reader = fn() { fn() { outer_value; }; };
+let nested_reader = make_reader();
+let outer_value = 2;
+nested_reader();"#,
+                "1",
+            ),
+            (
+                r#"let factorial = fn(n) {
+  if (n == 0) { 1 } else { n * factorial(n - 1) }
+};
+factorial(5);"#,
+                "120",
+            ),
         ];
         apply_test(&test_case);
     }
@@ -375,6 +431,21 @@ trace.order;"#,
                 "1234",
             ),
         ];
+        apply_test(&test_case);
+    }
+
+    #[test]
+    fn test_class_methods_capture_the_declared_class_binding() {
+        let test_case = [(
+            r#"class CapturedClass {
+  make() { new CapturedClass(); }
+  value() { 1; }
+}
+let old_instance = new CapturedClass();
+class CapturedClass { value() { 2; } }
+old_instance.make().value();"#,
+            "1",
+        )];
         apply_test(&test_case);
     }
 

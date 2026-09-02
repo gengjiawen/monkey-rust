@@ -10,14 +10,23 @@ expression: "fn(x) { x };"
         "type": "FunctionDeclaration",
         "params": [
           {
-            "type": "IDENTIFIER",
-            "name": "x",
+            "type": "Param",
+            "identifier": {
+              "type": "IDENTIFIER",
+              "name": "x",
+              "span": {
+                "start": 3,
+                "end": 4
+              }
+            },
+            "type_annotation": null,
             "span": {
               "start": 3,
               "end": 4
             }
           }
         ],
+        "return_type": null,
         "body": {
           "type": "BlockStatement",
           "body": [

@@ -1,6 +1,6 @@
 use core::fmt;
 use core::fmt::Result;
-use lexer::token::{Span, Token, TokenKind};
+use lexer::token::{Span, Token};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 
@@ -77,7 +77,9 @@ pub struct ClassDeclaration {
 pub struct MethodDefinition {
     pub kind: MethodKind,
     pub name: IDENTIFIER,
-    pub params: Vec<IDENTIFIER>,
+    pub params: Vec<Param>,
+    /// Always `None` for `MethodKind::Constructor` (parser rejects the annotation).
+    pub return_type: Option<TypeAnnotation>,
     pub body: BlockStatement,
     pub span: Span,
 }
@@ -100,9 +102,147 @@ pub struct SetPropertyStatement {
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
 #[serde(tag = "type")]
 pub struct Let {
-    pub identifier: Token, // rust can't do precise type with enum
+    pub identifier: IDENTIFIER,
+    pub type_annotation: Option<TypeAnnotation>,
     pub expr: Expression,
     pub span: Span,
+}
+
+/// A function or method parameter: name plus its optional type annotation.
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type")]
+pub struct Param {
+    pub identifier: IDENTIFIER,
+    pub type_annotation: Option<TypeAnnotation>,
+    pub span: Span,
+}
+
+impl fmt::Display for Param {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match &self.type_annotation {
+            Some(annotation) => write!(f, "{}: {}", self.identifier, annotation),
+            None => write!(f, "{}", self.identifier),
+        }
+    }
+}
+
+/// Type annotations are parsed and carried through the AST, but every execution
+/// backend erases them: see docs/type-system-design.md section 6.
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(untagged)]
+pub enum TypeAnnotation {
+    Named(NamedType),
+    Array(ArrayType),
+    Hash(HashType),
+    Function(FunctionType),
+    Optional(OptionalType),
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type", rename = "NamedType")]
+pub struct NamedType {
+    /// `int` | `bool` | `string` | `any` | `null` | a class name
+    pub name: String,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type", rename = "ArrayType")]
+pub struct ArrayType {
+    pub element: Box<TypeAnnotation>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type", rename = "HashType")]
+pub struct HashType {
+    pub key: Box<TypeAnnotation>,
+    pub value: Box<TypeAnnotation>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type", rename = "FunctionType")]
+pub struct FunctionType {
+    pub params: Vec<TypeAnnotation>,
+    pub return_type: Box<TypeAnnotation>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
+#[serde(tag = "type", rename = "OptionalType")]
+pub struct OptionalType {
+    pub inner: Box<TypeAnnotation>,
+    pub span: Span,
+}
+
+impl TypeAnnotation {
+    pub fn span(&self) -> &Span {
+        match self {
+            TypeAnnotation::Named(annotation) => &annotation.span,
+            TypeAnnotation::Array(annotation) => &annotation.span,
+            TypeAnnotation::Hash(annotation) => &annotation.span,
+            TypeAnnotation::Function(annotation) => &annotation.span,
+            TypeAnnotation::Optional(annotation) => &annotation.span,
+        }
+    }
+}
+
+impl fmt::Display for TypeAnnotation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            TypeAnnotation::Named(NamedType {
+                name,
+                ..
+            }) => write!(f, "{}", name),
+            TypeAnnotation::Array(ArrayType {
+                element,
+                ..
+            }) => write!(f, "[{}]", element),
+            TypeAnnotation::Hash(HashType {
+                key,
+                value,
+                ..
+            }) => write!(f, "{{{}: {}}}", key, value),
+            TypeAnnotation::Function(FunctionType {
+                params,
+                return_type,
+                ..
+            }) => {
+                let params = params
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "fn({}): {}", params, return_type)
+            }
+            TypeAnnotation::Optional(OptionalType {
+                inner,
+                ..
+            }) => match **inner {
+                // `fn(int): int?` would parse the `?` as part of the return
+                // type, so a nullable function type needs its grouping back.
+                TypeAnnotation::Function(_) => write!(f, "({})?", inner),
+                _ => write!(f, "{}?", inner),
+            },
+        }
+    }
+}
+
+/// Renders `: T` for an optional annotation, or nothing when absent.
+fn format_type_annotation(annotation: &Option<TypeAnnotation>) -> String {
+    match annotation {
+        Some(annotation) => format!(": {}", annotation),
+        None => String::new(),
+    }
+}
+
+fn format_params(params: &[Param]) -> String {
+    return params
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<String>>()
+        .join(", ");
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize, Hash, PartialEq)]
@@ -123,16 +263,11 @@ impl fmt::Display for Statement {
         match self {
             Statement::Let(Let {
                 identifier: id,
+                type_annotation,
                 expr,
                 ..
             }) => {
-                if let TokenKind::IDENTIFIER {
-                    name,
-                } = &id.kind
-                {
-                    return write!(f, "let {} = {};", name, expr);
-                }
-                panic!("unreachable")
+                write!(f, "let {}{} = {};", id.name, format_type_annotation(type_annotation), expr)
             }
             Statement::Return(ReturnStatement {
                 argument,
@@ -160,13 +295,14 @@ impl fmt::Display for Statement {
 
 impl fmt::Display for MethodDefinition {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let params = self
-            .params
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(", ");
-        write!(f, "{}({}) {{{}}}", self.name, params, self.body)
+        write!(
+            f,
+            "{}({}){} {{{}}}",
+            self.name,
+            format_params(&self.params),
+            format_type_annotation(&self.return_type),
+            self.body
+        )
     }
 }
 
@@ -263,7 +399,8 @@ pub struct IF {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
 #[serde(tag = "type")]
 pub struct FunctionDeclaration {
-    pub params: Vec<IDENTIFIER>,
+    pub params: Vec<Param>,
+    pub return_type: Option<TypeAnnotation>,
     pub body: BlockStatement,
     pub span: Span,
     pub name: String,
@@ -324,15 +461,18 @@ impl fmt::Display for Expression {
             Expression::FUNCTION(FunctionDeclaration {
                 name,
                 params,
+                return_type,
                 body,
                 ..
             }) => {
-                let func_params = params
-                    .iter()
-                    .map(|stmt| stmt.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                write!(f, "fn {}({}) {{ {} }}", name, func_params, body)
+                write!(
+                    f,
+                    "fn {}({}){} {{ {} }}",
+                    name,
+                    format_params(params),
+                    format_type_annotation(return_type),
+                    body
+                )
             }
             Expression::FunctionCall(FunctionCall {
                 callee,

@@ -1,9 +1,11 @@
-// Type definitions for Monkey AST nodes
+// The AST node definitions ship inside `@gengjiawen/monkey-wasm` itself:
+// wasm/src/ast_types.d.ts is appended to the generated declarations. The
+// plugin adds the two things only a formatter needs: comments, which the
+// parser recovers separately, and the narrower token kinds the printer
+// switches on.
+export type * from '@gengjiawen/monkey-wasm'
 
-export interface Span {
-  start: number
-  end: number
-}
+import type { Span } from '@gengjiawen/monkey-wasm'
 
 export interface MonkeyComment {
   type: 'CommentLine' | 'CommentBlock'
@@ -16,12 +18,8 @@ export interface MonkeyComment {
   printed?: boolean
 }
 
-export interface Token {
-  kind: TokenKind
-  span: Span
-}
-
-// Only define token kinds that are actually used in printer
+// The printer switches on these; the trailing `{ type: string }` keeps every
+// other token kind assignable.
 export type TokenKind =
   | { type: 'PLUS' }
   | { type: 'MINUS' }
@@ -34,9 +32,14 @@ export type TokenKind =
   | { type: 'NotEq' }
   | { type: 'ASSIGN' }
   | { type: 'IDENTIFIER'; value: { name: string } }
-  | { type: string } // Allow other token types
+  | { type: string }
 
-// Base interface for all AST nodes
+export interface Token {
+  kind: TokenKind
+  span: Span
+}
+
+/** Every node the printer visits may carry attached comments. */
 export interface ASTNode {
   type: string
   span?: Span
@@ -48,139 +51,3 @@ export interface Program extends ASTNode {
   body: ASTNode[]
   comments?: MonkeyComment[]
 }
-
-export interface LetStatement extends ASTNode {
-  type: 'Let'
-  identifier: Token
-  expr: ASTNode
-}
-
-export interface ReturnStatement extends ASTNode {
-  type: 'ReturnStatement'
-  argument: ASTNode
-}
-
-export interface BlockStatement extends ASTNode {
-  type: 'BlockStatement'
-  body: ASTNode[]
-}
-
-export type MethodKind = 'Constructor' | 'Method'
-
-export interface ClassDeclaration extends ASTNode {
-  type: 'ClassDeclaration'
-  name: Identifier
-  methods: MethodDefinition[]
-}
-
-export interface MethodDefinition extends ASTNode {
-  type: 'MethodDefinition'
-  kind: MethodKind
-  name: Identifier
-  params: Identifier[]
-  body: BlockStatement
-}
-
-export interface SetPropertyStatement extends ASTNode {
-  type: 'SetPropertyStatement'
-  object: ASTNode
-  property: Identifier
-  value: ASTNode
-}
-
-export interface DebuggerStatement extends ASTNode {
-  type: 'DebuggerStatement'
-}
-
-export interface Identifier extends ASTNode {
-  type: 'IDENTIFIER'
-  name: string
-}
-
-export interface UnaryExpression extends ASTNode {
-  type: 'UnaryExpression'
-  op: Token
-  operand: ASTNode
-}
-
-export interface BinaryExpression extends ASTNode {
-  type: 'BinaryExpression'
-  op: Token
-  left: ASTNode
-  right: ASTNode
-}
-
-export interface IfExpression extends ASTNode {
-  type: 'IF'
-  condition: ASTNode
-  consequent: BlockStatement
-  alternate?: BlockStatement
-}
-
-export interface FunctionDeclaration extends ASTNode {
-  type: 'FunctionDeclaration'
-  params: Identifier[]
-  body: BlockStatement
-  name?: string
-}
-
-export interface FunctionCall extends ASTNode {
-  type: 'FunctionCall'
-  callee: ASTNode
-  arguments: ASTNode[]
-}
-
-export interface IndexExpression extends ASTNode {
-  type: 'Index'
-  object: ASTNode
-  index: ASTNode
-}
-
-export interface ThisExpression extends ASTNode {
-  type: 'ThisExpression'
-}
-
-export interface PropertyExpression extends ASTNode {
-  type: 'PropertyExpression'
-  object: ASTNode
-  property: Identifier
-}
-
-export interface NewExpression extends ASTNode {
-  type: 'NewExpression'
-  callee: Identifier
-  arguments: ASTNode[]
-}
-
-// Literals
-export interface IntegerLiteral extends ASTNode {
-  type: 'Integer'
-  raw: number
-}
-
-export interface BooleanLiteral extends ASTNode {
-  type: 'Boolean'
-  raw: boolean
-}
-
-export interface StringLiteral extends ASTNode {
-  type: 'String'
-  raw: string
-}
-
-export interface ArrayLiteral extends ASTNode {
-  type: 'Array'
-  elements: ASTNode[]
-}
-
-export interface HashLiteral extends ASTNode {
-  type: 'Hash'
-  elements: [ASTNode, ASTNode][]
-}
-
-export type Literal =
-  | IntegerLiteral
-  | BooleanLiteral
-  | StringLiteral
-  | ArrayLiteral
-  | HashLiteral

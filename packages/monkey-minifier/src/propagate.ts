@@ -60,7 +60,7 @@ export function propagateConstants(program: Program): boolean {
 function literalWidth(expression: Expression): number | null {
   switch (expression.type) {
     case 'Integer':
-      return expression.raw.length
+      return String(expression.raw).length
     case 'Boolean':
       return expression.raw ? 4 : 5
     case 'String':
@@ -69,7 +69,7 @@ function literalWidth(expression: Expression): number | null {
       // Folding renders a negative integer as MINUS over a positive literal.
       return tokenType(expression.op) === 'MINUS' &&
         expression.operand.type === 'Integer'
-        ? expression.operand.raw.length + 1
+        ? String(expression.operand.raw).length + 1
         : null
     default:
       return null

@@ -5,6 +5,7 @@ import type {
   Identifier,
   LetStatement,
   MethodDefinition,
+  Param,
   Program,
   Span,
   Statement,
@@ -199,13 +200,19 @@ function analyzeFunction(
 }
 
 function defineParameter(
-  parameter: Identifier,
+  parameter: Param,
   scope: Scope,
   analysis: ScopeAnalysis
 ): void {
-  const binding = createBinding(analysis, 'parameter', parameter.name)
-  binding.declaration = parameter
-  binding.nameSpan = parameter.span
+  // The binding is the name only: a `p: int` parameter must report on `p`, not
+  // on the annotation the compiler erases.
+  const binding = createBinding(
+    analysis,
+    'parameter',
+    parameter.identifier.name
+  )
+  binding.declaration = parameter.identifier
+  binding.nameSpan = parameter.identifier.span
   define(scope, binding)
 }
 

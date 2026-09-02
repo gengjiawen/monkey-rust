@@ -106,4 +106,28 @@ mod tests {
         let input = "let my_func = fn(x) { x };";
         test_ast_tree("test_func_with_name", input)
     }
+
+    #[test]
+    fn test_let_with_type() {
+        let input = "let a: int? = 3";
+        test_ast_tree("test_let_with_type", input)
+    }
+
+    #[test]
+    fn test_type_shapes() {
+        let input = "let a: {string: [int]} = 1; let b: fn(fn(int): int, int): [string] = 2;";
+        test_ast_tree("test_type_shapes", input)
+    }
+
+    #[test]
+    fn test_annotated_func_declaration() {
+        let input = "fn(x: int, y: [string]): bool { x };";
+        test_ast_tree("test_annotated_func_declaration", input)
+    }
+
+    #[test]
+    fn test_annotated_class() {
+        let input = "class Point { constructor(x: int) { this.x = x; } norm(): int { 1 } }";
+        test_ast_tree("test_annotated_class", input)
+    }
 }

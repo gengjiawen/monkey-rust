@@ -77,7 +77,10 @@ let f = fn() {
   "bbbbbbbbbbbbbbbbbbbb",
 ];
 `
-    const output = await format(input, { printWidth: 20, trailingComma: 'all' })
+    const output = await format(input, {
+      printWidth: 20,
+      trailingComma: 'all',
+    })
     expect(output).toBe(expected)
   })
 
@@ -248,5 +251,149 @@ class Node {
     const secondFormat = await format(firstFormat)
 
     expect(firstFormat).toBe(secondFormat)
+  })
+
+  // Unlike the minifier, the formatter preserves annotations: it normalizes the
+  // spacing around `:` and leaves the type itself alone.
+  it.each([
+    ['let x:int=5;', 'let x: int = 5;\n'],
+    ['let x  :  int?=5;', 'let x: int? = 5;\n'],
+    ['let x:[int]=5;', 'let x: [int] = 5;\n'],
+    ['let x:{string:[int]}=5;', 'let x: {string: [int]} = 5;\n'],
+    ['let x:fn(int,string):bool=5;', 'let x: fn(int, string): bool = 5;\n'],
+    ['let x:(fn(int):int)?=5;', 'let x: (fn(int): int)? = 5;\n'],
+    ['let x:fn(int):int?=5;', 'let x: fn(int): int? = 5;\n'],
+  ])('formats the annotation in %s', async (input, expected) => {
+    expect(await format(input)).toBe(expected)
+  })
+
+  it('formats parameter and return type annotations', async () => {
+    const input = 'let add=fn(a:int,b:[string]):bool{a};'
+    const expected = `let add = fn(a: int, b: [string]): bool {
+  a
+};
+`
+    expect(await format(input)).toBe(expected)
+  })
+
+  it('formats method return types and leaves constructors bare', async () => {
+    const input = `class Point{constructor(x:int,y:int){this.x=x;}norm():int{1;}}`
+    const expected = `class Point {
+  constructor(x: int, y: int) {
+    this.x = x;
+  }
+
+  norm(): int {
+    1
+  }
+}
+`
+    expect(await format(input)).toBe(expected)
+  })
+
+  it('keeps annotated programs parseable and idempotent', async () => {
+    const input = `let box:{string:fn(int):int?}={"f":fn(n:int):int?{n}};let g:(fn():null)?=fn(a:[int],b):bool{a};`
+    const firstFormat = await format(input)
+    const secondFormat = await format(firstFormat)
+
+    expect(() => parse(firstFormat, {})).not.toThrow()
+    expect(firstFormat).toBe(secondFormat)
+  })
+
+  it.each([
+    [
+      `let xs: [
+  // element
+  int
+] = [1];`,
+      `let xs: [
+  // element
+  int
+] = [1];
+`,
+    ],
+    [
+      `let f = fn(value: [
+  // parameter element
+  int
+]) { value; };`,
+      `let f = fn(
+  value: [
+    // parameter element
+    int
+  ]
+) {
+  value
+};
+`,
+    ],
+    [
+      `let callback: fn(
+  // input type
+  int
+): bool = fn(value) { value; };`,
+      `let callback: fn(
+  // input type
+  int
+): bool = fn(value) {
+  value
+};
+`,
+    ],
+    [
+      `let make = fn():
+  // result type
+  [int] { []; };`,
+      `let make = fn():
+  // result type
+  [int] {
+  []
+};
+`,
+    ],
+    [
+      `let maybe: (fn(
+  // optional input type
+  int
+): bool)? = null;`,
+      `let maybe: (fn(
+  // optional input type
+  int
+): bool)? = null;
+`,
+    ],
+    [
+      `let table: {
+  // key type
+  string:
+  // value type
+  [int]
+} = {};`,
+      `let table: {
+  // key type
+  string:
+    // value type
+    [int]
+} = {};
+`,
+    ],
+  ])('preserves comments inside type annotations', async (input, expected) => {
+    const output = await format(input)
+
+    expect(output).toBe(expected)
+    expect(() => parse(output, {})).not.toThrow()
+    expect(await format(output)).toBe(output)
+  })
+
+  it('wraps long annotated parameter lists', async () => {
+    const input = `let f=fn(firstParameter:int,secondParameter:[string]):bool{firstParameter};`
+    const expected = `let f = fn(
+  firstParameter: int,
+  secondParameter: [string]
+): bool {
+  firstParameter
+};
+`
+    expect(await format(input, { printWidth: 30 })).toBe(expected)
   })
 })

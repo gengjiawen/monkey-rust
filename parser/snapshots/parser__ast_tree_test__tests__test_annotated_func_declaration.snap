@@ -1,0 +1,103 @@
+---
+source: parser/ast_tree_test.rs
+expression: "fn(x: int, y: [string]): bool { x };"
+---
+{
+  "Program": {
+    "type": "Program",
+    "body": [
+      {
+        "type": "FunctionDeclaration",
+        "params": [
+          {
+            "type": "Param",
+            "identifier": {
+              "type": "IDENTIFIER",
+              "name": "x",
+              "span": {
+                "start": 3,
+                "end": 4
+              }
+            },
+            "type_annotation": {
+              "type": "NamedType",
+              "name": "int",
+              "span": {
+                "start": 6,
+                "end": 9
+              }
+            },
+            "span": {
+              "start": 3,
+              "end": 9
+            }
+          },
+          {
+            "type": "Param",
+            "identifier": {
+              "type": "IDENTIFIER",
+              "name": "y",
+              "span": {
+                "start": 11,
+                "end": 12
+              }
+            },
+            "type_annotation": {
+              "type": "ArrayType",
+              "element": {
+                "type": "NamedType",
+                "name": "string",
+                "span": {
+                  "start": 15,
+                  "end": 21
+                }
+              },
+              "span": {
+                "start": 14,
+                "end": 22
+              }
+            },
+            "span": {
+              "start": 11,
+              "end": 22
+            }
+          }
+        ],
+        "return_type": {
+          "type": "NamedType",
+          "name": "bool",
+          "span": {
+            "start": 25,
+            "end": 29
+          }
+        },
+        "body": {
+          "type": "BlockStatement",
+          "body": [
+            {
+              "type": "IDENTIFIER",
+              "name": "x",
+              "span": {
+                "start": 32,
+                "end": 33
+              }
+            }
+          ],
+          "span": {
+            "start": 30,
+            "end": 35
+          }
+        },
+        "span": {
+          "start": 0,
+          "end": 35
+        },
+        "name": ""
+      }
+    ],
+    "span": {
+      "start": 0,
+      "end": 36
+    }
+  }
+}

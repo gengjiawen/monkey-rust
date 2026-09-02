@@ -19,6 +19,7 @@
     "@codemirror/view": "^6.43.1",
     "@gengjiawen/monkey-lint": "workspace:^1.2.0",
     "@gengjiawen/monkey-minifier": "workspace:^1.2.0",
+    "@gengjiawen/monkey-typechecker": "workspace:^1.2.0",
     "@gengjiawen/monkey-wasm": "workspace:^1.2.0",
     "@lezer/highlight": "^1.2.1",
     "@radix-ui/themes": "^3.3.0",

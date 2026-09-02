@@ -178,3 +178,50 @@ fn builtins_do_not_occupy_global_slots() {
     // And `puts` is a tagged immediate, not a load from g_globals.
     assert!(text.contains("movz x0, #0xd"));
 }
+
+#[test]
+fn type_annotations_lower_to_identical_assembly() {
+    // The native backend erases annotations too (design §6): every emitted
+    // instruction has to match the unannotated program's. Only the trailing
+    // `//` comments differ, because those echo the source line verbatim — the
+    // same carve-out the bytecode backends make for debug info.
+    let pairs = [
+        (
+            "let add = fn(a: int, b: int): int { a + b }; add(1, 2);",
+            "let add = fn(a, b) { a + b }; add(1, 2);",
+        ),
+        (
+            "class C { constructor(x: int) { this.x = x; } get(): int { this.x } } new C(1).get();",
+            "class C { constructor(x) { this.x = x; } get() { this.x } } new C(1).get();",
+        ),
+        ("let xs: [int] = [1, 2]; xs[0];", "let xs = [1, 2]; xs[0];"),
+    ];
+
+    for (annotated, erased) in pairs {
+        assert_eq!(
+            strip_comments(&assembly(annotated)),
+            strip_comments(&assembly(erased)),
+            "assembly differs for {}",
+            annotated
+        );
+        assert_eq!(
+            strip_comments(&macho_assembly(annotated)),
+            strip_comments(&macho_assembly(erased)),
+            "Mach-O assembly differs for {}",
+            annotated
+        );
+    }
+
+    // And the comments are exactly where the difference shows up.
+    assert!(assembly("let x: int = 1;").contains("// let x: int = 1;"));
+}
+
+/// Drops trailing `//` comments and the blank lines they leave behind.
+fn strip_comments(text: &str) -> String {
+    return text
+        .lines()
+        .map(|line| line.split("//").next().unwrap_or("").trim_end())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+}

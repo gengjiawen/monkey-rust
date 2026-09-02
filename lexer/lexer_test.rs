@@ -218,4 +218,53 @@ if (5 < 10) {
             }
         );
     }
+
+    #[test]
+    fn lexes_type_annotation_tokens() {
+        let input = "let x: int? = 5;";
+        let mut lexer = Lexer::new(input);
+        let expected = [
+            TokenKind::LET,
+            TokenKind::IDENTIFIER {
+                name: "x".to_string(),
+            },
+            TokenKind::COLON,
+            TokenKind::IDENTIFIER {
+                name: "int".to_string(),
+            },
+            TokenKind::QUESTION,
+            TokenKind::ASSIGN,
+            TokenKind::INT(5),
+            TokenKind::SEMICOLON,
+            TokenKind::EOF,
+        ];
+
+        for kind in expected {
+            assert_eq!(lexer.next_token().kind, kind);
+        }
+    }
+
+    #[test]
+    fn type_names_are_lexed_as_identifiers() {
+        // The type names are soft keywords: only a type position gives them
+        // meaning, so the lexer must keep emitting plain identifiers.
+        let mut lexer = Lexer::new("int bool string any null");
+        for expected in ["int", "bool", "string", "any", "null"] {
+            assert_eq!(
+                lexer.next_token().kind,
+                TokenKind::IDENTIFIER {
+                    name: expected.to_string(),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn question_mark_span_is_one_byte() {
+        let input = "?";
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::QUESTION);
+        assert_eq!(&input[token.span.start..token.span.end], "?");
+    }
 }

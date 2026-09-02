@@ -1,0 +1,155 @@
+---
+source: parser/ast_tree_test.rs
+expression: "class Point { constructor(x: int) { this.x = x; } norm(): int { 1 } }"
+---
+{
+  "Program": {
+    "type": "Program",
+    "body": [
+      {
+        "type": "ClassDeclaration",
+        "name": {
+          "type": "IDENTIFIER",
+          "name": "Point",
+          "span": {
+            "start": 6,
+            "end": 11
+          }
+        },
+        "methods": [
+          {
+            "type": "MethodDefinition",
+            "kind": "Constructor",
+            "name": {
+              "type": "IDENTIFIER",
+              "name": "constructor",
+              "span": {
+                "start": 14,
+                "end": 25
+              }
+            },
+            "params": [
+              {
+                "type": "Param",
+                "identifier": {
+                  "type": "IDENTIFIER",
+                  "name": "x",
+                  "span": {
+                    "start": 26,
+                    "end": 27
+                  }
+                },
+                "type_annotation": {
+                  "type": "NamedType",
+                  "name": "int",
+                  "span": {
+                    "start": 29,
+                    "end": 32
+                  }
+                },
+                "span": {
+                  "start": 26,
+                  "end": 32
+                }
+              }
+            ],
+            "return_type": null,
+            "body": {
+              "type": "BlockStatement",
+              "body": [
+                {
+                  "type": "SetPropertyStatement",
+                  "object": {
+                    "type": "ThisExpression",
+                    "span": {
+                      "start": 36,
+                      "end": 40
+                    }
+                  },
+                  "property": {
+                    "type": "IDENTIFIER",
+                    "name": "x",
+                    "span": {
+                      "start": 41,
+                      "end": 42
+                    }
+                  },
+                  "value": {
+                    "type": "IDENTIFIER",
+                    "name": "x",
+                    "span": {
+                      "start": 45,
+                      "end": 46
+                    }
+                  },
+                  "span": {
+                    "start": 36,
+                    "end": 47
+                  }
+                }
+              ],
+              "span": {
+                "start": 34,
+                "end": 49
+              }
+            },
+            "span": {
+              "start": 14,
+              "end": 49
+            }
+          },
+          {
+            "type": "MethodDefinition",
+            "kind": "Method",
+            "name": {
+              "type": "IDENTIFIER",
+              "name": "norm",
+              "span": {
+                "start": 50,
+                "end": 54
+              }
+            },
+            "params": [],
+            "return_type": {
+              "type": "NamedType",
+              "name": "int",
+              "span": {
+                "start": 58,
+                "end": 61
+              }
+            },
+            "body": {
+              "type": "BlockStatement",
+              "body": [
+                {
+                  "type": "Integer",
+                  "raw": 1,
+                  "span": {
+                    "start": 64,
+                    "end": 65
+                  }
+                }
+              ],
+              "span": {
+                "start": 62,
+                "end": 67
+              }
+            },
+            "span": {
+              "start": 50,
+              "end": 67
+            }
+          }
+        ],
+        "span": {
+          "start": 0,
+          "end": 69
+        }
+      }
+    ],
+    "span": {
+      "start": 0,
+      "end": 69
+    }
+  }
+}

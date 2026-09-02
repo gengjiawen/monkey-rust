@@ -234,7 +234,7 @@ impl<'a> Lowerer<'a> {
     }
 
     fn lower_let(&mut self, let_statement: &Let) -> Result<(), LowerError> {
-        let name = let_statement.identifier.kind.to_string();
+        let name = let_statement.identifier.name.clone();
         let comment = self.snippet(&let_statement.span);
         self.emitter.comment(&comment);
         // The right-hand side sees the previous binding, if any. Named
@@ -644,8 +644,8 @@ impl<'a> Lowerer<'a> {
         }
         let mut parameter_names = Vec::with_capacity(function.params.len());
         for parameter in &function.params {
-            self.symbols.define(parameter.name.clone());
-            parameter_names.push(parameter.name.clone());
+            self.symbols.define(parameter.identifier.name.clone());
+            parameter_names.push(parameter.identifier.name.clone());
         }
 
         let label = self.emitter.new_function_label();
@@ -694,8 +694,8 @@ impl<'a> Lowerer<'a> {
         self.symbols.define("this".to_string());
         let mut parameter_names = vec!["this".to_string()];
         for parameter in &method.params {
-            self.symbols.define(parameter.name.clone());
-            parameter_names.push(parameter.name.clone());
+            self.symbols.define(parameter.identifier.name.clone());
+            parameter_names.push(parameter.identifier.name.clone());
         }
 
         let label = self.emitter.new_function_label();

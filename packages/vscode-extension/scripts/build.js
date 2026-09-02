@@ -13,7 +13,10 @@ const buildOptions = {
   platform: 'node',
   format: 'cjs',
   target: 'node16',
-  external: ['vscode'],
+  // The type checker's Node entry resolves the .wasm asset itself, but this
+  // extension hands it an already-instantiated `analyze_lossless` and never
+  // takes that path. Leaving the asset external keeps it out of the bundle.
+  external: ['vscode', '@gengjiawen/monkey-wasm/monkey_wasm_bg.wasm'],
   sourcemap: true,
   logLevel: 'info',
 }
