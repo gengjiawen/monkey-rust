@@ -1,6 +1,6 @@
 [package]
 name = "monkey-asm"
-version = "1.2.0"
+version = "2.0.0"
 description = "AOT AArch64 assembly backend for monkeylang (Linux ELF and macOS Mach-O)"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -21,10 +21,10 @@ name = "monkey-asm"
 path = "main.rs"
 
 [dependencies]
-monkey-lexer = { path = "../lexer", version = "1.0.0" }
-monkey-parser = { path = "../parser", version = "1.0.0" }
-monkey-compiler = { path = "../compiler", version = "1.0.0" }
-monkey-object = { path = "../object", version = "1.0.0" }
+monkey-lexer = { path = "../lexer", version = "2.0.0" }
+monkey-parser = { path = "../parser", version = "2.0.0" }
+monkey-compiler = { path = "../compiler", version = "2.0.0" }
+monkey-object = { path = "../object", version = "2.0.0" }
 serde_json = "1.0"
 
 [dev-dependencies]
