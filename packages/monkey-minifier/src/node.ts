@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-
 import {
   minifyWithParser,
   parseProgramWithParser,
@@ -8,45 +6,34 @@ import {
   type ParseLossless,
 } from './core'
 import type { Program } from './types'
+import { loadMonkeyWasm, type MonkeyWasmGlue } from './wasm-node'
 
-interface MonkeyWasmGlue extends WebAssembly.ModuleImports {
-  __wbg_set_wasm(exports: WebAssembly.Exports): void
+interface MonkeyParserGlue extends MonkeyWasmGlue {
   parse_lossless: ParseLossless
 }
 
 function loadNodeParser(): ParseLossless {
-  // wasm-pack's bundler target statically imports `.wasm`, which Node cannot
-  // execute directly. Load the generated glue without its bundler entrypoint
-  // and instantiate the same module through Node's WebAssembly API.
-  // Node 24 can synchronously require this dependency's ESM glue module.
-  const glue =
-    require('@gengjiawen/monkey-wasm/monkey_wasm_bg.js') as MonkeyWasmGlue
-  const wasmPath = require.resolve(
-    '@gengjiawen/monkey-wasm/monkey_wasm_bg.wasm'
-  )
-  const module = new WebAssembly.Module(readFileSync(wasmPath))
-  const instance = new WebAssembly.Instance(module, {
-    './monkey_wasm_bg.js': glue,
-  })
-  glue.__wbg_set_wasm(instance.exports)
-  const start = instance.exports.__wbindgen_start
-  if (typeof start === 'function') {
-    start()
-  }
-  return glue.parse_lossless
+  return (loadMonkeyWasm() as MonkeyParserGlue).parse_lossless
 }
 
-const parseLossless = loadNodeParser()
+let cachedParser: ParseLossless | undefined
 
+/**
+ * Minify Monkey source in Node, instantiating the bundled wasm module directly.
+ * Instantiation happens on the first call and is cached, so merely importing
+ * this module (e.g. for `monkey-minify --help`) never pays the wasm setup cost.
+ */
 export function minify(
   source: string,
   options: MinifyOptions = {}
 ): MinifyResult {
-  return minifyWithParser(parseLossless, source, options)
+  cachedParser ??= loadNodeParser()
+  return minifyWithParser(cachedParser, source, options)
 }
 
 export function parseProgram(source: string): Program {
-  return parseProgramWithParser(parseLossless, source)
+  cachedParser ??= loadNodeParser()
+  return parseProgramWithParser(cachedParser, source)
 }
 
 export { eliminateDeadLets, foldConstants } from './fold'

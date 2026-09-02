@@ -143,6 +143,17 @@ CommonJS `require`），Node 主入口加载生成的 `*_bg.js` glue，再通过
 `WebAssembly.Module`/`WebAssembly.Instance` 同步实例化同一份 Wasm。CLI 复用
 Node 入口，从而保持 `minify()` 同步 API；Node 最低版本是 24。
 
+这里有个跨包的约束：glue 模块在 Node 的模块缓存里只有一份，而它把当前的
+`WebAssembly.Instance` 存在模块级变量里（`wasm`、`cachedUint8ArrayMemory0`
+……）。谁第二次实例化，谁就把这些变量重新绑定到自己的实例上，先来的那个包从此
+读到一段不再属于它的内存，之后每次调用都报
+`The encoded data was not valid for encoding utf-8`。所以 minifier、linter、
+typechecker 共用同一段加载器 `src/wasm-node.ts`：实例按 glue 的解析路径缓存在
+`globalThis[Symbol.for('@gengjiawen/monkey-wasm.node-glue')]` 上，一份 glue 只
+实例化一次。这三份文件刻意保持逐字节相同——它们各自独立发布，除了生成出来的
+`@gengjiawen/monkey-wasm` 之外没有共同模块可以承载这段代码。
+`scripts/analyzers-coexist.cjs` 在一个进程里同时加载三个包，验证这条约束。
+
 ## Phase 1 — Compact printer（v0）
 
 v0 里唯一真正需要动脑的部分。三个设计点：
