@@ -592,6 +592,21 @@ describe('classes', () => {
     ).toEqual(['assign-to-method'])
   })
 
+  it('does not expose the constructor as an instance method', () => {
+    // Every backend rejects `instance.constructor` at runtime; the checker
+    // must not type it as a bound method.
+    const source = `${point} let p = new Point(1, 2); p.constructor(3, 4);`
+    const diagnostic = only(source)
+    expect(diagnostic.message).toBe(
+      "property 'constructor' does not exist on 'Point'"
+    )
+    expect(slice(source, diagnostic)).toBe('constructor')
+    // Writing it declares an ordinary field; it is not an `assign-to-method`.
+    clean(
+      'class Tagged { constructor() { this.constructor = 1; } read(): int { this.constructor } }'
+    )
+  })
+
   it('rejects writing an unknown property', () => {
     expect(codes(`${point} let p = new Point(1, 2); p.z = 1;`)).toEqual([
       'unknown-property',

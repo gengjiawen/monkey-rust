@@ -100,7 +100,13 @@ interface MethodSignature {
 interface ClassInfo {
   id: ClassId
   name: string
+  /**
+   * Instance methods only. The constructor is not a property of the instance
+   * — `new A().constructor` fails at runtime on every backend — so it is kept
+   * apart, where `new` alone can see it.
+   */
   methods: Map<string, MethodSignature>
+  constructorSignature: MethodSignature | undefined
   fields: Map<string, Type>
 }
 
@@ -385,15 +391,21 @@ class Checker {
     // Signatures come from annotations only, and are known for every method
     // before any body is walked — `this.make()` must not depend on the order
     // methods happen to appear in.
-    for (const method of declaration.methods) {
-      info.methods.set(method.name.name, this.methodSignature(method))
-    }
+    const signatures = declaration.methods.map((method) => {
+      const signature = this.methodSignature(method)
+      if (method.kind === 'Constructor') {
+        info.constructorSignature = signature
+      } else {
+        info.methods.set(method.name.name, signature)
+      }
+      return signature
+    })
 
     const previousClass = this.currentClass
     this.currentClass = info
-    for (const method of declaration.methods) {
-      this.checkMethodBody(info, method)
-    }
+    declaration.methods.forEach((method, index) => {
+      this.checkMethodBody(method, signatures[index]!)
+    })
     this.currentClass = previousClass
   }
 
@@ -412,6 +424,7 @@ class Checker {
         id,
         name: declaration.name.name,
         methods: new Map(),
+        constructorSignature: undefined,
         fields: new Map(),
       }
       this.classes.set(id, info)
@@ -436,8 +449,10 @@ class Checker {
     }
   }
 
-  private checkMethodBody(info: ClassInfo, method: MethodDefinition): void {
-    const signature = info.methods.get(method.name.name)!
+  private checkMethodBody(
+    method: MethodDefinition,
+    signature: MethodSignature
+  ): void {
     this.env.push()
     method.params.forEach((param, index) => {
       this.env.define(param.identifier.name, signature.params[index] ?? ANY)
@@ -457,7 +472,7 @@ class Checker {
   }
 
   private constructorParams(info: ClassInfo): Type[] {
-    return info.methods.get('constructor')?.params ?? []
+    return info.constructorSignature?.params ?? []
   }
 
   /**
