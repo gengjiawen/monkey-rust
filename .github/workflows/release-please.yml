@@ -85,11 +85,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
-      # Ahead of the VS Code extension, which bundles the checker into its
-      # diagnostics and so needs the built declarations.
-      - name: Build Monkey typechecker
-        if: ${{ steps.release.outputs.release_created }}
-        run: pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-typechecker run build
       - run: pnpm install --filter prettier-plugin-monkey... && pnpm --filter prettier-plugin-monkey run build
         if: ${{ steps.release.outputs.release_created }}
       - run: npm publish --access public
@@ -111,8 +106,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         if: ${{ steps.release.outputs.release_created }}
-      # Keep this immediately ahead of the extension in release order while
-      # allowing the independent npm packages to publish first.
+      # The extension bundles the checker, so build and publish it together
+      # immediately before packaging the extension.
+      - name: Build Monkey typechecker
+        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-typechecker run build
       - name: Publish Monkey typechecker
         if: ${{ steps.release.outputs.release_created }}
         working-directory: packages/monkey-typechecker
