@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/gengjiawen/monkey-rust/compare/v2.0.1...v2.0.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* keep typechecker build with publish ([#332](https://github.com/gengjiawen/monkey-rust/issues/332)) ([c99be75](https://github.com/gengjiawen/monkey-rust/commit/c99be756e520180900fe35e0f3cbcc302f6ece9e))
+
 ## [2.0.1](https://github.com/gengjiawen/monkey-rust/compare/v2.0.0...v2.0.1) (2026-09-02)
 
 
