@@ -134,8 +134,8 @@ puts(s);
   },
   {
     // Annotations are erased before compilation, so this still runs; press
-    // Types to see what the checker makes of the last four lines.
-    label: 'Types demo',
+    // Type-check to see what the checker makes of the last four lines.
+    label: 'Type-check demo',
     code: `
 let greeting: string = "hello";
 let sizes: [int] = [1, 2, 3];
@@ -729,7 +729,7 @@ function App() {
               Lint
             </Button>
             <Button size="2" onClick={runTypeCheck}>
-              Types
+              Type-check
             </Button>
             <Select.Root
               size="2"

@@ -483,23 +483,25 @@ describe('Lint', () => {
   })
 })
 
-describe('Types', () => {
+describe('Type-check', () => {
   it('type checks the source editor when the toolbar button is pressed', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Types' }))
+    await user.click(screen.getByRole('button', { name: 'Type-check' }))
 
     expect(runTypeCheckMock).toHaveBeenCalledTimes(1)
     expect(runLintMock).not.toHaveBeenCalled()
   })
 
-  it('loads the Types demo snippet from the dropdown', async () => {
+  it('loads the Type-check demo snippet from the dropdown', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await user.click(screen.getByRole('combobox'))
-    await user.click(await screen.findByRole('option', { name: 'Types demo' }))
+    await user.click(
+      await screen.findByRole('option', { name: 'Type-check demo' })
+    )
 
     expect(screen.getByLabelText('Source editor')).toHaveValue(
       'let greeting: string = "hello";\n' +
