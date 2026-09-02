@@ -1,6 +1,6 @@
 [package]
 name = "monkey-interpreter"
-version = "1.2.0"
+version = "2.0.0"
 description = "an interpreter for monkeylang"
 homepage = "https://github.com/gengjiawen/monkey-rust"
 repository = "https://github.com/gengjiawen/monkey-rust"
@@ -19,8 +19,8 @@ name = "monkey-interpreter"
 path = "main.rs"
 
 [dependencies]
-monkey-parser = { path = "../parser", version = "1.0.0" }
-monkey-object = { path = "../object", version = "1.0.0" }
+monkey-parser = { path = "../parser", version = "2.0.0" }
+monkey-object = { path = "../object", version = "2.0.0" }
 
 [lints]
 workspace = true

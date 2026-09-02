@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0](https://github.com/gengjiawen/monkey-rust/compare/v1.2.0...v2.0.0) (2026-09-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* add optional type annotations and a gradual type checker ([#326](https://github.com/gengjiawen/monkey-rust/issues/326))
+
+### Features
+
+* add debugger statement with playground stack/heap inspector ([#306](https://github.com/gengjiawen/monkey-rust/issues/306)) ([16caa10](https://github.com/gengjiawen/monkey-rust/commit/16caa10221c0162af3fb9d480bac0de604b81854))
+* add optional type annotations and a gradual type checker ([#326](https://github.com/gengjiawen/monkey-rust/issues/326)) ([bee2370](https://github.com/gengjiawen/monkey-rust/commit/bee237033f77c3b9918a0195171abb8311491341))
+
+
+### Bug Fixes
+
+* **gc:** replace raw-pointer list helpers with safe reborrows ([#329](https://github.com/gengjiawen/monkey-rust/issues/329)) ([f60f357](https://github.com/gengjiawen/monkey-rust/commit/f60f35710a04cc935af927cf40c5e19979923c74))
+* **interpreter:** return runtime errors for division by zero and integer overflow ([#328](https://github.com/gengjiawen/monkey-rust/issues/328)) ([8ea8996](https://github.com/gengjiawen/monkey-rust/commit/8ea89963c8f80a79fc329b5260f32d0cdd701ab2))
+* **lexer:** stop empty line comments from swallowing the next line ([#327](https://github.com/gengjiawen/monkey-rust/issues/327)) ([743b9ec](https://github.com/gengjiawen/monkey-rust/commit/743b9ecfed87fad417211da3c9b892cae548a179))
+
 ## [1.2.0](https://github.com/gengjiawen/monkey-rust/compare/v1.1.0...v1.2.0) (2026-07-26)
 
 
