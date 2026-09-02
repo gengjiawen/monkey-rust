@@ -30,7 +30,18 @@ impl Parser<'_> {
     }
 
     /// `type ::= postfix_type`. Assumes the current token starts the type.
+    ///
+    /// Shares the expression parser's nesting budget: the type grammar recurses
+    /// on the same native stack, so `[[[…]]]` has to be refused for the same
+    /// reason `(((…)))` is.
     pub(crate) fn parse_type(&mut self) -> Result<TypeAnnotation, ParseError> {
+        self.enter_nesting()?;
+        let result = self.parse_type_inner();
+        self.leave_nesting();
+        return result;
+    }
+
+    fn parse_type_inner(&mut self) -> Result<TypeAnnotation, ParseError> {
         let mut annotation = self.parse_primary_type()?;
 
         // `?` is postfix and binds tightest; `T??` normalizes to `T?`.

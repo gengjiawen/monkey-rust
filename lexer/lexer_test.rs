@@ -74,6 +74,27 @@ mod tests {
     }
 
     #[test]
+    fn integer_literal_out_of_i64_range_is_illegal() {
+        let input = "let big = 9223372036854775808;";
+        let mut lexer = Lexer::new(input);
+        let tokens = test_token_set(&mut lexer);
+        let number = &tokens[3];
+
+        assert_eq!(number.kind, TokenKind::ILLEGAL);
+        assert_eq!(number.span.start, 10);
+        assert_eq!(number.span.end, input.len() - 1);
+        assert_eq!(tokens.last().unwrap().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn largest_i64_literal_still_lexes() {
+        let mut lexer = Lexer::new("9223372036854775807");
+        let token = lexer.next_token();
+
+        assert_eq!(token.kind, TokenKind::INT(i64::MAX));
+    }
+
+    #[test]
     fn test_lexer_array() {
         test_lexer_common("array", "[3]");
     }

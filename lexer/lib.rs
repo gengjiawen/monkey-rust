@@ -124,7 +124,12 @@ impl<'a> Lexer<'a> {
                             start,
                             end,
                         },
-                        kind: TokenKind::INT(num),
+                        kind: match num {
+                            Some(value) => TokenKind::INT(value),
+                            // Out of `i64` range: report the whole literal as a
+                            // single ILLEGAL token instead of panicking.
+                            None => TokenKind::ILLEGAL,
+                        },
                     };
                 } else {
                     TokenKind::ILLEGAL
@@ -186,13 +191,16 @@ impl<'a> Lexer<'a> {
         return (pos, self.position, x);
     }
 
-    fn read_number(&mut self) -> (usize, usize, i64) {
+    /// Reads an integer literal. Returns `None` when the digits do not fit in
+    /// an `i64`, in which case the span still covers the whole literal so the
+    /// caller can emit one ILLEGAL token for it.
+    fn read_number(&mut self) -> (usize, usize, Option<i64>) {
         let pos = self.position;
         while is_digit(self.ch) {
             self.read_char();
         }
 
-        let x = self.input[pos..self.position].parse().unwrap();
+        let x = self.input[pos..self.position].parse().ok();
 
         return (pos, self.position, x);
     }
