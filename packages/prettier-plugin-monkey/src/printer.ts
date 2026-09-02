@@ -36,6 +36,34 @@ import type {
 
 const { group, indent, line, softline, hardline, join, ifBreak } = doc.builders
 
+/**
+ * Statements that print their own terminator. Everything else that shows up in
+ * a `body` is an expression statement — the AST has no wrapper node for one —
+ * and has to end in `;`, or adjacent statements re-associate when the output is
+ * read back: `a` followed by `[0]` parses as `a[0]`, and `puts(a)` followed by
+ * `(a + b) * c` parses as a call.
+ */
+const SELF_TERMINATING_STATEMENTS = new Set([
+  'Let',
+  'ReturnStatement',
+  'SetPropertyStatement',
+  'DebuggerStatement',
+  'ClassDeclaration',
+])
+
+/** True when `path` points at an expression standing in for a statement. */
+function isExpressionStatement(path: AstPath, node: ASTNode): boolean {
+  if (SELF_TERMINATING_STATEMENTS.has(node.type)) {
+    return false
+  }
+
+  const parent = path.getParentNode() as ASTNode | null
+  return (
+    path.key === 'body' &&
+    (parent?.type === 'Program' || parent?.type === 'BlockStatement')
+  )
+}
+
 export function print(
   path: AstPath,
   options: Options,
@@ -47,6 +75,20 @@ export function print(
     return ''
   }
 
+  const printed = printNode(node, path, options, print)
+
+  // The terminator belongs to the node's own doc: Prettier wraps whatever this
+  // returns in the node's comments, and a `;` appended outside that wrapper
+  // would land after a trailing `// comment`.
+  return isExpressionStatement(path, node) ? [printed, ';'] : printed
+}
+
+function printNode(
+  node: any,
+  path: AstPath,
+  options: Options,
+  print: (path: AstPath) => Doc
+): Doc {
   switch (node.type) {
     case 'Program':
       return printProgram(node as Program, path, print, options)
@@ -621,7 +663,8 @@ function printArrayLiteral(
       indent([
         shouldBreak ? hardline : softline,
         join([',', line], elements),
-        options.trailingComma === 'none' ? '' : ifBreak(','),
+        // No `trailingComma` here: `parse_expression_list` wants an element
+        // after every comma, so an array that ends in one no longer parses.
       ]),
       shouldBreak ? hardline : softline,
       ']',

@@ -297,6 +297,18 @@ export function locEnd(node: any): number {
 }
 ```
 
+复用别人的解析器很省事，但它的输出未必是 JavaScript 的坐标系，有两处要当心：
+
+- **数字精度**。`parse` 把 i64 字面量序列化成 JSON number，`JSON.parse` 再把它
+  变成 double，超过 2^53 就被改写了：`9223372036854775807` 打印回来是
+  `9223372036854776000`，换了一个字面量。`@gengjiawen/monkey-wasm` 为此提供了
+  `parse_lossless`，把 `raw` 保留成十进制字符串——格式化器必须用它。
+- **偏移量单位**。Rust 的 span 是 UTF-8 字节偏移，Prettier 却把源码当成
+  JavaScript 字符串（UTF-16 code unit）来索引。只要源码里出现一个多字节字符，
+  两者就开始错位，注释和节点的区间会互相穿插，Prettier 直接报
+  `Comment location overlaps with node location`。解析后把整棵树的 span 换算成
+  code unit 下标，后面所有基于位置的逻辑才是对的。
+
 ### 5.2 定义 AST 类型
 
 ```typescript
@@ -542,6 +554,37 @@ path.each((childPath) => {
 
 ### 6.3 打印各种节点类型
 
+Monkey 的 AST 没有 `ExpressionStatement` 这层包装：`body` 里的表达式本身就是语句。
+于是「要不要补 `;`」这个判断只能由 printer 来做，而且必须做——`;` 在 Monkey 里是
+可选的，可一旦省掉，相邻语句会重新结合：`a` 后面跟 `[0]` 会被解析成 `a[0]`，
+`puts(a)` 后面跟 `(a + b) * c` 会被解析成一次调用。格式化器改变了程序的含义，
+这是最严重的一类 bug。
+
+判断放在 `print` 分发处，而不是 `printProgram`/`printBlockStatement` 里：Prettier
+会用节点的注释包住 `print` 的返回值，`;` 拼在外面就会落到行尾注释的后面。
+
+```typescript
+const SELF_TERMINATING_STATEMENTS = new Set([
+  'Let',
+  'ReturnStatement',
+  'SetPropertyStatement',
+  'DebuggerStatement',
+  'ClassDeclaration',
+]);
+
+function isExpressionStatement(path: AstPath, node: ASTNode): boolean {
+  if (SELF_TERMINATING_STATEMENTS.has(node.type)) {
+    return false;
+  }
+
+  const parent = path.getParentNode();
+  return (
+    path.key === 'body' &&
+    (parent?.type === 'Program' || parent?.type === 'BlockStatement')
+  );
+}
+```
+
 ```typescript
 // 打印程序（根节点）
 function printProgram(
@@ -729,7 +772,10 @@ function printArrayLiteral(
       indent([
         shouldBreak ? hardline : softline,
         join([',', line], elements),
-        options.trailingComma === 'none' ? '' : ifBreak(','),
+        // 这里没有 trailingComma：Monkey 的 `parse_expression_list` 要求逗号后
+        // 必须还有元素，数组末尾多一个逗号就再也解析不回来了。哈希字面量允许，
+        // 所以 printHashLiteral 才尊重这个选项。宿主语言的语法，永远优先于
+        // Prettier 的通用选项。
       ]),
       shouldBreak ? hardline : softline,
       ']',
