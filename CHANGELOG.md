@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/gengjiawen/monkey-rust/compare/v2.0.0...v2.0.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* publish typechecker before VS Code extension ([#330](https://github.com/gengjiawen/monkey-rust/issues/330)) ([90ec17b](https://github.com/gengjiawen/monkey-rust/commit/90ec17b8e7541897d95cd6b6b4cca5610fcc710f))
+
 ## [2.0.0](https://github.com/gengjiawen/monkey-rust/compare/v1.2.0...v2.0.0) (2026-09-02)
 
 
