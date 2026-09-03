@@ -41,30 +41,23 @@ describe('no-literal-type-mismatch tracks the GC VM', () => {
 })
 
 describe('builtin-arity tracks the GC VM', () => {
-  it.each(['len();', 'len(1, 2);'])(
-    'flags %s, which the VM evaluates to an arity error',
-    (source) => {
-      expect(rulesOf(source)).toContain('builtin-arity')
-      // The VM surfaces a builtin arity violation as an `Error` result value
-      // rather than halting, so the signal is the rendered result string.
-      const report = runGc(source)
-      expect(`${report.result ?? report.message ?? ''}`).toContain(
-        'expected 1 argument'
-      )
-    }
-  )
-
   it.each([
+    ['len();', 'expected 1 argument'],
+    ['len(1, 2);', 'expected 1 argument'],
     ['first();', 'expected 1 argument'],
     ['first([1], [2]);', 'expected 1 argument'],
     ['last([1], [2]);', 'expected 1 argument'],
     ['rest([1], [2]);', 'expected 1 argument'],
     ['push([1]);', 'expected 2 arguments'],
     ['push([1], 2, 3);', 'expected 2 arguments'],
-  ])('flags %s, which the VM evaluates to an arity error', (source, wording) => {
+  ])('flags %s, which the VM rejects with a call error', (source, wording) => {
     expect(rulesOf(source)).toContain('builtin-arity')
+    // A failing builtin halts the VM; it used to leave the message on the
+    // stack as an ordinary `Error` value that the program kept computing on.
     const report = runGc(source)
-    expect(`${report.result ?? report.message ?? ''}`).toContain(wording)
+    expect(report.status).toBe('error')
+    expect(report.kind).toBe('call')
+    expect(`${report.message ?? ''}`).toContain(wording)
   })
 
   it('stays quiet for len("hi"), which the VM accepts', () => {

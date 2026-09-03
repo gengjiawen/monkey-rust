@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::vm_test::{run_vm_tests, VmTestCase};
+    use crate::vm::VmRuntimeErrorKind;
+    use crate::vm_test::{run_vm_tests, vm_runtime_error, VmTestCase};
     use object::Object;
     use std::rc::Rc;
 
@@ -159,14 +160,6 @@ mod tests {
                 input: "len(\"hello world\");",
                 expected: Object::Integer(11),
             },
-            // VmTestCase {
-            //     input: "len(1);",
-            //     expected: Object::Error("argument to `len` not supported, got INTEGER".to_string()),
-            // },
-            VmTestCase {
-                input: "len(\"one\", \"two\");",
-                expected: Object::Error("builtin len expected 1 argument, got 2".to_string()),
-            },
             VmTestCase {
                 input: "len([1, 2, 3]);",
                 expected: Object::Integer(3),
@@ -183,10 +176,6 @@ mod tests {
                 input: "first([]);",
                 expected: Object::Null,
             },
-            // VmTestCase {
-            //     input: "first(1);",
-            //     expected: Object::Error("argument to `first` must be ARRAY, got INTEGER".to_string()),
-            // },
             VmTestCase {
                 input: "last([1, 2, 3]);",
                 expected: Object::Integer(3),
@@ -215,36 +204,54 @@ mod tests {
     }
 
     #[test]
-    fn test_builtin_arity_errors() {
-        // Same wording as the gc VM (gc/vm_test.rs) and the interpreter: a
-        // wrong argument count is an error value, never a panic or a call that
-        // quietly ignores the extra arguments.
-        let tests = vec![
-            VmTestCase {
-                input: "first();",
-                expected: Object::Error("builtin first expected 1 argument, got 0".to_string()),
-            },
-            VmTestCase {
-                input: "first([1], [2]);",
-                expected: Object::Error("builtin first expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
-                input: "last([1], [2]);",
-                expected: Object::Error("builtin last expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
-                input: "rest([1], [2]);",
-                expected: Object::Error("builtin rest expected 1 argument, got 2".to_string()),
-            },
-            VmTestCase {
-                input: "push([1]);",
-                expected: Object::Error("builtin push expected 2 arguments, got 1".to_string()),
-            },
-            VmTestCase {
-                input: "push([1], 2, 3);",
-                expected: Object::Error("builtin push expected 2 arguments, got 3".to_string()),
-            },
+    fn test_builtin_failures_are_runtime_errors() {
+        // A failing builtin aborts the program, the same way the interpreter
+        // and the asm backend do; the message must never survive as a value.
+        let tests = [
+            ("len(1);", "builtin len not supported for for type 1"),
+            ("len(\"one\", \"two\");", "builtin len expected 1 argument, got 2"),
+            ("first();", "builtin first expected 1 argument, got 0"),
+            ("first(1);", "builtin first not supported for for type 1"),
+            ("first([1], [2]);", "builtin first expected 1 argument, got 2"),
+            ("last(1);", "builtin last not supported for for type 1"),
+            ("last([1], [2]);", "builtin last expected 1 argument, got 2"),
+            ("rest(1);", "builtin rest not supported for for type 1"),
+            ("rest([1], [2]);", "builtin rest expected 1 argument, got 2"),
+            ("push(1, 1);", "builtin push not supported for for type 1"),
+            ("push([1]);", "builtin push expected 2 arguments, got 1"),
+            ("push([1], 2, 3);", "builtin push expected 2 arguments, got 3"),
         ];
-        run_vm_tests(tests);
+
+        for (input, message) in tests {
+            let error = vm_runtime_error(input);
+            assert_eq!(error.kind, VmRuntimeErrorKind::Call, "input: {:?}", input);
+            assert_eq!(error.message, message, "input: {:?}", input);
+        }
+    }
+
+    #[test]
+    fn a_failed_builtin_never_flows_on_as_a_value() {
+        // Before this was an Err, the error object was pushed on the stack and
+        // kept being used: `len(1) + 1` produced another error value, and the
+        // message was truthy, so `if (len(1))` took the consequent.
+        let tests = [
+            "len(1) + 1",
+            "[len(1), 2]",
+            "if (len(1)) { \"truthy\" } else { \"falsy\" }",
+            "len(1) == len(1)",
+            "len(1); 42",
+            "let broken = len(1); broken",
+            "let identity = fn(x) { x }; identity(len(1))",
+        ];
+
+        for input in tests {
+            let error = vm_runtime_error(input);
+            assert_eq!(error.kind, VmRuntimeErrorKind::Call, "input: {:?}", input);
+            assert_eq!(
+                error.message, "builtin len not supported for for type 1",
+                "input: {:?}",
+                input
+            );
+        }
     }
 }

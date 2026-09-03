@@ -1089,6 +1089,15 @@ impl GcVM {
         );
         self.clear_stack_range(base, self.sp);
         self.sp = base;
+        // Builtins report failures as Value::Error. Every other runtime
+        // failure here is an Err, so lift them the way the interpreter does;
+        // otherwise the message keeps flowing as an ordinary value and ends up
+        // as an operand, e.g. `len(1) + 1`.
+        if let Value::Error(message) = get_value(&self.heap, result) {
+            let error = self.runtime_error(GcRuntimeErrorKind::Call, message.clone());
+            self.heap.free(result);
+            return Err(error);
+        }
         self.push_raw(result)
     }
 

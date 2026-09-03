@@ -423,8 +423,9 @@ FFI 壳直接使用空 slice，绝不能对 null 调 `slice::from_raw_parts`。
 
 builtin（`len`/`first`/`last`/`rest`/`push`/`puts`，及别名 `print`）不单列 FFI 符号，
 统一经 `rt_call` 按 id 分发到 `runtime_core` 内的实现；`puts`/`print` 的结果是 `null`。arity/type
-错误是终止型 `ArityError`/`TypeError`，不产生可继续参与运算的 Error value；现有引擎的对应迁移是
-里程碑 0 前置工作（§10、§13）。
+错误是终止型 `ArityError`/`TypeError`，不产生可继续参与运算的 Error value。普通 VM 与 gc VM 的
+对应迁移已完成：两者都在 builtin 调用边界把 `Object::Error`/`Value::Error` 提升为终止型运行时错误
+（类别 `Call`），与 interpreter 一致（§10 语义一致性列表第 4 项）。
 
 `RuntimeErrorKind` 是 `.s` 与静态库之间的冻结 ABI，首版编号如下；测试比较 `kind`，不比较可能改进措辞的
 人类消息：
@@ -546,7 +547,7 @@ identity 对象的地址只在单次引擎执行内部有意义，跨引擎测�
 1. interpreter、普通 VM、gc VM 全部改用 checked 整数运算和同一 `RuntimeErrorKind` 映射；
 2. 普通 VM/gc VM 的 bang 改为 truthiness 的逻辑反值；
 3. 三引擎实现上表的 aggregate/identity 相等规则；
-4. builtin 返回的 `Object::Error`/`Value::Error` 在调用边界立即转成终止型错误；
+4. builtin 返回的 `Object::Error`/`Value::Error` 在调用边界立即转成终止型错误（已完成）；
 5. 保持 §13 已修复的 `define_function_name` 路径与重绑定求值顺序；
 6. 抽出共享的规范化 language display 与 observer value encoder。
 

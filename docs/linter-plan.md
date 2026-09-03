@@ -375,7 +375,7 @@ JSON 格式给编辑器集成与脚本消费。
   `examples/hello.monkey` 中已有未使用绑定，会被 `no-unused-let` 合理报告。
 - **逐规则 GC VM oracle**：error 级规则的 fixture 在 GC VM 上实际执行——
   `no-literal-type-mismatch` 命中的程序断言产生 classified type error，
-  `builtin-arity` 命中的程序断言产生对应的 error value。interpreter 侧不做
+  `builtin-arity` 命中的程序断言产生 classified call error。interpreter 侧不做
   可执行断言（不为此增加 wasm 执行导出），其行为以本文档的实测记录为准。
   oracle 明确区分 error object/value、classified runtime failure
   与静默错误结果，不用笼统的“报错”代替。`1 == true` 是 divergence fixture，
