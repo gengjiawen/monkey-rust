@@ -203,6 +203,8 @@ import * as wasm from './monkey_wasm_bg.wasm'
 
 bindings 子路径没有自带类型声明，因此 extension 只在本地补充内部 `__wbg_set_wasm` 类型；`parse` 和 `compile` 类型来自生成包自带的 `monkey_wasm.d.ts`。
 
+注意这段加载器和 analyzer 包里的 `src/wasm-node.ts` 是两套：extension 的 `.wasm` 放在 `dist/` 下，路径不同。glue 模块只有一份且带模块级状态，第二次 `__wbg_set_wasm` 会把先来者的内存指针换掉，所以 extension 只能用 `checkWithAnalyzer` 这类接受 analyzer 的核心函数，把自己实例化出来的 bindings 传进去，不能再去调 typechecker 或 linter 的 `check()`/`lint()`——那会触发第二次实例化。
+
 简化流程如下：
 
 ```mermaid

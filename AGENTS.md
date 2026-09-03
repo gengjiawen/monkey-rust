@@ -17,6 +17,7 @@
   - Playground: `pnpm -C packages/playground dev` (local server) or `pnpm build`.
   - Minifier: `pnpm -C packages/monkey-minifier test` and `pnpm -C packages/monkey-minifier build`.
   - Prettier plugin: `pnpm -C packages/prettier-plugin-monkey test` and `pnpm -C packages/prettier-plugin-monkey build`.
+  - Linter / type checker / minifier together: `node scripts/analyzers-coexist.cjs` after building all three. They share one wasm instance in Node, and nothing inside a single package can check that.
 
 ## Coding Style & Naming Conventions
 

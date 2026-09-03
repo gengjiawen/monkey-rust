@@ -1,37 +1,17 @@
-import { readFileSync } from 'node:fs'
-
 import type { CheckOptions } from './check'
 import {
   checkWithAnalyzer,
   type AnalyzeLossless,
   type CheckResult,
 } from './core'
+import { loadMonkeyWasm, type MonkeyWasmGlue } from './wasm-node'
 
-interface MonkeyWasmGlue extends WebAssembly.ModuleImports {
-  __wbg_set_wasm(exports: WebAssembly.Exports): void
+interface MonkeyAnalyzerGlue extends MonkeyWasmGlue {
   analyze_lossless: AnalyzeLossless
 }
 
 function loadNodeAnalyzer(): AnalyzeLossless {
-  // wasm-pack's bundler target statically imports `.wasm`, which Node cannot
-  // execute directly. Load the generated glue without its bundler entrypoint
-  // and instantiate the same module through Node's WebAssembly API. Node 24 can
-  // synchronously require this dependency's ESM glue module.
-  const glue =
-    require('@gengjiawen/monkey-wasm/monkey_wasm_bg.js') as MonkeyWasmGlue
-  const wasmPath = require.resolve(
-    '@gengjiawen/monkey-wasm/monkey_wasm_bg.wasm'
-  )
-  const module = new WebAssembly.Module(readFileSync(wasmPath))
-  const instance = new WebAssembly.Instance(module, {
-    './monkey_wasm_bg.js': glue,
-  })
-  glue.__wbg_set_wasm(instance.exports)
-  const start = instance.exports.__wbindgen_start
-  if (typeof start === 'function') {
-    start()
-  }
-  return glue.analyze_lossless
+  return (loadMonkeyWasm() as MonkeyAnalyzerGlue).analyze_lossless
 }
 
 let cachedAnalyzer: AnalyzeLossless | undefined
