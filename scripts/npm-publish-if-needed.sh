@@ -32,12 +32,33 @@ if [ -z "$name" ] || [ -z "$version" ]; then
   exit 1
 fi
 
-# `npm view` exits non-zero when the package has never been published, and
-# exits zero printing nothing when the package exists but the version does not,
-# so the output is the only signal that covers both cases.
-published=$(npm view "$name@$version" version 2>/dev/null || true)
+# The published version list, or `[]` when the package has never been
+# published. A registry that cannot be reached is a third answer, and it must
+# not be read as either of the first two: treating a timeout as "not published"
+# walks into the EPUBLISHCONFLICT this script exists to avoid, and treating it
+# as "published" skips a package that is genuinely missing. So only npm's own
+# "no such package" answer means the package is new; anything else stops the
+# release with the registry's error still visible.
+errors=$(mktemp)
+trap 'rm -f "$errors"' EXIT
 
-if [ "$published" = "$version" ]; then
+if versions=$(npm view "$name" versions --json 2>"$errors"); then
+  :
+elif grep -q 'E404' "$errors"; then
+  versions='[]'
+else
+  cat "$errors" >&2
+  echo "could not ask the registry about $name; not publishing $version" >&2
+  exit 1
+fi
+
+# `--json` returns a bare string, not a list, for a package with one version.
+if node -e '
+  const [versions, wanted] = process.argv.slice(1)
+  const parsed = JSON.parse(versions)
+  const published = Array.isArray(parsed) ? parsed : [parsed]
+  process.exit(published.includes(wanted) ? 0 : 1)
+' "$versions" "$version"; then
   echo "$name@$version is already on the registry, skipping"
   exit 0
 fi
