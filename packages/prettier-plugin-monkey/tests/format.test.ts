@@ -29,7 +29,7 @@ describe('Prettier Plugin Monkey', () => {
     const expected = `let x = 1;
 debugger;
 let f = fn() {
-  x
+  x;
   debugger;
 };
 `
@@ -47,7 +47,7 @@ let f = fn() {
   it('formats function declarations', async () => {
     const input = 'let add=fn(a,b){a+b};'
     const expected = `let add = fn(a, b) {
-  a + b
+  a + b;
 };
 `
     expect(await format(input)).toBe(expected)
@@ -56,9 +56,9 @@ let f = fn() {
   it('formats if expressions', async () => {
     const input = 'let x=if(true){1}else{2};'
     const expected = `let x = if (true) {
-  1
+  1;
 } else {
-  2
+  2;
 };
 `
     expect(await format(input)).toBe(expected)
@@ -70,11 +70,14 @@ let f = fn() {
     expect(await format(input)).toBe(expected)
   })
 
-  it('formats long arrays with line breaks', async () => {
+  // `trailingComma` is a hash-literal option here: `parse_expression_list`
+  // wants an element after every comma, so an array that ends in one no longer
+  // parses, whatever the option says.
+  it('never ends an array with a comma, even at trailingComma=all', async () => {
     const input = 'let arr=["aaaaaaaaaaaaaaaaaaaa","bbbbbbbbbbbbbbbbbbbb"];'
     const expected = `let arr = [
   "aaaaaaaaaaaaaaaaaaaa",
-  "bbbbbbbbbbbbbbbbbbbb",
+  "bbbbbbbbbbbbbbbbbbbb"
 ];
 `
     const output = await format(input, {
@@ -82,6 +85,7 @@ let f = fn() {
       trailingComma: 'all',
     })
     expect(output).toBe(expected)
+    expect(() => parse(output, {})).not.toThrow()
   })
 
   it('formats hash literals with correct spacing and trailing comma behavior', async () => {
@@ -145,7 +149,7 @@ let f = fn() {
     expect(await format('let x=(a+b).value;')).toBe('let x = (a + b).value;\n')
     expect(await format('let x=(fn(){1})();')).toBe(
       `let x = (fn() {
-  1
+  1;
 })();
 `
     )
@@ -164,7 +168,7 @@ let f = fn() {
       firstParameter,
       secondParameter,
       thirdParameter
-    )
+    );
   }
 }
 `
@@ -188,7 +192,7 @@ class Node {
 
   // between methods
   value() {
-    1
+    1;
   }
 }
 `
@@ -270,7 +274,7 @@ class Node {
   it('formats parameter and return type annotations', async () => {
     const input = 'let add=fn(a:int,b:[string]):bool{a};'
     const expected = `let add = fn(a: int, b: [string]): bool {
-  a
+  a;
 };
 `
     expect(await format(input)).toBe(expected)
@@ -284,7 +288,7 @@ class Node {
   }
 
   norm(): int {
-    1
+    1;
   }
 }
 `
@@ -323,7 +327,7 @@ class Node {
     int
   ]
 ) {
-  value
+  value;
 };
 `,
     ],
@@ -336,7 +340,7 @@ class Node {
   // input type
   int
 ): bool = fn(value) {
-  value
+  value;
 };
 `,
     ],
@@ -347,7 +351,7 @@ class Node {
       `let make = fn():
   // result type
   [int] {
-  []
+  [];
 };
 `,
     ],
@@ -391,7 +395,7 @@ class Node {
   firstParameter: int,
   secondParameter: [string]
 ): bool {
-  firstParameter
+  firstParameter;
 };
 `
     expect(await format(input, { printWidth: 30 })).toBe(expected)

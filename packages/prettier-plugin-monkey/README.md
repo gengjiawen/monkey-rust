@@ -72,11 +72,16 @@ This plugin supports all standard Prettier options:
 - `printWidth` (default: 80)
 - `tabWidth` (default: 2)
 - `useTabs` (default: false)
-- `trailingComma` (default: "none")
+- `trailingComma` (default: "all")
 - `bracketSpacing` (default: true)
 
 Notes:
 - Monkey strings currently use double quotes only, so `singleQuote` is intentionally ignored.
+- `trailingComma` applies to hash literals only. Monkey's grammar wants an
+  element after every comma in an array, so an array never ends in one.
+- Every expression statement is terminated with `;`. Monkey's `;` is optional,
+  but without it adjacent statements re-associate: `a` followed by `[0]` parses
+  as `a[0]`, and `puts(a)` followed by `(a + b) * c` parses as a call.
 
 ## Examples
 
@@ -91,14 +96,14 @@ let fibonacci=fn(x){if(x==0){0}else{if(x==1){return 1;}else{fibonacci(x-1)+fibon
 ```monkey
 let fibonacci = fn(x) {
   if (x == 0) {
-    0
+    0;
   } else {
     if (x == 1) {
       return 1;
     } else {
       fibonacci(x - 1) + fibonacci(x - 2);
-    }
-  }
+    };
+  };
 };
 ```
 

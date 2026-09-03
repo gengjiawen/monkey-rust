@@ -161,15 +161,13 @@ Supported File Extensions: .monkey, .mk
 
 ---
 
-### 8. Missing ExpressionStatement Handling
+### 8. Missing ExpressionStatement Handling — done
 
 **Location**: `src/printer.ts`
 
-`types.ts` defines `ExpressionStatement`, but there's no corresponding case in the printer's switch statement.
-
-**TODO**:
-- [ ] Add explicit handling for ExpressionStatement
-- [ ] Verify all statement types are handled
+The AST has no `ExpressionStatement` wrapper: an expression in a `body` *is* the
+statement. `printer.ts` now recognizes that position and terminates it with `;`,
+which is what keeps adjacent statements from re-associating.
 
 ---
 
