@@ -38,8 +38,8 @@ mod tests {
         let debugger_tests = [
             ("debugger", "debugger;"),
             ("debugger;", "debugger;"),
-            ("1; debugger;", "1debugger;"),
-            ("fn() { debugger; }", "fn () { debugger; }"),
+            ("1; debugger;", "1;debugger;"),
+            ("fn() { debugger; }", "fn () { debugger; };"),
         ];
 
         verify_program(&debugger_tests);
@@ -55,12 +55,12 @@ mod tests {
     #[test]
     fn test_parse_prefix_expression() {
         let let_tests = [
-            ("-15;", "(-15)"),
-            ("!5;", "(!5)"),
-            ("!foobar;", "(!foobar)"),
-            ("-foobar;", "(-foobar)"),
-            ("!true;", "(!true)"),
-            ("!false;", "(!false)"),
+            ("-15;", "(-15);"),
+            ("!5;", "(!5);"),
+            ("!foobar;", "(!foobar);"),
+            ("-foobar;", "(-foobar);"),
+            ("!true;", "(!true);"),
+            ("!false;", "(!false);"),
         ];
 
         verify_program(&let_tests);
@@ -69,25 +69,25 @@ mod tests {
     #[test]
     fn test_parse_infix_expression() {
         let let_tests = [
-            ("5 + 5;", "(5 + 5)"),
-            ("5 - 5;", "(5 - 5)"),
-            ("5 * 5;", "(5 * 5)"),
-            ("5 / 5;", "(5 / 5)"),
-            ("5 > 5;", "(5 > 5)"),
-            ("5 < 5;", "(5 < 5)"),
-            ("5 == 5;", "(5 == 5)"),
-            ("5 != 5;", "(5 != 5)"),
-            ("foobar + barfoo;", "(foobar + barfoo)"),
-            ("foobar - barfoo;", "(foobar - barfoo)"),
-            ("foobar * barfoo;", "(foobar * barfoo)"),
-            ("foobar / barfoo;", "(foobar / barfoo)"),
-            ("foobar > barfoo;", "(foobar > barfoo)"),
-            ("foobar < barfoo;", "(foobar < barfoo)"),
-            ("foobar == barfoo;", "(foobar == barfoo)"),
-            ("foobar != barfoo;", "(foobar != barfoo)"),
-            ("true == true", "(true == true)"),
-            ("true != false", "(true != false)"),
-            ("false == false", "(false == false)"),
+            ("5 + 5;", "(5 + 5);"),
+            ("5 - 5;", "(5 - 5);"),
+            ("5 * 5;", "(5 * 5);"),
+            ("5 / 5;", "(5 / 5);"),
+            ("5 > 5;", "(5 > 5);"),
+            ("5 < 5;", "(5 < 5);"),
+            ("5 == 5;", "(5 == 5);"),
+            ("5 != 5;", "(5 != 5);"),
+            ("foobar + barfoo;", "(foobar + barfoo);"),
+            ("foobar - barfoo;", "(foobar - barfoo);"),
+            ("foobar * barfoo;", "(foobar * barfoo);"),
+            ("foobar / barfoo;", "(foobar / barfoo);"),
+            ("foobar > barfoo;", "(foobar > barfoo);"),
+            ("foobar < barfoo;", "(foobar < barfoo);"),
+            ("foobar == barfoo;", "(foobar == barfoo);"),
+            ("foobar != barfoo;", "(foobar != barfoo);"),
+            ("true == true", "(true == true);"),
+            ("true != false", "(true != false);"),
+            ("false == false", "(false == false);"),
         ];
 
         verify_program(&let_tests);
@@ -96,22 +96,22 @@ mod tests {
     #[test]
     fn parse_op_expression() {
         let tt = [
-            ("-a * b", "((-a) * b)"),
-            ("!-a", "(!(-a))"),
-            ("a + b + c", "((a + b) + c)"),
-            ("a + b - c", "((a + b) - c)"),
-            ("a * b * c", "((a * b) * c)"),
-            ("a * b / c", "((a * b) / c)"),
-            ("a + b / c", "(a + (b / c))"),
-            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
-            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
-            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
-            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
-            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
-            ("true", "true"),
-            ("false", "false"),
-            ("3 > 5 == false", "((3 > 5) == false)"),
-            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("-a * b", "((-a) * b);"),
+            ("!-a", "(!(-a));"),
+            ("a + b + c", "((a + b) + c);"),
+            ("a + b - c", "((a + b) - c);"),
+            ("a * b * c", "((a * b) * c);"),
+            ("a * b / c", "((a * b) / c);"),
+            ("a + b / c", "(a + (b / c));"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f);"),
+            ("3 + 4; -5 * 5", "(3 + 4);((-5) * 5);"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4));"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4));"),
+            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));"),
+            ("true", "true;"),
+            ("false", "false;"),
+            ("3 > 5 == false", "((3 > 5) == false);"),
+            ("3 < 5 == true", "((3 < 5) == true);"),
         ];
 
         verify_program(&tt);
@@ -120,12 +120,12 @@ mod tests {
     #[test]
     fn parse_brace_expression() {
         let tt = [
-            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
-            ("(5 + 5) * 2", "((5 + 5) * 2)"),
-            ("2 / (5 + 5)", "(2 / (5 + 5))"),
-            ("(5 + 5) * 2 * (5 + 5)", "(((5 + 5) * 2) * (5 + 5))"),
-            ("-(5 + 5)", "(-(5 + 5))"),
-            ("!(true == true)", "(!(true == true))"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4);"),
+            ("(5 + 5) * 2", "((5 + 5) * 2);"),
+            ("2 / (5 + 5)", "(2 / (5 + 5));"),
+            ("(5 + 5) * 2 * (5 + 5)", "(((5 + 5) * 2) * (5 + 5));"),
+            ("-(5 + 5)", "(-(5 + 5));"),
+            ("!(true == true)", "(!(true == true));"),
         ];
 
         verify_program(&tt);
@@ -133,35 +133,35 @@ mod tests {
 
     #[test]
     fn test_if_expression() {
-        let tt = [("if (x < y) { x }", "if (x < y) { x }")];
+        let tt = [("if (x < y) { x }", "if (x < y) { x; };")];
         verify_program(&tt);
     }
 
     #[test]
     fn test_if_else_expression() {
-        let tt = [("if (x < y) { x } else { y }", "if (x < y) { x } else { y }")];
+        let tt = [("if (x < y) { x } else { y }", "if (x < y) { x; } else { y; };")];
         verify_program(&tt);
     }
 
     #[test]
     fn test_fn_else_expression() {
         let tt = [
-            ("fn() {};", "fn () {  }"),
-            ("fn(x) {};", "fn (x) {  }"),
-            ("fn(x, y, z) { x };", "fn (x, y, z) { x }"),
+            ("fn() {};", "fn () {  };"),
+            ("fn(x) {};", "fn (x) {  };"),
+            ("fn(x, y, z) { x };", "fn (x, y, z) { x; };"),
         ];
         verify_program(&tt);
     }
 
     #[test]
     fn test_fn_call_else_expression() {
-        let tt = [("add(1, 2 * 3, 4 + 5);", "add(1, (2 * 3), (4 + 5))")];
+        let tt = [("add(1, 2 * 3, 4 + 5);", "add(1, (2 * 3), (4 + 5));")];
         verify_program(&tt);
     }
 
     #[test]
     fn test_string_literal_expression() {
-        let test_case = [(r#""hello world";"#, r#""hello world""#)];
+        let test_case = [(r#""hello world";"#, r#""hello world";"#)];
         verify_program(&test_case);
     }
 
@@ -172,25 +172,28 @@ mod tests {
 
     #[test]
     fn test_array_literal_expression() {
-        let test_case = [("[]", "[]"), ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)]")];
+        let test_case = [
+            ("[]", "[];"),
+            ("[1, 2 * 2, 3 + 3]", "[1, (2 * 2), (3 + 3)];"),
+        ];
         verify_program(&test_case);
     }
 
     #[test]
     fn test_index_expression() {
-        let test_case = [("a[1]", "(a[1])"), ("a[1 + 1]", "(a[(1 + 1)])")];
+        let test_case = [("a[1]", "(a[1]);"), ("a[1 + 1]", "(a[(1 + 1)]);")];
         verify_program(&test_case);
     }
 
     #[test]
     fn test_hash_literal_expression() {
         let test_case = [
-            (r#"{"a": 1}"#, r#"{"a": 1}"#),
-            (r#"{"one": 1, "two": 2, "three": 3}"#, r#"{"one": 1, "two": 2, "three": 3}"#),
-            (r#"{}"#, r#"{}"#),
+            (r#"{"a": 1}"#, r#"{"a": 1};"#),
+            (r#"{"one": 1, "two": 2, "three": 3}"#, r#"{"one": 1, "two": 2, "three": 3};"#),
+            (r#"{}"#, r#"{};"#),
             (
                 r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#,
-                r#"{"one": (0 + 1), "two": (10 - 8), "three": (15 / 5)}"#,
+                r#"{"one": (0 + 1), "two": (10 - 8), "three": (15 / 5)};"#,
             ),
         ];
         verify_program(&test_case);
@@ -226,6 +229,36 @@ connect();"#;
     }
 
     #[test]
+    fn display_preserves_expression_statement_boundaries() {
+        let Node::Program(program) = parse("let a = [1, 2]; a; [0];").unwrap() else {
+            panic!("expected program")
+        };
+        let displayed = program.to_string();
+        assert_eq!(displayed, "let a = [1, 2];a;[0];");
+
+        let Node::Program(reparsed) = parse(&displayed).unwrap() else {
+            panic!("expected program")
+        };
+        assert_eq!(reparsed.body.len(), 3);
+        assert!(matches!(reparsed.body[1], Statement::Expr(Expression::IDENTIFIER(_))));
+        assert!(matches!(reparsed.body[2], Statement::Expr(Expression::LITERAL(_))));
+
+        let Node::Program(program) = parse("if (a < b) { puts(a); (a + b) * c; }").unwrap() else {
+            panic!("expected program")
+        };
+        let displayed = program.to_string();
+        assert_eq!(displayed, "if (a < b) { puts(a);((a + b) * c); };");
+
+        let Node::Program(reparsed) = parse(&displayed).unwrap() else {
+            panic!("expected program")
+        };
+        let Statement::Expr(Expression::IF(if_expression)) = &reparsed.body[0] else {
+            panic!("expected if expression")
+        };
+        assert_eq!(if_expression.consequent.body.len(), 2);
+    }
+
+    #[test]
     fn parses_property_set_as_statement() {
         let input = "node.next.value = new Node(1);";
         let Node::Program(program) = parse(input).unwrap() else { panic!("expected program") };
@@ -257,13 +290,13 @@ connect();"#;
     fn skips_empty_statements() {
         verify_program(&[
             ("class A {};", "class A {}"),
-            (";;5", "5"),
-            ("5;;", "5"),
+            (";;5", "5;"),
+            ("5;;", "5;"),
             ("let x = 1;;", "let x = 1;"),
             (";", ""),
             (";;;", ""),
-            ("fn() { 1;; }", "fn () { 1 }"),
-            ("if (true) { ; } else { ;; }", "if true {  } else {  }"),
+            ("fn() { 1;; }", "fn () { 1; };"),
+            ("if (true) { ; } else { ;; }", "if true {  } else {  };"),
         ]);
 
         let Node::Program(program) = parse(";;5;;").unwrap() else { panic!("expected program") };

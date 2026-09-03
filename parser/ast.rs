@@ -288,7 +288,7 @@ impl fmt::Display for Statement {
                 write!(f, "{}.{} = {};", set.object, set.property, set.value)
             }
             Statement::Debugger(_) => write!(f, "debugger;"),
-            Statement::Expr(expr) => write!(f, "{}", expr),
+            Statement::Expr(expr) => write!(f, "{};", expr),
         }
     }
 }

@@ -188,11 +188,11 @@ mod tests {
     #[test]
     fn annotated_function_display() {
         let cases = [
-            ("fn(a: int): int { a; }", "fn (a: int): int { a }"),
-            ("fn(a: int?, b: [string]) { a; }", "fn (a: int?, b: [string]) { a }"),
+            ("fn(a: int): int { a; }", "fn (a: int): int { a; };"),
+            ("fn(a: int?, b: [string]) { a; }", "fn (a: int?, b: [string]) { a; };"),
             (
                 "let f: fn(int): int = fn(a: int): int { a; };",
-                "let f: fn(int): int = fn f(a: int): int { a };",
+                "let f: fn(int): int = fn f(a: int): int { a; };",
             ),
         ];
 
@@ -226,7 +226,7 @@ mod tests {
         let cases = [
             ("let int = 5;", "let int = 5;"),
             ("let string = \"x\";", "let string = \"x\";"),
-            ("let any = fn(any) { any; };", "let any = fn any(any) { any };"),
+            ("let any = fn(any) { any; };", "let any = fn any(any) { any; };"),
             ("let null: int = 5;", "let null: int = 5;"),
             ("let int: int = int;", "let int: int = int;"),
         ];
