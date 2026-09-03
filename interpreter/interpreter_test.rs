@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_function_object() {
-        let test_case = [("fn(x) { x + 2; };", "fn(x) { (x + 2) }")];
+        let test_case = [("fn(x) { x + 2; };", "fn(x) { (x + 2); }")];
         apply_test(&test_case);
     }
 
@@ -180,8 +180,8 @@ mod tests {
         // declared exception to type erasure: see docs/type-system-design.md
         // section 6.1.
         let test_case = [
-            ("fn(x: int): int { x + 2; };", "fn(x: int) { (x + 2) }"),
-            ("fn(x: [int]?, y): bool { x; };", "fn(x: [int]?, y) { x }"),
+            ("fn(x: int): int { x + 2; };", "fn(x: int) { (x + 2); }"),
+            ("fn(x: [int]?, y): bool { x; };", "fn(x: [int]?, y) { x; }"),
         ];
         apply_test(&test_case);
     }
