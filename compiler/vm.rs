@@ -60,6 +60,33 @@ impl std::error::Error for VmRuntimeError {}
 
 type VmResult<T> = Result<T, VmRuntimeError>;
 
+fn truncated_operand(opcode: Opcode) -> VmRuntimeError {
+    VmRuntimeError::new(
+        VmRuntimeErrorKind::InvalidBytecode,
+        format!("{:?} operand runs past the end of its instructions", opcode),
+    )
+}
+
+/// Reads the two-byte operand that follows the opcode at `ip`.
+///
+/// `Bytecode` is a plain struct with public fields, so instructions reach the
+/// VM without necessarily passing through `read_bytecode`'s stream validation
+/// (see `snapshot.rs`). A stream that ends mid-operand is therefore a runtime
+/// error rather than a slice panic.
+fn read_u16_operand(ins: &[u8], ip: usize, opcode: Opcode) -> VmResult<usize> {
+    let bytes = ins
+        .get(ip + 1..ip + 3)
+        .ok_or_else(|| truncated_operand(opcode))?;
+    Ok(BigEndian::read_u16(bytes) as usize)
+}
+
+/// Reads the one-byte operand `offset` bytes past the opcode at `ip`.
+fn read_u8_operand(ins: &[u8], ip: usize, offset: usize, opcode: Opcode) -> VmResult<usize> {
+    ins.get(ip + offset)
+        .map(|byte| *byte as usize)
+        .ok_or_else(|| truncated_operand(opcode))
+}
+
 pub struct VM {
     constants: Vec<Rc<Object>>,
 
@@ -180,7 +207,7 @@ impl VM {
 
             match opcode {
                 Opcode::OpConst => {
-                    let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let const_index = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let constant = self.constant(const_index)?;
                     self.push(constant)?;
@@ -210,11 +237,11 @@ impl VM {
                     self.execute_bang_operation()?;
                 }
                 Opcode::OpJump => {
-                    let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let pos = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip = pos as i32 - 1;
                 }
                 Opcode::OpJumpNotTruthy => {
-                    let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let pos = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let condition = self.pop()?;
                     if !self.is_truthy(condition) {
@@ -225,17 +252,17 @@ impl VM {
                     self.push(Rc::new(Object::Null))?;
                 }
                 Opcode::OpGetGlobal => {
-                    let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let global_index = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     self.push(Rc::clone(&self.globals[global_index]))?;
                 }
                 Opcode::OpSetGlobal => {
-                    let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let global_index = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     self.globals[global_index] = self.pop()?;
                 }
                 Opcode::OpArray => {
-                    let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let count = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let start = self.stack_base_for(count)?;
                     let elements = self.build_array(start, self.sp);
@@ -243,7 +270,7 @@ impl VM {
                     self.push(Rc::new(Object::Array(elements)))?;
                 }
                 Opcode::OpHash => {
-                    let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let count = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let start = self.stack_base_for(count)?;
                     #[allow(clippy::mutable_key_type)]
@@ -284,26 +311,24 @@ impl VM {
                     self.push(Rc::new(object::Object::Null))?;
                 }
                 Opcode::OpCall => {
-                    let num_args = ins[ip + 1] as usize;
+                    let num_args = read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     self.execute_call(num_args)?;
                 }
                 Opcode::OpSetLocal => {
-                    let local_index = ins[ip + 1] as usize;
+                    let local_index = read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
-                    let base = self.current_frame().base_pointer;
-                    let slot = self.local_slot(base, local_index)?;
+                    let slot = self.local_slot(local_index)?;
                     self.stack[slot] = self.pop()?;
                 }
                 Opcode::OpGetLocal => {
-                    let local_index = ins[ip + 1] as usize;
+                    let local_index = read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
-                    let base = self.current_frame().base_pointer;
-                    let slot = self.local_slot(base, local_index)?;
+                    let slot = self.local_slot(local_index)?;
                     self.push(Rc::clone(&self.stack[slot]))?;
                 }
                 Opcode::OpGetBuiltin => {
-                    let built_index = ins[ip + 1] as usize;
+                    let built_index = read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     let definition = BuiltIns
                         .get(built_index)
@@ -317,13 +342,13 @@ impl VM {
                     self.push(Rc::new(Object::Builtin(definition)))?;
                 }
                 Opcode::OpClosure => {
-                    let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    let num_free = ins[ip + 3] as usize;
+                    let const_index = read_u16_operand(&ins, ip, opcode)?;
+                    let num_free = read_u8_operand(&ins, ip, 3, opcode)?;
                     self.current_frame().ip += 3;
                     self.push_closure(const_index, num_free)?;
                 }
                 Opcode::OpGetFree => {
-                    let free_index = ins[ip + 1] as usize;
+                    let free_index = read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     let current_closure = self.current_frame().cl.clone();
                     let free_var =
@@ -344,7 +369,7 @@ impl VM {
                     self.push(Rc::new(Object::ClosureObj(current_closure)))?;
                 }
                 Opcode::OpClass => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let name_index = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let name = self.constant_string(name_index)?;
                     self.push(Rc::new(Object::Class(Rc::new(RefCell::new(ClassObject {
@@ -354,8 +379,8 @@ impl VM {
                     })))))?;
                 }
                 Opcode::OpMethod => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    let kind = ins[ip + 3];
+                    let name_index = read_u16_operand(&ins, ip, opcode)?;
+                    let kind = read_u8_operand(&ins, ip, 3, opcode)?;
                     self.current_frame().ip += 3;
                     let name = self.constant_string(name_index)?;
                     let method = self.pop()?;
@@ -376,7 +401,7 @@ impl VM {
                     }
                 }
                 Opcode::OpGetProperty => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let name_index = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let name = self.constant_string(name_index)?;
                     let receiver = self.pop()?;
@@ -384,7 +409,7 @@ impl VM {
                     self.push(value)?;
                 }
                 Opcode::OpSetProperty => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let name_index = read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let name = self.constant_string(name_index)?;
                     let value = self.pop()?;
@@ -392,7 +417,7 @@ impl VM {
                     self.set_property(&receiver, name, value)?;
                 }
                 Opcode::OpNew => {
-                    let num_args = ins[ip + 1] as usize;
+                    let num_args = read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     self.execute_new(num_args)?;
                 }
@@ -526,18 +551,28 @@ impl VM {
     }
 
     /// The absolute slot of a frame-relative local. `local_index` is a raw
-    /// bytecode byte, so it can point past the frame and past the stack.
-    fn local_slot(&self, base: usize, local_index: usize) -> VmResult<usize> {
-        let slot = base
-            .checked_add(local_index)
-            .filter(|slot| *slot < STACK_SIZE)
+    /// bytecode byte, so it can name a slot beyond the ones this frame
+    /// reserved. Those slots hold the caller's operands or another frame's
+    /// locals, so reading or writing one silently computes with a value that
+    /// is not this local: the index has to be rejected, not just clamped to
+    /// the stack.
+    fn local_slot(&mut self, local_index: usize) -> VmResult<usize> {
+        let frame = self.current_frame();
+        let base = frame.base_pointer;
+        // Parameters are defined before the body's own locals, so `num_locals`
+        // counts them too and bounds every index the compiler can emit.
+        let num_locals = frame.cl.func.num_locals;
+        base.checked_add(local_index)
+            .filter(|slot| local_index < num_locals && *slot < STACK_SIZE)
             .ok_or_else(|| {
                 VmRuntimeError::new(
                     VmRuntimeErrorKind::InvalidBytecode,
-                    format!("local index {} out of range", local_index),
+                    format!(
+                        "local index {} out of range for a frame with {} locals",
+                        local_index, num_locals
+                    ),
                 )
-            })?;
-        Ok(slot)
+            })
     }
 
     fn constant(&self, index: usize) -> VmResult<Rc<Object>> {

@@ -144,6 +144,98 @@ mod tests {
         }
     }
 
+    /// `read_bytecode` walks operand widths, so a stream that ends mid-operand
+    /// never reaches the VM through a `.mbc` file. `Bytecode` is a plain struct
+    /// with public fields, though, so one can reach it directly — and the
+    /// dispatch loop runs the final byte of the stream as an opcode, leaving
+    /// its operand off the end.
+    #[test]
+    fn an_operand_past_the_end_of_the_stream_is_a_runtime_error() {
+        use crate::compiler::{Bytecode, DebugInfo};
+        use crate::op_code::{Instructions, Opcode};
+        use crate::vm::VmRuntimeErrorKind;
+
+        // Both truncations of each operand: entirely absent, and half written.
+        let cases: Vec<(Vec<u8>, &str)> = vec![
+            (vec![Opcode::OpConst as u8], "OpConst"),
+            (vec![Opcode::OpConst as u8, 0], "OpConst"),
+            (vec![Opcode::OpJump as u8, 0], "OpJump"),
+            (vec![Opcode::OpJumpNotTruthy as u8, 0], "OpJumpNotTruthy"),
+            (vec![Opcode::OpGetGlobal as u8, 0], "OpGetGlobal"),
+            (vec![Opcode::OpArray as u8, 0], "OpArray"),
+            (vec![Opcode::OpGetLocal as u8], "OpGetLocal"),
+            (vec![Opcode::OpSetLocal as u8], "OpSetLocal"),
+            (vec![Opcode::OpCall as u8], "OpCall"),
+            (vec![Opcode::OpGetBuiltin as u8], "OpGetBuiltin"),
+            (vec![Opcode::OpGetFree as u8], "OpGetFree"),
+            (vec![Opcode::OpNew as u8], "OpNew"),
+            (vec![Opcode::OpGetProperty as u8, 0], "OpGetProperty"),
+            // Two-byte operand present, the trailing one-byte one missing.
+            (vec![Opcode::OpClosure as u8, 0, 0], "OpClosure"),
+            (vec![Opcode::OpMethod as u8, 0, 0], "OpMethod"),
+        ];
+
+        for (data, opcode) in cases {
+            let mut vm = VM::new(Bytecode {
+                instructions: Instructions {
+                    data,
+                },
+                constants: vec![],
+                debug_info: DebugInfo::default(),
+                function_debug_info: Default::default(),
+            });
+            let error = vm
+                .run_with_budget(INSTRUCTION_BUDGET)
+                .expect_err(&format!("{} has no operand to read", opcode));
+            assert_eq!(error.kind, VmRuntimeErrorKind::InvalidBytecode);
+            assert_eq!(
+                error.message,
+                format!("{} operand runs past the end of its instructions", opcode)
+            );
+        }
+    }
+
+    /// A frame's locals are bounded by the function's own `num_locals`: a
+    /// higher index still lands inside the stack, but on the caller's operands
+    /// rather than on a local of this call.
+    #[test]
+    fn a_local_index_past_the_frames_locals_is_rejected() {
+        use std::rc::Rc;
+
+        use object::{CompiledFunction, Object};
+
+        use crate::compiler::{Bytecode, DebugInfo};
+        use crate::op_code::{make_instructions, Instructions, Opcode};
+        use crate::vm::VmRuntimeErrorKind;
+
+        let mut body = make_instructions(Opcode::OpGetLocal, &[200]).data;
+        body.extend(make_instructions(Opcode::OpReturnValue, &[]).data);
+        let function = Rc::new(Object::CompiledFunction(Rc::new(CompiledFunction {
+            name: "one_local".to_string(),
+            instructions: body,
+            num_locals: 1,
+            num_parameters: 0,
+        })));
+
+        let mut data = make_instructions(Opcode::OpClosure, &[0, 0]).data;
+        data.extend(make_instructions(Opcode::OpCall, &[0]).data);
+        data.extend(make_instructions(Opcode::OpPop, &[]).data);
+
+        let mut vm = VM::new(Bytecode {
+            instructions: Instructions {
+                data,
+            },
+            constants: vec![function],
+            debug_info: DebugInfo::default(),
+            function_debug_info: Default::default(),
+        });
+        let error = vm
+            .run_with_budget(INSTRUCTION_BUDGET)
+            .expect_err("local 200 is outside a frame holding one local");
+        assert_eq!(error.kind, VmRuntimeErrorKind::InvalidBytecode);
+        assert_eq!(error.message, "local index 200 out of range for a frame with 1 locals");
+    }
+
     #[test]
     fn a_mutant_that_loops_forever_hits_the_budget() {
         // OpJump back to its own offset: the smallest infinite loop.

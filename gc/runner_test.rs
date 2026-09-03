@@ -134,6 +134,82 @@ fn structurally_valid_hostile_bytecode_errors_instead_of_panicking() {
     }
 }
 
+/// `read_bytecode` walks operand widths, so a stream that ends mid-operand
+/// never reaches the VM through a `.mbc` file. `Bytecode` is a plain struct
+/// with public fields, though, so one can reach it directly — and the dispatch
+/// loop runs the final byte of the stream as an opcode, leaving its operand
+/// off the end.
+#[test]
+fn an_operand_past_the_end_of_the_stream_is_a_runtime_error() {
+    use crate::vm::GcRuntimeErrorKind;
+
+    // Both truncations of each operand: entirely absent, and half written.
+    let cases: Vec<(Vec<u8>, &str)> = vec![
+        (vec![Opcode::OpConst as u8], "OpConst"),
+        (vec![Opcode::OpConst as u8, 0], "OpConst"),
+        (vec![Opcode::OpJump as u8, 0], "OpJump"),
+        (vec![Opcode::OpJumpNotTruthy as u8, 0], "OpJumpNotTruthy"),
+        (vec![Opcode::OpGetGlobal as u8, 0], "OpGetGlobal"),
+        (vec![Opcode::OpArray as u8, 0], "OpArray"),
+        (vec![Opcode::OpGetLocal as u8], "OpGetLocal"),
+        (vec![Opcode::OpSetLocal as u8], "OpSetLocal"),
+        (vec![Opcode::OpCall as u8], "OpCall"),
+        (vec![Opcode::OpGetBuiltin as u8], "OpGetBuiltin"),
+        (vec![Opcode::OpGetFree as u8], "OpGetFree"),
+        (vec![Opcode::OpNew as u8], "OpNew"),
+        (vec![Opcode::OpGetProperty as u8, 0], "OpGetProperty"),
+        // Two-byte operand present, the trailing one-byte one missing.
+        (vec![Opcode::OpClosure as u8, 0, 0], "OpClosure"),
+        (vec![Opcode::OpMethod as u8, 0, 0], "OpMethod"),
+    ];
+
+    for (instructions, opcode) in cases {
+        let mut vm = GcVM::new(hostile_bytecode(instructions, vec![]));
+        let error = vm
+            .run_with_budget_classified(10_000)
+            .expect_err(&format!("{} has no operand to read", opcode));
+        assert_eq!(error.kind, GcRuntimeErrorKind::InvalidBytecode);
+        assert_eq!(
+            error.message,
+            format!("{} operand runs past the end of its instructions", opcode)
+        );
+    }
+}
+
+/// A frame's locals are bounded by the function's own `num_locals`: a higher
+/// index still lands inside the stack, but on the caller's operands rather
+/// than on a local of this call.
+#[test]
+fn a_local_index_past_the_frames_locals_is_rejected() {
+    use crate::vm::GcRuntimeErrorKind;
+
+    let function = Rc::new(Object::CompiledFunction(Rc::new(CompiledFunction {
+        name: "one_local".to_string(),
+        instructions: vec![Opcode::OpGetLocal as u8, 200, Opcode::OpReturnValue as u8],
+        num_locals: 1,
+        num_parameters: 0,
+    })));
+    let bytecode = hostile_bytecode(
+        vec![
+            Opcode::OpClosure as u8,
+            0,
+            0,
+            0,
+            Opcode::OpCall as u8,
+            0,
+            Opcode::OpPop as u8,
+        ],
+        vec![function],
+    );
+
+    let mut vm = GcVM::new(bytecode);
+    let error = vm
+        .run_with_budget_classified(10_000)
+        .expect_err("local 200 is outside a frame holding one local");
+    assert_eq!(error.kind, GcRuntimeErrorKind::InvalidBytecode);
+    assert_eq!(error.message, "local index 200 out of range for a frame with 1 locals");
+}
+
 #[test]
 fn oversized_function_locals_fail_before_frame_allocation() {
     let function = Rc::new(Object::CompiledFunction(Rc::new(CompiledFunction {
