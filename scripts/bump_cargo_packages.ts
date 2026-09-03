@@ -279,6 +279,22 @@ const DEPENDENCY_FIELDS = [
 ] as const
 
 /**
+ * Does `range` name exactly `version`, rather than merely contain its digits?
+ *
+ * A substring test reads the wrong answer off `^2.0.20` when the release is
+ * `2.0.2`, off `^2.0.2-beta.1` when it is `2.0.2`, and off `^11.0.0` when it is
+ * `1.0.0` — always in the direction that makes a stale range look fresh, which
+ * is the one direction a guard must not fail in. So the version has to be
+ * bounded on both sides by something that cannot continue a semver version:
+ * not a digit, a dot, or a prerelease/build separator. `^2.0.2`, `~2.0.2`,
+ * `workspace:^2.0.2` and `>=2.0.2 <3.0.0` all still match.
+ */
+function namesVersion(range: string, version: string): boolean {
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|[^0-9.+-])${escaped}([^0-9.+-]|$)`).test(range)
+}
+
+/**
  * Every package the release chain touches is listed by hand in the blocks
  * above, so a package added later silently keeps whatever range it had. Re-read
  * the workspace and refuse to prepare the release if any dependency on another
@@ -319,7 +335,7 @@ function assertWorkspaceDependenciesAreSynced(version: string) {
         if (!/\d/.test(range)) {
           continue
         }
-        if (!range.includes(version)) {
+        if (!namesVersion(range, version)) {
           stale.push(`${directory}: ${field}.${dependency} is "${range}"`)
         }
       }

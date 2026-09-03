@@ -17,13 +17,22 @@ cargo workspaces publish --from-git --token $CARGO_TOKEN
 
 ### Re-running a failed release
 
-The publish chain is idempotent, so re-running the `release-please` workflow
-after a failure resumes instead of starting over. `cargo workspaces publish
---from-git` skips crates it already finds on crates.io, `ovsx publish` is called
-with `--skip-duplicate`, and every npm package goes through
-`scripts/npm-publish-if-needed.sh`, which skips a package whose exact
-`name@version` is already on the registry. A re-run therefore publishes only
-what is missing and exits 0 when there is nothing left to do.
+Either re-run the failed `release-please` job from the Actions UI, or run the
+workflow manually with `resume_publish` checked. Both re-enter the publish
+chain; a plain push, or a dispatch without `resume_publish`, does not, because
+`release_created` is only true on the run that cut the release.
+
+The chain then publishes what is missing and skips what is already out there:
+`cargo workspaces publish --from-git` reports `already published` for crates it
+finds on crates.io, `ovsx publish` runs with `--skip-duplicate`, and every npm
+package goes through `scripts/npm-publish-if-needed.sh`, which skips a package
+whose exact `name@version` the registry already has. A resume with nothing left
+to do exits 0.
+
+If the registry cannot be reached, `npm-publish-if-needed.sh` fails the release
+rather than guessing — "not published" would walk into the
+`EPUBLISHCONFLICT` that stops the chain in the first place. Re-run once the
+registry answers again.
 
 ## Debug CI
 

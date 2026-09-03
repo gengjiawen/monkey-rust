@@ -6,6 +6,11 @@ on:
       - main
       - release_extra
   workflow_dispatch:
+    inputs:
+      resume_publish:
+        description: 'Run the publish chain for the versions on this branch, skipping whatever is already on the registries'
+        type: boolean
+        default: false
 
 jobs:
   release-please:
@@ -35,6 +40,36 @@ jobs:
               {"type":"playground","section":"playground","hidden":false},
               {"type":"meta","section":"Miscellaneous","hidden":false}
             ]
+      # `release_created` is true on exactly one run — the one whose push merged
+      # the release PR. Gating the publish chain on it alone means a release
+      # that dies partway through cannot be finished by re-running the
+      # workflow: the retry skips every step and reports success, so nothing
+      # downstream of the failure ever gets published. Making the steps
+      # idempotent only helps if the chain can be entered a second time.
+      #
+      # It is safe to enter: `cargo workspaces publish --from-git` reports
+      # "already published" and moves on, `ovsx publish` runs with
+      # `--skip-duplicate`, and every npm package goes through
+      # `scripts/npm-publish-if-needed.sh`. So allow the two ways a maintainer
+      # would ask for a retry — GitHub's "Re-run jobs" button, which repeats the
+      # original push event with a higher attempt number, and an explicit
+      # dispatch with `resume_publish`.
+      - id: publish
+        name: Decide whether to run the publish chain
+        env:
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          RESUME_REQUESTED: ${{ inputs.resume_publish }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          if [ "$RELEASE_CREATED" = "true" ] ||
+             [ "$RESUME_REQUESTED" = "true" ] ||
+             [ "$RUN_ATTEMPT" != "1" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "publishing: release_created=$RELEASE_CREATED resume=$RESUME_REQUESTED attempt=$RUN_ATTEMPT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "no release to publish"
+          fi
       - name: Trigger prepare-release for open release PR
         uses: actions/github-script@v7
         if: ${{ steps.release.outputs.release_created != 'true' }}
@@ -71,49 +106,49 @@ jobs:
             core.info(`Triggered prepare-release.yml on ${releasePr.head.ref}`)
       - uses: actions/checkout@v6
       - name: Pin npm to 11.x
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
         run: npm install -g npm@11
       - run: npx envinfo
       - run: cargo workspaces publish --from-git --token $CARGO_TOKEN
         env:
           CARGO_TOKEN: ${{secrets.CARGO_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: cd wasm && wasm-pack build --release --scope=gengjiawen
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: scripts/npm-publish-if-needed.sh wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: pnpm install --filter prettier-plugin-monkey... --frozen-lockfile && pnpm --filter prettier-plugin-monkey run build
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: scripts/npm-publish-if-needed.sh packages/prettier-plugin-monkey
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: pnpm install --filter @gengjiawen/monkey-minifier... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-minifier run build
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: scripts/npm-publish-if-needed.sh packages/monkey-minifier
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: pnpm install --filter @gengjiawen/monkey-lint... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-lint run build
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       - run: scripts/npm-publish-if-needed.sh packages/monkey-linter
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
       # The extension bundles the checker, so build and publish it together
       # immediately before packaging the extension.
       - name: Build Monkey typechecker
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
         run: pnpm install --filter @gengjiawen/monkey-typechecker... --frozen-lockfile && pnpm --filter @gengjiawen/monkey-typechecker run build
       - name: Publish Monkey typechecker
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
         run: scripts/npm-publish-if-needed.sh packages/monkey-typechecker
       - name: Publish VS Code extension to Open VSX
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.publish.outputs.enabled == 'true' }}
         working-directory: packages/vscode-extension
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
