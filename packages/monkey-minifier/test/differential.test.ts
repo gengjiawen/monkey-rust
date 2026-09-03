@@ -38,8 +38,27 @@ const programs = [
   'let a = 1 + 1;\nlet b= a + 1;\nprint(a)',
   // A conditional let's slot may stay unset; propagation must leave it alone.
   'let v = 1; if (1 > 2) { let v = 2; }; puts(v);',
+  // After the block the name means the arm's last `let` or the binding from
+  // before the branch, so neither may be dropped and both must keep one name.
+  'let v = 1; if (1 > 2) { let v = 2; let v = 3; }; puts(v);',
+  'let v = 1; if (1 < 2) { let v = 2; let v = 3; }; puts(v);',
+  'let v = 1; if (1 < 2) { let v = 2; } else { let v = 3; }; puts(v);',
+  'let v = 1; if (1 > 2) { let v = 2; } else { let v = 3; }; puts(v);',
+  'let v = 1; if (1 < 2) { if (1 > 2) { let v = 2; } let v = 4; }; puts(v);',
+  // ... including when the binding it shadows lives in an enclosing scope,
+  // where a skipped arm leaves the read on the captured free variable.
+  'let v = 1; let f = fn() { if (1 > 2) { let v = 2; } v }; puts(f());',
+  'let v = 1; let f = fn() { if (1 > 2) { let v = 2; let v = 3; } v }; puts(f());',
+  'let v = 1; let f = fn(p) { if (1 > 2) { let p = 2; } p }; puts(f(9));',
+  // A block shadowing a builtin is left alone: it cannot share a name with one.
+  'if (1 > 2) { let len = 5; }; puts(len("ab"));',
   // A closure keeps observing the pre-redeclaration slot.
   'let v = 1; let g = fn() { v }; let v = 2; puts(g()); v;',
+  // ... including when a block redeclares the name in between: the block
+  // writes the captured slot, but the `let` after it is unconditional again
+  // and starts a binding of its own.
+  'let v = 1; let g = fn() { v }; if (false) { let v = 2; }; let v = 3; puts(g()); v;',
+  'if (true) { let v = 1; let g = fn() { v }; }; let v = 2; puts(g()); v;',
   // `new` requires its callee to stay an identifier reference.
   'let a = 1; let b = new a(); b;',
   // `debugger` is completion-transparent: the statement before a trailing run
@@ -66,7 +85,10 @@ describe('GC VM differential semantics', () => {
 const annotated: [string, string][] = [
   ['let a: int = 1; a;', 'let a = 1; a;'],
   ['let a: [int]? = [1]; a;', 'let a = [1]; a;'],
-  ['let f: fn(int): int = fn(n: int): int { n * 2 }; f(21);', 'let f = fn(n) { n * 2 }; f(21);'],
+  [
+    'let f: fn(int): int = fn(n: int): int { n * 2 }; f(21);',
+    'let f = fn(n) { n * 2 }; f(21);',
+  ],
   ['fn(a: int, b): int { a + b }(1, 2);', 'fn(a, b) { a + b }(1, 2);'],
   [
     'class Box { constructor(v: int) { this.v = v; } get(): int { this.v } } new Box(1).get();',
@@ -79,13 +101,19 @@ const annotated: [string, string][] = [
 ]
 
 describe('type annotations are erased', () => {
-  it.each(annotated)('minifies %s exactly like its erased twin', (withTypes, without) => {
-    expect(minify(withTypes).code).toBe(minify(without).code)
-  })
+  it.each(annotated)(
+    'minifies %s exactly like its erased twin',
+    (withTypes, without) => {
+      expect(minify(withTypes).code).toBe(minify(without).code)
+    }
+  )
 
-  it.each(annotated)('runs %s exactly like its erased twin', (withTypes, without) => {
-    expect(observe(minify(withTypes).code)).toEqual(observe(without))
-  })
+  it.each(annotated)(
+    'runs %s exactly like its erased twin',
+    (withTypes, without) => {
+      expect(observe(minify(withTypes).code)).toEqual(observe(without))
+    }
+  )
 
   it('never emits a colon outside a hash literal', () => {
     const { code } = minify(

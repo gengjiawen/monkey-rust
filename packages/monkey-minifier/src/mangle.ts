@@ -1,6 +1,6 @@
 import type { Program } from './types'
 import { setIdentifierName } from './types'
-import { analyzeScopes, type Binding } from './scope'
+import { analyzeScopes, isUserBinding, type Binding } from './scope'
 
 const KEYWORDS = new Set([
   'let',
@@ -56,10 +56,6 @@ export function mangle(program: Program, options: MangleOptions = {}): Program {
     renameBinding(binding, name)
   }
   return program
-}
-
-function isUserBinding(binding: Binding): boolean {
-  return binding.kind === 'let' || binding.kind === 'parameter'
 }
 
 function renameBinding(binding: Binding, name: string): void {

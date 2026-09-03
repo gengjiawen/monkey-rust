@@ -49,9 +49,75 @@ export interface ScopeAnalysis {
   safe: boolean
 }
 
+/** Identifies one block inside a scope; see [`enterBlock`]. */
+type BlockId = number
+
+/** A scope's own top level, outside every block. */
+const TOP_LEVEL_BLOCK: BlockId = 0
+
 interface Scope {
   parent?: Scope
   names: Map<string, Binding>
+  // Blocks are not scopes in Monkey, but they are skippable: after an `if`, a
+  // name an arm rebound means either that arm's last `let` or the binding from
+  // before the branch, depending on which way the jump went
+  // (compiler/symbol_table.rs). Both are therefore live at every read after
+  // the block, and both must end up under one name — so the model here folds
+  // them into one binding. Recording which block introduced each name is what
+  // tells that case apart from a redefinition inside one block, where a
+  // closure made in between keeps reading its own `let`.
+  definitionBlock: Map<string, BlockId>
+  currentBlock: BlockId
+  openBlocks: BlockId[]
+  nextBlock: BlockId
+}
+
+function createScope(parent?: Scope): Scope {
+  return {
+    parent,
+    names: new Map(),
+    definitionBlock: new Map(),
+    currentBlock: TOP_LEVEL_BLOCK,
+    openBlocks: [],
+    nextBlock: TOP_LEVEL_BLOCK + 1,
+  }
+}
+
+/**
+ * Opens a block. Every block gets an id of its own, so two sibling `if` arms
+ * defining the same name are redefinitions of one binding rather than two
+ * independent ones.
+ */
+function enterBlock(scope: Scope): void {
+  scope.openBlocks.push(scope.currentBlock)
+  scope.currentBlock = scope.nextBlock
+  scope.nextBlock += 1
+}
+
+function leaveBlock(scope: Scope): void {
+  scope.currentBlock = scope.openBlocks.pop() ?? TOP_LEVEL_BLOCK
+}
+
+/**
+ * The binding a `let` named `name` here would shadow for the code after the
+ * block, or `undefined` when there is none to shadow — either because nothing
+ * binds the name yet or because this very block bound it, in which case the
+ * `let` is an ordinary redefinition and takes a binding of its own.
+ *
+ * A `let` outside every block is not shadowing anything either: it runs
+ * unconditionally and displaces what came before it outright.
+ */
+function shadowedByBlock(scope: Scope, name: string): Binding | undefined {
+  if (scope.currentBlock === TOP_LEVEL_BLOCK) {
+    return undefined
+  }
+  const own = scope.names.get(name)
+  if (own) {
+    return scope.definitionBlock.get(name) === scope.currentBlock
+      ? undefined
+      : own
+  }
+  return scope.parent && resolve(scope.parent, name)
 }
 
 interface Context {
@@ -70,7 +136,7 @@ export function analyzeScopes(program: Program): ScopeAnalysis {
     forbiddenNames: new Set(BUILTIN_NAMES),
     safe: true,
   }
-  const root: Scope = { names: new Map() }
+  const root = createScope()
   for (const name of BUILTIN_NAMES) {
     define(root, createBinding(analysis, name, 'builtin', true))
   }
@@ -106,8 +172,18 @@ function createBinding(
   return binding
 }
 
-function define(scope: Scope, binding: Binding): void {
+function define(
+  scope: Scope,
+  binding: Binding,
+  block: BlockId = scope.currentBlock
+): void {
   scope.names.set(binding.originalName, binding)
+  scope.definitionBlock.set(binding.originalName, block)
+}
+
+/** Bindings the mangler may rename, and the only ones a block may rebind. */
+export function isUserBinding(binding: Binding): boolean {
+  return binding.kind === 'let' || binding.kind === 'parameter'
 }
 
 function resolve(scope: Scope, name: string): Binding | undefined {
@@ -135,6 +211,18 @@ function analyzeStatements(
   }
 }
 
+/** One `if` arm: its own block, mirroring compile_block_statement_as_value. */
+function analyzeBlock(
+  block: BlockStatement,
+  scope: Scope,
+  analysis: ScopeAnalysis,
+  context: Context
+): void {
+  enterBlock(scope)
+  analyzeStatements(block.body, scope, analysis, context)
+  leaveBlock(scope)
+}
+
 function analyzeStatement(
   statement: Statement,
   scope: Scope,
@@ -143,18 +231,42 @@ function analyzeStatement(
 ): void {
   switch (statement.type) {
     case 'Let': {
-      // Mirror Compiler::compile_stmt: the RHS sees the preceding binding.
-      const binding = createBinding(
-        analysis,
-        identifierName(statement),
-        'let',
-        false
-      )
-      binding.conditional = context.conditional
+      const name = identifierName(statement)
+      // A `let` in an `if` arm that shadows a binding from outside the arm
+      // joins it rather than starting a binding of its own: after the block
+      // the name means one or the other depending on which way the jump went,
+      // so both have to survive DCE together and be renamed alike
+      // (compiler/symbol_table.rs, #335).
+      const shadowed = shadowedByBlock(scope, name)
+      if (shadowed && !isUserBinding(shadowed)) {
+        // A block shadowing a class name or a builtin cannot be renamed into
+        // one binding with it; leave such a program alone rather than guess.
+        analysis.safe = false
+      }
+      const binding =
+        shadowed && isUserBinding(shadowed)
+          ? shadowed
+          : createBinding(analysis, name, 'let', false)
+
+      binding.conditional = binding.conditional || context.conditional
       binding.lets.push(statement)
       analysis.letBindings.set(statement, binding)
+      // Mirror Compiler::compile_stmt: the RHS sees the preceding binding,
+      // which for a joining `let` is the very binding it is about to write.
       analyzeExpression(statement.expr, scope, analysis, context, binding)
-      define(scope, binding)
+      // A joining `let` leaves the name owned by the block it came from — the
+      // enclosing scope counts as this scope's top level — so a second `let`
+      // of it in this same arm joins as well. The arm's last one is what a
+      // read after the block sees, and it only carries the right name if it is
+      // the same binding. Leaving the block therefore restores nothing: the
+      // name never moved, and the next `let` outside the arm binds anew.
+      define(
+        scope,
+        binding,
+        shadowed
+          ? scope.definitionBlock.get(name) ?? TOP_LEVEL_BLOCK
+          : scope.currentBlock
+      )
       return
     }
     case 'ReturnStatement':
@@ -199,7 +311,7 @@ function analyzeMethod(
   analysis: ScopeAnalysis,
   _context: Context
 ): void {
-  const scope: Scope = { parent, names: new Map() }
+  const scope = createScope(parent)
   define(scope, createBinding(analysis, 'this', 'this', true))
   for (const parameter of method.params) {
     const binding = createBinding(
@@ -225,7 +337,7 @@ function analyzeFunction(
   context: Context,
   selfBinding?: Binding
 ): void {
-  const scope: Scope = { parent, names: new Map() }
+  const scope = createScope(parent)
   if (declaration.name) {
     const binding =
       selfBinding ?? createBinding(analysis, declaration.name, 'let', true)
@@ -305,9 +417,9 @@ function analyzeExpression(
       // compiler's source order.
       analyzeExpression(expression.condition, scope, analysis, context)
       const branch = { ...context, conditional: true }
-      analyzeStatements(expression.consequent.body, scope, analysis, branch)
+      analyzeBlock(expression.consequent, scope, analysis, branch)
       if (expression.alternate) {
-        analyzeStatements(expression.alternate.body, scope, analysis, branch)
+        analyzeBlock(expression.alternate, scope, analysis, branch)
       }
       return
     }

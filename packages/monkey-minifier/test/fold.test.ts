@@ -122,9 +122,78 @@ describe('constant propagation', () => {
     )
   })
 
-  it('leaves conditional lets alone: their slot may never be written', () => {
+  it('keeps a let that a conditional block shadows', () => {
+    // Blocks are not scopes, and an arm is skippable: after the block the name
+    // means the arm's `let` or the one before the branch, whichever ran.
+    // Dropping the outer one would leave `puts(v)` reading an unwritten slot
+    // whenever the branch is skipped, and neither initializer can be
+    // propagated because the binding no longer has just one.
     expect(optimize('let v = 1; if (1 > 2) { let v = 2; }; puts(v);')).toBe(
+      'let v=1;if(false){let v=2;};puts(v);'
+    )
+    expect(
+      optimize('if (true) { let v = 1; } if (false) { let v = 2; } puts(v);')
+    ).toBe('if(true){let v=1;};if(false){let v=2;};puts(v);')
+    // Every `let` of the name in the arm joins that one binding, so the last
+    // of them stays under the same name as the binding it converges with.
+    expect(
+      optimize('let v = 1; if (1 > 2) { let v = 2; let v = 3; }; puts(v);')
+    ).toBe('let v=1;if(false){let v=2;let v=3;};puts(v);')
+  })
+
+  it('keeps a let that a conditional block in a nested scope shadows', () => {
+    // The binding an arm shadows can sit in an enclosing scope, and a skipped
+    // arm leaves the read after the block on that captured value. Mangling
+    // shows the two stay one name; renaming them apart would strand the read.
+    const source =
+      'let v = 1; let f = fn() { if (1 > 2) { let v = 2; } v }; f();'
+    expect(optimize(source)).toBe(
+      'let v=1;let f=fn(){if(false){let v=2;};v;};f();'
+    )
+    expect(minify(source).code).toBe(
+      'let a=1;let b=fn(){if(false){let a=2;};a;};b();'
+    )
+  })
+
+  it('leaves a program where a block shadows a builtin alone', () => {
+    // `len` cannot be renamed, so the arm's `let` and the builtin cannot be
+    // brought under one name; nothing in the program is touched.
+    expect(optimize('if (1 > 2) { let len = 5; }; puts(len("ab"));')).toBe(
+      'if(1>2){let len=5;};puts(len("ab"));'
+    )
+  })
+
+  it('starts a new binding at the first let after the block', () => {
+    // Once the arm closes the name is unconditional again, so this `let` takes
+    // a slot of its own (compiler/symbol_table.rs) — the closure keeps the
+    // value it captured, and the fresh binding has one initializer to
+    // propagate.
+    expect(
+      optimize(
+        'if (true) { let v = 1; let g = fn() { v }; }; let v = 2; g() + v;'
+      )
+    ).toBe('if(true){let v=1;let g=fn(){v;};};g()+2;')
+    expect(
+      optimize('let v = 1; if (1 > 2) { let v = 2; }; let v = 3; puts(v);')
+    ).toBe('if(false){let v=2;};puts(3);')
+  })
+
+  it('leaves a conditional let alone: its slot may never be written', () => {
+    expect(optimize('if (1 > 2) { let v = 2; }; puts(v);')).toBe(
       'if(false){let v=2;};puts(v);'
+    )
+  })
+
+  it('keeps a redeclaration inside one block separate', () => {
+    // Two `let`s at the same depth take a slot each, so the closure keeps the
+    // value it captured. Mangling shows the two `v`s stay distinct bindings.
+    const source =
+      'if (true) { let v = 1; let g = fn() { v }; let v = 2; g() + v }'
+    expect(optimize(source)).toBe(
+      'if(true){let v=1;let g=fn(){v;};let v=2;g()+v;};'
+    )
+    expect(minify(source).code).toBe(
+      'if(true){let a=1;let b=fn(){a;};let c=2;b()+c;};'
     )
   })
 
