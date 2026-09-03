@@ -701,6 +701,17 @@ AOT 通过 spill 后的闭包槽读取，局部递归不再依赖外层绑定是
 `let x = 1; let x = x + 2;` 的 RHS 解析到旧 `x`，最终得到 3；具名递归由上面的 Function scope 提供，
 不需要提前暴露未初始化的新 slot。普通 VM、gc VM、AOT 快照和 Linux AArch64 E2E 都有对应回归语料。
 
+每个 `let` 分到自己的 slot 这一点没有例外，包括 `if` 分支里的 `let`。block 不是作用域——
+`if (true) { let inner = 1; } inner;` 求值为 `1`——但 block 是可以被跳过的，所以 block 之后的 read
+不能直接读分支内部那个 slot，否则分支没走时会读到未初始化的 `null`。
+
+编译器和 AOT lower 因此在分支之前为每个"分支可能重绑定的名字"（`symbol_table::shadowed_names`
+扫 AST 得到，宁可多算）额外申请一个 slot，用分支前的当前绑定 seed 它，并在每个 arm 结尾把该 arm
+最终的绑定拷进去；`if` 结束后名字改指这个 slot。于是走了哪个 arm 就得到哪个 arm 的值，两个 arm
+都没走就保持分支前的值，而 arm 内部连续的同名 `let` 仍各占一个 slot，其间创建的闭包读到的仍是
+它捕获的那个。分支之前创建的闭包同理不受影响：它捕获的是旧 slot，收敛拷贝只写新 slot。
+AOT 的累加器模型下，这些拷贝夹在 `push_acc` / `pop` 之间，block 自身的值不受影响。
+
 ## 14. 后续演进
 
 - 已知顶层函数调用点直连 `bl`，跳过 `rt_call` 分发；已知 builtin 可跳过 callee 类型判别，

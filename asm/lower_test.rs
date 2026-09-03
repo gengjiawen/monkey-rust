@@ -180,6 +180,22 @@ fn builtins_do_not_occupy_global_slots() {
 }
 
 #[test]
+fn a_let_inside_a_block_converges_on_a_slot_picked_before_it() {
+    // Blocks are not scopes, so the read after the branch means whatever the
+    // block bound — but the block is skippable, so that cannot be the block's
+    // own slot or the read lands on unwritten memory (see #335). The branch
+    // gets a slot of its own, seeded before the jump and written by the arm.
+    let text = assembly("let x = 1; if (false) { let x = 2; } x;");
+    assert!(text.contains("3 global slot(s)"), "{}", text);
+    assert!(text.contains("shadow x"), "{}", text);
+
+    // Two `let`s in one block still take a slot each (here: x, f, x, plus the
+    // shadow), so a closure made between them keeps reading what it captured.
+    let text = assembly("if (true) { let x = 1; let f = fn() { x }; let x = 2; f() };");
+    assert!(text.contains("3 global slot(s)"), "{}", text);
+}
+
+#[test]
 fn type_annotations_lower_to_identical_assembly() {
     // The native backend erases annotations too (design §6): every emitted
     // instruction has to match the unannotated program's. Only the trailing
