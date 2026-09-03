@@ -89,7 +89,7 @@ pub fn len(args: Vec<Rc<Object>>) -> Rc<Object> {
     Rc::from(match &*args[0] {
         Object::String(s) => Object::Integer(s.len() as i64),
         Object::Array(a) => Object::Integer(a.len() as i64),
-        o => Object::Error(format!("builtin len not supported for for type {}", o)),
+        o => Object::Error(format!("builtin len not supported for type {}", o)),
     })
 }
 
@@ -107,7 +107,7 @@ pub fn first(args: Vec<Rc<Object>>) -> Rc<Object> {
             Some(obj) => Rc::clone(obj),
             None => Rc::new(Object::Null),
         },
-        o => Rc::new(Object::Error(format!("builtin first not supported for for type {}", o))),
+        o => Rc::new(Object::Error(format!("builtin first not supported for type {}", o))),
     }
 }
 
@@ -120,7 +120,7 @@ pub fn last(args: Vec<Rc<Object>>) -> Rc<Object> {
             Some(obj) => Rc::clone(obj),
             None => Rc::new(Object::Null),
         },
-        o => Rc::new(Object::Error(format!("builtin last not supported for for type {}", o))),
+        o => Rc::new(Object::Error(format!("builtin last not supported for type {}", o))),
     }
 }
 
@@ -137,7 +137,7 @@ pub fn rest(args: Vec<Rc<Object>>) -> Rc<Object> {
             }
             return Rc::new(Object::Null);
         }
-        o => Rc::new(Object::Error(format!("builtin rest not supported for for type {}", o))),
+        o => Rc::new(Object::Error(format!("builtin rest not supported for type {}", o))),
     }
 }
 
@@ -151,6 +151,6 @@ pub fn push(args: Vec<Rc<Object>>) -> Rc<Object> {
             new_array.push(Rc::clone(&args[1]));
             return Rc::new(Object::Array(new_array));
         }
-        o => Rc::new(Object::Error(format!("builtin push not supported for for type {}", o))),
+        o => Rc::new(Object::Error(format!("builtin push not supported for type {}", o))),
     }
 }

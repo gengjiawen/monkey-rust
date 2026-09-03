@@ -16,8 +16,8 @@ use crate::report::{
 };
 use crate::value::{
     alloc_value, call_builtin_with_output, export_object, get_value, get_value_mut, import_object,
-    try_export_object, value_to_string, GcBoundMethod, GcClass, GcClosure, GcInstance, HashKey,
-    Value,
+    try_export_object, value_to_string, values_equal, GcBoundMethod, GcClass, GcClosure,
+    GcInstance, HashKey, Value,
 };
 use crate::{GcHeap, GcId, GcRef};
 
@@ -804,16 +804,30 @@ impl GcVM {
         let (right, left) = self.pop_owned_pair()?;
         let left_value = get_value(&self.heap, left).clone();
         let right_value = get_value(&self.heap, right).clone();
+        // Checked arithmetic, matching the tree-walking interpreter and the
+        // bytecode VM word for word (design §10.1). Wrapping here silently
+        // produced a different answer than the other backends' runtime error.
+        let overflow = |operation: &str| {
+            (GcRuntimeErrorKind::Arithmetic, format!("integer overflow in {}", operation))
+        };
         let result = match (&left_value, &right_value) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
-                Opcode::OpAdd => Ok(Value::Integer(l.wrapping_add(*r))),
-                Opcode::OpSub => Ok(Value::Integer(l.wrapping_sub(*r))),
-                Opcode::OpMul => Ok(Value::Integer(l.wrapping_mul(*r))),
-                Opcode::OpDiv if *r != 0 => {
-                    l.checked_div(*r).map(Value::Integer).ok_or_else(|| {
-                        (GcRuntimeErrorKind::Arithmetic, "integer overflow in division".to_string())
-                    })
-                }
+                Opcode::OpAdd => l
+                    .checked_add(*r)
+                    .map(Value::Integer)
+                    .ok_or_else(|| overflow("addition")),
+                Opcode::OpSub => l
+                    .checked_sub(*r)
+                    .map(Value::Integer)
+                    .ok_or_else(|| overflow("subtraction")),
+                Opcode::OpMul => l
+                    .checked_mul(*r)
+                    .map(Value::Integer)
+                    .ok_or_else(|| overflow("multiplication")),
+                Opcode::OpDiv if *r != 0 => l
+                    .checked_div(*r)
+                    .map(Value::Integer)
+                    .ok_or_else(|| overflow("division")),
                 Opcode::OpDiv => {
                     Err((GcRuntimeErrorKind::Arithmetic, "division by zero".to_string()))
                 }
@@ -841,37 +855,20 @@ impl GcVM {
 
     fn execute_comparison(&mut self, opcode: Opcode) -> Result<(), GcClassifiedRuntimeError> {
         let (right, left) = self.pop_owned_pair()?;
-        let result = match (get_value(&self.heap, left), get_value(&self.heap, right)) {
-            (Value::Integer(l), Value::Integer(r)) => match opcode {
-                Opcode::OpEqual => Some(l == r),
-                Opcode::OpNotEqual => Some(l != r),
-                Opcode::OpGreaterThan => Some(l > r),
-                Opcode::OpLessThan => Some(l < r),
-                _ => unreachable!(),
-            },
-            (Value::Boolean(l), Value::Boolean(r)) => match opcode {
-                Opcode::OpEqual => Some(l == r),
-                Opcode::OpNotEqual => Some(l != r),
+        // `==` and `!=` are total: every pair of values compares, and values of
+        // different types are unequal rather than a type error (design §10.1).
+        // Only `>` and `<` are integer-only.
+        let result = match opcode {
+            Opcode::OpEqual => Some(values_equal(&self.heap, left, right)),
+            Opcode::OpNotEqual => Some(!values_equal(&self.heap, left, right)),
+            _ => match (get_value(&self.heap, left), get_value(&self.heap, right)) {
+                (Value::Integer(l), Value::Integer(r)) => match opcode {
+                    Opcode::OpGreaterThan => Some(l > r),
+                    Opcode::OpLessThan => Some(l < r),
+                    _ => unreachable!(),
+                },
                 _ => None,
             },
-            (Value::String(l), Value::String(r)) => match opcode {
-                Opcode::OpEqual => Some(l == r),
-                Opcode::OpNotEqual => Some(l != r),
-                _ => None,
-            },
-            (Value::Null, Value::Null) => match opcode {
-                Opcode::OpEqual => Some(true),
-                Opcode::OpNotEqual => Some(false),
-                _ => None,
-            },
-            (Value::Class(_), Value::Class(_))
-            | (Value::Instance(_), Value::Instance(_))
-            | (Value::BoundMethod(_), Value::BoundMethod(_)) => match opcode {
-                Opcode::OpEqual => Some(left == right),
-                Opcode::OpNotEqual => Some(left != right),
-                _ => None,
-            },
-            _ => None,
         };
         let message = if result.is_none() {
             Some(format!(
@@ -893,27 +890,30 @@ impl GcVM {
 
     fn execute_minus_operation(&mut self) -> Result<(), GcClassifiedRuntimeError> {
         let operand = self.pop_owned()?;
+        // Checked, so `-(-9223372036854775808)` raises the same runtime error
+        // here as in the other backends instead of wrapping (design §10.1).
         let negated = match get_value(&self.heap, operand) {
-            Value::Integer(value) => Some(value.wrapping_neg()),
-            _ => None,
+            Value::Integer(value) => value.checked_neg().ok_or((
+                GcRuntimeErrorKind::Arithmetic,
+                "integer overflow in negation".to_string(),
+            )),
+            _ => Err((
+                GcRuntimeErrorKind::Type,
+                format!("unsupported type for negation: {}", value_to_string(&self.heap, operand)),
+            )),
         };
-        let message = negated.is_none().then(|| {
-            format!("unsupported type for negation: {}", value_to_string(&self.heap, operand))
-        });
         self.heap.free(operand);
-        if let Some(negated) = negated {
-            self.alloc_and_push(Value::Integer(negated))
-        } else {
-            Err(self.runtime_error(GcRuntimeErrorKind::Type, message.unwrap()))
+        match negated {
+            Ok(negated) => self.alloc_and_push(Value::Integer(negated)),
+            Err((kind, message)) => Err(self.runtime_error(kind, message)),
         }
     }
 
     fn execute_bang_operation(&mut self) -> Result<(), GcClassifiedRuntimeError> {
         let operand = self.pop_owned()?;
-        let result = match get_value(&self.heap, operand) {
-            Value::Boolean(l) => !l,
-            _ => false,
-        };
+        // `!v` is the logical inverse of truthiness, so `!null` is `true`
+        // (design §10.1); anything else disagrees with `if (null)`.
+        let result = !is_truthy(&self.heap, operand);
         self.heap.free(operand);
         self.alloc_and_push(Value::Boolean(result))
     }
@@ -1406,11 +1406,7 @@ impl GcVM {
 }
 
 fn is_truthy(heap: &GcHeap, condition: GcRef) -> bool {
-    match get_value(heap, condition) {
-        Value::Boolean(b) => *b,
-        Value::Null => false,
-        _ => true,
-    }
+    return get_value(heap, condition).is_truthy();
 }
 
 fn callee_kind(heap: &GcHeap, reference: GcRef) -> CalleeKind {

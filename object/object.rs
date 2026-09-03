@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
@@ -88,8 +88,9 @@ impl fmt::Display for Object {
             ),
             Object::Hash(map) => write!(
                 f,
-                "[{}]",
-                map.iter()
+                "{{{}}}",
+                sorted_hash_entries(map.iter())
+                    .iter()
                     .map(|(k, v)| format!("{}: {}", k, v))
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -109,6 +110,39 @@ impl fmt::Display for Object {
                 write!(f, "[bound method {}.{}]", class_name, method.name)
             }
         }
+    }
+}
+
+/// Hash entries in the canonical order every backend renders them in:
+/// `(key type rank, canonical key bytes)` with integer=0, boolean=1, string=2
+/// (arm64 backend design §10.2). `HashMap` iteration order is unspecified and
+/// varies run to run, so a display that walked the map directly would print
+/// the same hash differently on two runs of the same program.
+fn sorted_hash_entries<'a>(
+    map: impl Iterator<Item = (&'a Rc<Object>, &'a Rc<Object>)>,
+) -> Vec<(&'a Rc<Object>, &'a Rc<Object>)> {
+    let mut entries = map.collect::<Vec<_>>();
+    entries.sort_by_key(|(key, _)| (hash_key_rank(key), hash_key_canonical_bytes(key)));
+    entries
+}
+
+fn hash_key_rank(key: &Object) -> u8 {
+    match key {
+        Object::Integer(_) => 0,
+        Object::Boolean(_) => 1,
+        Object::String(_) => 2,
+        // Unreachable for hashes the runtimes build: `is_hashable` rejects
+        // every other variant before it can become a key.
+        _ => 3,
+    }
+}
+
+fn hash_key_canonical_bytes(key: &Object) -> Vec<u8> {
+    match key {
+        Object::Integer(raw) => raw.to_string().into_bytes(),
+        Object::Boolean(raw) => raw.to_string().into_bytes(),
+        Object::String(raw) => raw.clone().into_bytes(),
+        other => other.to_string().into_bytes(),
     }
 }
 
@@ -141,38 +175,105 @@ impl fmt::Debug for Object {
 }
 
 impl PartialEq for Object {
+    /// Structural, and driven by an explicit worklist rather than by the call
+    /// stack. Nesting depth is a property of the *data*, and `a == b` is a
+    /// single step for every backend, so an array a few thousand levels deep —
+    /// which no engine has any other trouble with — would answer by
+    /// overflowing the native stack. `gc::value::values_equal` mirrors this.
+    ///
+    /// `seen` memoises: reaching a pair a second time means the first visit
+    /// did not disprove it, because any inequality returns immediately. It
+    /// also keeps a shared subtree from being compared once per path into it.
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Object::Integer(left), Object::Integer(right)) => left == right,
-            (Object::Boolean(left), Object::Boolean(right)) => left == right,
-            (Object::String(left), Object::String(right)) => left == right,
-            (Object::Array(left), Object::Array(right)) => left == right,
-            (Object::Hash(left), Object::Hash(right)) => left == right,
-            (Object::Null, Object::Null) => true,
-            (Object::ReturnValue(left), Object::ReturnValue(right)) => left == right,
-            (
-                Object::Function(left_params, left_body, left_env),
-                Object::Function(right_params, right_body, right_env),
-            ) => {
-                left_params == right_params
-                    && left_body == right_body
-                    && Rc::ptr_eq(left_env, right_env)
+        let mut pending: Vec<(&Object, &Object)> = vec![(self, other)];
+        let mut seen: HashSet<(*const Object, *const Object)> = HashSet::new();
+
+        while let Some((left, right)) = pending.pop() {
+            if !seen.insert((left as *const Object, right as *const Object)) {
+                continue;
             }
-            (Object::Builtin(left), Object::Builtin(right)) => std::ptr::fn_addr_eq(*left, *right),
-            (Object::Error(left), Object::Error(right)) => left == right,
-            (Object::CompiledFunction(left), Object::CompiledFunction(right)) => left == right,
-            (Object::ClosureObj(left), Object::ClosureObj(right)) => left == right,
-            (Object::Class(left), Object::Class(right)) => Rc::ptr_eq(left, right),
-            (Object::Instance(left), Object::Instance(right)) => Rc::ptr_eq(left, right),
-            (Object::BoundMethod(left), Object::BoundMethod(right)) => Rc::ptr_eq(left, right),
-            _ => false,
+            let equal = match (left, right) {
+                (Object::Integer(left), Object::Integer(right)) => left == right,
+                (Object::Boolean(left), Object::Boolean(right)) => left == right,
+                (Object::String(left), Object::String(right)) => left == right,
+                (Object::Array(left), Object::Array(right)) => {
+                    left.len() == right.len() && {
+                        pending.extend(zip_deref(left, right));
+                        true
+                    }
+                }
+                (Object::Hash(left), Object::Hash(right)) => {
+                    // Keys are scalars (`is_hashable`), so the lookup itself
+                    // never nests; only the values can.
+                    left.len() == right.len()
+                        && left.iter().all(|(key, value)| match right.get(key) {
+                            Some(other) => {
+                                pending.push((value, other));
+                                true
+                            }
+                            None => false,
+                        })
+                }
+                (Object::Null, Object::Null) => true,
+                (Object::ReturnValue(left), Object::ReturnValue(right)) => {
+                    pending.push((left, right));
+                    true
+                }
+                (
+                    Object::Function(left_params, left_body, left_env),
+                    Object::Function(right_params, right_body, right_env),
+                ) => {
+                    left_params == right_params
+                        && left_body == right_body
+                        && Rc::ptr_eq(left_env, right_env)
+                }
+                (Object::Builtin(left), Object::Builtin(right)) => {
+                    std::ptr::fn_addr_eq(*left, *right)
+                }
+                (Object::Error(left), Object::Error(right)) => left == right,
+                (Object::CompiledFunction(left), Object::CompiledFunction(right)) => left == right,
+                (Object::ClosureObj(left), Object::ClosureObj(right)) => {
+                    left.func == right.func && left.free.len() == right.free.len() && {
+                        pending.extend(zip_deref(&left.free, &right.free));
+                        true
+                    }
+                }
+                (Object::Class(left), Object::Class(right)) => Rc::ptr_eq(left, right),
+                (Object::Instance(left), Object::Instance(right)) => Rc::ptr_eq(left, right),
+                (Object::BoundMethod(left), Object::BoundMethod(right)) => Rc::ptr_eq(left, right),
+                _ => false,
+            };
+            if !equal {
+                return false;
+            }
         }
+        return true;
     }
+}
+
+fn zip_deref<'a>(
+    left: &'a [Rc<Object>],
+    right: &'a [Rc<Object>],
+) -> impl Iterator<Item = (&'a Object, &'a Object)> {
+    left.iter()
+        .map(Rc::as_ref)
+        .zip(right.iter().map(Rc::as_ref))
 }
 
 impl Eq for Object {}
 
 impl Object {
+    /// Frozen truthiness (arm64 backend design §10.1): only `false` and `null`
+    /// are falsy, and `!v` is exactly `!v.is_truthy()`. Every backend routes
+    /// both `if` and `!` through this one definition.
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Object::Boolean(value) => return *value,
+            Object::Null => return false,
+            _ => return true,
+        }
+    }
+
     pub fn is_hashable(&self) -> bool {
         match self {
             Object::Integer(_) | Object::Boolean(_) | Object::String(_) => return true,

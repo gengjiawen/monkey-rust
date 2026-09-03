@@ -264,6 +264,7 @@ dependencies = [
  "byteorder",
  "insta",
  "monkey-compiler",
+ "monkey-interpreter",
  "monkey-object",
  "monkey-parser",
  "serde",

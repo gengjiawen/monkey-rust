@@ -155,6 +155,23 @@ pub enum HashKey {
 }
 
 impl HashKey {
+    /// Rank + canonical bytes ordering used by displays (design §10.2).
+    fn rank(&self) -> u8 {
+        match self {
+            HashKey::Integer(_) => 0,
+            HashKey::Boolean(_) => 1,
+            HashKey::String(_) => 2,
+        }
+    }
+
+    fn canonical_bytes(&self) -> Vec<u8> {
+        match self {
+            HashKey::Integer(raw) => raw.to_string().into_bytes(),
+            HashKey::Boolean(raw) => raw.to_string().into_bytes(),
+            HashKey::String(raw) => raw.clone().into_bytes(),
+        }
+    }
+
     pub fn kind(&self) -> HashKeyKind {
         match self {
             HashKey::Integer(_) => HashKeyKind::Integer,
@@ -175,6 +192,17 @@ impl GcObject for ValueCell {
 }
 
 impl Value {
+    /// Frozen truthiness (arm64 backend design §10.1): only `false` and `null`
+    /// are falsy, and `!v` is exactly `!v.is_truthy()`. Mirrors
+    /// [`object::Object::is_truthy`], which the other two backends use.
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Boolean(value) => return *value,
+            Value::Null => return false,
+            _ => return true,
+        }
+    }
+
     pub fn kind(&self) -> ValueKind {
         match self {
             Value::Class(_) => ValueKind::Class,
@@ -454,10 +482,10 @@ fn format_value(heap: &GcHeap, value: &Value, visited: &mut HashSet<usize>) -> S
             format!("[{}]", parts)
         }
         Value::Hash(map) => {
-            let parts = map
-                .iter()
+            let parts = sorted_hash_entries(map)
+                .into_iter()
                 .map(|(k, v)| {
-                    format!("{}: {}", format_hash_key(k), format_reference(heap, *v, visited))
+                    format!("{}: {}", format_hash_key(k), format_reference(heap, v, visited))
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
@@ -490,12 +518,97 @@ fn instance_class_name(heap: &GcHeap, instance: GcRef) -> String {
     }
 }
 
+/// Hash entries in the canonical order every backend renders them in:
+/// `(key type rank, canonical key bytes)` with integer=0, boolean=1, string=2
+/// (arm64 backend design §10.2). Without this, the same hash prints in a
+/// different order on different runs, because `HashMap` iteration order is
+/// unspecified.
+pub fn sorted_hash_entries(map: &HashMap<HashKey, GcRef>) -> Vec<(&HashKey, GcRef)> {
+    let mut entries = map
+        .iter()
+        .map(|(key, value)| (key, *value))
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|(key, _)| (key.rank(), key.canonical_bytes()));
+    entries
+}
+
 fn format_hash_key(key: &HashKey) -> String {
     match key {
         HashKey::Integer(i) => i.to_string(),
         HashKey::Boolean(b) => b.to_string(),
         HashKey::String(s) => s.clone(),
     }
+}
+
+/// Frozen equality (arm64 backend design §10.1), the `GcRef` mirror of
+/// `impl PartialEq for object::Object`: scalars compare by value, arrays and
+/// hashes compare recursively and independently of iteration order, classes,
+/// instances and bound methods compare by identity, and two values of
+/// different types are simply unequal — never a type error.
+///
+/// The comparison runs on an explicit worklist rather than the call stack.
+/// Nesting depth is a property of the *data*, and one `OpEqual` can be handed
+/// an array thousands of levels deep, which the instruction budget cannot see
+/// and a recursive walk would answer by overflowing the native stack.
+///
+/// `assumed` doubles as the cycle guard and as a memo: reaching a pair a
+/// second time means the first visit did not disprove it (any inequality
+/// returns immediately), so it is equal, or still in progress and assumed
+/// equal — the co-inductive reading that lets two structurally identical
+/// cyclic graphs compare equal. Memoising also keeps a shared subtree from
+/// being compared once per path into it.
+pub fn values_equal(heap: &GcHeap, left: GcRef, right: GcRef) -> bool {
+    let mut pending = vec![(left, right)];
+    let mut assumed: HashSet<(usize, usize)> = HashSet::new();
+
+    while let Some((left, right)) = pending.pop() {
+        if left == right || !assumed.insert((left.0, right.0)) {
+            continue;
+        }
+        let equal = match (get_value(heap, left), get_value(heap, right)) {
+            (Value::Integer(l), Value::Integer(r)) => l == r,
+            (Value::Boolean(l), Value::Boolean(r)) => l == r,
+            (Value::String(l), Value::String(r)) => l == r,
+            (Value::Null, Value::Null) => true,
+            (Value::Error(l), Value::Error(r)) => l == r,
+            (Value::Builtin(l), Value::Builtin(r)) => l == r,
+            (Value::CompiledFunction(l), Value::CompiledFunction(r)) => l == r,
+            (Value::Array(l), Value::Array(r)) => {
+                l.len() == r.len() && {
+                    pending.extend(l.iter().copied().zip(r.iter().copied()));
+                    true
+                }
+            }
+            (Value::Hash(l), Value::Hash(r)) => {
+                // Keys are scalars, so the lookup never nests; values can.
+                l.len() == r.len()
+                    && l.iter().all(|(key, value)| match r.get(key) {
+                        Some(other) => {
+                            pending.push((*value, *other));
+                            true
+                        }
+                        None => false,
+                    })
+            }
+            (Value::Closure(l), Value::Closure(r)) => {
+                l.free.len() == r.free.len() && {
+                    pending.push((l.func, r.func));
+                    pending.extend(l.free.iter().copied().zip(r.free.iter().copied()));
+                    true
+                }
+            }
+            // Identity only: `left == right` above already covered it, and two
+            // distinct objects are never equal even with identical fields.
+            (Value::Class(_), Value::Class(_))
+            | (Value::Instance(_), Value::Instance(_))
+            | (Value::BoundMethod(_), Value::BoundMethod(_)) => false,
+            _ => false,
+        };
+        if !equal {
+            return false;
+        }
+    }
+    return true;
 }
 
 pub fn import_object(heap: &mut GcHeap, object: &Object) -> GcRef {
@@ -638,7 +751,7 @@ pub fn call_builtin_with_output(
                 _ => alloc_value(
                     heap,
                     Value::Error(format!(
-                        "builtin len not supported for for type {}",
+                        "builtin len not supported for type {}",
                         value_to_string(heap, args[0])
                     )),
                 ),
@@ -678,7 +791,7 @@ pub fn call_builtin_with_output(
                     return alloc_value(
                         heap,
                         Value::Error(format!(
-                            "builtin {} not supported for for type {}",
+                            "builtin {} not supported for type {}",
                             name,
                             value_to_string(heap, args[0])
                         )),
@@ -717,7 +830,7 @@ pub fn call_builtin_with_output(
                     return alloc_value(
                         heap,
                         Value::Error(format!(
-                            "builtin push not supported for for type {}",
+                            "builtin push not supported for type {}",
                             value_to_string(heap, args[0])
                         )),
                     )

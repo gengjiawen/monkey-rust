@@ -433,10 +433,11 @@ impl VM {
 
     fn execute_bang_operation(&mut self) -> VmResult<()> {
         let operand = self.pop();
-        match operand.as_ref() {
-            Object::Boolean(l) => self.push(Rc::from(Object::Boolean(!*l))),
-            _ => self.push(Rc::from(Object::Boolean(false))),
-        }
+        // `!v` is the logical inverse of truthiness, so `!null` is `true`
+        // (design §10.1). Treating every non-boolean as truthy here would make
+        // `!null` disagree with `if (null)`.
+        let negated = !self.is_truthy(operand);
+        self.push(Rc::from(Object::Boolean(negated)))
     }
 
     pub fn last_popped_stack_elm(&self) -> Option<Rc<Object>> {
@@ -458,11 +459,7 @@ impl VM {
         Ok(())
     }
     fn is_truthy(&self, condition: Rc<Object>) -> bool {
-        match condition.as_ref() {
-            Object::Boolean(b) => *b,
-            Object::Null => false,
-            _ => true,
-        }
+        condition.is_truthy()
     }
     fn build_array(&self, start: usize, end: usize) -> Vec<Rc<Object>> {
         let mut elements = Vec::with_capacity(end - start);

@@ -208,16 +208,16 @@ mod tests {
         // A failing builtin aborts the program, the same way the interpreter
         // and the asm backend do; the message must never survive as a value.
         let tests = [
-            ("len(1);", "builtin len not supported for for type 1"),
+            ("len(1);", "builtin len not supported for type 1"),
             ("len(\"one\", \"two\");", "builtin len expected 1 argument, got 2"),
             ("first();", "builtin first expected 1 argument, got 0"),
-            ("first(1);", "builtin first not supported for for type 1"),
+            ("first(1);", "builtin first not supported for type 1"),
             ("first([1], [2]);", "builtin first expected 1 argument, got 2"),
-            ("last(1);", "builtin last not supported for for type 1"),
+            ("last(1);", "builtin last not supported for type 1"),
             ("last([1], [2]);", "builtin last expected 1 argument, got 2"),
-            ("rest(1);", "builtin rest not supported for for type 1"),
+            ("rest(1);", "builtin rest not supported for type 1"),
             ("rest([1], [2]);", "builtin rest expected 1 argument, got 2"),
-            ("push(1, 1);", "builtin push not supported for for type 1"),
+            ("push(1, 1);", "builtin push not supported for type 1"),
             ("push([1]);", "builtin push expected 2 arguments, got 1"),
             ("push([1], 2, 3);", "builtin push expected 2 arguments, got 3"),
         ];
@@ -248,7 +248,7 @@ mod tests {
             let error = vm_runtime_error(input);
             assert_eq!(error.kind, VmRuntimeErrorKind::Call, "input: {:?}", input);
             assert_eq!(
-                error.message, "builtin len not supported for for type 1",
+                error.message, "builtin len not supported for type 1",
                 "input: {:?}",
                 input
             );

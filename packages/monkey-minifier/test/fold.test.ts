@@ -8,7 +8,6 @@ describe('constant folding and conservative DCE', () => {
 
   it.each([
     ['40 + 2', '42;'],
-    ['9223372036854775807 + 2', '-9223372036854775807;'],
     ['"mon" + "key"', '"monkey";'],
     ['1 < 2 == true', 'true;'],
     ['!!1', 'true;'],
@@ -19,9 +18,20 @@ describe('constant folding and conservative DCE', () => {
 
   it('retains arithmetic errors and unprintable i64::MIN results', () => {
     expect(optimize('1 / 0')).toBe('1/0;')
-    expect(optimize('9223372036854775807 + 1')).toBe('9223372036854775807+1;')
     expect(optimize('(-9223372036854775807 - 1) / -1')).toBe(
       '(-9223372036854775807-1)/-1;'
+    )
+  })
+
+  it('leaves overflowing arithmetic for the runtime to reject', () => {
+    // Every backend raises on overflow, so folding to the wrapped value would
+    // replace a runtime error with a wrong answer.
+    expect(optimize('9223372036854775807 + 1')).toBe('9223372036854775807+1;')
+    expect(optimize('9223372036854775807 + 2')).toBe('9223372036854775807+2;')
+    expect(optimize('-9223372036854775807 - 2')).toBe('-9223372036854775807-2;')
+    expect(optimize('9223372036854775807 * 2')).toBe('9223372036854775807*2;')
+    expect(optimize('-(-9223372036854775807 - 1)')).toBe(
+      '-(-9223372036854775807-1);'
     )
   })
 
