@@ -537,7 +537,7 @@ builtin error 和 HashMap Display 都存在差异。里程碑 0 必须先合入�
 | truthiness / `!`   | 只有 `false`、`null` 为假；`!v` 严格等于 `!truthy(v)`，因此 `!null == true`、`!0 == false`             |
 | 整数               | 值域为 `i64`；SMI/boxed 只是表示差异；所有算术按 §5.2 checked-fatal，除零单独分类                      |
 | scalar 相等        | integer 按 raw 值（SMI 与 boxed 可相等），boolean/string/null 按值，builtin 按 id                      |
-| aggregate 相等     | array 逐元素、hash 按键值集合递归比较，与插入/迭代顺序无关                                             |
+| aggregate 相等     | array 逐元素、hash 按键值集合递归比较，与插入/迭代顺序无关；嵌套深度由数据决定，实现必须显式 worklist  |
 | identity 相等      | closure、class、instance、bound method 按同一次执行中的对象身份；不同类型 `== false`、`!= true`        |
 | 大小比较           | `>`/`<` 只接受 integer；其他组合为 `TypeError`                                                         |
 | 索引               | 数组越界和 hash 缺键返回 `null`；错误容器/索引类型为 `TypeError`；非法 hash key 为 `InvalidHashKey`    |

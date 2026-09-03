@@ -11,6 +11,7 @@ import {
   BOOL,
   INT,
   STRING,
+  isNullable,
   joinAll,
   members,
   optional,
@@ -127,22 +128,33 @@ export type EqualityVerdict = { ok: true } | { ok: false; reason: 'mixed' }
  * is whether its answer is already known at check time.
  */
 export function inferEquality(left: Type, right: Type): EqualityVerdict {
+  // The answer is only known when *no* pair of members can be equal. A union
+  // stands for one of its members, so `(int | string) == int` is not decided
+  // at check time: the `int` member of the left makes it a real question, and
+  // warning on it would flag the very test that tells the members apart.
+  //
+  // `null` is a value like any other and two nulls are equal, so a comparison
+  // with a nullable type on both sides can come out true whatever the rest of
+  // the members are.
+  if (isNullable(left) && isNullable(right)) {
+    return { ok: true }
+  }
+
   const lefts = members(stripNull(left))
   const rights = members(stripNull(right))
 
-  for (const leftMember of lefts) {
-    for (const rightMember of rights) {
-      if (leftMember.kind === 'any' || rightMember.kind === 'any') {
-        continue
-      }
-      // Identity comparisons never require the same class: `new A() == new B()`
-      // is legal in every backend and constantly false.
-      if (leftMember.kind !== rightMember.kind) {
-        return { ok: false, reason: 'mixed' }
-      }
-    }
-  }
-  return { ok: true }
+  // Identity comparisons never require the same class: `new A() == new B()`
+  // is legal in every backend and constantly false, so `instance` matching
+  // `instance` is enough.
+  const canBeEqual = lefts.some((leftMember) =>
+    rights.some(
+      (rightMember) =>
+        leftMember.kind === 'any' ||
+        rightMember.kind === 'any' ||
+        leftMember.kind === rightMember.kind
+    )
+  )
+  return canBeEqual ? { ok: true } : { ok: false, reason: 'mixed' }
 }
 
 export type IndexVerdict =

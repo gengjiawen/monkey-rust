@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
@@ -175,33 +175,89 @@ impl fmt::Debug for Object {
 }
 
 impl PartialEq for Object {
+    /// Structural, and driven by an explicit worklist rather than by the call
+    /// stack. Nesting depth is a property of the *data*, and `a == b` is a
+    /// single step for every backend, so an array a few thousand levels deep —
+    /// which no engine has any other trouble with — would answer by
+    /// overflowing the native stack. `gc::value::values_equal` mirrors this.
+    ///
+    /// `seen` memoises: reaching a pair a second time means the first visit
+    /// did not disprove it, because any inequality returns immediately. It
+    /// also keeps a shared subtree from being compared once per path into it.
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Object::Integer(left), Object::Integer(right)) => left == right,
-            (Object::Boolean(left), Object::Boolean(right)) => left == right,
-            (Object::String(left), Object::String(right)) => left == right,
-            (Object::Array(left), Object::Array(right)) => left == right,
-            (Object::Hash(left), Object::Hash(right)) => left == right,
-            (Object::Null, Object::Null) => true,
-            (Object::ReturnValue(left), Object::ReturnValue(right)) => left == right,
-            (
-                Object::Function(left_params, left_body, left_env),
-                Object::Function(right_params, right_body, right_env),
-            ) => {
-                left_params == right_params
-                    && left_body == right_body
-                    && Rc::ptr_eq(left_env, right_env)
+        let mut pending: Vec<(&Object, &Object)> = vec![(self, other)];
+        let mut seen: HashSet<(*const Object, *const Object)> = HashSet::new();
+
+        while let Some((left, right)) = pending.pop() {
+            if !seen.insert((left as *const Object, right as *const Object)) {
+                continue;
             }
-            (Object::Builtin(left), Object::Builtin(right)) => std::ptr::fn_addr_eq(*left, *right),
-            (Object::Error(left), Object::Error(right)) => left == right,
-            (Object::CompiledFunction(left), Object::CompiledFunction(right)) => left == right,
-            (Object::ClosureObj(left), Object::ClosureObj(right)) => left == right,
-            (Object::Class(left), Object::Class(right)) => Rc::ptr_eq(left, right),
-            (Object::Instance(left), Object::Instance(right)) => Rc::ptr_eq(left, right),
-            (Object::BoundMethod(left), Object::BoundMethod(right)) => Rc::ptr_eq(left, right),
-            _ => false,
+            let equal = match (left, right) {
+                (Object::Integer(left), Object::Integer(right)) => left == right,
+                (Object::Boolean(left), Object::Boolean(right)) => left == right,
+                (Object::String(left), Object::String(right)) => left == right,
+                (Object::Array(left), Object::Array(right)) => {
+                    left.len() == right.len() && {
+                        pending.extend(zip_deref(left, right));
+                        true
+                    }
+                }
+                (Object::Hash(left), Object::Hash(right)) => {
+                    // Keys are scalars (`is_hashable`), so the lookup itself
+                    // never nests; only the values can.
+                    left.len() == right.len()
+                        && left.iter().all(|(key, value)| match right.get(key) {
+                            Some(other) => {
+                                pending.push((value, other));
+                                true
+                            }
+                            None => false,
+                        })
+                }
+                (Object::Null, Object::Null) => true,
+                (Object::ReturnValue(left), Object::ReturnValue(right)) => {
+                    pending.push((left, right));
+                    true
+                }
+                (
+                    Object::Function(left_params, left_body, left_env),
+                    Object::Function(right_params, right_body, right_env),
+                ) => {
+                    left_params == right_params
+                        && left_body == right_body
+                        && Rc::ptr_eq(left_env, right_env)
+                }
+                (Object::Builtin(left), Object::Builtin(right)) => {
+                    std::ptr::fn_addr_eq(*left, *right)
+                }
+                (Object::Error(left), Object::Error(right)) => left == right,
+                (Object::CompiledFunction(left), Object::CompiledFunction(right)) => left == right,
+                (Object::ClosureObj(left), Object::ClosureObj(right)) => {
+                    left.func == right.func && left.free.len() == right.free.len() && {
+                        pending.extend(zip_deref(&left.free, &right.free));
+                        true
+                    }
+                }
+                (Object::Class(left), Object::Class(right)) => Rc::ptr_eq(left, right),
+                (Object::Instance(left), Object::Instance(right)) => Rc::ptr_eq(left, right),
+                (Object::BoundMethod(left), Object::BoundMethod(right)) => Rc::ptr_eq(left, right),
+                _ => false,
+            };
+            if !equal {
+                return false;
+            }
         }
+        return true;
     }
+}
+
+fn zip_deref<'a>(
+    left: &'a [Rc<Object>],
+    right: &'a [Rc<Object>],
+) -> impl Iterator<Item = (&'a Object, &'a Object)> {
+    left.iter()
+        .map(Rc::as_ref)
+        .zip(right.iter().map(Rc::as_ref))
 }
 
 impl Eq for Object {}

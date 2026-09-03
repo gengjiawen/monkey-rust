@@ -194,6 +194,40 @@ fn test_equality_is_total_and_structural() {
     ]);
 }
 
+/// `let a1 = [a0]; let b1 = [b0]; ...` — two identical arrays nested `depth`
+/// levels deep, compared at the top. `equal` false makes the innermost
+/// elements differ, so the walk has to reach the bottom before it can answer.
+fn deeply_nested_equality(depth: usize, equal: bool) -> String {
+    let mut source = format!("let a0 = [0]; let b0 = [{}];", if equal { 0 } else { 1 });
+    for level in 1..=depth {
+        source.push_str(&format!(
+            "let a{level} = [a{prev}]; let b{level} = [b{prev}];",
+            level = level,
+            prev = level - 1
+        ));
+    }
+    source.push_str(&format!("a{depth} == b{depth}", depth = depth));
+    return source;
+}
+
+/// §10.1, equality on deep structures. Nesting depth is a property of the
+/// *data*: `a == b` is one instruction for every backend, so neither the
+/// instruction budget nor any other limit sees it coming, and all three used to
+/// answer a few-thousand-deep array by overflowing the native stack and
+/// aborting the process. Each backend now walks the structure iteratively.
+///
+/// 5000 is well past where the recursive versions died (they survived 2000)
+/// while staying under the depth at which dropping the interpreter's and
+/// bytecode VM's `Rc<Object>` chains recurses too far — a separate limit in
+/// teardown, not in the comparison.
+#[test]
+fn test_equality_on_deeply_nested_values_does_not_exhaust_the_stack() {
+    check(&[
+        (&deeply_nested_equality(5000, true), Expect::Value("true")),
+        (&deeply_nested_equality(5000, false), Expect::Value("false")),
+    ]);
+}
+
 /// §10.1, truthiness: only `false` and `null` are falsy, and `!v` is exactly
 /// `!truthy(v)`. Both VMs used to answer `false` for `!null` while branching
 /// on `null` as false — `!n` and `if (n)` contradicted each other.

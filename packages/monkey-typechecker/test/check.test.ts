@@ -244,6 +244,30 @@ describe('equality', () => {
   it('strips null first', () => {
     clean('let xs: [int] = [1]; first(xs) == 1;')
   })
+
+  it('lets a union through when one member can match', () => {
+    // `int | string` against `int`: the comparison is exactly how a program
+    // finds out which member it holds, so its answer is not known here.
+    const union = 'let c = true; let y = if (c) { 1 } else { "s" };'
+    clean(`${union} y == 1;`)
+    clean(`${union} y == "s";`)
+    clean(`${union} 1 == y;`)
+    // No member of either side can match, so the answer is known again.
+    expect(only(`${union} y == true;`).message).toBe(
+      "comparing 'int | string' with 'bool' is always false"
+    )
+  })
+
+  it('lets two nullables through — both can be null', () => {
+    const optionals =
+      'let xs: [int] = [1]; let ss: [string] = ["a"]; let x = first(xs); let s = first(ss);'
+    clean(`${optionals} x == s;`)
+    // Only one side can be null, so `null == null` is not reachable and no
+    // non-null member matches either.
+    expect(only(`${optionals} x == "a";`).message).toBe(
+      "comparing 'int?' with 'string' is always false"
+    )
+  })
 })
 
 // --- 7.4/7.5 indexing --------------------------------------------------------

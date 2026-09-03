@@ -387,7 +387,7 @@ let x: int = if (c) { 1 } else { "a" };
 - 操作数为 `Union`：先套用 7.1 的 union 消解通用规则（null-stripping 后逐成员检查，结果取各成员结果的 join），再对每个具体成员组合应用上面的 `Any` 规则。例如 `(int | string) + int` 报错——运行时可能命中 `string + int`，所有后端都会报错；`any + (int | string)` 得 `int | string`；`any + (int | bool)` 因 `any + bool` 的结果为 `any`，join 后坍缩为 `any`；而 `int? + 1` 剥离 `null` 后按 `int + int` 通过。
 - `==` / `!=` 不复用 assignability，使用独立的 **equality 矩阵**（null-stripping 后判定，任一侧 `Any` 豁免）：
   - **相等是全域的**：任意两个值都可比较，结果恒为 `bool`，永远不是类型错误。`int`、`bool`、`string`、`null` 按值比较；`Array`/`Hash` 递归结构比较且与迭代顺序无关；`Class`、`Instance`、bound method、closure 按 identity 比较（`new A() == new B()` 合法、恒 `false`，`Instance` 之间不要求同名 class）。四个后端在这点上已经对齐，运行时依据是 `gc/backend_parity_test.rs` 的差分语料。
-  - 类别不同 → `mixed-equality`，**warning 而非 error**：所有后端都静默返回 `false`（`!=` 返回 `true`），程序照常运行，只是这个答案通常不是作者想要的。任一侧 `any` 时豁免。
+  - **两侧没有任何一对成员可能相等** → `mixed-equality`，**warning 而非 error**：所有后端都静默返回 `false`（`!=` 返回 `true`），程序照常运行，只是这个答案通常不是作者想要的。任一侧 `any` 时豁免。判定逐对枚举 union 成员，只要存在一对同类别成员就不报：`(int | string) == int` 零诊断——这正是程序用来区分 union 成员的写法，答案在检查期并不知道。两侧都可空时同理（都可能是 `null`，而 `null == null` 为真），`int? == string?` 零诊断，只有一侧可空的 `int? == string` 照报。
 - `if` 条件不限制类型（运行时 truthiness 对一切值有定义，仅 `false` 与 `null` 为假）。
 
 **索引**（合法性规则；结果类型见 7.5 的表）：
@@ -553,7 +553,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 | -------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `type-mismatch`      | assignable 失败（let 标注、实参、字段写入、返回值）                                | `type 'string' is not assignable to type 'int'`                                                                         |
 | `operator-type`      | 运算符操作数不满足 7.4                                                             | `operator '+' expects 'int + int' or 'string + string', got 'int + string'`                                             |
-| `mixed-equality`     | `==`/`!=` 两侧类别不同（见 7.4 equality 矩阵；warning）                            | `comparing 'int' with 'string' is always false`                                                                         |
+| `mixed-equality`     | `==`/`!=` 两侧没有任何一对成员可能相等（见 7.4 equality 矩阵；warning）            | `comparing 'int' with 'string' is always false`                                                                         |
 | `arity-mismatch`     | 调用/`new` 参数个数不符                                                            | `Point constructor expects 2 arguments, got 3`                                                                          |
 | `not-callable`       | callee 静态类型不可调用                                                            | `type 'int' is not callable`                                                                                            |
 | `not-constructable`  | `new` 的 callee 不是 class                                                         | `cannot construct 'fn(int): int'`                                                                                       |
@@ -596,7 +596,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 - 每条 7.x 规则的正反用例；重点回归：`examples/hello.monkey` 原样通过且**零诊断**（异构 hash 经 union + any 参数不触发误报）。
 - 递归：fibonacci 未标注静默、标注 `: int` 后对 `return "a"` 报 `type-mismatch`。
 - class：字段收集覆盖全部方法体（constructor 外赋值同样入 map，无 `T?` 提升）与 `this` 的简单/传递 alias（`let self = this; let other = self; other.x = 1;`）、未标注方法的跨方法返回降级 `any`（`this.value = this.make();`）、对方法名赋值报 `assign-to-method`（含方法体内 `this.<方法名> = ...`，验证字段收集的排除规则未吞掉该诊断）、字段间依赖降级（`this.y = this.x;` 得 `any`）、`unknown-property` 拼写捕获、`new` alias、同名 class shadowing 保留不同 `ClassId`（旧 class alias 的实例不能赋给新 class 标注）、`class int {}` 报 `reserved-type-name`。
-- equality：`xs == xs`（`xs: [int]`）、`h == h`（`h: {string: int}`）与 `f == f`（`f: fn(): int`）零诊断，并由 oracle 语料确认运行时同样通过；跨类别报 `mixed-equality`（warning）；`new A() == new B()` 零诊断（四后端合法、恒 `false`）。
+- equality：`xs == xs`（`xs: [int]`）、`h == h`（`h: {string: int}`）与 `f == f`（`f: fn(): int`）零诊断，并由 oracle 语料确认运行时同样通过；跨类别报 `mixed-equality`（warning）；`new A() == new B()` 零诊断（四后端合法、恒 `false`）；union 与可空的逐对判定：`(int | string) == int`、`int? == string?` 零诊断，`(int | string) == bool`、`int? == string` 报 warning。
 - union 消解：`let f = if (c) { fn(x: int): int { x; } } else { fn(x: string): string { x; } }; f(1);` 报错；`let xs = if (c) { [1] } else { ["a"] }; xs[0];` 通过且类型为 `(int | string)?`。两例都由分支推导内部 union，不依赖 v1 尚未支持的 union 用户语法。
 - any 与 builtin 泛型：`any + true`、`any + [1]` 通过且结果为 `any`；`let c = true; let x: any = 0; let y = if (c) { 1 } else { "s" }; x + y;` 按 RHS 的内部 union 成员检查，结果为 `int | string`；`first(x)`（`x: any`）结果为 `any`，`push(x, 1)` 结果为 `[any]`。
 - 返回推导 completion：`return` 后不可达语句不参与 join（`fn(): int { return 1; "s"; }` 零诊断）；条件 return 与 fallthrough 合并（`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 报 `type-mismatch`）。
