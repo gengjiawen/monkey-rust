@@ -17,10 +17,13 @@ cargo workspaces publish --from-git --token $CARGO_TOKEN
 
 ### Re-running a failed release
 
-Either re-run the failed `release-please` job from the Actions UI, or run the
-workflow manually with `resume_publish` checked. Both re-enter the publish
-chain; a plain push, or a dispatch without `resume_publish`, does not, because
-`release_created` is only true on the run that cut the release.
+Run the `release-please` workflow manually with `resume_publish` checked. That
+is the only way back into the publish chain besides the run that cut the
+release — re-running the failed job from the Actions UI does not do it, and
+neither does a dispatch with the box unchecked, because `release_created` is
+only true on the run whose push merged the release PR. The ask is deliberate:
+any rerun entering the chain on its own would publish the versions in the tree
+without a release behind them.
 
 The chain then publishes what is missing and skips what is already out there:
 `cargo workspaces publish --from-git` reports `already published` for crates it

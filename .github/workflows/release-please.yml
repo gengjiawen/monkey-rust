@@ -47,25 +47,24 @@ jobs:
       # downstream of the failure ever gets published. Making the steps
       # idempotent only helps if the chain can be entered a second time.
       #
-      # It is safe to enter: `cargo workspaces publish --from-git` reports
-      # "already published" and moves on, `ovsx publish` runs with
-      # `--skip-duplicate`, and every npm package goes through
-      # `scripts/npm-publish-if-needed.sh`. So allow the two ways a maintainer
-      # would ask for a retry — GitHub's "Re-run jobs" button, which repeats the
-      # original push event with a higher attempt number, and an explicit
-      # dispatch with `resume_publish`.
+      # So the chain needs a second entrance, and exactly one: a dispatch with
+      # `resume_publish` checked. Re-entering is safe once asked for —
+      # `cargo workspaces publish --from-git` reports "already published" and
+      # moves on, `ovsx publish` runs with `--skip-duplicate`, and every npm
+      # package goes through `scripts/npm-publish-if-needed.sh` — but it must
+      # stay something a maintainer asks for. A run attempt number is not that
+      # ask: re-running this workflow for an unrelated failure would then
+      # publish whatever versions happen to be in the tree, with no release
+      # behind them.
       - id: publish
         name: Decide whether to run the publish chain
         env:
           RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
           RESUME_REQUESTED: ${{ inputs.resume_publish }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          if [ "$RELEASE_CREATED" = "true" ] ||
-             [ "$RESUME_REQUESTED" = "true" ] ||
-             [ "$RUN_ATTEMPT" != "1" ]; then
+          if [ "$RELEASE_CREATED" = "true" ] || [ "$RESUME_REQUESTED" = "true" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "publishing: release_created=$RELEASE_CREATED resume=$RESUME_REQUESTED attempt=$RUN_ATTEMPT"
+            echo "publishing: release_created=$RELEASE_CREATED resume=$RESUME_REQUESTED"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "no release to publish"
