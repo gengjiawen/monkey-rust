@@ -155,6 +155,17 @@ describe('constant propagation', () => {
     )
   })
 
+  it('keeps the arms of a name the branch introduces under one name', () => {
+    // Neither arm inherits `n`, but the read after the branch means whichever
+    // arm ran, so the two `let`s are one binding — renaming them apart would
+    // strand that read on the arm that did not run.
+    const source = 'if (1 < 2) { let n = 2; } else { let n = 3; }; puts(n);'
+    expect(optimize(source)).toBe('if(true){let n=2;}else{let n=3;};puts(n);')
+    expect(minify(source).code).toBe(
+      'if(true){let a=2;}else{let a=3;};puts(a);'
+    )
+  })
+
   it('leaves a program where a block shadows a builtin alone', () => {
     // `len` cannot be renamed, so the arm's `let` and the builtin cannot be
     // brought under one name; nothing in the program is touched.

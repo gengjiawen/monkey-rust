@@ -217,6 +217,34 @@ mod tests {
             // evaluates to, rebinding or not.
             ("let x = 1; let y = if (true) { let x = 2; 42 }; y", "42"),
             ("let x = 1; if (true) { let x = 2; x }", "2"),
+            // A name neither the branch nor anything before it had a binding
+            // for still has to mean one thing afterwards: both arms converge
+            // on the same slot rather than each keeping its own.
+            ("if (true) { let n = 2; } else { let n = 3; } n", "2"),
+            ("if (false) { let n = 2; } else { let n = 3; } n", "3"),
+            ("if (true) { let n = 2; let n = 5; } else { let n = 3; } n", "5"),
+            (
+                "if (false) { if (true) { let n = 2; } else { let n = 3; } } else { let n = 4; } n",
+                "4",
+            ),
+            ("let f = fn() { if (true) { let n = 2; } else { let n = 3; } n }; f()", "2"),
+            ("let f = fn(p) { if (true) { let p = 2; } else { let p = 3; } p }; f(9)", "2"),
+            (
+                "if (true) { let n = 1; let g = fn() { n }; } else { let n = 2; let g = fn() { n }; } g()",
+                "1",
+            ),
+            // The condition runs before either arm, so a rebinding it makes is
+            // in force for both of them and for the code after the branch.
+            (
+                "let x = 1; let y = if (if (true) { let x = 2; false }) { let x = 3; 30 } else { let y = x; let x = 4; y }; y",
+                "2",
+            ),
+            (
+                "let x = 1; let y = if (if (true) { let x = 2; true }) { let y = x; let x = 3; y } else { 40 }; y",
+                "2",
+            ),
+            ("let x = 1; if (if (true) { let x = 2; false }) { let x = 3; } else { 0 } x", "2"),
+            ("let x = 1; if (if (true) { let x = 2; true }) { 0 } else { 0 } x", "2"),
         ];
         apply_test(&test_case);
     }

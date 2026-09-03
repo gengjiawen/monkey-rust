@@ -207,6 +207,55 @@ mod tests {
                 input: "let x = 1; if (true) { let x = 2; x }",
                 expected: Object::Integer(2),
             },
+            // A name neither the branch nor anything before it had a binding
+            // for still has to mean one thing afterwards: both arms converge
+            // on the same slot rather than each keeping its own.
+            VmTestCase {
+                input: "if (true) { let n = 2; } else { let n = 3; } n",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "if (false) { let n = 2; } else { let n = 3; } n",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "if (true) { let n = 2; let n = 5; } else { let n = 3; } n",
+                expected: Object::Integer(5),
+            },
+            VmTestCase {
+                input: "if (false) { if (true) { let n = 2; } else { let n = 3; } } else { let n = 4; } n",
+                expected: Object::Integer(4),
+            },
+            VmTestCase {
+                input: "let f = fn() { if (true) { let n = 2; } else { let n = 3; } n }; f()",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let f = fn(p) { if (true) { let p = 2; } else { let p = 3; } p }; f(9)",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "if (true) { let n = 1; let g = fn() { n }; } else { let n = 2; let g = fn() { n }; } g()",
+                expected: Object::Integer(1),
+            },
+            // The condition runs before either arm, so a rebinding it makes is
+            // in force for both of them and for the code after the branch.
+            VmTestCase {
+                input: "let x = 1; let y = if (if (true) { let x = 2; false }) { let x = 3; 30 } else { let y = x; let x = 4; y }; y",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; let y = if (if (true) { let x = 2; true }) { let y = x; let x = 3; y } else { 40 }; y",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (if (true) { let x = 2; false }) { let x = 3; } else { 0 } x",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (if (true) { let x = 2; true }) { 0 } else { 0 } x",
+                expected: Object::Integer(2),
+            },
         ];
 
         run_gc_vm_tests(tests);

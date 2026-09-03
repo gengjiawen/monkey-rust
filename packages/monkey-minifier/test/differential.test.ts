@@ -52,6 +52,16 @@ const programs = [
   'let v = 1; let f = fn(p) { if (1 > 2) { let p = 2; } p }; puts(f(9));',
   // A block shadowing a builtin is left alone: it cannot share a name with one.
   'if (1 > 2) { let len = 5; }; puts(len("ab"));',
+  // A name the branch introduces means one thing after it whichever arm ran,
+  // so the two arms' `let`s have to keep one name too.
+  'if (1 < 2) { let n = 2; } else { let n = 3; }; puts(n);',
+  'if (1 > 2) { let n = 2; } else { let n = 3; }; puts(n);',
+  'if (1 < 2) { let n = 1; let g = fn() { n }; } else { let n = 2; let g = fn() { n }; }; puts(g());',
+  'let f = fn() { if (1 < 2) { let n = 2; } else { let n = 3; }; n }; puts(f());',
+  // The condition runs before either arm, so a rebinding it makes is what both
+  // of them, and the code after the branch, see.
+  'let x = 1; let y = if (if (1 < 2) { let x = 2; 1 > 2 }) { let x = 3; 30 } else { let y = x; let x = 4; y }; puts(y); puts(x);',
+  'let x = 1; if (if (1 < 2) { let x = 2; 1 < 2 }) { let x = 3; } else { 0; }; puts(x);',
   // A closure keeps observing the pre-redeclaration slot.
   'let v = 1; let g = fn() { v }; let v = 2; puts(g()); v;',
   // ... including when a block redeclares the name in between: the block

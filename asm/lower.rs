@@ -32,8 +32,9 @@ fn main_epilogue_label(dialect: AsmDialect) -> String {
     format!("{}main_exit", dialect.local_label_prefix())
 }
 
-/// A name an `if` can rebind: what it meant before the branch, and the slot
-/// every arm converges on so it means one thing after it.
+/// A name an `if` can rebind: what it meant on entry to the arms, and the slot
+/// every arm converges on so it means one thing after the branch. `before` is
+/// the slot itself for a name that had no binding before the branch.
 struct Shadow {
     name: String,
     before: Rc<Symbol>,
@@ -271,15 +272,35 @@ impl<'a> Lowerer<'a> {
     /// name means after the branch has to be picked before it — see
     /// `compiler::symbol_table::shadowed_names`. The name keeps meaning the
     /// old binding until the `let` that rebinds it, so the slot is not
-    /// installed yet.
+    /// installed yet; a name with no binding at all is the exception, and
+    /// starts the arms on the slot so that an arm not binding it reads the
+    /// null seed rather than the other arm's slot.
+    ///
+    /// The copies go through the accumulator, which holds the already-lowered
+    /// condition, so it waits on the machine stack.
     fn declare_shadow_slots(&mut self, if_node: &IF) -> Result<Vec<Shadow>, LowerError> {
+        let names = shadowed_names(if_node);
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.emitter
+            .without_span(|emitter| emitter.push_acc("condition"));
         let mut shadows = Vec::new();
-        for name in shadowed_names(if_node) {
-            let Some(before) = self.symbols.resolve(name.clone()) else {
-                continue;
-            };
+        for name in names {
             let slot = self.symbols.declare_slot(&name);
-            self.load_symbol(&before, &if_node.span)?;
+            let before = match self.symbols.resolve(name.clone()) {
+                Some(before) => {
+                    self.load_symbol(&before, &if_node.span)?;
+                    before
+                }
+                None => {
+                    self.emitter.without_span(|emitter| {
+                        emitter.load_imm64("x0", NULL_VALUE, "shadow seed: null");
+                    });
+                    self.symbols.rebind(&name, Rc::clone(&slot));
+                    Rc::clone(&slot)
+                }
+            };
             self.store_accumulator(&slot, &if_node.span, &format!("shadow {}", name));
             shadows.push(Shadow {
                 name,
@@ -287,6 +308,8 @@ impl<'a> Lowerer<'a> {
                 slot,
             });
         }
+        self.emitter
+            .without_span(|emitter| emitter.pop("x0", "condition"));
         Ok(shadows)
     }
 
@@ -421,8 +444,11 @@ impl<'a> Lowerer<'a> {
             }
             Expression::INFIX(infix) => self.lower_infix(infix),
             Expression::IF(if_node) => {
-                let shadows = self.declare_shadow_slots(if_node)?;
+                // The condition runs before either arm and can rebind a name
+                // itself, so the slots are picked against what it leaves, not
+                // against what was in force before it.
                 self.lower_expression(&if_node.condition)?;
+                let shadows = self.declare_shadow_slots(if_node)?;
                 let else_label = self.emitter.new_label();
                 let end_label = self.emitter.new_label();
                 let comment = format!("if ({})", self.snippet(if_node.condition.span()));

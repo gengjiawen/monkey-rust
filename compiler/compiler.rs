@@ -15,8 +15,12 @@ use crate::op_code::Opcode::*;
 use crate::op_code::{make_instructions, Instructions, Opcode};
 use crate::symbol_table::{shadowed_names, Symbol, SymbolScope, SymbolTable};
 
-/// A name an `if` can rebind: what it meant before the branch, and the slot
-/// every arm converges on so it means one thing after it.
+/// A name an `if` can rebind: what it meant on entry to the arms, and the slot
+/// every arm converges on so it means one thing after the branch.
+///
+/// `before` is the slot itself when the name had no binding before the branch:
+/// there is nothing to restore between the arms, and the slot's null seed is
+/// what such a name is worth until an arm binds it.
 struct Shadow {
     name: String,
     before: Rc<Symbol>,
@@ -545,8 +549,11 @@ impl Compiler {
                 }
             }
             Expression::IF(if_node) => {
-                let shadows = self.declare_shadow_slots(if_node)?;
+                // The condition runs before either arm and can rebind a name
+                // itself, so the slots are picked against what it leaves, not
+                // against what was in force before it.
                 self.compile_expr(&if_node.condition)?;
+                let shadows = self.declare_shadow_slots(if_node)?;
                 let jump_not_truthy = self.emit_with_span(OpJumpNotTruthy, &[9527], &if_node.span);
                 self.compile_if_branch(&if_node.consequent, &shadows)?;
 
@@ -779,20 +786,33 @@ impl Compiler {
     /// Gives every name an arm of `if_node` can rebind a slot of its own,
     /// seeded with the binding in force here, and emits the seeding copies.
     ///
-    /// The slot is not the name's binding yet: the condition, and everything
-    /// up to the `let` that rebinds it, still means the old one.
+    /// Each load/store pair is stack-neutral, so the condition value this is
+    /// emitted on top of stays where the jump expects it.
+    ///
+    /// The slot is not the name's binding yet — up to the `let` that rebinds
+    /// it the name still means what it did before the branch — except for a
+    /// name that had no binding at all, which starts the arms on the slot so
+    /// that an arm not binding it reads the null seed instead of the other
+    /// arm's slot.
     fn declare_shadow_slots(&mut self, if_node: &IF) -> Result<Vec<Shadow>, CompileError> {
         let mut shadows = Vec::new();
         for name in shadowed_names(if_node) {
-            // A name the arms only introduce has nothing to preserve: there is
-            // no binding to seed from, and code after the branch that reads it
-            // when no arm ran is already reading an unwritten slot.
-            let Some(before) = self.symbol_table.resolve(name.clone()) else {
-                continue;
-            };
             let slot = self.symbol_table.declare_slot(&name);
             self.check_slot_index(&slot)?;
-            self.load_symbol(&before, &if_node.span)?;
+            let before = match self.symbol_table.resolve(name.clone()) {
+                Some(before) => {
+                    self.load_symbol(&before, &if_node.span)?;
+                    before
+                }
+                // A name the arms introduce has nothing to preserve, and the
+                // arms have to converge on it all the same or neither of them
+                // means anything after the branch.
+                None => {
+                    self.emit_with_span(OpNull, &[], &if_node.span);
+                    self.symbol_table.rebind(&name, Rc::clone(&slot));
+                    Rc::clone(&slot)
+                }
+            };
             self.store_symbol(&slot, &if_node.span)?;
             shadows.push(Shadow {
                 name,

@@ -188,8 +188,14 @@ mod tests {
         assert_eq!(local(frame, "x", 0).value.as_ref().unwrap().display, "1");
         assert_eq!(local(frame, "x", 1).value.as_ref().unwrap().display, "2");
 
-        // The never-taken branch left its slot unwritten.
-        let ghost = local(frame, "ghost", 2);
+        // Slot 2 is the branch's convergence slot for `ghost`, seeded before
+        // the jump — with null, since the name had no binding to preserve.
+        let converged = local(frame, "ghost", 2);
+        assert!(converged.initialized);
+        assert_eq!(converged.value.as_ref().unwrap().display, "null");
+
+        // The never-taken branch left its own slot unwritten.
+        let ghost = local(frame, "ghost", 3);
         assert!(!ghost.initialized);
         assert!(ghost.value.is_none());
     }

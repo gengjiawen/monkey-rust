@@ -189,10 +189,18 @@ fn a_let_inside_a_block_converges_on_a_slot_picked_before_it() {
     assert!(text.contains("3 global slot(s)"), "{}", text);
     assert!(text.contains("shadow x"), "{}", text);
 
-    // Two `let`s in one block still take a slot each (here: x, f, x, plus the
-    // shadow), so a closure made between them keeps reading what it captured.
+    // A name the branch introduces converges the same way, on a slot seeded
+    // with null so that an arm not binding it leaves the name worth null
+    // rather than reading the other arm's slot.
+    let text = assembly("if (false) { let n = 2; } else { let n = 3; } n;");
+    assert!(text.contains("shadow seed: null"), "{}", text);
+    assert!(text.contains("shadow n"), "{}", text);
+
+    // Two `let`s in one block still take a slot each (here: x, f, x, plus a
+    // shadow for each of the two names), so a closure made between them keeps
+    // reading what it captured.
     let text = assembly("if (true) { let x = 1; let f = fn() { x }; let x = 2; f() };");
-    assert!(text.contains("3 global slot(s)"), "{}", text);
+    assert!(text.contains("5 global slot(s)"), "{}", text);
 }
 
 #[test]
