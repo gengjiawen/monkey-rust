@@ -8,7 +8,7 @@
 
 use compiler::compiler::{Bytecode, Compiler};
 
-use crate::vm::{GcClassifiedRuntimeError, GcRuntimeError, GcVM};
+use crate::vm::{GcClassifiedRuntimeError, GcRuntimeError, GcVM, DEFAULT_MEMORY_BUDGET};
 
 /// Parse and compile Monkey source, reporting the first error as a string.
 pub fn compile_source(source: &str) -> Result<Bytecode, String> {
@@ -29,7 +29,18 @@ pub fn run_bytecode(
     bytecode: Bytecode,
     instruction_budget: usize,
 ) -> Result<String, GcRuntimeError> {
+    run_bytecode_with_limits(bytecode, instruction_budget, DEFAULT_MEMORY_BUDGET)
+}
+
+/// [`run_bytecode`] with an explicit live-heap cap; the CLI's `--max-memory`
+/// threads a different one through here. `usize::MAX` disables the cap.
+pub fn run_bytecode_with_limits(
+    bytecode: Bytecode,
+    instruction_budget: usize,
+    memory_budget: usize,
+) -> Result<String, GcRuntimeError> {
     let mut vm = GcVM::new(bytecode);
+    vm.set_memory_budget(memory_budget);
     vm.run_with_budget(instruction_budget)?;
     Ok(vm.last_result_string())
 }

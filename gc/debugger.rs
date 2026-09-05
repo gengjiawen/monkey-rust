@@ -20,7 +20,7 @@ use serde::Serialize;
 
 use crate::report::summarize_gc_object;
 use crate::value::{format_hash_key_label, EdgeRelation, HashKey, Value, ValueCell, ValueKind};
-use crate::{Frame, GcHeap, GcId, GcRef};
+use crate::{BoundedText, Frame, GcHeap, GcId, GcRef};
 
 pub const MAX_DEBUGGER_HITS: usize = 25;
 pub const MAX_DEBUGGER_OBJECTS: usize = 100; // per hit
@@ -347,48 +347,6 @@ fn try_value(heap: &GcHeap, reference: GcRef) -> Option<&Value> {
     heap.runtime()
         .object_downcast::<ValueCell>(reference.0)
         .map(|cell| &cell.value)
-}
-
-/// Character-budgeted string builder. The budget is enforced while
-/// appending — a huge string or array never materializes in full before
-/// truncation (design §5.3).
-struct BoundedText {
-    out: String,
-    remaining: usize,
-    truncated: bool,
-}
-
-impl BoundedText {
-    fn new(limit: usize) -> Self {
-        BoundedText {
-            out: String::new(),
-            remaining: limit,
-            truncated: false,
-        }
-    }
-
-    fn push(&mut self, text: &str) {
-        if self.truncated {
-            return;
-        }
-        for ch in text.chars() {
-            if self.remaining == 0 {
-                self.truncated = true;
-                return;
-            }
-            self.out.push(ch);
-            self.remaining -= 1;
-        }
-    }
-
-    fn finish(mut self) -> String {
-        if self.truncated {
-            // The ellipsis is part of the advertised character budget.
-            self.out.pop();
-            self.out.push('…');
-        }
-        self.out
-    }
 }
 
 fn bounded_display(heap: &GcHeap, reference: GcRef) -> String {

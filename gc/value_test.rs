@@ -7,8 +7,9 @@ mod tests {
     use object::{CompiledFunction, Object};
 
     use crate::value::{
-        alloc_value, call_builtin, export_object, get_value, get_value_mut, import_object, GcClass,
-        GcInstance, HashKey, Value, ValueCell, ValueKind,
+        alloc_value, call_builtin, export_object, get_value, get_value_mut, import_object,
+        value_to_string, GcClass, GcInstance, HashKey, Value, ValueCell, ValueKind,
+        MAX_VALUE_DISPLAY_CHARS, MAX_VALUE_DISPLAY_DEPTH,
     };
     use crate::GcHeap;
 
@@ -251,5 +252,91 @@ mod tests {
             ]
         );
         assert!(stats.scan.garbage_candidate_objects.is_empty());
+    }
+
+    /// `[[…], […]]` nested `levels` deep: `levels` allocations, 2^levels leaves.
+    fn shared_dag(heap: &mut GcHeap, levels: usize) -> crate::GcRef {
+        let mut node = alloc_value(heap, Value::Integer(1));
+        for _ in 0..levels {
+            let left = heap.dup(node);
+            let right = heap.dup(node);
+            let parent = alloc_value(heap, Value::Array(vec![left, right]));
+            heap.free(node);
+            node = parent;
+        }
+        node
+    }
+
+    #[test]
+    fn rendering_shared_structure_stays_within_the_character_budget() {
+        // Every level doubles the fully expanded text, so an 18-level DAG —
+        // 18 allocations — used to render 1.8 MB, and 22 levels took 20 s.
+        let mut heap = GcHeap::new();
+        let root = shared_dag(&mut heap, 24);
+
+        let rendered = value_to_string(&heap, root);
+
+        assert_eq!(rendered.chars().count(), MAX_VALUE_DISPLAY_CHARS);
+        assert!(rendered.ends_with('…'), "expected a truncation marker: {}", &rendered[..40]);
+    }
+
+    #[test]
+    fn rendering_deep_nesting_stops_at_the_depth_cap() {
+        // Recursion is per level, so without a cap a few thousand levels —
+        // well inside any instruction budget — overflow the native stack.
+        let mut heap = GcHeap::new();
+        let mut node = alloc_value(&mut heap, Value::Integer(1));
+        for _ in 0..5_000 {
+            node = alloc_value(&mut heap, Value::Array(vec![node]));
+        }
+
+        let rendered = value_to_string(&heap, node);
+
+        // The cap's own `[…]` marker contributes the extra bracket.
+        assert_eq!(rendered.matches('[').count(), MAX_VALUE_DISPLAY_DEPTH + 1);
+        assert!(rendered.contains("[…]"), "expected a depth marker: {}", rendered);
+    }
+
+    #[test]
+    fn rendering_ordinary_values_is_unchanged() {
+        let mut heap = GcHeap::new();
+        let one = alloc_value(&mut heap, Value::Integer(1));
+        let two = alloc_value(&mut heap, Value::Integer(2));
+        let array = alloc_value(&mut heap, Value::Array(vec![one, two]));
+        let nested = alloc_value(&mut heap, Value::Array(vec![array]));
+        let text = alloc_value(&mut heap, Value::String("hi".to_string()));
+
+        assert_eq!(value_to_string(&heap, nested), "[[1, 2]]");
+        assert_eq!(value_to_string(&heap, text), "hi");
+    }
+
+    #[test]
+    fn tracked_bytes_grow_with_the_payload() {
+        // The budget compares against this number, so a long string has to
+        // cost more than a short one; slot-sized accounting made `"a" + "a"`
+        // free no matter how many times it doubled.
+        let mut heap = GcHeap::new();
+        let before = heap.malloc_state().malloc_size;
+        alloc_value(&mut heap, Value::String("a".to_string()));
+        let small = heap.malloc_state().malloc_size - before;
+
+        let before = heap.malloc_state().malloc_size;
+        alloc_value(&mut heap, Value::String("a".repeat(4096)));
+        let large = heap.malloc_state().malloc_size - before;
+
+        assert!(large >= 4096, "small: {}, large: {}", small, large);
+        assert!(small < 128, "a one-character string should not cost {} bytes", small);
+    }
+
+    #[test]
+    fn freeing_returns_exactly_what_allocating_charged() {
+        let mut heap = GcHeap::new();
+        let baseline = heap.malloc_state().malloc_size;
+        let reference = alloc_value(&mut heap, Value::String("a".repeat(4096)));
+        assert!(heap.malloc_state().malloc_size > baseline);
+
+        heap.free(reference);
+
+        assert_eq!(heap.malloc_state().malloc_size, baseline);
     }
 }

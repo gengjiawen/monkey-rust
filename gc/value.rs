@@ -8,7 +8,7 @@ use object::{Closure, CompiledFunction, Object};
 use serde::Serialize;
 
 use crate::header::GcObjectType;
-use crate::{GcHeap, GcObject, GcRef};
+use crate::{BoundedText, GcHeap, GcObject, GcRef};
 
 /// Runtime value stored in the GC heap. Mirrors `object::Object` but uses `GcRef` edges.
 #[derive(Debug, Clone, PartialEq)]
@@ -172,9 +172,47 @@ impl GcObject for ValueCell {
     fn trace(&self, visit: &mut dyn FnMut(crate::GcId)) {
         self.value.trace(&mut |reference| visit(reference.0));
     }
+
+    fn heap_size(&self) -> usize {
+        self.value.heap_size()
+    }
 }
 
 impl Value {
+    /// Bytes this value owns outside the `Value` enum itself.
+    ///
+    /// An estimate, not an allocator measurement: it is what the memory
+    /// budget is compared against, so it has to grow with the payload
+    /// (`"a" + "a"` doubles) rather than staying at one slot per object.
+    /// Growing an instance's field map in place is not re-charged.
+    pub fn heap_size(&self) -> usize {
+        use std::mem::size_of;
+        match self {
+            Value::String(text) | Value::Error(text) => text.capacity(),
+            Value::Array(items) => items.capacity() * size_of::<GcRef>(),
+            Value::Hash(entries) => {
+                let keys: usize = entries.keys().map(hash_key_heap_size).sum();
+                keys + entries.capacity() * (size_of::<HashKey>() + size_of::<GcRef>())
+            }
+            Value::Closure(closure) => closure.free.capacity() * size_of::<GcRef>(),
+            Value::Class(class) => {
+                let names: usize = class.methods.keys().map(String::capacity).sum();
+                class.name.capacity()
+                    + names
+                    + class.methods.capacity() * (size_of::<String>() + size_of::<GcRef>())
+            }
+            Value::Instance(instance) => {
+                let names: usize = instance.fields.keys().map(String::capacity).sum();
+                names + instance.fields.capacity() * (size_of::<String>() + size_of::<GcRef>())
+            }
+            Value::BoundMethod(method) => method.name.capacity(),
+            // Bytecode is compile-time data of a fixed size, not something a
+            // running program can grow, so it stays out of the runtime budget.
+            Value::CompiledFunction(_) => 0,
+            Value::Integer(_) | Value::Boolean(_) | Value::Null | Value::Builtin(_) => 0,
+        }
+    }
+
     pub fn kind(&self) -> ValueKind {
         match self {
             Value::Class(_) => ValueKind::Class,
@@ -425,53 +463,114 @@ pub fn get_value_mut(heap: &mut GcHeap, reference: GcRef) -> &mut Value {
         .value
 }
 
+/// Character budget for a rendered runtime value.
+///
+/// Rendering is the one part of a run the instruction budget does not cover:
+/// it happens per `puts`, per error message, and once more after the VM has
+/// stopped. Sharing makes it exponential in the nesting depth — `let a0 = [1];
+/// let a1 = [a0, a0]; …` costs three instructions per level but doubles the
+/// output — so the size, not the instruction count, is what has to be capped.
+pub const MAX_VALUE_DISPLAY_CHARS: usize = 64 * 1024;
+
+/// Nesting depth beyond which containers render as `[…]` / `{…}`.
+///
+/// Formatting recurses once per level, and thousands of levels fit inside a
+/// modest instruction budget, so without this the renderer overflows the
+/// native (or 1 MiB wasm) stack before the character budget is reached.
+pub const MAX_VALUE_DISPLAY_DEPTH: usize = 64;
+
 pub fn value_to_string(heap: &GcHeap, reference: GcRef) -> String {
-    format_reference(heap, reference, &mut HashSet::new())
+    let mut text = BoundedText::new(MAX_VALUE_DISPLAY_CHARS);
+    append_reference(heap, reference, MAX_VALUE_DISPLAY_DEPTH, &mut HashSet::new(), &mut text);
+    text.finish()
 }
 
-fn format_reference(heap: &GcHeap, reference: GcRef, visited: &mut HashSet<usize>) -> String {
-    if !visited.insert(reference.0) {
-        return format!("[cycle #{}]", reference.0);
+fn append_reference(
+    heap: &GcHeap,
+    reference: GcRef,
+    depth: usize,
+    visited: &mut HashSet<usize>,
+    text: &mut BoundedText,
+) {
+    if text.truncated {
+        return;
     }
-    let formatted = format_value(heap, get_value(heap, reference), visited);
+    if !visited.insert(reference.0) {
+        text.push(&format!("[cycle #{}]", reference.0));
+        return;
+    }
+    append_value(heap, get_value(heap, reference), depth, visited, text);
     visited.remove(&reference.0);
-    formatted
 }
 
-fn format_value(heap: &GcHeap, value: &Value, visited: &mut HashSet<usize>) -> String {
+fn append_value(
+    heap: &GcHeap,
+    value: &Value,
+    depth: usize,
+    visited: &mut HashSet<usize>,
+    text: &mut BoundedText,
+) {
     match value {
-        Value::Integer(i) => i.to_string(),
-        Value::Boolean(b) => b.to_string(),
-        Value::String(s) => s.clone(),
-        Value::Null => "null".to_string(),
-        Value::Error(e) => e.clone(),
+        Value::Integer(i) => text.push(&i.to_string()),
+        Value::Boolean(b) => text.push(&b.to_string()),
+        Value::String(s) => text.push(s),
+        Value::Null => text.push("null"),
+        Value::Error(e) => text.push(e),
         Value::Array(items) => {
-            let parts = items
-                .iter()
-                .map(|item| format_reference(heap, *item, visited))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("[{}]", parts)
+            if depth == 0 {
+                text.push("[…]");
+                return;
+            }
+            text.push("[");
+            for (position, item) in items.iter().enumerate() {
+                if text.truncated {
+                    break;
+                }
+                if position > 0 {
+                    text.push(", ");
+                }
+                append_reference(heap, *item, depth - 1, visited, text);
+            }
+            text.push("]");
         }
         Value::Hash(map) => {
-            let parts = map
-                .iter()
-                .map(|(k, v)| {
-                    format!("{}: {}", format_hash_key(k), format_reference(heap, *v, visited))
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("{{{}}}", parts)
+            if depth == 0 {
+                text.push("{…}");
+                return;
+            }
+            text.push("{");
+            for (position, (key, item)) in map.iter().enumerate() {
+                if text.truncated {
+                    break;
+                }
+                if position > 0 {
+                    text.push(", ");
+                }
+                text.push(&format_hash_key(key));
+                text.push(": ");
+                append_reference(heap, *item, depth - 1, visited, text);
+            }
+            text.push("}");
         }
-        Value::CompiledFunction(_) => "[compiled function]".to_string(),
-        Value::Closure(_) => "[closure function]".to_string(),
-        Value::Builtin(_) => "[builtin function]".to_string(),
-        Value::Class(class) => format!("[class {}]", class.name),
+        Value::CompiledFunction(_) => text.push("[compiled function]"),
+        Value::Closure(_) => text.push("[closure function]"),
+        Value::Builtin(_) => text.push("[builtin function]"),
+        Value::Class(class) => {
+            text.push("[class ");
+            text.push(&class.name);
+            text.push("]");
+        }
         Value::Instance(instance) => {
-            format!("[object {}]", class_name(heap, instance.class))
+            text.push("[object ");
+            text.push(&class_name(heap, instance.class));
+            text.push("]");
         }
         Value::BoundMethod(method) => {
-            format!("[bound method {}.{}]", instance_class_name(heap, method.receiver), method.name)
+            text.push("[bound method ");
+            text.push(&instance_class_name(heap, method.receiver));
+            text.push(".");
+            text.push(&method.name);
+            text.push("]");
         }
     }
 }
@@ -487,6 +586,13 @@ fn instance_class_name(heap: &GcHeap, instance: GcRef) -> String {
     match get_value(heap, instance) {
         Value::Instance(instance) => class_name(heap, instance.class),
         _ => "<invalid receiver>".to_string(),
+    }
+}
+
+fn hash_key_heap_size(key: &HashKey) -> usize {
+    match key {
+        HashKey::String(text) => text.capacity(),
+        HashKey::Integer(_) | HashKey::Boolean(_) => 0,
     }
 }
 

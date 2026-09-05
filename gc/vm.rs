@@ -26,6 +26,15 @@ pub const GLOBAL_SIZE: usize = 65536;
 const MAX_FRAMES: usize = 1024;
 pub const DEFAULT_INSTRUCTION_BUDGET: usize = 100_000;
 
+/// Default cap on live heap bytes, checked once per instruction.
+///
+/// The instruction budget does not bound memory: `let f = fn(s) { f(s + s) };
+/// f("a");` doubles the live string every five instructions, so a few hundred
+/// instructions are enough to abort the process. 256 MiB is far above what any
+/// teaching program needs and far below the point where the allocator gives
+/// up. `usize::MAX` disables the check.
+pub const DEFAULT_MEMORY_BUDGET: usize = 256 * 1024 * 1024;
+
 /// Runtime failure returned by the established VM and runner APIs.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +68,7 @@ pub enum GcRuntimeErrorKind {
     Call,
     ExecutionLimit,
     Index,
+    MemoryLimit,
     Property,
     Stack,
     Type,
@@ -72,6 +82,7 @@ impl GcRuntimeErrorKind {
             Self::Call => "call",
             Self::ExecutionLimit => "executionLimit",
             Self::Index => "index",
+            Self::MemoryLimit => "memoryLimit",
             Self::Property => "property",
             Self::Stack => "stack",
             Self::Type => "type",
@@ -110,6 +121,9 @@ pub struct GcVM {
     /// `debugger;` in a hot loop cannot grow memory without bound.
     dropped_debugger_hits: usize,
     output: Option<String>,
+    /// Cap on live heap bytes, checked once per instruction like the
+    /// instruction budget. See [`DEFAULT_MEMORY_BUDGET`].
+    memory_budget: usize,
 }
 
 impl GcVM {
@@ -194,6 +208,7 @@ impl GcVM {
             debugger_hits: Vec::new(),
             dropped_debugger_hits: 0,
             output: None,
+            memory_budget: DEFAULT_MEMORY_BUDGET,
         }
     }
 
@@ -287,6 +302,11 @@ impl GcVM {
 
     pub fn heap_mut(&mut self) -> &mut GcHeap {
         &mut self.heap
+    }
+
+    /// Cap live heap bytes. `usize::MAX` disables the check.
+    pub fn set_memory_budget(&mut self, budget: usize) {
+        self.memory_budget = budget;
     }
 
     /// Capture `puts`/`print` output in-memory instead of writing to stdout.
@@ -446,6 +466,19 @@ impl GcVM {
                 return Err(self.runtime_error(
                     GcRuntimeErrorKind::ExecutionLimit,
                     format!("instruction limit exceeded (budget: {})", instruction_budget),
+                ));
+            }
+            // Checked per instruction rather than per allocation: one
+            // instruction can at most double the live heap, so the overshoot
+            // is bounded, and every allocation site stays infallible.
+            let live = self.heap.malloc_state().malloc_size;
+            if live > self.memory_budget {
+                return Err(self.runtime_error(
+                    GcRuntimeErrorKind::MemoryLimit,
+                    format!(
+                        "memory limit exceeded (budget: {} bytes, live: {} bytes)",
+                        self.memory_budget, live
+                    ),
                 ));
             }
             executed += 1;
