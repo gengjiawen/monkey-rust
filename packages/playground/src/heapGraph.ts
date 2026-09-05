@@ -52,20 +52,47 @@ function globalNamesLabel(names: string[]): string {
   return names.length <= 2 ? shown : `${shown} +${names.length - 2} more`
 }
 
+/** One drawable arrow: parallel visited edges merged, labels in visit order. */
+export interface MergedHeapEdge {
+  fromId: number
+  toId: number
+  labels: string[]
+}
+
 /**
- * Build a mermaid flowchart of the heap topology the collector actually
- * visited: solid arrows are the reported heap-to-heap edges, and a single
- * "External refs" pseudo-node stands in for every non-heap reference
- * (constants, global slots, VM stack) with one dotted arrow per trial
- * survivor labeled by its trial reference count.
+ * The drawable slice of a collection report, shared by the static topology
+ * graph and the phase replay so both emit the exact same nodes and arrows
+ * (and therefore the exact same mermaid layout).
+ */
+export interface HeapGraphModel {
+  /** Drawn object ids, ascending. */
+  sortedIds: number[]
+  labels: Map<number, string>
+  decisions: Map<number, ObjectDecision>
+  globalNames: Map<number, string[]>
+  /** Sorted by (fromId, toId); array order matches emitted link order. */
+  mergedEdges: MergedHeapEdge[]
+  /** Trial survivors that get a dotted External refs arrow, ascending id. */
+  externalTargets: ObjectDecision[]
+  droppedIsolated: number
+}
+
+export type HeapGraphModelResult =
+  | { status: 'ok'; model: HeapGraphModel }
+  | { status: 'unavailable'; reason: string }
+
+/**
+ * Collect the drawable topology of the heap the collector actually visited.
  *
  * Only objects that participate in at least one reported edge, plus every
  * candidate, become nodes; isolated survivors (mostly VM bookkeeping values)
  * are dropped and counted in `droppedIsolated`. When the report truncated
- * edge or decision details the graph would silently lie, so it is reported
- * as unavailable instead.
+ * edge or decision details the drawing would silently lie, so the model is
+ * reported as unavailable instead.
  */
-export function buildHeapGraph(report: GcCollectionReport): HeapGraph {
+export function buildHeapGraphModel(
+  report: GcCollectionReport
+): HeapGraphModelResult {
   const trial = report.phases.trialDeletion
   if (trial.omittedObjectDecisions > 0 || trial.omittedEdgeDetails > 0) {
     return {
@@ -131,53 +158,102 @@ export function buildHeapGraph(report: GcCollectionReport): HeapGraph {
         decision.trialRefCount > 0
     )
 
+  const mergedEdgeMap = new Map<string, MergedHeapEdge>()
+  for (const edge of trial.visitedEdges) {
+    const key = `${edge.fromId}->${edge.toId}`
+    const label = formatEdgeRelation(edge.relation)
+    const entry = mergedEdgeMap.get(key)
+    if (entry) {
+      entry.labels.push(label)
+    } else {
+      mergedEdgeMap.set(key, { fromId: edge.fromId, toId: edge.toId, labels: [label] })
+    }
+  }
+  const mergedEdges = [...mergedEdgeMap.values()].sort(
+    (left, right) => left.fromId - right.fromId || left.toId - right.toId
+  )
+
+  return {
+    status: 'ok',
+    model: {
+      sortedIds,
+      labels,
+      decisions,
+      globalNames,
+      mergedEdges,
+      externalTargets,
+      droppedIsolated,
+    },
+  }
+}
+
+/** Per-node hooks for renderHeapGraphModel. */
+export interface NodeDecoration {
+  /** Extra text between the object label and its global-names line. */
+  suffix?: string
+  /** mermaid ::: class attached to the node. */
+  className?: string
+}
+
+/**
+ * Emit mermaid source for a model. Link order is deterministic: solid merged
+ * edges first (so `linkStyle N` addresses `mergedEdges[N]`), then one dotted
+ * External refs arrow per external target. `extraLines` (linkStyle / class
+ * statements) never affect layout, only styling.
+ */
+export function renderHeapGraphModel(
+  model: HeapGraphModel,
+  decorate: (id: number) => NodeDecoration,
+  extraLines: readonly string[] = []
+): string {
   const lines: string[] = ['flowchart LR']
-  if (externalTargets.length > 0) {
+  if (model.externalTargets.length > 0) {
     lines.push(
       '  ext(["External refs<br/>constants · globals · stack"]):::external'
     )
   }
-  for (const id of sortedIds) {
-    const label = escapeMermaidText(labels.get(id) ?? `Object#${id}`)
-    const names = globalNames.get(id)
+  for (const id of model.sortedIds) {
+    const label = escapeMermaidText(model.labels.get(id) ?? `Object#${id}`)
+    const names = model.globalNames.get(id)
     const nameLine = names
       ? `<br/><i>global${names.length > 1 ? 's' : ''}: ${globalNamesLabel(names)}</i>`
       : ''
-    const decision = decisions.get(id)
-    const fate = decision ? fateClass(decision) : null
-    const fateSuffix = fate ? ` · ${FATE_TEXT[fate]}` : ''
-    const fateTag = fate ? `:::${fate}` : ''
-    lines.push(`  o${id}["${label}${fateSuffix}${nameLine}"]${fateTag}`)
+    const { suffix = '', className } = decorate(id)
+    const classTag = className ? `:::${className}` : ''
+    lines.push(`  o${id}["${label}${suffix}${nameLine}"]${classTag}`)
   }
-
-  const mergedEdges = new Map<
-    string,
-    { fromId: number; toId: number; labels: string[] }
-  >()
-  for (const edge of trial.visitedEdges) {
-    const key = `${edge.fromId}->${edge.toId}`
-    const label = formatEdgeRelation(edge.relation)
-    const entry = mergedEdges.get(key)
-    if (entry) {
-      entry.labels.push(label)
-    } else {
-      mergedEdges.set(key, { fromId: edge.fromId, toId: edge.toId, labels: [label] })
-    }
-  }
-  const sortedEdges = [...mergedEdges.values()].sort(
-    (left, right) => left.fromId - right.fromId || left.toId - right.toId
-  )
-  for (const edge of sortedEdges) {
+  for (const edge of model.mergedEdges) {
     const label = escapeMermaidText(mergedEdgeLabel(edge.labels))
     lines.push(`  o${edge.fromId} -- "${label}" --> o${edge.toId}`)
   }
-  for (const decision of externalTargets) {
+  for (const decision of model.externalTargets) {
     lines.push(`  ext -. "×${decision.trialRefCount}" .-> o${decision.objectId}`)
   }
-
+  lines.push(...extraLines)
   // No classDef lines: mermaid still adds the ::: class names to each node's
-  // SVG class attribute, and HeapGraphView's canvas styles them with the same
-  // Radix tokens as the walkthrough badges (classDef cannot express CSS
-  // variables).
-  return { status: 'ok', source: lines.join('\n'), droppedIsolated }
+  // SVG class attribute, and the canvas Tailwind variants in HeapGraphView /
+  // PhaseReplayView style them with the same Radix tokens as the walkthrough
+  // badges (classDef cannot express CSS variables).
+  return lines.join('\n')
+}
+
+/**
+ * Build a mermaid flowchart of the heap topology the collector actually
+ * visited: solid arrows are the reported heap-to-heap edges, and a single
+ * "External refs" pseudo-node stands in for every non-heap reference
+ * (constants, global slots, VM stack) with one dotted arrow per trial
+ * survivor labeled by its trial reference count.
+ */
+export function buildHeapGraph(report: GcCollectionReport): HeapGraph {
+  const result = buildHeapGraphModel(report)
+  if (result.status === 'unavailable') {
+    return result
+  }
+  const { model } = result
+  const source = renderHeapGraphModel(model, (id) => {
+    const decision = model.decisions.get(id)
+    const fate = decision ? fateClass(decision) : null
+    return fate ? { suffix: ` · ${FATE_TEXT[fate]}`, className: fate } : {}
+  })
+  return { status: 'ok', source, droppedIsolated: model.droppedIsolated }
 }
