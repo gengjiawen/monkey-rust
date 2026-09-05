@@ -1,6 +1,6 @@
 {
   "name": "monkey-rust",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "An interpreter and compiler for the Monkey programming language written in Rust",
   "main": "index.js",
   "directories": {
