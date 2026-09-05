@@ -37,6 +37,9 @@ function errors(source: string): string[] {
 /** Fully annotated programs that must both check and run cleanly. */
 const sound = [
   'let a: int = 1 + 2 * 3 - 4 / 2; puts(a);',
+  'let f = fn(a: int): int { a + 1; }; let n: int = f(if (true) { let f = 0; 1; } else { 2; }); puts(n);',
+  'let n: int = len(if (true) { let len = 0; [1, 2]; } else { []; }); puts(n);',
+  'class A { constructor(n: int) { this.n = n; } } let p = new A(if (true) { let A = 0; 1; } else { 2; }); puts(p.n);',
   'let greet = fn(name: string): string { "hi, " + name }; puts(greet("anna"));',
   'let twice = fn(f: fn(int): int, n: int): int { f(f(n)) }; puts(twice(fn(x: int): int { x * 2 }, 3));',
   'let xs: [int] = push(push([], 1), 2); puts(len(xs));',
@@ -57,6 +60,10 @@ const rejected: [string, string][] = [
   ['let a: int = 1; a();', 'not-callable'],
   ['let f = fn(a: int): int { a }; f(1, 2);', 'arity-mismatch'],
   ['let f = fn(a: int): int { a + 1 }; f("s");', 'type-mismatch'],
+  [
+    '(if (true) { let x = "s"; fn(a: int): int { a + 1; } })(x);',
+    'type-mismatch',
+  ],
   ['let s: string = "a"; s[0];', 'invalid-index'],
   ['let xs: [int] = [1]; xs == xs;', 'invalid-comparison'],
   ['1 == "a";', 'mixed-equality'],
