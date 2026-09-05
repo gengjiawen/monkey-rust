@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::ast::{Expression, MethodKind, Node, Statement};
-    use crate::{parse, parse_ast_lossless_json_string};
+    use crate::{parse, parse_ast_lossless_json_string, MAX_NESTING_DEPTH};
 
     fn verify_program(test_cases: &[(&str, &str)]) {
         for (input, expected) in test_cases {
@@ -349,6 +349,79 @@ connect();"#;
                 errors
             );
         }
+    }
+
+    /// Runs `body` on a stack the size of a main thread's.
+    ///
+    /// Recursing to [`MAX_NESTING_DEPTH`] costs several KiB per level in a debug
+    /// build — more than the 2 MiB the test harness gives its threads, though
+    /// well inside the 1 MiB a release wasm build needs it to fit in.
+    fn on_a_deep_stack(body: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(body)
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn nesting_within_the_limit_parses() {
+        on_a_deep_stack(|| {
+            // One nesting level is spent on the expression itself, so the
+            // deepest accepted wrapper count is one below the limit.
+            let depth = MAX_NESTING_DEPTH - 1;
+            for (open, close) in [("(", ")"), ("[", "]"), ("-", ""), ("!", "")] {
+                let input = format!("{}1{};", open.repeat(depth), close.repeat(depth));
+                assert!(parse(&input).is_ok(), "{}{} at depth {}", open, close, depth);
+            }
+
+            let halved = depth / 2;
+            for wrapper in ["if (true) { ", "fn() { "] {
+                let input = format!("{}1{};", wrapper.repeat(halved), " }".repeat(halved));
+                assert!(parse(&input).is_ok(), "{} at depth {}", wrapper, halved);
+            }
+
+            let nested_type = format!("let x: {}int{} = 1;", "[".repeat(depth), "]".repeat(depth));
+            assert!(parse(&nested_type).is_ok());
+        });
+    }
+
+    #[test]
+    fn nesting_past_the_limit_is_a_parse_error_not_a_stack_overflow() {
+        on_a_deep_stack(|| {
+            // Deep enough to overflow any stack the parser could run on.
+            let depth = 20_000;
+            for input in [
+                format!("{}1{};", "(".repeat(depth), ")".repeat(depth)),
+                format!("{}{};", "[".repeat(depth), "]".repeat(depth)),
+                format!("{}1;", "-".repeat(depth)),
+                format!("{}1;", "!".repeat(depth)),
+                format!("{}1{};", "if (true) { ".repeat(depth), " }".repeat(depth)),
+                format!("{}1{};", "fn() { ".repeat(depth), " }".repeat(depth)),
+                format!("let x: {}int{} = 1;", "[".repeat(depth), "]".repeat(depth)),
+            ] {
+                let errors = parse(&input).unwrap_err();
+                assert!(
+                    errors.iter().any(|error| error.contains("maximum depth")),
+                    "expected a depth error, got {:?}",
+                    errors.first()
+                );
+            }
+        });
+    }
+
+    #[test]
+    fn the_depth_budget_is_released_after_each_expression() {
+        on_a_deep_stack(|| {
+            // Two statements that each go nearly to the limit: if the counter
+            // were not released, the second one would be refused.
+            let depth = MAX_NESTING_DEPTH - 2;
+            let deep = format!("{}1{}", "(".repeat(depth), ")".repeat(depth));
+            let program = format!("let a = {}; let b = {}; a + b;", deep, deep);
+
+            assert!(parse(&program).is_ok());
+        });
     }
 
     #[test]

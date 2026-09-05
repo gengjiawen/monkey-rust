@@ -16,12 +16,28 @@ use lexer::Lexer;
 type ParseError = String;
 type ParseErrors = Vec<ParseError>;
 
+/// How deeply expressions and types may nest before the parser gives up.
+///
+/// Recursive descent uses native stack frames, and a stack overflow cannot be
+/// caught: natively it aborts the process, and in wasm it traps and leaves the
+/// module poisoned for every later call. Refusing the input keeps the failure a
+/// `ParseError`.
+///
+/// The budget is sized against the 1 MiB stack wasm builds get. Nesting `if`
+/// bodies is the most expensive construct measured (parser frame, block, inner
+/// statement); in a release build 128 of them fit in 1 MiB with room to spare
+/// and 256 overflow it. Debug builds use several times more stack per level,
+/// which is why anything parsing near the limit needs a thread with a stack
+/// larger than the 2 MiB the test harness hands out.
+pub const MAX_NESTING_DEPTH: usize = 128;
+
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
     peek_token: Token,
     errors: ParseErrors,
     block_depth: usize,
+    nesting_depth: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -44,6 +60,7 @@ impl<'a> Parser<'a> {
             peek_token: next,
             errors,
             block_depth: 0,
+            nesting_depth: 0,
         };
 
         return p;
@@ -231,7 +248,33 @@ impl<'a> Parser<'a> {
         Ok(Statement::Expr(expr))
     }
 
+    /// Counts one level of nesting, refusing to recurse deeper than
+    /// [`MAX_NESTING_DEPTH`]. Every caller must pair this with
+    /// [`Parser::leave_nesting`]; the counter is only raised on success, so a
+    /// refused level must not be released.
+    fn enter_nesting(&mut self) -> Result<(), ParseError> {
+        if self.nesting_depth >= MAX_NESTING_DEPTH {
+            return Err(format!("nesting exceeds the maximum depth of {}", MAX_NESTING_DEPTH));
+        }
+        self.nesting_depth += 1;
+        return Ok(());
+    }
+
+    fn leave_nesting(&mut self) {
+        self.nesting_depth -= 1;
+    }
+
     fn parse_expression(
+        &mut self,
+        precedence: Precedence,
+    ) -> Result<(Expression, Span), ParseError> {
+        self.enter_nesting()?;
+        let result = self.parse_expression_inner(precedence);
+        self.leave_nesting();
+        return result;
+    }
+
+    fn parse_expression_inner(
         &mut self,
         precedence: Precedence,
     ) -> Result<(Expression, Span), ParseError> {
