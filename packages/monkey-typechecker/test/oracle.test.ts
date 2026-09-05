@@ -49,6 +49,9 @@ const sound = [
   'class Point { constructor(x: int, y: int) { this.x = x; this.y = y; } sum(): int { this.x + this.y } } let p = new Point(1, 2); puts(p.sum());',
   'class Counter { constructor() { this.n = 0; } bump(k: int): int { this.n + k } } puts(new Counter().bump(2));',
   'let sizes = fn(a: [int], b: [string]): int { len(a) + len(b) }; puts(sizes([1], ["x", "y"]));',
+  'let f = fn(): int { 1; debugger; debugger; }; puts(f());',
+  'let n: int = if (true) { 1; debugger; } else { 2; debugger; }; puts(n);',
+  'class A { value(): int { 1; debugger; } } puts(new A().value());',
 ]
 
 /** Gradual programs the checker rejects and the GC VM also refuses to run. */

@@ -182,6 +182,11 @@ class Checker {
     let span: Span = spanOf(block)
 
     for (const statement of block.body) {
+      // Like the runtime, a debugger statement neither produces a value nor
+      // clears the preceding completion (including its diagnostic span).
+      if (statement.type === 'DebuggerStatement') {
+        continue
+      }
       if (!reachable) {
         // Statements after a `return` are still checked — a type error there is
         // still an error — but they contribute neither to the block's value nor
