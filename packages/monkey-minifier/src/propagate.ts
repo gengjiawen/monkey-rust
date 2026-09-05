@@ -14,11 +14,11 @@ interface Substitution {
 // Replace references to literal-initialized bindings with the literal.
 //
 // The compiler resolves a name to the binding whose `let` most recently
-// precedes it in source order, and each such slot is written exactly once —
-// redeclaring a name allocates a fresh slot instead of mutating the old one.
-// A reference therefore always observes its own binding's initializer, except
-// when the `let` sits inside an `if` arm and may never have run; those
-// bindings stay put (`Binding.conditional`).
+// precedes it in source order. A reference therefore observes its own
+// binding's initializer, with two exceptions that stay put: a `let` inside an
+// `if` arm may never have run (`Binding.conditional`), and a binding written
+// by more than one `let` — a block rebinding a name from an enclosing block —
+// has no single initializer to attribute a reference to.
 //
 // Bindings whose references disappear here become dead and are collected by
 // `eliminateDeadLets`. Returns whether any reference was replaced so the
@@ -33,7 +33,11 @@ export function propagateConstants(program: Program): boolean {
     replaced: false,
   }
   for (const [statement, binding] of analysis.letBindings) {
-    if (binding.conditional || binding.references.length === 0) {
+    if (
+      binding.conditional ||
+      binding.references.length === 0 ||
+      binding.lets.length > 1
+    ) {
       continue
     }
     const width = literalWidth(statement.expr)

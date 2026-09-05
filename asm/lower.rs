@@ -3,11 +3,11 @@
 //! compiler's `SymbolTable`, and every dynamic operation through the frozen
 //! `rt_*` ABI. No IR, no register allocation, no optimization.
 
-use compiler::symbol_table::{Symbol, SymbolScope, SymbolTable};
+use compiler::symbol_table::{shadowed_names, Symbol, SymbolScope, SymbolTable};
 use object::builtins::BuiltIns;
 use parser::ast::{
     BlockStatement, ClassDeclaration, Expression, FunctionDeclaration, Let, Literal,
-    MethodDefinition, MethodKind, Node, Statement,
+    MethodDefinition, MethodKind, Node, Statement, IF,
 };
 use parser::lexer::token::{Span, TokenKind};
 use parser::validation::validate_program;
@@ -30,6 +30,15 @@ pub const MAX_METHOD_PARAMETERS: usize = 6;
 /// (`.Lmain_exit` on ELF, `Lmain_exit` on Mach-O).
 fn main_epilogue_label(dialect: AsmDialect) -> String {
     format!("{}main_exit", dialect.local_label_prefix())
+}
+
+/// A name an `if` can rebind: what it meant on entry to the arms, and the slot
+/// every arm converges on so it means one thing after the branch. `before` is
+/// the slot itself for a name that had no binding before the branch.
+struct Shadow {
+    name: String,
+    before: Rc<Symbol>,
+    slot: Rc<Symbol>,
 }
 
 #[derive(Clone, Debug)]
@@ -243,12 +252,97 @@ impl<'a> Lowerer<'a> {
         self.lower_expression(&let_statement.expr)?;
         let symbol = self.symbols.define(name.clone());
         let span = let_statement.span.clone();
-        self.emitter.with_span(&span, |emitter| match symbol.scope {
-            SymbolScope::Global => {
-                emitter.global_store("x0", symbol.index, &format!("let {}", name))
-            }
-            _ => emitter.frame_store("x0", slot_offset(symbol.index), &format!("let {}", name)),
+        self.store_accumulator(&symbol, &span, &format!("let {}", name));
+        Ok(())
+    }
+
+    /// Stores the accumulator into a slot this scope allocated.
+    fn store_accumulator(&mut self, symbol: &Rc<Symbol>, span: &Span, comment: &str) {
+        let (scope, index) = (symbol.scope.clone(), symbol.index);
+        self.emitter.with_span(span, |emitter| match scope {
+            SymbolScope::Global => emitter.global_store("x0", index, comment),
+            _ => emitter.frame_store("x0", slot_offset(index), comment),
         });
+    }
+
+    /// Gives every name an arm of `if_node` can rebind a slot of its own,
+    /// seeded with the binding in force here, and emits the seeding copies.
+    ///
+    /// Blocks are not scopes in Monkey, but a jump can skip one, so the slot a
+    /// name means after the branch has to be picked before it — see
+    /// `compiler::symbol_table::shadowed_names`. The name keeps meaning the
+    /// old binding until the `let` that rebinds it, so the slot is not
+    /// installed yet; a name with no binding at all is the exception, and
+    /// starts the arms on the slot so that an arm not binding it reads the
+    /// null seed rather than the other arm's slot.
+    ///
+    /// The copies go through the accumulator, which holds the already-lowered
+    /// condition, so it waits on the machine stack.
+    fn declare_shadow_slots(&mut self, if_node: &IF) -> Result<Vec<Shadow>, LowerError> {
+        let names = shadowed_names(if_node);
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.emitter
+            .without_span(|emitter| emitter.push_acc("condition"));
+        let mut shadows = Vec::new();
+        for name in names {
+            let slot = self.symbols.declare_slot(&name);
+            let before = match self.symbols.resolve(name.clone()) {
+                Some(before) => {
+                    self.load_symbol(&before, &if_node.span)?;
+                    before
+                }
+                None => {
+                    self.emitter.without_span(|emitter| {
+                        emitter.load_imm64("x0", NULL_VALUE, "shadow seed: null");
+                    });
+                    self.symbols.rebind(&name, Rc::clone(&slot));
+                    Rc::clone(&slot)
+                }
+            };
+            self.store_accumulator(&slot, &if_node.span, &format!("shadow {}", name));
+            shadows.push(Shadow {
+                name,
+                before,
+                slot,
+            });
+        }
+        self.emitter
+            .without_span(|emitter| emitter.pop("x0", "condition"));
+        Ok(shadows)
+    }
+
+    /// An arm of an `if`, followed by the copies that make every shadowed name
+    /// mean one slot after the branch. The arm's value is in `x0`, so it goes
+    /// on the machine stack while the copies use the accumulator.
+    fn lower_if_branch(
+        &mut self,
+        block: &BlockStatement,
+        shadows: &[Shadow],
+    ) -> Result<(), LowerError> {
+        self.lower_block_value(block)?;
+        for shadow in shadows {
+            let current = self
+                .symbols
+                .resolve(shadow.name.clone())
+                .unwrap_or_else(|| Rc::clone(&shadow.before));
+            if !Rc::ptr_eq(&current, &shadow.before) {
+                self.emitter
+                    .without_span(|emitter| emitter.push_acc("block value"));
+                self.load_symbol(&current, &block.span)?;
+                self.store_accumulator(
+                    &shadow.slot,
+                    &block.span,
+                    &format!("shadow {}", shadow.name),
+                );
+                self.emitter
+                    .without_span(|emitter| emitter.pop("x0", "block value"));
+            }
+            // The other arm compiles against the bindings this one started
+            // from, not the ones it made.
+            self.symbols.rebind(&shadow.name, Rc::clone(&shadow.before));
+        }
         Ok(())
     }
 
@@ -350,7 +444,11 @@ impl<'a> Lowerer<'a> {
             }
             Expression::INFIX(infix) => self.lower_infix(infix),
             Expression::IF(if_node) => {
+                // The condition runs before either arm and can rebind a name
+                // itself, so the slots are picked against what it leaves, not
+                // against what was in force before it.
                 self.lower_expression(&if_node.condition)?;
+                let shadows = self.declare_shadow_slots(if_node)?;
                 let else_label = self.emitter.new_label();
                 let end_label = self.emitter.new_label();
                 let comment = format!("if ({})", self.snippet(if_node.condition.span()));
@@ -358,13 +456,13 @@ impl<'a> Lowerer<'a> {
                     emitter.call_runtime("rt_truthy", &comment);
                     emitter.ins(&format!("cbz x0, {}", else_label));
                 });
-                self.lower_block_value(&if_node.consequent)?;
+                self.lower_if_branch(&if_node.consequent, &shadows)?;
                 self.emitter.with_span(&if_node.span.clone(), |emitter| {
                     emitter.ins(&format!("b {}", end_label));
                     emitter.label(&else_label);
                 });
                 match &if_node.alternate {
-                    Some(alternate) => self.lower_block_value(alternate)?,
+                    Some(alternate) => self.lower_if_branch(alternate, &shadows)?,
                     None => {
                         self.emitter.without_span(|emitter| {
                             emitter.load_imm64("x0", NULL_VALUE, "if without else: null");
@@ -374,6 +472,9 @@ impl<'a> Lowerer<'a> {
                 self.emitter.with_span(&if_node.span.clone(), |emitter| {
                     emitter.label(&end_label);
                 });
+                for shadow in &shadows {
+                    self.symbols.rebind(&shadow.name, Rc::clone(&shadow.slot));
+                }
                 Ok(())
             }
             Expression::Index(index) => {

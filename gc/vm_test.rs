@@ -65,6 +65,202 @@ mod tests {
     use super::*;
     use crate::value::{alloc_value, get_value_mut, value_to_string, Value, ValueCell, ValueKind};
 
+    /// A block is not a scope: a `let` inside one rebinds the name that is
+    /// still visible after the block. The store therefore has to hit the slot
+    /// later reads use, or a branch that does not run leaves them reading an
+    /// uninitialised slot (see #335).
+    #[test]
+    fn let_inside_a_block_rebinds_the_outer_name() {
+        let tests = vec![
+            VmTestCase {
+                input: "let x = 1; if (false) { let x = \"shadow\"; } x + 1",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { let x = 2; } x",
+                expected: Object::Integer(2),
+            },
+            // Several `let`s of one name in one arm: the last one the arm ran
+            // is what the name means afterwards, and an arm that did not run
+            // leaves the binding from before the branch alone.
+            VmTestCase {
+                input: "let x = 1; if (false) { let x = 2; let x = 3; } x",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { let x = 2; let x = 3; } x",
+                expected: Object::Integer(3),
+            },
+            // The else arm rebinds the same name; whichever arm ran decides.
+            VmTestCase {
+                input: "let x = 1; if (true) { let x = 2; } else { let x = 3; } x",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (false) { let x = 2; } else { let x = 3; } x",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { 0 } else { let x = 3; } x",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; if (false) { 0 } else { let x = 3; } x",
+                expected: Object::Integer(3),
+            },
+            // Sequential and nested blocks, each conditional on its own.
+            VmTestCase {
+                input: "if (true) { let x = 1; } if (false) { let x = 2; } x",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "if (false) { let x = 1; } if (true) { let x = 2; } x",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { if (true) { let x = 5; } } x",
+                expected: Object::Integer(5),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { if (false) { let x = 2; } } x",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; if (false) { if (true) { let x = 2; } } x",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { if (false) { let x = 2; } let x = 4; } x",
+                expected: Object::Integer(4),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { if (false) { let x = 2; } x }",
+                expected: Object::Integer(1),
+            },
+            // A closure made before the branch keeps reading what it captured,
+            // whichever way the branch went.
+            VmTestCase {
+                input: "let x = 1; let f = fn() { x }; if (true) { let x = 2; } f()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; let f = fn() { x }; if (false) { let x = 2; } f()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let z = 1; if (true) { let z = 2; let f = fn() { z }; let z = 9; f() }",
+                expected: Object::Integer(2),
+            },
+            // Once the block closes the name is unconditional again, so the
+            // next `let` binds anew and a closure made earlier keeps reading
+            // what it captured — the block in between changes nothing.
+            VmTestCase {
+                input: "let x = 1; let f = fn() { x }; if (false) { let x = 2; } let x = 3; f()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "if (true) { let y = 1; let g = fn() { y }; } let y = 2; g()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { let x = 2; if (true) { let x = 3; } let f = fn() { x }; let x = 4; f() }",
+                expected: Object::Integer(3),
+            },
+            // Function locals and parameters go the same way through frame
+            // slots, and a captured free variable is untouched by an arm that
+            // shadows it.
+            VmTestCase {
+                input: "fn() { let y = 1; if (false) { let y = 2; } y }()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "fn() { let y = 1; if (true) { let y = 2; } y }()",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "fn(p) { if (true) { let p = 5; } p }(1)",
+                expected: Object::Integer(5),
+            },
+            VmTestCase {
+                input: "let f = fn() { let x = 1; if (false) { let x = 2; let x = 3; } x }; f()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let f = fn() { let x = 1; if (true) { let x = 2; let x = 3; } x }; f()",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "let x = 1; let f = fn() { if (false) { let x = 2; } x }; f()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "let x = 1; let f = fn() { if (true) { let x = 2; } x }; f()",
+                expected: Object::Integer(2),
+            },
+            // The arm is still an expression: its own value is what the `if`
+            // evaluates to, rebinding or not.
+            VmTestCase {
+                input: "let x = 1; let y = if (true) { let x = 2; 42 }; y",
+                expected: Object::Integer(42),
+            },
+            VmTestCase {
+                input: "let x = 1; if (true) { let x = 2; x }",
+                expected: Object::Integer(2),
+            },
+            // A name neither the branch nor anything before it had a binding
+            // for still has to mean one thing afterwards: both arms converge
+            // on the same slot rather than each keeping its own.
+            VmTestCase {
+                input: "if (true) { let n = 2; } else { let n = 3; } n",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "if (false) { let n = 2; } else { let n = 3; } n",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "if (true) { let n = 2; let n = 5; } else { let n = 3; } n",
+                expected: Object::Integer(5),
+            },
+            VmTestCase {
+                input: "if (false) { if (true) { let n = 2; } else { let n = 3; } } else { let n = 4; } n",
+                expected: Object::Integer(4),
+            },
+            VmTestCase {
+                input: "let f = fn() { if (true) { let n = 2; } else { let n = 3; } n }; f()",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let f = fn(p) { if (true) { let p = 2; } else { let p = 3; } p }; f(9)",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "if (true) { let n = 1; let g = fn() { n }; } else { let n = 2; let g = fn() { n }; } g()",
+                expected: Object::Integer(1),
+            },
+            // The condition runs before either arm, so a rebinding it makes is
+            // in force for both of them and for the code after the branch.
+            VmTestCase {
+                input: "let x = 1; let y = if (if (true) { let x = 2; false }) { let x = 3; 30 } else { let y = x; let x = 4; y }; y",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; let y = if (if (true) { let x = 2; true }) { let y = x; let x = 3; y } else { 40 }; y",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (if (true) { let x = 2; false }) { let x = 3; } else { 0 } x",
+                expected: Object::Integer(2),
+            },
+            VmTestCase {
+                input: "let x = 1; if (if (true) { let x = 2; true }) { 0 } else { 0 } x",
+                expected: Object::Integer(2),
+            },
+        ];
+
+        run_gc_vm_tests(tests);
+    }
+
     #[test]
     fn test_integer_arithmetic() {
         run_gc_vm_tests(vec![

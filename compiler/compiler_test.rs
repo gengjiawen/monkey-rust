@@ -520,15 +520,23 @@ mod tests {
     #[test]
     fn condition_arms_without_values_emit_null() {
         let tests = vec![CompilerTestCase {
+            // The arm ends in a `let`, so its value is null — as is the empty
+            // else arm's. The prologue and the copy before the jump are the
+            // convergence slot `y` means after the branch, pinned in full by
+            // `branch_arms_converge_on_a_slot_picked_before_them`.
             input: "if (true) { let y = 1; } else {};",
             expected_constants: vec![Object::Integer(1)],
             expected_instructions: vec![
                 make_instructions(OpTrue, &[]),
-                make_instructions(OpJumpNotTruthy, &[14]),
-                make_instructions(OpConst, &[0]),
-                make_instructions(OpSetGlobal, &[0]),
                 make_instructions(OpNull, &[]),
-                make_instructions(OpJump, &[15]),
+                make_instructions(OpSetGlobal, &[0]),
+                make_instructions(OpJumpNotTruthy, &[24]),
+                make_instructions(OpConst, &[0]),
+                make_instructions(OpSetGlobal, &[1]),
+                make_instructions(OpNull, &[]),
+                make_instructions(OpGetGlobal, &[1]),
+                make_instructions(OpSetGlobal, &[0]),
+                make_instructions(OpJump, &[25]),
                 make_instructions(OpNull, &[]),
                 make_instructions(OpPop, &[]),
             ],
@@ -1102,5 +1110,69 @@ mod tests {
             "unexpected error: {}",
             err
         );
+    }
+
+    /// A block is skippable, so the slot a name means after the branch has to
+    /// be one picked before it: seeded with the binding in force there, and
+    /// written by whichever arm runs, at its end (see #335).
+    #[test]
+    fn branch_arms_converge_on_a_slot_picked_before_them() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "let x = 1; if (true) { let x = 2; } x;",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpTrue, &[]),
+                    // The convergence slot, seeded from the binding the
+                    // condition left in force.
+                    make_instructions(OpGetGlobal, &[0]),
+                    make_instructions(OpSetGlobal, &[1]),
+                    make_instructions(OpJumpNotTruthy, &[32]),
+                    make_instructions(OpConst, &[1]),
+                    make_instructions(OpSetGlobal, &[2]),
+                    make_instructions(OpNull, &[]),
+                    // The arm's own binding, copied in after its value.
+                    make_instructions(OpGetGlobal, &[2]),
+                    make_instructions(OpSetGlobal, &[1]),
+                    make_instructions(OpJump, &[33]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpPop, &[]),
+                    // `x` means the convergence slot from here on.
+                    make_instructions(OpGetGlobal, &[1]),
+                    make_instructions(OpPop, &[]),
+                ],
+            },
+            // A name neither arm inherits converges the same way, on a slot
+            // seeded with null: an arm that does not bind it must leave the
+            // name worth null rather than the other arm's unwritten slot.
+            CompilerTestCase {
+                input: "if (true) { let n = 2; } else { let n = 3; } n;",
+                expected_constants: vec![Object::Integer(2), Object::Integer(3)],
+                expected_instructions: vec![
+                    make_instructions(OpTrue, &[]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpJumpNotTruthy, &[24]),
+                    make_instructions(OpConst, &[0]),
+                    make_instructions(OpSetGlobal, &[1]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpGetGlobal, &[1]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpJump, &[37]),
+                    make_instructions(OpConst, &[1]),
+                    make_instructions(OpSetGlobal, &[2]),
+                    make_instructions(OpNull, &[]),
+                    make_instructions(OpGetGlobal, &[2]),
+                    make_instructions(OpSetGlobal, &[0]),
+                    make_instructions(OpPop, &[]),
+                    make_instructions(OpGetGlobal, &[0]),
+                    make_instructions(OpPop, &[]),
+                ],
+            },
+        ];
+
+        run_compiler_test(tests);
     }
 }

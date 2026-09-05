@@ -1,5 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+
+use parser::ast::{BlockStatement, Expression, Literal, Statement, IF};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SymbolScope {
@@ -56,20 +58,44 @@ impl SymbolTable {
         }
     }
 
+    /// Every `let` takes a slot of its own, so a closure created between two
+    /// bindings of one name keeps reading the value it captured.
     pub fn define(&mut self, name: String) -> Rc<Symbol> {
-        let mut scope = SymbolScope::LOCAL;
-        if self.outer.is_none() {
-            scope = SymbolScope::Global;
-        }
+        let symbol = self.allocate(&name);
+        self.symbols.insert(name, Rc::clone(&symbol));
+        return symbol;
+    }
+
+    /// Takes a slot for `name` without making it the name's binding yet.
+    ///
+    /// Blocks are not scopes in Monkey — `if (true) { let inner = 1; } inner;`
+    /// evaluates to `1` — but a block is still something a jump can skip, so a
+    /// slot a block binds is one nothing may have written by the time the code
+    /// after the block reads it. The binding for after the branch therefore
+    /// has to be a slot picked *before* it, seeded with the value in force
+    /// there and overwritten by whichever arm runs (see
+    /// [`shadowed_names`]). Until the `let` that rebinds it, the name still
+    /// means what it meant before, so this deliberately leaves `symbols`
+    /// alone; [`SymbolTable::rebind`] performs the switch.
+    pub fn declare_slot(&mut self, name: &str) -> Rc<Symbol> {
+        return self.allocate(name);
+    }
+
+    /// Points `name` at `symbol`, which must be one this scope handed out.
+    pub fn rebind(&mut self, name: &str, symbol: Rc<Symbol>) {
+        self.symbols.insert(name.to_string(), symbol);
+    }
+
+    fn allocate(&mut self, name: &str) -> Rc<Symbol> {
+        let scope = if self.outer.is_none() { SymbolScope::Global } else { SymbolScope::LOCAL };
 
         let symbol = Rc::new(Symbol {
-            name: name.clone(),
+            name: name.to_string(),
             index: self.num_definitions,
             scope,
         });
 
         self.num_definitions += 1;
-        self.symbols.insert(name.clone(), Rc::clone(&symbol));
         self.definitions.push(Rc::clone(&symbol));
         return symbol;
     }
@@ -147,5 +173,115 @@ impl SymbolTable {
         self.symbols
             .insert(original.name.clone(), Rc::clone(&symbol));
         return symbol;
+    }
+}
+
+/// The names `if_node` can rebind for the code that follows it, in the order
+/// they appear.
+///
+/// A backend gives each of these a slot before the branch and copies the arm's
+/// own final binding into it at the end of every arm, so the name means the
+/// same thing after the `if` whichever way the jump went — and means what it
+/// meant before when neither arm runs. The list over-approximates on purpose:
+/// a name that turns out not to be rebound just costs a slot and a copy of
+/// itself onto itself, whereas missing one leaves a read after the branch on a
+/// slot that may never have been written.
+///
+/// Nested `if`s are included because their own rebinding happens inside this
+/// one, and so is conditional on it too. Function and method bodies are not:
+/// they open a scope of their own, and a `let` in there cannot rebind a name
+/// out here.
+pub fn shadowed_names(if_node: &IF) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    let mut collect = |block: &BlockStatement| {
+        let mut found = Vec::new();
+        collect_block(block, &mut found);
+        for name in found {
+            if seen.insert(name.clone()) {
+                names.push(name);
+            }
+        }
+    };
+    collect(&if_node.consequent);
+    if let Some(alternate) = &if_node.alternate {
+        collect(alternate);
+    }
+    return names;
+}
+
+fn collect_block(block: &BlockStatement, names: &mut Vec<String>) {
+    for statement in &block.body {
+        collect_statement(statement, names);
+    }
+}
+
+fn collect_statement(statement: &Statement, names: &mut Vec<String>) {
+    match statement {
+        Statement::Let(let_statement) => {
+            names.push(let_statement.identifier.name.clone());
+            collect_expression(&let_statement.expr, names);
+        }
+        // A class declaration binds its name the way a `let` does. The parser
+        // only allows one at top level, so a block cannot hold one today; this
+        // is here so the match cannot quietly drop a binder if that changes.
+        Statement::Class(class) => names.push(class.name.name.clone()),
+        Statement::Return(statement) => collect_expression(&statement.argument, names),
+        Statement::SetProperty(statement) => {
+            collect_expression(&statement.object, names);
+            collect_expression(&statement.value, names);
+        }
+        Statement::Debugger(_) => {}
+        Statement::Expr(expression) => collect_expression(expression, names),
+    }
+}
+
+fn collect_expression(expression: &Expression, names: &mut Vec<String>) {
+    match expression {
+        Expression::IF(if_node) => {
+            collect_expression(&if_node.condition, names);
+            collect_block(&if_node.consequent, names);
+            if let Some(alternate) = &if_node.alternate {
+                collect_block(alternate, names);
+            }
+        }
+        Expression::PREFIX(unary) => collect_expression(&unary.operand, names),
+        Expression::INFIX(binary) => {
+            collect_expression(&binary.left, names);
+            collect_expression(&binary.right, names);
+        }
+        Expression::FunctionCall(call) => {
+            collect_expression(&call.callee, names);
+            for argument in &call.arguments {
+                collect_expression(argument, names);
+            }
+        }
+        Expression::Index(index) => {
+            collect_expression(&index.object, names);
+            collect_expression(&index.index, names);
+        }
+        Expression::Property(property) => collect_expression(&property.object, names),
+        Expression::New(new) => {
+            for argument in &new.arguments {
+                collect_expression(argument, names);
+            }
+        }
+        Expression::LITERAL(literal) => match literal {
+            Literal::Array(array) => {
+                for element in &array.elements {
+                    collect_expression(element, names);
+                }
+            }
+            Literal::Hash(hash) => {
+                for (key, value) in &hash.elements {
+                    collect_expression(key, names);
+                    collect_expression(value, names);
+                }
+            }
+            Literal::Integer(_) | Literal::Boolean(_) | Literal::String(_) => {}
+        },
+        // A function body is a scope, so nothing in it rebinds a name here.
+        Expression::FUNCTION(_) => {}
+        Expression::IDENTIFIER(_) | Expression::This(_) => {}
     }
 }

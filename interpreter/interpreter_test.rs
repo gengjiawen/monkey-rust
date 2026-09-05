@@ -167,6 +167,88 @@ mod tests {
         apply_test(&test_case);
     }
 
+    /// Blocks are not scopes, so these are the results the bytecode VMs are
+    /// pinned to as well (compiler and gc `vm_test.rs`).
+    #[test]
+    fn test_let_inside_a_block_rebinds_the_outer_name() {
+        let test_case = [
+            ("let x = 1; if (false) { let x = \"shadow\"; } x + 1", "2"),
+            ("let x = 1; if (true) { let x = 2; } x", "2"),
+            // Several `let`s of one name in one arm: the last one the arm ran
+            // is what the name means afterwards, and an arm that did not run
+            // leaves the binding from before the branch alone.
+            ("let x = 1; if (false) { let x = 2; let x = 3; } x", "1"),
+            ("let x = 1; if (true) { let x = 2; let x = 3; } x", "3"),
+            // The else arm rebinds the same name; whichever arm ran decides.
+            ("let x = 1; if (true) { let x = 2; } else { let x = 3; } x", "2"),
+            ("let x = 1; if (false) { let x = 2; } else { let x = 3; } x", "3"),
+            ("let x = 1; if (true) { 0 } else { let x = 3; } x", "1"),
+            ("let x = 1; if (false) { 0 } else { let x = 3; } x", "3"),
+            // Sequential and nested blocks, each conditional on its own.
+            ("if (true) { let x = 1; } if (false) { let x = 2; } x", "1"),
+            ("if (false) { let x = 1; } if (true) { let x = 2; } x", "2"),
+            ("let x = 1; if (true) { if (true) { let x = 5; } } x", "5"),
+            ("let x = 1; if (true) { if (false) { let x = 2; } } x", "1"),
+            ("let x = 1; if (false) { if (true) { let x = 2; } } x", "1"),
+            ("let x = 1; if (true) { if (false) { let x = 2; } let x = 4; } x", "4"),
+            ("let x = 1; if (true) { if (false) { let x = 2; } x }", "1"),
+            // A closure made before the branch keeps reading what it captured,
+            // whichever way the branch went.
+            ("let x = 1; let f = fn() { x }; if (true) { let x = 2; } f()", "1"),
+            ("let x = 1; let f = fn() { x }; if (false) { let x = 2; } f()", "1"),
+            ("let z = 1; if (true) { let z = 2; let f = fn() { z }; let z = 9; f() }", "2"),
+            // Once the block closes the name is unconditional again, so the
+            // next `let` binds anew and a closure made earlier keeps reading
+            // what it captured — the block in between changes nothing.
+            ("let x = 1; let f = fn() { x }; if (false) { let x = 2; } let x = 3; f()", "1"),
+            ("if (true) { let y = 1; let g = fn() { y }; } let y = 2; g()", "1"),
+            ("let x = 1; if (true) { let x = 2; if (true) { let x = 3; } let f = fn() { x }; let x = 4; f() }", "3"),
+            // Function locals and parameters go the same way through frame
+            // slots, and a captured free variable is untouched by an arm that
+            // shadows it.
+            ("fn() { let y = 1; if (false) { let y = 2; } y }()", "1"),
+            ("fn() { let y = 1; if (true) { let y = 2; } y }()", "2"),
+            ("fn(p) { if (true) { let p = 5; } p }(1)", "5"),
+            ("let f = fn() { let x = 1; if (false) { let x = 2; let x = 3; } x }; f()", "1"),
+            ("let f = fn() { let x = 1; if (true) { let x = 2; let x = 3; } x }; f()", "3"),
+            ("let x = 1; let f = fn() { if (false) { let x = 2; } x }; f()", "1"),
+            ("let x = 1; let f = fn() { if (true) { let x = 2; } x }; f()", "2"),
+            // The arm is still an expression: its own value is what the `if`
+            // evaluates to, rebinding or not.
+            ("let x = 1; let y = if (true) { let x = 2; 42 }; y", "42"),
+            ("let x = 1; if (true) { let x = 2; x }", "2"),
+            // A name neither the branch nor anything before it had a binding
+            // for still has to mean one thing afterwards: both arms converge
+            // on the same slot rather than each keeping its own.
+            ("if (true) { let n = 2; } else { let n = 3; } n", "2"),
+            ("if (false) { let n = 2; } else { let n = 3; } n", "3"),
+            ("if (true) { let n = 2; let n = 5; } else { let n = 3; } n", "5"),
+            (
+                "if (false) { if (true) { let n = 2; } else { let n = 3; } } else { let n = 4; } n",
+                "4",
+            ),
+            ("let f = fn() { if (true) { let n = 2; } else { let n = 3; } n }; f()", "2"),
+            ("let f = fn(p) { if (true) { let p = 2; } else { let p = 3; } p }; f(9)", "2"),
+            (
+                "if (true) { let n = 1; let g = fn() { n }; } else { let n = 2; let g = fn() { n }; } g()",
+                "1",
+            ),
+            // The condition runs before either arm, so a rebinding it makes is
+            // in force for both of them and for the code after the branch.
+            (
+                "let x = 1; let y = if (if (true) { let x = 2; false }) { let x = 3; 30 } else { let y = x; let x = 4; y }; y",
+                "2",
+            ),
+            (
+                "let x = 1; let y = if (if (true) { let x = 2; true }) { let y = x; let x = 3; y } else { 40 }; y",
+                "2",
+            ),
+            ("let x = 1; if (if (true) { let x = 2; false }) { let x = 3; } else { 0 } x", "2"),
+            ("let x = 1; if (if (true) { let x = 2; true }) { 0 } else { 0 } x", "2"),
+        ];
+        apply_test(&test_case);
+    }
+
     #[test]
     fn test_function_object() {
         let test_case = [("fn(x) { x + 2; };", "fn(x) { (x + 2); }")];

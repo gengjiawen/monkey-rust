@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use object::Object;
 use parser::ast::{
-    BlockStatement, Expression, Literal, MethodDefinition, MethodKind, Node, Statement,
+    BlockStatement, Expression, Literal, MethodDefinition, MethodKind, Node, Statement, IF,
 };
 use parser::lexer::token::Span;
 use parser::lexer::token::TokenKind;
@@ -13,7 +13,19 @@ use parser::validation::validate_program;
 
 use crate::op_code::Opcode::*;
 use crate::op_code::{make_instructions, Instructions, Opcode};
-use crate::symbol_table::{Symbol, SymbolScope, SymbolTable};
+use crate::symbol_table::{shadowed_names, Symbol, SymbolScope, SymbolTable};
+
+/// A name an `if` can rebind: what it meant on entry to the arms, and the slot
+/// every arm converges on so it means one thing after the branch.
+///
+/// `before` is the slot itself when the name had no binding before the branch:
+/// there is nothing to restore between the arms, and the slot's null seed is
+/// what such a name is worth until an arm binds it.
+struct Shadow {
+    name: String,
+    before: Rc<Symbol>,
+    slot: Rc<Symbol>,
+}
 
 struct CompilationScope {
     instructions: Instructions,
@@ -384,11 +396,7 @@ impl Compiler {
                 // inside the function body, not by an uninitialized slot.
                 self.compile_expr(&let_statement.expr)?;
                 let symbol = self.define_symbol(let_statement.identifier.name.clone())?;
-                if symbol.scope == SymbolScope::Global {
-                    self.emit_with_span(Opcode::OpSetGlobal, &[symbol.index], &let_statement.span);
-                } else {
-                    self.emit_with_span(Opcode::OpSetLocal, &[symbol.index], &let_statement.span);
-                }
+                self.store_symbol(&symbol, &let_statement.span)?;
                 return Ok(());
             }
             Statement::Return(r) => {
@@ -541,9 +549,13 @@ impl Compiler {
                 }
             }
             Expression::IF(if_node) => {
+                // The condition runs before either arm and can rebind a name
+                // itself, so the slots are picked against what it leaves, not
+                // against what was in force before it.
                 self.compile_expr(&if_node.condition)?;
+                let shadows = self.declare_shadow_slots(if_node)?;
                 let jump_not_truthy = self.emit_with_span(OpJumpNotTruthy, &[9527], &if_node.span);
-                self.compile_block_statement_as_value(&if_node.consequent)?;
+                self.compile_if_branch(&if_node.consequent, &shadows)?;
 
                 let jump_pos = self.emit_with_span(OpJump, &[9527], &if_node.span);
 
@@ -551,12 +563,20 @@ impl Compiler {
                 self.change_operand(jump_not_truthy, after_consequence_location)?;
 
                 if let Some(alternate) = &if_node.alternate {
-                    self.compile_block_statement_as_value(alternate)?;
+                    self.compile_if_branch(alternate, &shadows)?;
                 } else {
                     self.emit_with_span(OpNull, &[], &if_node.span);
                 }
                 let after_alternative_location = self.current_instruction().data.len();
                 self.change_operand(jump_pos, after_alternative_location)?;
+
+                // Whichever arm ran left its own binding in the shadow slot,
+                // and no arm running left the seed there, so from here on the
+                // name means that slot.
+                for shadow in &shadows {
+                    self.symbol_table
+                        .rebind(&shadow.name, Rc::clone(&shadow.slot));
+                }
             }
             Expression::Index(index) => {
                 self.compile_expr(&index.object)?;
@@ -681,6 +701,11 @@ impl Compiler {
 
     fn define_symbol(&mut self, name: String) -> Result<Rc<Symbol>, CompileError> {
         let symbol = self.symbol_table.define(name);
+        self.check_slot_index(&symbol)?;
+        Ok(symbol)
+    }
+
+    fn check_slot_index(&self, symbol: &Rc<Symbol>) -> Result<(), CompileError> {
         match symbol.scope {
             SymbolScope::LOCAL => ensure_u8_index(symbol.index, "locals")?,
             SymbolScope::Global => ensure_u16_index(symbol.index, "globals")?,
@@ -689,7 +714,23 @@ impl Compiler {
             // rather than here — bounded by the OpClosure capture count.
             SymbolScope::Builtin | SymbolScope::Free | SymbolScope::Function => {}
         }
-        Ok(symbol)
+        Ok(())
+    }
+
+    /// Stores the top of the stack into a slot this scope allocated.
+    fn store_symbol(&mut self, symbol: &Rc<Symbol>, span: &Span) -> Result<(), CompileError> {
+        match symbol.scope {
+            SymbolScope::Global => {
+                self.emit_with_span(OpSetGlobal, &[symbol.index], span);
+            }
+            SymbolScope::LOCAL => {
+                self.emit_with_span(OpSetLocal, &[symbol.index], span);
+            }
+            // Only `define`/`declare_slot` produce assignable symbols, and
+            // they only ever produce these two scopes.
+            _ => return Err(format!("cannot assign to {}", symbol.name)),
+        }
+        Ok(())
     }
 
     /// Global slots in slot order, one entry per definition — a rebound name
@@ -742,7 +783,76 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_block_statement_as_value(
+    /// Gives every name an arm of `if_node` can rebind a slot of its own,
+    /// seeded with the binding in force here, and emits the seeding copies.
+    ///
+    /// Each load/store pair is stack-neutral, so the condition value this is
+    /// emitted on top of stays where the jump expects it.
+    ///
+    /// The slot is not the name's binding yet — up to the `let` that rebinds
+    /// it the name still means what it did before the branch — except for a
+    /// name that had no binding at all, which starts the arms on the slot so
+    /// that an arm not binding it reads the null seed instead of the other
+    /// arm's slot.
+    fn declare_shadow_slots(&mut self, if_node: &IF) -> Result<Vec<Shadow>, CompileError> {
+        let mut shadows = Vec::new();
+        for name in shadowed_names(if_node) {
+            let slot = self.symbol_table.declare_slot(&name);
+            self.check_slot_index(&slot)?;
+            let before = match self.symbol_table.resolve(name.clone()) {
+                Some(before) => {
+                    self.load_symbol(&before, &if_node.span)?;
+                    before
+                }
+                // A name the arms introduce has nothing to preserve, and the
+                // arms have to converge on it all the same or neither of them
+                // means anything after the branch.
+                None => {
+                    self.emit_with_span(OpNull, &[], &if_node.span);
+                    self.symbol_table.rebind(&name, Rc::clone(&slot));
+                    Rc::clone(&slot)
+                }
+            };
+            self.store_symbol(&slot, &if_node.span)?;
+            shadows.push(Shadow {
+                name,
+                before,
+                slot,
+            });
+        }
+        Ok(shadows)
+    }
+
+    /// Compiles one arm of an `if`, then copies whatever each shadowed name
+    /// ends up bound to in here into the slot the branch converges on.
+    ///
+    /// The copies go after the arm's value is computed, and each is a load
+    /// followed by a store, so the value stays on top of the stack.
+    fn compile_if_branch(
+        &mut self,
+        block_statement: &BlockStatement,
+        shadows: &[Shadow],
+    ) -> Result<(), CompileError> {
+        self.compile_block_body_as_value(block_statement)?;
+        for shadow in shadows {
+            let current = self
+                .symbol_table
+                .resolve(shadow.name.clone())
+                .unwrap_or_else(|| Rc::clone(&shadow.before));
+            if !Rc::ptr_eq(&current, &shadow.before) {
+                self.load_symbol(&current, &block_statement.span)?;
+                self.store_symbol(&shadow.slot, &block_statement.span)?;
+            }
+            // Blocks are not scopes, but the *other* arm has to compile
+            // against the bindings this one started from rather than the ones
+            // it made.
+            self.symbol_table
+                .rebind(&shadow.name, Rc::clone(&shadow.before));
+        }
+        Ok(())
+    }
+
+    fn compile_block_body_as_value(
         &mut self,
         block_statement: &BlockStatement,
     ) -> Result<(), CompileError> {

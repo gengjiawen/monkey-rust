@@ -369,6 +369,28 @@ fn e2e_programs_behave_like_the_interpreter() {
             "let x = 1;\nlet x = x + 2;\nputs(x);",
             "3\n",
         ),
+        // A block is not a scope but it is skippable, so a name an arm binds
+        // means a slot picked before the branch: whichever arm ran wrote it,
+        // and a name no arm inherits starts from the null seed. The condition
+        // runs unconditionally, so its own rebinding is what both arms see.
+        (
+            "branch_rebinding",
+            concat!(
+                "let x = 1;\n",
+                "if (true) { let x = 2; } else { let x = 3; }\n",
+                "puts(x);\n",
+                "if (false) { let n = 2; } else { let n = 3; }\n",
+                "puts(n);\n",
+                "let y = if (if (true) { let x = 4; false }) { let x = 5; 50 }",
+                " else { let y = x; let x = 6; y };\n",
+                "puts(y);\n",
+                "puts(x);\n",
+                "let g = if (true) { let m = 7; fn() { m } }",
+                " else { let m = 8; fn() { m } };\n",
+                "puts(g());",
+            ),
+            "2\n3\n4\n6\n7\n",
+        ),
         (
             "less_than_order",
             "let f = fn(x) { puts(x); x };\nputs(f(1) < f(2));",

@@ -701,6 +701,29 @@ AOT 通过 spill 后的闭包槽读取，局部递归不再依赖外层绑定是
 `let x = 1; let x = x + 2;` 的 RHS 解析到旧 `x`，最终得到 3；具名递归由上面的 Function scope 提供，
 不需要提前暴露未初始化的新 slot。普通 VM、gc VM、AOT 快照和 Linux AArch64 E2E 都有对应回归语料。
 
+每个 `let` 分到自己的 slot 这一点没有例外，包括 `if` 分支里的 `let`。block 不是作用域——
+`if (true) { let inner = 1; } inner;` 求值为 `1`——但 block 是可以被跳过的，所以 block 之后的 read
+不能直接读分支内部那个 slot，否则分支没走时会读到未初始化的 `null`。
+
+编译器和 AOT lower 因此为每个"分支可能重绑定的名字"（`symbol_table::shadowed_names`
+扫 AST 得到，宁可多算）额外申请一个 slot，用当前绑定 seed 它，并在每个 arm 结尾把该 arm
+最终的绑定拷进去；`if` 结束后名字改指这个 slot。于是走了哪个 arm 就得到哪个 arm 的值，两个 arm
+都没走就保持分支前的值，而 arm 内部连续的同名 `let` 仍各占一个 slot，其间创建的闭包读到的仍是
+它捕获的那个。分支之前创建的闭包同理不受影响：它捕获的是旧 slot，收敛拷贝只写新 slot。
+
+两个细节决定了 seed 取什么、什么时候取：
+
+- **在条件之后申请**。条件本身会执行，其中的 `let` 是无条件重绑定，两个 arm 和分支之后的代码
+  都应该看到它。所以 slot 在条件编译/降低完之后才申请，seed 取的是条件留下的绑定，arm 结尾
+  恢复的也是它。字节码后端里 get 压栈、set 弹栈，收支相抵，条件值仍在栈顶等着跳转指令；AOT 里
+  条件值在累加器上，因此整段 seed 夹在 `push_acc` / `pop` 之间。
+- **分支之前没有绑定的名字也要收敛**。两个 arm 各自新建的同名 `let` 若不汇合，分支之后的 read
+  就只落在其中一个 arm 的 slot 上，另一个 arm 走完是未写入的 `null`。这类名字同样拿一个 slot，
+  seed 为 `null`（本来就没有值可保留），并且从申请起就让名字指向它——这样某个 arm 不绑定该
+  名字时读到的是 `null`，而不是另一个 arm 的私有 slot。
+
+AOT 的累加器模型下，arm 结尾的收敛拷贝同样夹在 `push_acc` / `pop` 之间，block 自身的值不受影响。
+
 ## 14. 后续演进
 
 - 已知顶层函数调用点直连 `bl`，跳过 `rt_call` 分发；已知 builtin 可跳过 callee 类型判别，
