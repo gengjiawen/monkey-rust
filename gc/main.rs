@@ -40,18 +40,23 @@ impl Repl {
     fn eval_line(&mut self, input: &str) -> Result<String, String> {
         let program = parse(input).map_err(|errors| format!("parse error: {}", errors[0]))?;
 
-        // Compile against clones and commit only after a successful run, so a
-        // failed line cannot leak a half-defined binding into the next one.
         let mut compiler =
             Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
         let bytecode = compiler.compile(&program)?;
         self.vm.set_global_bindings(compiler.global_bindings());
+
+        // The heap retains mutations made before a runtime error, including
+        // escaped closures. Preserve their constant/global operand identities
+        // and the slot ledger, but expose new names only after a successful run.
+        self.constants = compiler.constants;
+        self.symbol_table.definitions = compiler.symbol_table.definitions.clone();
+        self.symbol_table.num_definitions = compiler.symbol_table.num_definitions;
+
         self.vm.load_bytecode(bytecode);
         self.vm
             .run_with_budget(usize::MAX)
             .map_err(|error| error.message)?;
         self.symbol_table = compiler.symbol_table;
-        self.constants = compiler.constants;
         Ok(self.vm.last_result_string())
     }
 }

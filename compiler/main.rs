@@ -33,24 +33,26 @@ impl Repl {
 
         let mut compiler =
             Compiler::new_with_state(self.symbol_table.clone(), self.constants.clone());
-        let compiled = compiler.compile(&program).and_then(|bytecode| {
-            let mut vm = VM::new_with_global_store(bytecode, std::mem::take(&mut self.globals));
-            let run_result = vm.run_checked().map_err(|error| error.to_string());
-            let output = vm
-                .last_popped_stack_elm()
-                .map_or_else(String::new, |o| o.to_string());
-            // The VM owns the persistent store while it runs. Take it back even
-            // when execution fails so the next REPL line starts from valid state.
-            self.globals = vm.globals;
-            run_result?;
-            Ok(output)
-        });
+        let bytecode = compiler.compile(&program)?;
 
-        if compiled.is_ok() {
-            self.symbol_table = compiler.symbol_table;
-            self.constants = compiler.constants;
-        }
-        return compiled;
+        // Execution can store a closure in an existing object before failing.
+        // Its constant/global operands must keep their identities, even though
+        // a failed line's new name bindings remain invisible. Keep the complete
+        // slot ledger as well as the allocation cursor for debug metadata.
+        self.constants = compiler.constants;
+        self.symbol_table.definitions = compiler.symbol_table.definitions.clone();
+        self.symbol_table.num_definitions = compiler.symbol_table.num_definitions;
+
+        let mut vm = VM::new_with_global_store(bytecode, std::mem::take(&mut self.globals));
+        let run_result = vm.run_checked().map_err(|error| error.to_string());
+        let output = vm
+            .last_popped_stack_elm()
+            .map_or_else(String::new, |o| o.to_string());
+        // The store includes mutations made before a runtime error.
+        self.globals = vm.globals;
+        run_result?;
+        self.symbol_table = compiler.symbol_table;
+        Ok(output)
     }
 }
 
