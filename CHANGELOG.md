@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.3](https://github.com/gengjiawen/monkey-rust/compare/v2.0.2...v2.0.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **packages:** share one wasm instance across the analyzer packages ([#349](https://github.com/gengjiawen/monkey-rust/issues/349)) ([3094257](https://github.com/gengjiawen/monkey-rust/commit/3094257c57a460961d5ea0047ed4ab5ab805ebea))
+* **parser:** preserve expression statement terminators ([#355](https://github.com/gengjiawen/monkey-rust/issues/355)) ([5d5902a](https://github.com/gengjiawen/monkey-rust/commit/5d5902a5502d950a630fa80ea14d9dae1b8186ac))
+* **prettier:** keep formatter output meaning-preserving ([#348](https://github.com/gengjiawen/monkey-rust/issues/348)) ([304f5f6](https://github.com/gengjiawen/monkey-rust/commit/304f5f6534aab31b99970ec9b0bba5da95bc1086))
+* **repl:** preserve escaped closures after runtime errors ([5ba2bf9](https://github.com/gengjiawen/monkey-rust/commit/5ba2bf907b286fc1b22f7259352810a9b65381c4))
+* **typechecker:** infer callees before call arguments ([86145d3](https://github.com/gengjiawen/monkey-rust/commit/86145d3bf2dc353792c1c3e9e53f28b0b7077750))
+* **typechecker:** preserve block completion across debugger statements ([e1e88ad](https://github.com/gengjiawen/monkey-rust/commit/e1e88ad2020fc803f32500da7ab0119395aa8505))
+* **vm:** raise builtin failures instead of pushing them as values ([#346](https://github.com/gengjiawen/monkey-rust/issues/346)) ([c80243a](https://github.com/gengjiawen/monkey-rust/commit/c80243abfc66ca43f07cc2e478b9f5f80355ffb0))
+
 ## [2.0.2](https://github.com/gengjiawen/monkey-rust/compare/v2.0.1...v2.0.2) (2026-09-02)
 
 

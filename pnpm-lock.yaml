@@ -27,7 +27,7 @@ importers:
   packages/monkey-linter:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^2.0.2
+        specifier: ^2.0.3
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
@@ -52,7 +52,7 @@ importers:
   packages/monkey-minifier:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^2.0.2
+        specifier: ^2.0.3
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
@@ -77,7 +77,7 @@ importers:
   packages/monkey-typechecker:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^2.0.2
+        specifier: ^2.0.3
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
@@ -123,16 +123,16 @@ importers:
         specifier: ^6.43.1
         version: 6.43.1
       '@gengjiawen/monkey-lint':
-        specifier: workspace:^2.0.2
+        specifier: workspace:^2.0.3
         version: link:../monkey-linter
       '@gengjiawen/monkey-minifier':
-        specifier: workspace:^2.0.2
+        specifier: workspace:^2.0.3
         version: link:../monkey-minifier
       '@gengjiawen/monkey-typechecker':
-        specifier: workspace:^2.0.2
+        specifier: workspace:^2.0.3
         version: link:../monkey-typechecker
       '@gengjiawen/monkey-wasm':
-        specifier: workspace:^2.0.2
+        specifier: workspace:^2.0.3
         version: link:../../wasm/pkg
       '@lezer/highlight':
         specifier: ^1.2.1
@@ -220,7 +220,7 @@ importers:
   packages/prettier-plugin-monkey:
     dependencies:
       '@gengjiawen/monkey-wasm':
-        specifier: ^2.0.2
+        specifier: ^2.0.3
         version: link:../../wasm/pkg
     devDependencies:
       '@types/node':
