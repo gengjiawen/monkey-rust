@@ -460,7 +460,7 @@ impl GcVM {
 
             match opcode {
                 Opcode::OpConst => {
-                    let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let const_index = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let constant = self.constant(const_index)?;
                     self.dup_and_push(constant)?;
@@ -490,11 +490,11 @@ impl GcVM {
                     self.execute_bang_operation()?;
                 }
                 Opcode::OpJump => {
-                    let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let pos = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip = pos as i32 - 1;
                 }
                 Opcode::OpJumpNotTruthy => {
-                    let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let pos = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let condition = self.pop_owned()?;
                     if !is_truthy(&self.heap, condition) {
@@ -506,12 +506,12 @@ impl GcVM {
                     self.dup_and_push(self.null)?;
                 }
                 Opcode::OpGetGlobal => {
-                    let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let global_index = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     self.dup_and_push(self.globals[global_index])?;
                 }
                 Opcode::OpSetGlobal => {
-                    let global_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let global_index = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let value = self.pop_owned()?;
                     self.heap.free(self.globals[global_index]);
@@ -519,7 +519,7 @@ impl GcVM {
                     self.globals_initialized[global_index] = true;
                 }
                 Opcode::OpArray => {
-                    let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let count = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let start = self.stack_base_for(count)?;
                     let elements = self.build_array(start, self.sp);
@@ -529,7 +529,7 @@ impl GcVM {
                     self.push_raw(array)?;
                 }
                 Opcode::OpHash => {
-                    let count = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let count = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let start = self.stack_base_for(count)?;
                     let elements = self.build_hash(start, self.sp)?;
@@ -577,33 +577,29 @@ impl GcVM {
                     self.dup_and_push(self.null)?;
                 }
                 Opcode::OpCall => {
-                    let num_args = ins[ip + 1] as usize;
+                    let num_args = self.read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     self.execute_call(num_args)?;
                 }
                 Opcode::OpSetLocal => {
-                    let local_index = ins[ip + 1] as usize;
+                    let local_index = self.read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
-                    let base = self.current_frame().base_pointer;
-                    let slot = self.local_slot(base, local_index)?;
+                    let slot = self.local_slot(local_index)?;
                     let value = self.pop_owned()?;
                     self.heap.free(self.stack[slot]);
                     self.stack[slot] = value;
-                    // get_mut: hostile bytecode can index past num_locals; the
-                    // write above is bounded by STACK_SIZE, the bitset is not.
-                    if let Some(flag) = self.current_frame().initialized.get_mut(local_index) {
-                        *flag = true;
-                    }
+                    // `local_slot` bounds the index by the flag count, so the
+                    // bitset covers every slot the write above can reach.
+                    self.current_frame().initialized[local_index] = true;
                 }
                 Opcode::OpGetLocal => {
-                    let local_index = ins[ip + 1] as usize;
+                    let local_index = self.read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
-                    let base = self.current_frame().base_pointer;
-                    let slot = self.local_slot(base, local_index)?;
+                    let slot = self.local_slot(local_index)?;
                     self.dup_and_push(self.stack[slot])?;
                 }
                 Opcode::OpGetBuiltin => {
-                    let built_index = ins[ip + 1] as usize;
+                    let built_index = self.read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     let definition = BuiltIns.get(built_index).ok_or_else(|| {
                         self.runtime_error(
@@ -614,13 +610,13 @@ impl GcVM {
                     self.alloc_and_push(Value::Builtin(definition.id))?;
                 }
                 Opcode::OpClosure => {
-                    let const_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    let num_free = ins[ip + 3] as usize;
+                    let const_index = self.read_u16_operand(&ins, ip, opcode)?;
+                    let num_free = self.read_u8_operand(&ins, ip, 3, opcode)?;
                     self.current_frame().ip += 3;
                     self.push_closure(const_index, num_free)?;
                 }
                 Opcode::OpGetFree => {
-                    let free_index = ins[ip + 1] as usize;
+                    let free_index = self.read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     let free_var = self.current_frame().cl.free.get(free_index).copied();
                     let free_var = free_var.ok_or_else(|| {
@@ -636,7 +632,7 @@ impl GcVM {
                     self.alloc_and_push(Value::Closure(current))?;
                 }
                 Opcode::OpClass => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let name_index = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let name = self.constant_string(name_index)?;
                     self.alloc_and_push(Value::Class(GcClass {
@@ -646,8 +642,8 @@ impl GcVM {
                     }))?;
                 }
                 Opcode::OpMethod => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
-                    let kind = ins[ip + 3];
+                    let name_index = self.read_u16_operand(&ins, ip, opcode)?;
+                    let kind = self.read_u8_operand(&ins, ip, 3, opcode)?;
                     self.current_frame().ip += 3;
                     let name = self.constant_string(name_index)?;
                     let method = self.pop_owned()?;
@@ -663,7 +659,7 @@ impl GcVM {
                     result?;
                 }
                 Opcode::OpGetProperty => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let name_index = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let name = self.constant_string(name_index)?;
                     let receiver = self.pop_owned()?;
@@ -672,7 +668,7 @@ impl GcVM {
                     self.push_raw(value?)?;
                 }
                 Opcode::OpSetProperty => {
-                    let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
+                    let name_index = self.read_u16_operand(&ins, ip, opcode)?;
                     self.current_frame().ip += 2;
                     let name = self.constant_string(name_index)?;
                     let (value, receiver) = self.pop_owned_pair()?;
@@ -682,7 +678,7 @@ impl GcVM {
                     result?;
                 }
                 Opcode::OpNew => {
-                    let num_args = ins[ip + 1] as usize;
+                    let num_args = self.read_u8_operand(&ins, ip, 1, opcode)?;
                     self.current_frame().ip += 1;
                     self.execute_new(num_args)?;
                 }
@@ -777,19 +773,69 @@ impl GcVM {
             .ok_or_else(|| self.runtime_error(GcRuntimeErrorKind::Stack, "stack underflow"))
     }
 
-    fn local_slot(
+    /// The absolute slot of a frame-relative local. `local_index` is a raw
+    /// bytecode byte, so it can name a slot beyond the ones this frame
+    /// reserved. Those slots hold the caller's operands or another frame's
+    /// locals, so reading or writing one silently computes with a value that
+    /// is not this local: the index has to be rejected, not just clamped to
+    /// the stack.
+    fn local_slot(&self, local_index: usize) -> Result<usize, GcClassifiedRuntimeError> {
+        let frame = &self.frames[self.frame_index - 1];
+        // One flag per local, so this is the frame's `num_locals`. Parameters
+        // are defined before the body's own locals, so it bounds every index
+        // the compiler can emit.
+        let num_locals = frame.initialized.len();
+        frame
+            .base_pointer
+            .checked_add(local_index)
+            .filter(|slot| local_index < num_locals && *slot < STACK_SIZE)
+            .ok_or_else(|| {
+                self.runtime_error(
+                    GcRuntimeErrorKind::InvalidBytecode,
+                    format!(
+                        "local index {} out of range for a frame with {} locals",
+                        local_index, num_locals
+                    ),
+                )
+            })
+    }
+
+    /// Reads the two-byte operand that follows the opcode at `ip`.
+    ///
+    /// `Bytecode` is a plain struct with public fields, so instructions reach
+    /// the VM without necessarily passing through `read_bytecode`'s L1 stream
+    /// walk. A stream that ends mid-operand is therefore a runtime error
+    /// rather than a slice panic.
+    fn read_u16_operand(
         &self,
-        base: usize,
-        local_index: usize,
+        ins: &[u8],
+        ip: usize,
+        opcode: Opcode,
     ) -> Result<usize, GcClassifiedRuntimeError> {
-        let slot = base + local_index;
-        if slot >= STACK_SIZE {
-            return Err(self.runtime_error(
-                GcRuntimeErrorKind::InvalidBytecode,
-                format!("local index {} out of range", local_index),
-            ));
-        }
-        Ok(slot)
+        let bytes = ins
+            .get(ip + 1..ip + 3)
+            .ok_or_else(|| self.truncated_operand(opcode))?;
+        Ok(BigEndian::read_u16(bytes) as usize)
+    }
+
+    /// Reads the one-byte operand `offset` bytes past the opcode at `ip`.
+    fn read_u8_operand(
+        &self,
+        ins: &[u8],
+        ip: usize,
+        offset: usize,
+        opcode: Opcode,
+    ) -> Result<usize, GcClassifiedRuntimeError> {
+        ins.get(ip + offset)
+            .map(|byte| *byte as usize)
+            .ok_or_else(|| self.truncated_operand(opcode))
+    }
+
+    fn truncated_operand(&self, opcode: Opcode) -> GcClassifiedRuntimeError {
+        self.runtime_error(
+            GcRuntimeErrorKind::InvalidBytecode,
+            format!("{:?} operand runs past the end of its instructions", opcode),
+        )
     }
 
     fn clear_stack_range(&mut self, start: usize, end: usize) {
