@@ -25,6 +25,9 @@ const programs = [
   'let unused = 1.missing; 42;',
   'let unused = [][0]; 42;',
   'let unused = 1 + true; 42;',
+  // Negating i64::MIN overflows, so the operand being an integer is not enough.
+  'let unused = -(-9223372036854775807 - 1); 42;',
+  'let unused = [-(-9223372036854775807 - 1)]; 42;',
   'let f = fn() { 42; let unused = 1; }; f();',
   'let f = fn() { if (true) { 1; let first = 2; } else { let second = 2; 1; } }; f();',
   'if (true) { 42; let unused = 1; };',

@@ -680,11 +680,13 @@ function isPureTotal(expression: Expression, analysis: ScopeAnalysis): boolean {
     case 'Hash':
       return hashIsPureTotal(expression, analysis)
     case 'UnaryExpression':
+      // Negation is checked like the binary operators: `-(i64::MIN)` raises,
+      // so an integer operand alone does not make it total.
       return (
         isPureTotal(expression.operand, analysis) &&
         (tokenType(expression.op) === 'BANG' ||
           (tokenType(expression.op) === 'MINUS' &&
-            evaluateConstant(expression.operand)?.kind === 'integer'))
+            evaluateConstant(expression) !== null))
       )
     case 'BinaryExpression':
       return (

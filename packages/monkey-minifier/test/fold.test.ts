@@ -33,6 +33,10 @@ describe('constant folding and conservative DCE', () => {
     expect(optimize('-(-9223372036854775807 - 1)')).toBe(
       '-(-9223372036854775807-1);'
     )
+    // Nor may DCE delete an unused binding whose initializer overflows.
+    expect(optimize('let unused = -(-9223372036854775807 - 1); 1')).toBe(
+      'let unused=-(-9223372036854775807-1);1;'
+    )
   })
 
   it('only folds if branches that do not alter compiler scope', () => {
