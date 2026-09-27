@@ -29,7 +29,7 @@
 
 ## 1. 背景与结论
 
-Monkey 目前是完全动态类型的语言。所有类型错误在运行时才暴露，且三个 runtime 的报错行为存在已知分歧（例如混合类型 `==`：interpreter 返回 `false`，GcVM 报错）。linter 的 `no-literal-type-mismatch` 规则是仓库里最接近类型检查的能力，但它只检查字面量操作数——变量一旦介入就沉默。
+Monkey 目前是完全动态类型的语言，所有类型错误在运行时才暴露。linter 的 `no-literal-type-mismatch` 规则是仓库里最接近类型检查的能力，但它只检查字面量操作数——变量一旦介入就沉默。
 
 本提案引入一个渐进式（gradual）类型系统：
 
