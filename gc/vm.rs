@@ -497,7 +497,7 @@ impl GcVM {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
                     let condition = self.pop_owned()?;
-                    if !is_truthy(&self.heap, condition) {
+                    if !get_value(&self.heap, condition).is_truthy() {
                         self.current_frame().ip = pos as i32 - 1;
                     }
                     self.heap.free(condition);
@@ -922,7 +922,7 @@ impl GcVM {
         let operand = self.pop_owned()?;
         // `!v` is the logical inverse of truthiness, so `!null` is `true`
         // (design §10.1); anything else disagrees with `if (null)`.
-        let result = !is_truthy(&self.heap, operand);
+        let result = !get_value(&self.heap, operand).is_truthy();
         self.heap.free(operand);
         self.alloc_and_push(Value::Boolean(result))
     }
@@ -1412,10 +1412,6 @@ impl GcVM {
         }
         Ok(())
     }
-}
-
-fn is_truthy(heap: &GcHeap, condition: GcRef) -> bool {
-    return get_value(heap, condition).is_truthy();
 }
 
 fn callee_kind(heap: &GcHeap, reference: GcRef) -> CalleeKind {

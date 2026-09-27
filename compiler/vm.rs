@@ -183,7 +183,7 @@ impl VM {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
                     let condition = self.pop();
-                    if !self.is_truthy(condition) {
+                    if !condition.is_truthy() {
                         self.current_frame().ip = pos as i32 - 1;
                     }
                 }
@@ -444,7 +444,7 @@ impl VM {
         // `!v` is the logical inverse of truthiness, so `!null` is `true`
         // (design §10.1). Treating every non-boolean as truthy here would make
         // `!null` disagree with `if (null)`.
-        let negated = !self.is_truthy(operand);
+        let negated = !operand.is_truthy();
         self.push(Rc::from(Object::Boolean(negated)))
     }
 
@@ -465,9 +465,6 @@ impl VM {
         self.stack[self.sp] = o;
         self.sp += 1;
         Ok(())
-    }
-    fn is_truthy(&self, condition: Rc<Object>) -> bool {
-        condition.is_truthy()
     }
     fn build_array(&self, start: usize, end: usize) -> Vec<Rc<Object>> {
         let mut elements = Vec::with_capacity(end - start);
