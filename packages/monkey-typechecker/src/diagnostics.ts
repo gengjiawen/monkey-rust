@@ -23,6 +23,8 @@ export const DIAGNOSTIC_CODES = {
   typeMismatch: 'type-mismatch',
   operatorType: 'operator-type',
   mixedEquality: 'mixed-equality',
+  /** @deprecated Equality comparisons are now total and no longer emit this code. */
+  invalidComparison: 'invalid-comparison',
   arityMismatch: 'arity-mismatch',
   notCallable: 'not-callable',
   notConstructable: 'not-constructable',
