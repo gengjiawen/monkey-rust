@@ -596,11 +596,7 @@ mod tests {
         for input in tests {
             let error = gc_vm_runtime_error(input);
             assert_eq!(error.kind, GcRuntimeErrorKind::Call, "input: {:?}", input);
-            assert_eq!(
-                error.message, "builtin len not supported for type 1",
-                "input: {:?}",
-                input
-            );
+            assert_eq!(error.message, "builtin len not supported for type 1", "input: {:?}", input);
         }
     }
 

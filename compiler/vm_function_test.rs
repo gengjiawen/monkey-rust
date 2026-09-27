@@ -247,11 +247,7 @@ mod tests {
         for input in tests {
             let error = vm_runtime_error(input);
             assert_eq!(error.kind, VmRuntimeErrorKind::Call, "input: {:?}", input);
-            assert_eq!(
-                error.message, "builtin len not supported for type 1",
-                "input: {:?}",
-                input
-            );
+            assert_eq!(error.message, "builtin len not supported for type 1", "input: {:?}", input);
         }
     }
 }
