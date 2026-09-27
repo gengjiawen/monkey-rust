@@ -299,7 +299,7 @@ parser test 对每种类型节点执行 `&input[span.start..span.end]` 精确切
 这是本提案的硬性约束：
 
 1. **bytecode 恒等**：`let x: int = 5;` 与 `let x = 5;` 的 instructions 与 constants 逐字节相同；不含 debug info 的编译产物（`compile` 输出、strip-debug 快照）逐字节相同。compiler 不读取 `type_annotation` / `return_type`，不新增 opcode。**debug info 不在恒等范围内**：`PcSpan` 记录的是绝对字节偏移，插入标注必然移动后续 span——两份产物的 debug info 应各自准确映射回各自的源码，单独校验，不做互相恒等断言。debug info 里的非 span 字段（`local_bindings`、`free_names`）仍在恒等范围内。asm 后端同理：emit 出的指令逐条相同，但 `.s` 里逐行回显源码的 `//` 注释属于 debug info，比较时先剥离。
-2. **执行恒等**：同一程序带/去标注在 interpreter、默认 VM、GcVM、asm 四个后端产生相同的计算结果、控制流与错误行为。**声明例外——函数值的 source-reflective 操作**：interpreter 的 `Object::Function` 直接内嵌 AST 的 params 与 body，其 `Display` 渲染（`puts(fn(x: int) { x })` 会连标注一起输出）与结构 `==`（比较 params/body AST，标注参与相等判定）都会观察到标注。函数值渲染本就后端分歧（VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`），本设计不为此引入运行时擦除层，改为专项测试固定该例外；擦除恒等语料不打印、不比较**任何包含函数值的值**——函数嵌套在 array/hash 里同样会被 Display/`==` 间接观察到。
+2. **执行恒等**：同一程序带/去标注在 interpreter、默认 VM、GcVM、asm 四个后端产生相同的计算结果、控制流与错误行为。**声明例外——函数值的 source-reflective 操作**：interpreter 的 `Object::Function` 直接内嵌 AST 的 params 与 body，其 `Display` 渲染（`puts(fn(x: int) { x })` 会连标注一起输出）会观察到标注；`==` 不会——函数值在所有后端都按 identity 比较（见 7.4）。函数值渲染本就后端分歧（VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`），本设计不为此引入运行时擦除层，改为专项测试固定该例外；擦除恒等语料不打印**任何包含函数值的值**——函数嵌套在 array/hash 里同样会被 Display 间接观察到。
 3. **checker 不是门禁**：类型检查不通过的程序照常可以执行。是否在 playground / CI 中把诊断当作 error 是消费方的策略，不属于语言语义。
 
 ### 6.2 各后端实际改动
@@ -589,7 +589,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 
 - 新增 compiler 测试：同一程序带满标注与完全去标注两个版本，断言 instructions **逐字节相同**、constants 相同、strip-debug 产物相同。debug info 不做互相恒等断言（span 偏移必然不同），改为分别断言两版的 `PcSpan` 精确映射回**各自**源码。
 - 现有 compiler/VM/GcVM/asm 全部快照必须零变化（parser 快照除外）。
-- e2e：带标注程序在四个后端与去标注版输出一致（含 error 场景）；语料不打印、不比较任何包含函数值的值（含嵌套于 array/hash）。6.1 的声明例外配专项测试固定：`puts(fn(x: int) { x })` 按后端分别断言——interpreter 输出含标注的源码渲染，VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`。
+- e2e：带标注程序在四个后端与去标注版输出一致（含 error 场景）；语料不打印任何包含函数值的值（含嵌套于 array/hash）。6.1 的声明例外配专项测试固定：`puts(fn(x: int) { x })` 按后端分别断言——interpreter 输出含标注的源码渲染，VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`。
 
 ### 12.3 Checker
 

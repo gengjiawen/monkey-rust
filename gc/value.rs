@@ -540,8 +540,8 @@ fn format_hash_key(key: &HashKey) -> String {
 
 /// Frozen equality (arm64 backend design §10.1), the `GcRef` mirror of
 /// `impl PartialEq for object::Object`: scalars compare by value, arrays and
-/// hashes compare recursively and independently of iteration order, classes,
-/// instances and bound methods compare by identity, and two values of
+/// hashes compare recursively and independently of iteration order, closures,
+/// classes, instances and bound methods compare by identity, and two values of
 /// different types are simply unequal — never a type error.
 ///
 /// The comparison runs on an explicit worklist rather than the call stack.
@@ -588,16 +588,11 @@ pub fn values_equal(heap: &GcHeap, left: GcRef, right: GcRef) -> bool {
                         None => false,
                     })
             }
-            (Value::Closure(l), Value::Closure(r)) => {
-                l.free.len() == r.free.len() && {
-                    pending.push((l.func, r.func));
-                    pending.extend(l.free.iter().copied().zip(r.free.iter().copied()));
-                    true
-                }
-            }
             // Identity only: `left == right` above already covered it, and two
-            // distinct objects are never equal even with identical fields.
-            (Value::Class(_), Value::Class(_))
+            // distinct objects are never equal even with identical fields —
+            // two closures sharing code and captures included.
+            (Value::Closure(_), Value::Closure(_))
+            | (Value::Class(_), Value::Class(_))
             | (Value::Instance(_), Value::Instance(_))
             | (Value::BoundMethod(_), Value::BoundMethod(_)) => false,
             _ => false,

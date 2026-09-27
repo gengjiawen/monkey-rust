@@ -279,8 +279,16 @@ impl VM {
                     self.push(current_closure.free[free_index].clone())?;
                 }
                 Opcode::OpCurrentClosure => {
-                    let current_closure = self.current_frame().cl.clone();
-                    self.push(Rc::new(Object::ClosureObj(current_closure)))?;
+                    // Push the object that was called — the callee slot just
+                    // below the frame, which method calls rewrite to the method
+                    // closure — not a fresh copy, so that closure identity
+                    // holds: `let f = fn() { f }; f() == f` is true.
+                    let base_pointer = self.current_frame().base_pointer;
+                    let current_closure = match base_pointer.checked_sub(1) {
+                        Some(callee_slot) => Rc::clone(&self.stack[callee_slot]),
+                        None => Rc::new(Object::ClosureObj(self.current_frame().cl.clone())),
+                    };
+                    self.push(current_closure)?;
                 }
                 Opcode::OpClass => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;

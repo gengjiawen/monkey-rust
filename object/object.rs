@@ -175,11 +175,16 @@ impl fmt::Debug for Object {
 }
 
 impl PartialEq for Object {
-    /// Structural, and driven by an explicit worklist rather than by the call
-    /// stack. Nesting depth is a property of the *data*, and `a == b` is a
-    /// single step for every backend, so an array a few thousand levels deep —
-    /// which no engine has any other trouble with — would answer by
-    /// overflowing the native stack. `gc::value::values_equal` mirrors this.
+    /// Frozen equality (arm64 backend design §10.1): scalars by value, arrays
+    /// and hashes structurally, functions, closures, classes, instances and
+    /// bound methods by identity — the address of the `Object`, which the
+    /// interpreter and the bytecode VM share through `Rc` rather than copy.
+    ///
+    /// Driven by an explicit worklist rather than by the call stack. Nesting
+    /// depth is a property of the *data*, and `a == b` is a single step for
+    /// every backend, so an array a few thousand levels deep — which no engine
+    /// has any other trouble with — would answer by overflowing the native
+    /// stack. `gc::value::values_equal` mirrors this.
     ///
     /// `seen` memoises: reaching a pair a second time means the first visit
     /// did not disprove it, because any inequality returns immediately. It
@@ -189,7 +194,9 @@ impl PartialEq for Object {
         let mut seen: HashSet<(*const Object, *const Object)> = HashSet::new();
 
         while let Some((left, right)) = pending.pop() {
-            if !seen.insert((left as *const Object, right as *const Object)) {
+            if std::ptr::eq(left, right)
+                || !seen.insert((left as *const Object, right as *const Object))
+            {
                 continue;
             }
             let equal = match (left, right) {
@@ -219,25 +226,16 @@ impl PartialEq for Object {
                     pending.push((left, right));
                     true
                 }
-                (
-                    Object::Function(left_params, left_body, left_env),
-                    Object::Function(right_params, right_body, right_env),
-                ) => {
-                    left_params == right_params
-                        && left_body == right_body
-                        && Rc::ptr_eq(left_env, right_env)
-                }
                 (Object::Builtin(left), Object::Builtin(right)) => {
                     std::ptr::fn_addr_eq(*left, *right)
                 }
                 (Object::Error(left), Object::Error(right)) => left == right,
                 (Object::CompiledFunction(left), Object::CompiledFunction(right)) => left == right,
-                (Object::ClosureObj(left), Object::ClosureObj(right)) => {
-                    left.func == right.func && left.free.len() == right.free.len() && {
-                        pending.extend(zip_deref(&left.free, &right.free));
-                        true
-                    }
-                }
+                // Identity only: `ptr::eq` above already answered for the same
+                // object, and two closures are distinct even when they share
+                // code and captures — `make() == make()` is false.
+                (Object::Function(..), Object::Function(..))
+                | (Object::ClosureObj(_), Object::ClosureObj(_)) => false,
                 (Object::Class(left), Object::Class(right)) => Rc::ptr_eq(left, right),
                 (Object::Instance(left), Object::Instance(right)) => Rc::ptr_eq(left, right),
                 (Object::BoundMethod(left), Object::BoundMethod(right)) => Rc::ptr_eq(left, right),

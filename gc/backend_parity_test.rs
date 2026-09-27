@@ -185,6 +185,28 @@ fn test_equality_is_total_and_structural() {
         ("let f = fn(x) { x }; f == f", Expect::Value("true")),
         ("let f = fn(x) { x }; let g = f; f == g", Expect::Value("true")),
         ("let a = [1]; let b = a; a == b", Expect::Value("true")),
+        ("let f = fn(x) { x }; [f][0] == f", Expect::Value("true")),
+        ("let f = fn(x) { x }; {\"k\": f}[\"k\"] == f", Expect::Value("true")),
+        // A named self-reference is the closure that was called, not a copy.
+        ("let f = fn() { f }; f() == f", Expect::Value("true")),
+        ("let f = fn() { f }; f() == f()", Expect::Value("true")),
+        // A captured closure is shared, not copied, by every closure over it.
+        (
+            "let make = fn() { let g = fn() { 1 }; fn() { g } }; let h = make(); h() == h()",
+            Expect::Value("true"),
+        ),
+        // Two closures are distinct objects even with identical code and
+        // captures: identity, not structure.
+        ("fn(x) { x } == fn(x) { x }", Expect::Value("false")),
+        ("let make = fn() { fn() { 1 } }; make() == make()", Expect::Value("false")),
+        (
+            "let make = fn(a) { fn() { a } }; let x = [1]; make(x) == make(x)",
+            Expect::Value("false"),
+        ),
+        ("let make = fn(a) { fn() { a } }; let f = make(1); f == f", Expect::Value("true")),
+        // Builtins by id.
+        ("len == len", Expect::Value("true")),
+        ("len == first", Expect::Value("false")),
         // `>` / `<` stay integer-only.
         ("1 < 2", Expect::Value("true")),
         ("2 > 1", Expect::Value("true")),

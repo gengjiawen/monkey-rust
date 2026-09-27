@@ -632,8 +632,18 @@ impl GcVM {
                     self.dup_and_push(free_var)?;
                 }
                 Opcode::OpCurrentClosure => {
-                    let current = self.current_frame().cl.clone();
-                    self.alloc_and_push(Value::Closure(current))?;
+                    // Push the object that was called — the callee slot just
+                    // below the frame, which method calls rewrite to the method
+                    // closure — not a fresh copy, so that closure identity
+                    // holds: `let f = fn() { f }; f() == f` is true.
+                    let base_pointer = self.current_frame().base_pointer;
+                    match base_pointer.checked_sub(1) {
+                        Some(callee_slot) => self.dup_and_push(self.stack[callee_slot])?,
+                        None => {
+                            let current = self.current_frame().cl.clone();
+                            self.alloc_and_push(Value::Closure(current))?;
+                        }
+                    }
                 }
                 Opcode::OpClass => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
