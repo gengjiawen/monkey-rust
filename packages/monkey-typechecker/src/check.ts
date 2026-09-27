@@ -182,6 +182,11 @@ class Checker {
     let span: Span = spanOf(block)
 
     for (const statement of block.body) {
+      // Like the runtime, a debugger statement neither produces a value nor
+      // clears the preceding completion (including its diagnostic span).
+      if (statement.type === 'DebuggerStatement') {
+        continue
+      }
       if (!reachable) {
         // Statements after a `return` are still checked — a type error there is
         // still an error — but they contribute neither to the block's value nor
@@ -756,16 +761,18 @@ class Checker {
   }
 
   private inferCall(call: FunctionCall): Type {
+    // The runtime selects the callee before evaluating arguments. Either side
+    // can introduce bindings, so keep both its type and builtin identity now.
+    const builtin = this.builtinFor(call.callee)
+    const callee = stripNull(this.inferExpression(call.callee))
     const args = call.arguments.map((argument) =>
       this.inferExpression(argument)
     )
 
-    const builtin = this.builtinFor(call.callee)
     if (builtin) {
       return this.checkBuiltinCall(call, builtin, args)
     }
 
-    const callee = stripNull(this.inferExpression(call.callee))
     const overloads = members(callee)
     if (overloads.some((member) => member.kind === 'any')) {
       return ANY
@@ -952,11 +959,11 @@ class Checker {
   }
 
   private inferNew(expression: NewExpression): Type {
-    const args = expression.arguments.map((argument) =>
-      this.inferExpression(argument)
-    )
     const callee = stripNull(
       this.env.lookup(expression.callee.name)?.type ?? ANY
+    )
+    const args = expression.arguments.map((argument) =>
+      this.inferExpression(argument)
     )
     const candidates = members(callee)
     if (candidates.some((member) => member.kind === 'any')) {

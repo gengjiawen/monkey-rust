@@ -327,6 +327,65 @@ describe('hash keys', () => {
   })
 })
 
+describe('call evaluation order', () => {
+  it('checks arguments against bindings introduced by the callee', () => {
+    const source =
+      '(if (true) { let x = "s"; fn(a: int): int { a + 1; } })(x);'
+    const diagnostic = only(source)
+    expect(diagnostic.code).toBe('type-mismatch')
+    expect(diagnostic.message).toBe(
+      "type 'string' is not assignable to type 'int'"
+    )
+    expect(slice(source, diagnostic)).toBe('x')
+    clean('(if (true) { let x = 1; fn(a: int): int { a + 1; } })(x);')
+  })
+
+  it('keeps the selected function when an argument shadows its name', () => {
+    clean(
+      'let f = fn(a: int): int { a + 1; }; let n: int = f(if (true) { let f = 0; 1; } else { 2; });'
+    )
+    clean(
+      'let len = fn(a: int): int { a + 1; }; len(if (true) { let len = "s"; 1; } else { 2; });'
+    )
+  })
+
+  it('keeps the selected builtin when an argument shadows its name', () => {
+    clean(
+      'let n: int = len(if (true) { let len = 0; [1, 2]; } else { []; });'
+    )
+    expect(
+      codes('len(if (true) { let len = fn(x) { x; }; 1; } else { 2; });')
+    ).toEqual(['type-mismatch'])
+  })
+
+  it('keeps the selected constructor when an argument shadows its name', () => {
+    const declaration =
+      'class A { constructor(n: int) { this.n = n; } }'
+    clean(
+      `${declaration} let p = new A(if (true) { let A = 0; 1; } else { 2; }); let n: int = p.n;`
+    )
+    expect(
+      codes(
+        `${declaration} new A(if (true) { let A = 0; "s"; } else { "t"; });`
+      )
+    ).toEqual(['type-mismatch'])
+  })
+
+  it('visits arguments in source order', () => {
+    expect(
+      codes(
+        'let f = fn(a: int, b: int): int { a + b; }; f(if (true) { let x = "s"; 1; } else { 2; }, x);'
+      )
+    ).toEqual(['type-mismatch'])
+  })
+
+  it('still checks argument expressions when the callee is any', () => {
+    expect(codes('let f: any = 0; f(1 + "s");')).toEqual([
+      'operator-type',
+    ])
+  })
+})
+
 // --- 7.6 builtins ------------------------------------------------------------
 
 describe('builtins', () => {
@@ -538,6 +597,41 @@ describe('functions', () => {
         'let fib = fn(x: int): int { if (x < 2) { return "a"; } fib(x - 1) };'
       )
     ).toEqual(['type-mismatch'])
+  })
+})
+
+describe('debugger completion', () => {
+  it('preserves annotated and inferred function return types', () => {
+    clean('let f = fn(): int { 1; debugger; debugger; }; f();')
+    clean('let f = fn() { debugger; 1; debugger; }; f() + 1;')
+  })
+
+  it('preserves method return types and if-expression values', () => {
+    clean('class A { value(): int { 1; debugger; } } new A().value();')
+    clean(
+      'let n: int = if (true) { 1; debugger; } else { 2; debugger; };'
+    )
+  })
+
+  it('reports the preceding value when a return annotation is wrong', () => {
+    const source = 'let f = fn(): int { "s"; debugger; };'
+    const diagnostic = only(source)
+    expect(diagnostic.message).toBe(
+      "type 'string' is not assignable to type 'int'"
+    )
+    expect(slice(source, diagnostic)).toBe('"s"')
+  })
+
+  it('keeps debugger-only blocks null and preserves a trailing let barrier', () => {
+    clean('let f = fn(): null { debugger; debugger; };')
+    clean('let f = fn(): null { 1; let x = 2; debugger; };')
+    expect(codes('let f = fn(): int { debugger; };')).toEqual([
+      'type-mismatch',
+    ])
+  })
+
+  it('does not make statements after a return reachable again', () => {
+    clean('let f = fn() { return 1; debugger; "s"; }; f() + 1;')
   })
 })
 
