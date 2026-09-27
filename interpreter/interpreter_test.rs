@@ -302,26 +302,26 @@ factorial(5);"#,
     #[test]
     fn test_builtin_errors_stop_evaluation() {
         let test_case = [
-            ("len(1)", "builtin len not supported for for type 1"),
+            ("len(1)", "builtin len not supported for type 1"),
             (r#"len("one", "two")"#, "builtin len expected 1 argument, got 2"),
-            ("first(1)", "builtin first not supported for for type 1"),
-            ("last(1)", "builtin last not supported for for type 1"),
-            ("rest(1)", "builtin rest not supported for for type 1"),
-            ("push(1, 1)", "builtin push not supported for for type 1"),
+            ("first(1)", "builtin first not supported for type 1"),
+            ("last(1)", "builtin last not supported for type 1"),
+            ("rest(1)", "builtin rest not supported for type 1"),
+            ("push(1, 1)", "builtin push not supported for type 1"),
             // a failed builtin must abort the program instead of flowing on as a value
-            ("if (len(1)) { 10 } else { 20 }", "builtin len not supported for for type 1"),
-            ("len(1) == len(1)", "builtin len not supported for for type 1"),
-            ("len(1) + 1", "builtin len not supported for for type 1"),
-            ("[len(1), 2]", "builtin len not supported for for type 1"),
+            ("if (len(1)) { 10 } else { 20 }", "builtin len not supported for type 1"),
+            ("len(1) == len(1)", "builtin len not supported for type 1"),
+            ("len(1) + 1", "builtin len not supported for type 1"),
+            ("[len(1), 2]", "builtin len not supported for type 1"),
             (
                 r#"if (len(1)) { "truthy" } else { "falsy" }"#,
-                "builtin len not supported for for type 1",
+                "builtin len not supported for type 1",
             ),
-            ("len(1); 42", "builtin len not supported for for type 1"),
-            ("let broken = len(1); broken", "builtin len not supported for for type 1"),
+            ("len(1); 42", "builtin len not supported for type 1"),
+            ("let broken = len(1); broken", "builtin len not supported for type 1"),
             (
                 "let identity = fn(x) { x }; identity(len(1))",
-                "builtin len not supported for for type 1",
+                "builtin len not supported for type 1",
             ),
         ];
         apply_error_test(&test_case);

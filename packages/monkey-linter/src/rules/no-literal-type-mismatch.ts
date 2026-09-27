@@ -29,9 +29,11 @@ const TYPE_LABEL: Record<ScalarKind, string> = {
  * from `eval_infix` (interpreter/lib.rs) and
  * `execute_binary_operation`/`execute_comparison` (gc/vm.rs):
  *
- *   - `==` / `!=` are never flagged. The interpreter compares any two values
- *     structurally and never errors; the VM diverges (it errors on mixed
- *     types), so flagging equality would be unsound against the interpreter.
+ *   - `==` / `!=` are never flagged. Equality is total in every backend —
+ *     any two values compare, and different types are simply unequal rather
+ *     than a runtime error — so there is nothing here for an error-severity
+ *     rule to catch. The typechecker reports the pointless ones instead
+ *     (`mixed-equality`, a warning).
  *   - `+` is valid only for two integers or two strings.
  *   - `-`, `*`, `/`, `<`, `>` are valid only for two integers.
  *

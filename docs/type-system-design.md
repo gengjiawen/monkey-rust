@@ -29,7 +29,7 @@
 
 ## 1. 背景与结论
 
-Monkey 目前是完全动态类型的语言。所有类型错误在运行时才暴露，且三个 runtime 的报错行为存在已知分歧（例如混合类型 `==`：interpreter 返回 `false`，GcVM 报错）。linter 的 `no-literal-type-mismatch` 规则是仓库里最接近类型检查的能力，但它只检查字面量操作数——变量一旦介入就沉默。
+Monkey 目前是完全动态类型的语言，所有类型错误在运行时才暴露。linter 的 `no-literal-type-mismatch` 规则是仓库里最接近类型检查的能力，但它只检查字面量操作数——变量一旦介入就沉默。
 
 本提案引入一个渐进式（gradual）类型系统：
 
@@ -299,7 +299,7 @@ parser test 对每种类型节点执行 `&input[span.start..span.end]` 精确切
 这是本提案的硬性约束：
 
 1. **bytecode 恒等**：`let x: int = 5;` 与 `let x = 5;` 的 instructions 与 constants 逐字节相同；不含 debug info 的编译产物（`compile` 输出、strip-debug 快照）逐字节相同。compiler 不读取 `type_annotation` / `return_type`，不新增 opcode。**debug info 不在恒等范围内**：`PcSpan` 记录的是绝对字节偏移，插入标注必然移动后续 span——两份产物的 debug info 应各自准确映射回各自的源码，单独校验，不做互相恒等断言。debug info 里的非 span 字段（`local_bindings`、`free_names`）仍在恒等范围内。asm 后端同理：emit 出的指令逐条相同，但 `.s` 里逐行回显源码的 `//` 注释属于 debug info，比较时先剥离。
-2. **执行恒等**：同一程序带/去标注在 interpreter、默认 VM、GcVM、asm 四个后端产生相同的计算结果、控制流与错误行为。**声明例外——函数值的 source-reflective 操作**：interpreter 的 `Object::Function` 直接内嵌 AST 的 params 与 body，其 `Display` 渲染（`puts(fn(x: int) { x })` 会连标注一起输出）与结构 `==`（比较 params/body AST，标注参与相等判定）都会观察到标注。函数值渲染本就后端分歧（VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`），本设计不为此引入运行时擦除层，改为专项测试固定该例外；擦除恒等语料不打印、不比较**任何包含函数值的值**——函数嵌套在 array/hash 里同样会被 Display/`==` 间接观察到。
+2. **执行恒等**：同一程序带/去标注在 interpreter、默认 VM、GcVM、asm 四个后端产生相同的计算结果、控制流与错误行为。**声明例外——函数值的 source-reflective 操作**：interpreter 的 `Object::Function` 直接内嵌 AST 的 params 与 body，其 `Display` 渲染（`puts(fn(x: int) { x })` 会连标注一起输出）会观察到标注；`==` 不会——函数值在所有后端都按 identity 比较（见 7.4）。函数值渲染本就后端分歧（VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`），本设计不为此引入运行时擦除层，改为专项测试固定该例外；擦除恒等语料不打印**任何包含函数值的值**——函数嵌套在 array/hash 里同样会被 Display 间接观察到。
 3. **checker 不是门禁**：类型检查不通过的程序照常可以执行。是否在 playground / CI 中把诊断当作 error 是消费方的策略，不属于语言语义。
 
 ### 6.2 各后端实际改动
@@ -386,9 +386,8 @@ let x: int = if (c) { 1 } else { "a" };
 - **Any 操作规则**（统一豁免）：任一操作数为 `any` 时检查一律通过。结果类型：单一重载的运算符直接取其结果（`any - 1`、`any * any` → `int`；`any < 1` → `bool`；prefix `-` → `int`）；`+` 的另一侧为 `int` / `string` 时分别得到 `int` / `string`，另一侧为 `any` 或其他具体类型时降级为 `any`（`any + true`、`any + [1]` → `any`），保证统一豁免下结果类型完备。比较与 `!` 恒 `bool`。索引 `any[...]`、调用 `any(...)`、`new any(...)`、属性 `any.prop` 全部合法且结果 `any`（7.7/7.8 的 callee/receiver 条目是该规则的实例）。这条规则是 gradual 的落地面：hello.monkey 的 `getName(person)`、未标注 fibonacci 的 `x - 1` 与 `fibonacci(x-1) + fibonacci(x-2)` 全靠它零诊断。
 - 操作数为 `Union`：先套用 7.1 的 union 消解通用规则（null-stripping 后逐成员检查，结果取各成员结果的 join），再对每个具体成员组合应用上面的 `Any` 规则。例如 `(int | string) + int` 报错——运行时可能命中 `string + int`，所有后端都会报错；`any + (int | string)` 得 `int | string`；`any + (int | bool)` 因 `any + bool` 的结果为 `any`，join 后坍缩为 `any`；而 `int? + 1` 剥离 `null` 后按 `int + int` 通过。
 - `==` / `!=` 不复用 assignability，使用独立的 **equality 矩阵**（null-stripping 后判定，任一侧 `Any` 豁免）：
-  - 可比较类别：`int`、`bool`、`string`、`null`、`Class`、`Instance`。两侧同类别 → 通过，结果 `bool`。`Instance` 与 `Class` 按 identity 比较且**不要求同名 class**——GcVM 的匹配臂只看类别（对任意 Instance/Instance 直接 identity，不检查所属 class），`new A() == new B()` 在四个后端都合法、恒 `false`，checker 如实放行（要提示可日后作为 lint 规则）。
-  - **`Array` / `Hash` / `Fn` 一律拒绝**，报 `invalid-comparison`，且该拒绝**优先于 `Any` 豁免**——`[1] == x` 在 `x: any` 时照报：GcVM 对数组/哈希/函数操作数不论另一侧是什么都会报错，已知一侧是容器就足以断定。运行时依据（`gc/vm.rs` 的 `execute_comparison`）：GcVM 只支持标量、`null` 与 class/instance/bound method，`[1] == [1]` 是 runtime error；而 interpreter 与默认 VM 走 `Object::PartialEq` 结构比较、asm 深比较/恒等——同一表达式三种行为，静态拒绝是唯一能对齐最严后端（GcVM）的选择。`Fn` 另有一层：静态类型无法区分 closure（GcVM 报错）与 bound method（GcVM identity 合法），只能保守全拒。
-  - 类别不同 → `mixed-equality`：GcVM 报错、其余后端静默 `false`，checker 对齐更严格的 GcVM，同时实现了 linter-plan 里提议的 `backend-divergent-comparison`。
+  - **相等是全域的**：任意两个值都可比较，结果恒为 `bool`，永远不是类型错误。`int`、`bool`、`string`、`null` 按值比较；`Array`/`Hash` 递归结构比较且与迭代顺序无关；`Class`、`Instance`、bound method、closure 按 identity 比较（`new A() == new B()` 合法、恒 `false`，`Instance` 之间不要求同名 class）。四个后端在这点上已经对齐，运行时依据是 `gc/backend_parity_test.rs` 的差分语料。
+  - **两侧没有任何一对成员可能相等** → `mixed-equality`，**warning 而非 error**：所有后端都静默返回 `false`（`!=` 返回 `true`），程序照常运行，只是这个答案通常不是作者想要的。任一侧 `any` 时豁免。判定逐对枚举 union 成员，只要存在一对同类别成员就不报：`(int | string) == int` 零诊断——这正是程序用来区分 union 成员的写法，答案在检查期并不知道。两侧都可空时同理（都可能是 `null`，而 `null == null` 为真），`int? == string?` 零诊断，只有一侧可空的 `int? == string` 照报。
 - `if` 条件不限制类型（运行时 truthiness 对一切值有定义，仅 `false` 与 `null` 为假）。
 
 **索引**（合法性规则；结果类型见 7.5 的表）：
@@ -554,8 +553,7 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 | -------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `type-mismatch`      | assignable 失败（let 标注、实参、字段写入、返回值）                                | `type 'string' is not assignable to type 'int'`                                                                         |
 | `operator-type`      | 运算符操作数不满足 7.4                                                             | `operator '+' expects 'int + int' or 'string + string', got 'int + string'`                                             |
-| `mixed-equality`     | `==`/`!=` 两侧类别不同（见 7.4 equality 矩阵）                                     | `comparing 'int' with 'string' diverges across backends; GcVM raises a runtime error`                                   |
-| `invalid-comparison` | `==`/`!=` 操作数为 Array/Hash/Fn（GcVM 运行时报错，其余后端行为各异）              | `values of type '[int]' cannot be compared; GcVM raises a runtime error`                                                |
+| `mixed-equality`     | `==`/`!=` 两侧没有任何一对成员可能相等（见 7.4 equality 矩阵；warning）            | `comparing 'int' with 'string' is always false`                                                                         |
 | `arity-mismatch`     | 调用/`new` 参数个数不符                                                            | `Point constructor expects 2 arguments, got 3`                                                                          |
 | `not-callable`       | callee 静态类型不可调用                                                            | `type 'int' is not callable`                                                                                            |
 | `not-constructable`  | `new` 的 callee 不是 class                                                         | `cannot construct 'fn(int): int'`                                                                                       |
@@ -591,14 +589,14 @@ AST JSON shape 变更（`TypeAnnotation` 五种节点、`Param`、`Let.identifie
 
 - 新增 compiler 测试：同一程序带满标注与完全去标注两个版本，断言 instructions **逐字节相同**、constants 相同、strip-debug 产物相同。debug info 不做互相恒等断言（span 偏移必然不同），改为分别断言两版的 `PcSpan` 精确映射回**各自**源码。
 - 现有 compiler/VM/GcVM/asm 全部快照必须零变化（parser 快照除外）。
-- e2e：带标注程序在四个后端与去标注版输出一致（含 error 场景）；语料不打印、不比较任何包含函数值的值（含嵌套于 array/hash）。6.1 的声明例外配专项测试固定：`puts(fn(x: int) { x })` 按后端分别断言——interpreter 输出含标注的源码渲染，VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`。
+- e2e：带标注程序在四个后端与去标注版输出一致（含 error 场景）；语料不打印任何包含函数值的值（含嵌套于 array/hash）。6.1 的声明例外配专项测试固定：`puts(fn(x: int) { x })` 按后端分别断言——interpreter 输出含标注的源码渲染，VM/GcVM 输出 `[closure function]`，asm 输出 `[function]`。
 
 ### 12.3 Checker
 
 - 每条 7.x 规则的正反用例；重点回归：`examples/hello.monkey` 原样通过且**零诊断**（异构 hash 经 union + any 参数不触发误报）。
 - 递归：fibonacci 未标注静默、标注 `: int` 后对 `return "a"` 报 `type-mismatch`。
 - class：字段收集覆盖全部方法体（constructor 外赋值同样入 map，无 `T?` 提升）与 `this` 的简单/传递 alias（`let self = this; let other = self; other.x = 1;`）、未标注方法的跨方法返回降级 `any`（`this.value = this.make();`）、对方法名赋值报 `assign-to-method`（含方法体内 `this.<方法名> = ...`，验证字段收集的排除规则未吞掉该诊断）、字段间依赖降级（`this.y = this.x;` 得 `any`）、`unknown-property` 拼写捕获、`new` alias、同名 class shadowing 保留不同 `ClassId`（旧 class alias 的实例不能赋给新 class 标注）、`class int {}` 报 `reserved-type-name`。
-- equality：`xs == xs`（`xs: [int]`）与 `f == f`（`f: fn(): int`）报 `invalid-comparison`，配 GcVM 运行时报错的对照用例；跨类别报 `mixed-equality`；`new A() == new B()` 零诊断（四后端合法、恒 `false`）。
+- equality：`xs == xs`（`xs: [int]`）、`h == h`（`h: {string: int}`）与 `f == f`（`f: fn(): int`）零诊断，并由 oracle 语料确认运行时同样通过；跨类别报 `mixed-equality`（warning）；`new A() == new B()` 零诊断（四后端合法、恒 `false`）；union 与可空的逐对判定：`(int | string) == int`、`int? == string?` 零诊断，`(int | string) == bool`、`int? == string` 报 warning。
 - union 消解：`let f = if (c) { fn(x: int): int { x; } } else { fn(x: string): string { x; } }; f(1);` 报错；`let xs = if (c) { [1] } else { ["a"] }; xs[0];` 通过且类型为 `(int | string)?`。两例都由分支推导内部 union，不依赖 v1 尚未支持的 union 用户语法。
 - any 与 builtin 泛型：`any + true`、`any + [1]` 通过且结果为 `any`；`let c = true; let x: any = 0; let y = if (c) { 1 } else { "s" }; x + y;` 按 RHS 的内部 union 成员检查，结果为 `int | string`；`first(x)`（`x: any`）结果为 `any`，`push(x, 1)` 结果为 `[any]`。
 - 返回推导 completion：`return` 后不可达语句不参与 join（`fn(): int { return 1; "s"; }` 零诊断）；条件 return 与 fallthrough 合并（`fn(flag: bool): int { if (flag) { return 1; } "s"; }` 报 `type-mismatch`）。

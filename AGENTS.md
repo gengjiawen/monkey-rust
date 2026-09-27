@@ -30,6 +30,10 @@
 - Run all Rust tests with `cargo test` at repo root. Snapshot tests use `insta`.
 - To refresh snapshots locally: `INSTA_UPDATE=always cargo test` (review diffs before committing).
 - Wasm tests (if used): `cd wasm && wasm-pack test --node`.
+- `gc/backend_parity_test.rs` is the cross-backend conformance suite: it runs one
+  corpus through the interpreter, the bytecode VM and the gc VM and fails when they
+  disagree. Any change to language semantics belongs there, and its module comment
+  lists the differences that are still known and deliberately uncompared.
 
 ## Commit & Pull Request Guidelines
 

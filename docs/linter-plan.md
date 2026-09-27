@@ -314,9 +314,9 @@ let a = 1 + "a";       // unsupported binary operation for 1 and a
 let b = true + 1;
 let c = "a" - "b";
 
-// ✓ 不报：1 == true 两个后端行为分歧——interpreter 返回 false，
-//    GC VM 报 unsupported comparison（实测）。不满足"必然 error"，
-//    归 v1 的 backend-divergent-comparison。
+// ✓ 不报：1 == true 在所有后端都合法、恒 false（相等是全域的，
+//    见 arm64 backend design §10.1）。不满足"必然 error"，
+//    要提示的话归 typechecker 的 mixed-equality warning。
 let d = 1 == true;
 ```
 
@@ -336,14 +336,9 @@ let d = 1 == true;
   编译期就把 `f` 体内的 `x` 解析到旧 slot。同一段代码的行为取决于跑在哪个
   后端上，写出来就该 warn。依赖 scope.ts 的捕获分析，v0 打好地基 v1 上。
 
-- `backend-divergent-comparison`：比较运算的后端分歧不只发生在跨类型字面量。
-  `1 == true` 会得到 interpreter → `false`、GC VM → runtime error；array/hash
-  等同类型值的比较也可能分歧。与
-  `no-literal-type-mismatch` 互补：后者只收"两后端都 error"的组合，
-  分歧组合归这条。
-- `no-self-compare`：把 `x == x` / `x != x` 作为高度可疑的自比较报告，但不宣称
-  恒真/恒假。例如 `let x = []; x == x` 在 interpreter 中是 `true`，GC VM 则拒绝
-  该比较。
+- `no-self-compare`：把 `x == x` / `x != x` 作为高度可疑的自比较报告。相等已在
+  四个后端对齐（`gc/backend_parity_test.rs`），`let x = []; x == x` 处处为
+  `true`，所以这条规则报的是"这句话没有信息量"，不是后端分歧。
 - `no-empty-block`：`if (ready) {}` 空分支。
 
 ### 明确不做的规则

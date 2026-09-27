@@ -4,6 +4,7 @@ use std::fmt::Write as _;
 use std::rc::Rc;
 
 use object::builtins::{BuiltIns, BuiltinId};
+use object::semantics::{structurally_equal, HashKeyOrder};
 use object::{Closure, CompiledFunction, Object};
 use serde::Serialize;
 
@@ -155,6 +156,15 @@ pub enum HashKey {
 }
 
 impl HashKey {
+    /// The key's place in the canonical display order (design §10.2).
+    fn order(&self) -> HashKeyOrder<'_> {
+        match self {
+            HashKey::Integer(raw) => return HashKeyOrder::Integer(*raw),
+            HashKey::Boolean(raw) => return HashKeyOrder::Boolean(*raw),
+            HashKey::String(raw) => return HashKeyOrder::String(raw),
+        }
+    }
+
     pub fn kind(&self) -> HashKeyKind {
         match self {
             HashKey::Integer(_) => HashKeyKind::Integer,
@@ -175,6 +185,17 @@ impl GcObject for ValueCell {
 }
 
 impl Value {
+    /// Frozen truthiness (arm64 backend design §10.1): only `false` and `null`
+    /// are falsy, and `!v` is exactly `!v.is_truthy()`. Mirrors
+    /// [`object::Object::is_truthy`], which the other two backends use.
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Boolean(value) => return *value,
+            Value::Null => return false,
+            _ => return true,
+        }
+    }
+
     pub fn kind(&self) -> ValueKind {
         match self {
             Value::Class(_) => ValueKind::Class,
@@ -211,15 +232,13 @@ impl Value {
                 }
             }
             Value::Hash(map) => {
-                let mut entries = map.iter().collect::<Vec<_>>();
-                entries.sort_by_key(|(left, _)| *left);
-                for (key, value) in entries {
+                for (key, value) in sorted_hash_entries(map) {
                     visit(
                         EdgeRelation::HashValue {
                             key_kind: key.kind(),
                             key: format_hash_key_label(key),
                         },
-                        *value,
+                        value,
                     );
                 }
             }
@@ -454,10 +473,10 @@ fn format_value(heap: &GcHeap, value: &Value, visited: &mut HashSet<usize>) -> S
             format!("[{}]", parts)
         }
         Value::Hash(map) => {
-            let parts = map
-                .iter()
+            let parts = sorted_hash_entries(map)
+                .into_iter()
                 .map(|(k, v)| {
-                    format!("{}: {}", format_hash_key(k), format_reference(heap, *v, visited))
+                    format!("{}: {}", format_hash_key(k), format_reference(heap, v, visited))
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
@@ -490,12 +509,77 @@ fn instance_class_name(heap: &GcHeap, instance: GcRef) -> String {
     }
 }
 
+/// Hash entries in the canonical order every backend renders them in
+/// ([`HashKeyOrder`], arm64 backend design §10.2). Without this, the same hash
+/// prints in a different order on different runs, because `HashMap` iteration
+/// order is unspecified.
+pub fn sorted_hash_entries(map: &HashMap<HashKey, GcRef>) -> Vec<(&HashKey, GcRef)> {
+    let mut entries = map
+        .iter()
+        .map(|(key, value)| (key, *value))
+        .collect::<Vec<_>>();
+    entries.sort_unstable_by_key(|&(key, _)| key.order());
+    return entries;
+}
+
 fn format_hash_key(key: &HashKey) -> String {
     match key {
         HashKey::Integer(i) => i.to_string(),
         HashKey::Boolean(b) => b.to_string(),
         HashKey::String(s) => s.clone(),
     }
+}
+
+/// Frozen equality (arm64 backend design §10.1), the `GcRef` mirror of
+/// `impl PartialEq for object::Object`: scalars compare by value, arrays and
+/// hashes compare structurally and independently of iteration order, closures,
+/// classes, instances and bound methods compare by identity, and two values of
+/// different types are simply unequal — never a type error.
+///
+/// The traversal is [`structurally_equal`]'s, over heap handles, so one
+/// `OpEqual` handed an array thousands of levels deep — which the instruction
+/// budget cannot see — neither recurses nor revisits a shared subtree.
+pub fn values_equal(heap: &GcHeap, left: GcRef, right: GcRef) -> bool {
+    return structurally_equal(left, right, |left, right, descend| {
+        match (get_value(heap, left), get_value(heap, right)) {
+            (Value::Integer(l), Value::Integer(r)) => return l == r,
+            (Value::Boolean(l), Value::Boolean(r)) => return l == r,
+            (Value::String(l), Value::String(r)) => return l == r,
+            (Value::Null, Value::Null) => return true,
+            (Value::Error(l), Value::Error(r)) => return l == r,
+            (Value::Builtin(l), Value::Builtin(r)) => return l == r,
+            (Value::CompiledFunction(l), Value::CompiledFunction(r)) => return l == r,
+            (Value::Array(l), Value::Array(r)) => {
+                if l.len() != r.len() {
+                    return false;
+                }
+                if descend.first_visit(left, right) {
+                    descend.extend(l.iter().copied().zip(r.iter().copied()));
+                }
+                return true;
+            }
+            (Value::Hash(l), Value::Hash(r)) => {
+                if l.len() != r.len() {
+                    return false;
+                }
+                if descend.first_visit(left, right) {
+                    // Keys are scalars, so the lookup never nests; values can.
+                    for (key, value) in l {
+                        match r.get(key) {
+                            Some(other) => descend.push(*value, *other),
+                            None => return false,
+                        }
+                    }
+                }
+                return true;
+            }
+            // Closures, classes, instances and bound methods compare by
+            // identity, which the traversal settles before asking: two
+            // distinct objects are never equal even with identical fields —
+            // two closures sharing code and captures included.
+            _ => return false,
+        }
+    });
 }
 
 pub fn import_object(heap: &mut GcHeap, object: &Object) -> GcRef {
@@ -638,7 +722,7 @@ pub fn call_builtin_with_output(
                 _ => alloc_value(
                     heap,
                     Value::Error(format!(
-                        "builtin len not supported for for type {}",
+                        "builtin len not supported for type {}",
                         value_to_string(heap, args[0])
                     )),
                 ),
@@ -678,7 +762,7 @@ pub fn call_builtin_with_output(
                     return alloc_value(
                         heap,
                         Value::Error(format!(
-                            "builtin {} not supported for for type {}",
+                            "builtin {} not supported for type {}",
                             name,
                             value_to_string(heap, args[0])
                         )),
@@ -717,7 +801,7 @@ pub fn call_builtin_with_output(
                     return alloc_value(
                         heap,
                         Value::Error(format!(
-                            "builtin push not supported for for type {}",
+                            "builtin push not supported for type {}",
                             value_to_string(heap, args[0])
                         )),
                     )

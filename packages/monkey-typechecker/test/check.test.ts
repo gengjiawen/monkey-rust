@@ -215,36 +215,58 @@ describe('equality', () => {
     clean('1 == 2; "a" != "b"; true == false;')
   })
 
-  it('rejects a mixed comparison', () => {
-    expect(only('1 == "a";').message).toBe(
-      "comparing 'int' with 'string' diverges across backends; GcVM raises a runtime error"
+  it('warns that a mixed comparison has a known answer', () => {
+    const mismatch = only('1 == "a";')
+    expect(mismatch.severity).toBe('warning')
+    expect(mismatch.message).toBe("comparing 'int' with 'string' is always false")
+    expect(only('1 != "a";').message).toBe(
+      "comparing 'int' with 'string' is always true"
     )
   })
 
-  it('rejects arrays, hashes and functions outright', () => {
-    expect(only('let xs: [int] = [1]; xs == xs;').message).toBe(
-      "values of type '[int]' cannot be compared; GcVM raises a runtime error"
-    )
-    expect(codes('let f: fn(): int = fn(): int { 1 }; f == f;')).toEqual([
-      'invalid-comparison',
-    ])
-    expect(codes('let h: {string: int} = {}; h == h;')).toEqual([
-      'invalid-comparison',
-    ])
+  it('allows arrays, hashes and functions', () => {
+    // Every backend compares these: arrays and hashes structurally, functions
+    // by identity (gc/backend_parity_test.rs).
+    clean('let xs: [int] = [1]; xs == xs;')
+    clean('let f: fn(): int = fn(): int { 1 }; f == f;')
+    clean('let h: {string: int} = {}; h == h;')
   })
 
   it('allows instances of different classes', () => {
     clean('class A {} class B {} new A() == new B();')
   })
 
-  it('exempts any on the scalar side only', () => {
+  it('exempts any on either side', () => {
     clean('let x: any = 0; x == "a"; x == 1;')
-    // An array operand is a GcVM runtime error whatever the other side is.
-    expect(codes('let x: any = 0; x == [1];')).toEqual(['invalid-comparison'])
+    clean('let x: any = 0; x == [1];')
   })
 
   it('strips null first', () => {
     clean('let xs: [int] = [1]; first(xs) == 1;')
+  })
+
+  it('lets a union through when one member can match', () => {
+    // `int | string` against `int`: the comparison is exactly how a program
+    // finds out which member it holds, so its answer is not known here.
+    const union = 'let c = true; let y = if (c) { 1 } else { "s" };'
+    clean(`${union} y == 1;`)
+    clean(`${union} y == "s";`)
+    clean(`${union} 1 == y;`)
+    // No member of either side can match, so the answer is known again.
+    expect(only(`${union} y == true;`).message).toBe(
+      "comparing 'int | string' with 'bool' is always false"
+    )
+  })
+
+  it('lets two nullables through — both can be null', () => {
+    const optionals =
+      'let xs: [int] = [1]; let ss: [string] = ["a"]; let x = first(xs); let s = first(ss);'
+    clean(`${optionals} x == s;`)
+    // Only one side can be null, so `null == null` is not reachable and no
+    // non-null member matches either.
+    expect(only(`${optionals} x == "a";`).message).toBe(
+      "comparing 'int?' with 'string' is always false"
+    )
   })
 })
 

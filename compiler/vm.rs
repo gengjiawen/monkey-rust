@@ -183,7 +183,7 @@ impl VM {
                     let pos = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
                     self.current_frame().ip += 2;
                     let condition = self.pop();
-                    if !self.is_truthy(condition) {
+                    if !condition.is_truthy() {
                         self.current_frame().ip = pos as i32 - 1;
                     }
                 }
@@ -279,8 +279,16 @@ impl VM {
                     self.push(current_closure.free[free_index].clone())?;
                 }
                 Opcode::OpCurrentClosure => {
-                    let current_closure = self.current_frame().cl.clone();
-                    self.push(Rc::new(Object::ClosureObj(current_closure)))?;
+                    // Push the object that was called — the callee slot just
+                    // below the frame, which method calls rewrite to the method
+                    // closure — not a fresh copy, so that closure identity
+                    // holds: `let f = fn() { f }; f() == f` is true.
+                    let base_pointer = self.current_frame().base_pointer;
+                    let current_closure = match base_pointer.checked_sub(1) {
+                        Some(callee_slot) => Rc::clone(&self.stack[callee_slot]),
+                        None => Rc::new(Object::ClosureObj(self.current_frame().cl.clone())),
+                    };
+                    self.push(current_closure)?;
                 }
                 Opcode::OpClass => {
                     let name_index = BigEndian::read_u16(&ins[ip + 1..ip + 3]) as usize;
@@ -433,10 +441,11 @@ impl VM {
 
     fn execute_bang_operation(&mut self) -> VmResult<()> {
         let operand = self.pop();
-        match operand.as_ref() {
-            Object::Boolean(l) => self.push(Rc::from(Object::Boolean(!*l))),
-            _ => self.push(Rc::from(Object::Boolean(false))),
-        }
+        // `!v` is the logical inverse of truthiness, so `!null` is `true`
+        // (design §10.1). Treating every non-boolean as truthy here would make
+        // `!null` disagree with `if (null)`.
+        let negated = !operand.is_truthy();
+        self.push(Rc::from(Object::Boolean(negated)))
     }
 
     pub fn last_popped_stack_elm(&self) -> Option<Rc<Object>> {
@@ -456,13 +465,6 @@ impl VM {
         self.stack[self.sp] = o;
         self.sp += 1;
         Ok(())
-    }
-    fn is_truthy(&self, condition: Rc<Object>) -> bool {
-        match condition.as_ref() {
-            Object::Boolean(b) => *b,
-            Object::Null => false,
-            _ => true,
-        }
     }
     fn build_array(&self, start: usize, end: usize) -> Vec<Rc<Object>> {
         let mut elements = Vec::with_capacity(end - start);
