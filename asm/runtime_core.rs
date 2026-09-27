@@ -7,7 +7,7 @@
 //! never exit the process at this layer; they are returned as stable
 //! [`RuntimeErrorKind`] categories.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use object::builtins::{BuiltIns, BuiltinId};
 
@@ -483,7 +483,40 @@ pub fn index<S: ValueStore>(store: &S, object: Value, index: Value) -> RuntimeRe
 /// Frozen equality matrix (design §10.1): integers by raw value, scalars by
 /// value, builtins by id, aggregates recursively, identity types by object
 /// identity, differing types compare unequal.
+///
+/// Aggregates are walked on an explicit worklist rather than the native
+/// stack: nesting depth is a property of the *data*, and `rt_eq` is a single
+/// call however deep the arrays go. `seen` memoises visited pairs — reaching
+/// one again means the first visit did not disprove it, because any
+/// inequality returns immediately — so a shared subtree is compared once, not
+/// once per path into it. Mirrors `object::Object::eq` and
+/// `gc::value::values_equal`.
 pub fn eq_values<S: ValueStore>(store: &S, left: Value, right: Value) -> RuntimeResult<bool> {
+    let mut pending = Vec::new();
+    if !eq_shallow(store, left, right, &mut pending)? {
+        return Ok(false);
+    }
+    let mut seen = HashSet::new();
+    while let Some((left, right)) = pending.pop() {
+        if left == right || !seen.insert((left, right)) {
+            continue;
+        }
+        if !eq_shallow(store, left, right, &mut pending)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// One step of [`eq_values`]: decides scalars and identity types outright,
+/// and for two same-length arrays or same-key hashes queues the element pairs
+/// on `pending` instead of recursing into them.
+fn eq_shallow<S: ValueStore>(
+    store: &S,
+    left: Value,
+    right: Value,
+    pending: &mut Vec<(Value, Value)>,
+) -> RuntimeResult<bool> {
     let left_int = int_value(store, left);
     let right_int = int_value(store, right);
     if let (Some(l), Some(r)) = (left_int, right_int) {
@@ -503,11 +536,7 @@ pub fn eq_values<S: ValueStore>(store: &S, left: Value, right: Value) -> Runtime
             if l.len() != r.len() {
                 return Ok(false);
             }
-            for (l_element, r_element) in l.iter().zip(r.iter()) {
-                if !eq_values(store, *l_element, *r_element)? {
-                    return Ok(false);
-                }
-            }
+            pending.extend(l.iter().copied().zip(r.iter().copied()));
             Ok(true)
         }
         (HeapObject::Hash(l), HeapObject::Hash(r)) => {
@@ -516,11 +545,7 @@ pub fn eq_values<S: ValueStore>(store: &S, left: Value, right: Value) -> Runtime
             }
             for (key, l_value) in l.iter() {
                 match r.get(key) {
-                    Some(r_value) => {
-                        if !eq_values(store, *l_value, *r_value)? {
-                            return Ok(false);
-                        }
-                    }
+                    Some(r_value) => pending.push((*l_value, *r_value)),
                     None => return Ok(false),
                 }
             }

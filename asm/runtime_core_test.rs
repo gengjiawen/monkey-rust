@@ -196,6 +196,36 @@ fn equality_matrix() {
     });
 }
 
+/// §10.1: nesting depth is a property of the data. `eq_values` must answer
+/// for arrays far deeper than the native stack could recurse through, and a
+/// subtree shared by both sides must be compared once rather than once per
+/// path into it (2^64 paths below).
+#[test]
+fn equality_walks_deep_and_shared_structures_iteratively() {
+    on_both_backends(|store| {
+        let mut store = store.as_store();
+        let mut left = array_from_values(&mut store, &[smi_from_i64(0)]);
+        let mut right = array_from_values(&mut store, &[smi_from_i64(0)]);
+        let mut different = array_from_values(&mut store, &[smi_from_i64(1)]);
+        for _ in 0..100_000 {
+            left = array_from_values(&mut store, &[left]);
+            right = array_from_values(&mut store, &[right]);
+            different = array_from_values(&mut store, &[different]);
+        }
+        assert!(eq_values(&store, left, right).unwrap());
+        assert!(!eq_values(&store, left, different).unwrap());
+
+        let mut left = array_from_values(&mut store, &[smi_from_i64(0)]);
+        let mut right = array_from_values(&mut store, &[smi_from_i64(0)]);
+        for _ in 0..64 {
+            left = array_from_values(&mut store, &[left, left]);
+            right = array_from_values(&mut store, &[right, right]);
+        }
+        assert!(eq_values(&store, left, right).unwrap());
+        true
+    });
+}
+
 #[test]
 fn gt_accepts_integers_only() {
     on_both_backends(|store| {
