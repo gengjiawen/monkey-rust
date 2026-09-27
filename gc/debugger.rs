@@ -19,7 +19,9 @@ use parser::lexer::token::Span;
 use serde::Serialize;
 
 use crate::report::summarize_gc_object;
-use crate::value::{format_hash_key_label, EdgeRelation, HashKey, Value, ValueCell, ValueKind};
+use crate::value::{
+    format_hash_key_label, sorted_hash_entries, EdgeRelation, Value, ValueCell, ValueKind,
+};
 use crate::{Frame, GcHeap, GcId, GcRef};
 
 pub const MAX_DEBUGGER_HITS: usize = 25;
@@ -475,8 +477,9 @@ fn append_value(
                 text.push("{…}");
                 return;
             }
-            let mut entries: Vec<(&HashKey, &GcRef)> = map.iter().collect();
-            entries.sort_by_key(|(key, _)| *key);
+            // The order `puts` and the run result use, so the debugger never
+            // shows the same hash differently from the program's own output.
+            let entries = sorted_hash_entries(map);
             text.push("{");
             for (position, (key, value)) in entries.iter().take(MAX_DEBUGGER_MEMBERS).enumerate() {
                 if position > 0 {
@@ -484,7 +487,7 @@ fn append_value(
                 }
                 text.push(&format_hash_key_label(key));
                 text.push(": ");
-                append_reference(heap, **value, depth - 1, visiting, text);
+                append_reference(heap, *value, depth - 1, visiting, text);
             }
             if entries.len() > MAX_DEBUGGER_MEMBERS {
                 text.push(", …");

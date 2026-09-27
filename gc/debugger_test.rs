@@ -363,6 +363,7 @@ mod tests {
                 let deep = [[[[1]]]];
                 let wide = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
                 let mixed = {{"b": 1, 3: 2, "a": 3}};
+                let numbered = {{2: 2, 10: 10, 1: 1}};
                 let text = "{}";
                 debugger;
             "#,
@@ -378,8 +379,30 @@ mod tests {
             global(hit, "wide").value.as_ref().unwrap().display,
             "[0, 1, 2, 3, 4, 5, 6, 7, …]"
         );
-        // Hash entries sort by key (integers before strings).
+        // Hash entries use the order `puts` and the run result use: key type
+        // rank (integers before strings), then canonical key bytes, so `10`
+        // sorts before `2`. The heap node's members follow the same order.
         assert_eq!(global(hit, "mixed").value.as_ref().unwrap().display, "{3: 2, a: 3, b: 1}");
+        let numbered = global(hit, "numbered").value.as_ref().unwrap();
+        assert_eq!(numbered.display, "{1: 1, 10: 10, 2: 2}");
+        let numbered_node = hit
+            .heap
+            .objects
+            .iter()
+            .find(|object| Some(object.id) == numbered.heap_id)
+            .expect("hash node selected");
+        let member_keys: Vec<&str> = numbered_node
+            .members
+            .iter()
+            .filter_map(|member| match &member.relation {
+                EdgeRelation::HashValue {
+                    key,
+                    ..
+                } => Some(key.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(member_keys, ["1", "10", "2"]);
         // Character budget includes the ellipsis.
         let text = &global(hit, "text").value.as_ref().unwrap().display;
         assert_eq!(text.chars().count(), MAX_DEBUGGER_DISPLAY_CHARS);

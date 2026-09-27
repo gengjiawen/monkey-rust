@@ -239,15 +239,13 @@ impl Value {
                 }
             }
             Value::Hash(map) => {
-                let mut entries = map.iter().collect::<Vec<_>>();
-                entries.sort_by_key(|(left, _)| *left);
-                for (key, value) in entries {
+                for (key, value) in sorted_hash_entries(map) {
                     visit(
                         EdgeRelation::HashValue {
                             key_kind: key.kind(),
                             key: format_hash_key_label(key),
                         },
-                        *value,
+                        value,
                     );
                 }
             }
