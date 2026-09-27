@@ -903,10 +903,9 @@ impl GcVM {
         // Checked, so `-(-9223372036854775808)` raises the same runtime error
         // here as in the other backends instead of wrapping (design §10.1).
         let negated = match get_value(&self.heap, operand) {
-            Value::Integer(value) => value.checked_neg().ok_or((
-                GcRuntimeErrorKind::Arithmetic,
-                "integer overflow in negation".to_string(),
-            )),
+            Value::Integer(value) => value.checked_neg().ok_or_else(|| {
+                (GcRuntimeErrorKind::Arithmetic, "integer overflow in negation".to_string())
+            }),
             _ => Err((
                 GcRuntimeErrorKind::Type,
                 format!("unsupported type for negation: {}", value_to_string(&self.heap, operand)),
