@@ -802,9 +802,7 @@ impl GcVM {
 
     fn execute_binary_operation(&mut self, opcode: Opcode) -> Result<(), GcClassifiedRuntimeError> {
         let (right, left) = self.pop_owned_pair()?;
-        let left_value = get_value(&self.heap, left).clone();
-        let right_value = get_value(&self.heap, right).clone();
-        let result = match (&left_value, &right_value) {
+        let result = match (get_value(&self.heap, left), get_value(&self.heap, right)) {
             (Value::Integer(l), Value::Integer(r)) => match opcode {
                 Opcode::OpAdd => Ok(Value::Integer(l.wrapping_add(*r))),
                 Opcode::OpSub => Ok(Value::Integer(l.wrapping_sub(*r))),
