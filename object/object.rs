@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
@@ -11,9 +11,14 @@ use parser::ast::{BlockStatement, Param};
 extern crate lazy_static;
 
 use crate::environment::Env;
+use crate::semantics::{structurally_equal, HashKeyOrder};
 
 pub mod builtins;
 pub mod environment;
+pub mod semantics;
+
+#[cfg(test)]
+mod semantics_test;
 
 pub type EvalError = String;
 pub type BuiltinFunc = fn(Vec<Rc<Object>>) -> Rc<Object>;
@@ -113,36 +118,27 @@ impl fmt::Display for Object {
     }
 }
 
-/// Hash entries in the canonical order every backend renders them in:
-/// `(key type rank, canonical key bytes)` with integer=0, boolean=1, string=2
-/// (arm64 backend design §10.2). `HashMap` iteration order is unspecified and
-/// varies run to run, so a display that walked the map directly would print
-/// the same hash differently on two runs of the same program.
+/// Hash entries in the canonical order every backend renders them in
+/// ([`HashKeyOrder`], arm64 backend design §10.2). `HashMap` iteration order is
+/// unspecified and varies run to run, so a display that walked the map
+/// directly would print the same hash differently on two runs of the same
+/// program.
 fn sorted_hash_entries<'a>(
     map: impl Iterator<Item = (&'a Rc<Object>, &'a Rc<Object>)>,
 ) -> Vec<(&'a Rc<Object>, &'a Rc<Object>)> {
     let mut entries = map.collect::<Vec<_>>();
-    entries.sort_by_key(|(key, _)| (hash_key_rank(key), hash_key_canonical_bytes(key)));
-    entries
+    entries.sort_unstable_by_key(|&(key, _)| hash_key_order(key));
+    return entries;
 }
 
-fn hash_key_rank(key: &Object) -> u8 {
+fn hash_key_order(key: &Object) -> HashKeyOrder<'_> {
     match key {
-        Object::Integer(_) => 0,
-        Object::Boolean(_) => 1,
-        Object::String(_) => 2,
-        // Unreachable for hashes the runtimes build: `is_hashable` rejects
-        // every other variant before it can become a key.
-        _ => 3,
-    }
-}
-
-fn hash_key_canonical_bytes(key: &Object) -> Vec<u8> {
-    match key {
-        Object::Integer(raw) => raw.to_string().into_bytes(),
-        Object::Boolean(raw) => raw.to_string().into_bytes(),
-        Object::String(raw) => raw.clone().into_bytes(),
-        other => other.to_string().into_bytes(),
+        Object::Integer(raw) => return HashKeyOrder::Integer(*raw),
+        Object::Boolean(raw) => return HashKeyOrder::Boolean(*raw),
+        Object::String(raw) => return HashKeyOrder::String(raw),
+        // `impl Hash for Object` panics on every other variant, so no map
+        // can hold one as a key.
+        other => unreachable!("unhashable hash key {}", other),
     }
 }
 
@@ -180,82 +176,87 @@ impl PartialEq for Object {
     /// bound methods by identity — the address of the `Object`, which the
     /// interpreter and the bytecode VM share through `Rc` rather than copy.
     ///
-    /// Driven by an explicit worklist rather than by the call stack. Nesting
-    /// depth is a property of the *data*, and `a == b` is a single step for
-    /// every backend, so an array a few thousand levels deep — which no engine
-    /// has any other trouble with — would answer by overflowing the native
-    /// stack. `gc::value::values_equal` mirrors this.
-    ///
-    /// `seen` memoises: reaching a pair a second time means the first visit
-    /// did not disprove it, because any inequality returns immediately. It
-    /// also keeps a shared subtree from being compared once per path into it.
+    /// The traversal is [`structurally_equal`]'s, over object addresses;
+    /// `gc::value::values_equal` and the arm64 runtime's `eq_values` share it.
     fn eq(&self, other: &Self) -> bool {
-        let mut pending: Vec<(&Object, &Object)> = vec![(self, other)];
-        let mut seen: HashSet<(*const Object, *const Object)> = HashSet::new();
-
-        while let Some((left, right)) = pending.pop() {
-            if std::ptr::eq(left, right)
-                || !seen.insert((left as *const Object, right as *const Object))
-            {
-                continue;
-            }
-            let equal = match (left, right) {
-                (Object::Integer(left), Object::Integer(right)) => left == right,
-                (Object::Boolean(left), Object::Boolean(right)) => left == right,
-                (Object::String(left), Object::String(right)) => left == right,
-                (Object::Array(left), Object::Array(right)) => {
-                    left.len() == right.len() && {
-                        pending.extend(zip_deref(left, right));
-                        true
+        return structurally_equal(ByAddress(self), ByAddress(other), |left, right, descend| {
+            match (left.0, right.0) {
+                (Object::Integer(left), Object::Integer(right)) => return left == right,
+                (Object::Boolean(left), Object::Boolean(right)) => return left == right,
+                (Object::String(left), Object::String(right)) => return left == right,
+                (Object::Array(items), Object::Array(others)) => {
+                    if items.len() != others.len() {
+                        return false;
                     }
+                    if descend.first_visit(left, right) {
+                        descend.extend(items.iter().zip(others).map(|(item, other)| {
+                            return (ByAddress(item), ByAddress(other));
+                        }));
+                    }
+                    return true;
                 }
-                (Object::Hash(left), Object::Hash(right)) => {
-                    // Keys are scalars (`is_hashable`), so the lookup itself
-                    // never nests; only the values can.
-                    left.len() == right.len()
-                        && left.iter().all(|(key, value)| match right.get(key) {
-                            Some(other) => {
-                                pending.push((value, other));
-                                true
+                (Object::Hash(entries), Object::Hash(others)) => {
+                    if entries.len() != others.len() {
+                        return false;
+                    }
+                    if descend.first_visit(left, right) {
+                        // Keys are scalars (`is_hashable`), so the lookup
+                        // itself never nests; only the values can.
+                        for (key, value) in entries {
+                            match others.get(key) {
+                                Some(other) => descend.push(ByAddress(value), ByAddress(other)),
+                                None => return false,
                             }
-                            None => false,
-                        })
+                        }
+                    }
+                    return true;
                 }
-                (Object::Null, Object::Null) => true,
+                (Object::Null, Object::Null) => return true,
                 (Object::ReturnValue(left), Object::ReturnValue(right)) => {
-                    pending.push((left, right));
-                    true
+                    descend.push(ByAddress(left), ByAddress(right));
+                    return true;
                 }
                 (Object::Builtin(left), Object::Builtin(right)) => {
-                    std::ptr::fn_addr_eq(*left, *right)
+                    return std::ptr::fn_addr_eq(*left, *right);
                 }
-                (Object::Error(left), Object::Error(right)) => left == right,
-                (Object::CompiledFunction(left), Object::CompiledFunction(right)) => left == right,
-                // Identity only: `ptr::eq` above already answered for the same
-                // object, and two closures are distinct even when they share
-                // code and captures — `make() == make()` is false.
-                (Object::Function(..), Object::Function(..))
-                | (Object::ClosureObj(_), Object::ClosureObj(_)) => false,
-                (Object::Class(left), Object::Class(right)) => Rc::ptr_eq(left, right),
-                (Object::Instance(left), Object::Instance(right)) => Rc::ptr_eq(left, right),
-                (Object::BoundMethod(left), Object::BoundMethod(right)) => Rc::ptr_eq(left, right),
-                _ => false,
-            };
-            if !equal {
-                return false;
+                (Object::Error(left), Object::Error(right)) => return left == right,
+                (Object::CompiledFunction(left), Object::CompiledFunction(right)) => {
+                    return left == right;
+                }
+                (Object::Class(left), Object::Class(right)) => return Rc::ptr_eq(left, right),
+                (Object::Instance(left), Object::Instance(right)) => {
+                    return Rc::ptr_eq(left, right);
+                }
+                (Object::BoundMethod(left), Object::BoundMethod(right)) => {
+                    return Rc::ptr_eq(left, right);
+                }
+                // Functions and closures compare by identity, which the
+                // traversal settles before asking: two closures are distinct
+                // even when they share code and captures, so `make() ==
+                // make()` is false. Mixed types are unequal, never an error.
+                _ => return false,
             }
-        }
-        return true;
+        });
     }
 }
 
-fn zip_deref<'a>(
-    left: &'a [Rc<Object>],
-    right: &'a [Rc<Object>],
-) -> impl Iterator<Item = (&'a Object, &'a Object)> {
-    left.iter()
-        .map(Rc::as_ref)
-        .zip(right.iter().map(Rc::as_ref))
+/// An `Object` compared and hashed by address: the identity the equality
+/// traversal needs for its memo and for its same-object shortcut.
+#[derive(Clone, Copy)]
+struct ByAddress<'a>(&'a Object);
+
+impl PartialEq for ByAddress<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        return std::ptr::eq(self.0, other.0);
+    }
+}
+
+impl Eq for ByAddress<'_> {}
+
+impl Hash for ByAddress<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.0, state);
+    }
 }
 
 impl Eq for Object {}

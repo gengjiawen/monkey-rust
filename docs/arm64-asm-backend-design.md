@@ -552,11 +552,12 @@ identity 对象的地址只在单次引擎执行内部有意义，跨引擎测�
 1. ✅ interpreter、普通 VM、gc VM 全部改用 checked 整数运算和同一 `RuntimeErrorKind` 映射；
 2. ✅ 普通 VM/gc VM 的 bang 改为 truthiness 的逻辑反值（`object::Object::is_truthy` /
    `gc::Value::is_truthy` 是唯一定义，`if` 与 `!` 都走它）；
-3. ✅ 三引擎实现上表的 aggregate/identity 相等规则（gc 侧是 `gc::value::values_equal`）；
+3. ✅ 三引擎实现上表的 aggregate/identity 相等规则，遍历共用 `object::semantics::structurally_equal`
+   的显式 worklist（`Object::eq`、gc 侧的 `gc::value::values_equal`、arm64 runtime 的 `eq_values`）；
 4. ✅ builtin 返回的 `Object::Error`/`Value::Error` 在调用边界立即转成终止型错误；
 5. ✅ 保持 §13 已修复的 `define_function_name` 路径与重绑定求值顺序；
-6. 抽出共享的规范化 language display 与 observer value encoder（hash 的 `{k: v}` 与
-   `(rank, canonical bytes)` 键序已在 `object`/`gc` 两侧对齐，整体抽取仍待做）。
+6. 抽出共享的规范化 language display 与 observer value encoder（hash 的 `{k: v}` 已在各引擎对齐，
+   `(rank, canonical bytes)` 键序统一由 `object::semantics::HashKeyOrder` 定义；display 本身的整体抽取仍待做）。
 
 依赖这些语义的上层工具同批更新：minifier 的常量折叠不再把溢出的算术折成回绕值（
 `packages/monkey-minifier/src/fold.ts`），typechecker 也不再因 GcVM 会报错而拒绝

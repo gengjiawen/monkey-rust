@@ -7,9 +7,10 @@
 //! never exit the process at this layer; they are returned as stable
 //! [`RuntimeErrorKind`] categories.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use object::builtins::{BuiltIns, BuiltinId};
+use object::semantics::{try_structurally_equal, Descend, HashKeyOrder};
 
 use crate::runtime_backend::{CodeHandle, ValueStore};
 
@@ -187,21 +188,13 @@ pub enum HashKey {
 }
 
 impl HashKey {
-    /// Rank + canonical bytes ordering used by displays and the observer
-    /// (integer=0, boolean=1, string=2; design §10.2).
-    fn rank(&self) -> u8 {
+    /// The key's place in the canonical order displays and the observer use
+    /// (design §10.2).
+    fn order(&self) -> HashKeyOrder<'_> {
         match self {
-            HashKey::Integer(_) => 0,
-            HashKey::Boolean(_) => 1,
-            HashKey::Str(_) => 2,
-        }
-    }
-
-    fn canonical_bytes(&self) -> Vec<u8> {
-        match self {
-            HashKey::Integer(raw) => raw.to_string().into_bytes(),
-            HashKey::Boolean(raw) => raw.to_string().into_bytes(),
-            HashKey::Str(raw) => raw.clone().into_bytes(),
+            HashKey::Integer(raw) => HashKeyOrder::Integer(*raw),
+            HashKey::Boolean(raw) => HashKeyOrder::Boolean(*raw),
+            HashKey::Str(raw) => HashKeyOrder::String(raw),
         }
     }
 }
@@ -481,41 +474,27 @@ pub fn index<S: ValueStore>(store: &S, object: Value, index: Value) -> RuntimeRe
 }
 
 /// Frozen equality matrix (design §10.1): integers by raw value, scalars by
-/// value, builtins by id, aggregates recursively, identity types by object
+/// value, builtins by id, aggregates structurally, identity types by object
 /// identity, differing types compare unequal.
 ///
-/// Aggregates are walked on an explicit worklist rather than the native
-/// stack: nesting depth is a property of the *data*, and `rt_eq` is a single
-/// call however deep the arrays go. `seen` memoises visited pairs — reaching
-/// one again means the first visit did not disprove it, because any
-/// inequality returns immediately — so a shared subtree is compared once, not
-/// once per path into it. Mirrors `object::Object::eq` and
-/// `gc::value::values_equal`.
+/// The traversal is `object::semantics::try_structurally_equal`'s, shared
+/// with `object::Object::eq` and `gc::value::values_equal`: `rt_eq` is a
+/// single call however deep the arrays go, and a shared subtree is compared
+/// once, not once per path into it.
 pub fn eq_values<S: ValueStore>(store: &S, left: Value, right: Value) -> RuntimeResult<bool> {
-    let mut pending = Vec::new();
-    if !eq_shallow(store, left, right, &mut pending)? {
-        return Ok(false);
-    }
-    let mut seen = HashSet::new();
-    while let Some((left, right)) = pending.pop() {
-        if left == right || !seen.insert((left, right)) {
-            continue;
-        }
-        if !eq_shallow(store, left, right, &mut pending)? {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+    try_structurally_equal(left, right, |left, right, descend| {
+        eq_shallow(store, left, right, descend)
+    })
 }
 
 /// One step of [`eq_values`]: decides scalars and identity types outright,
 /// and for two same-length arrays or same-key hashes queues the element pairs
-/// on `pending` instead of recursing into them.
+/// on `descend` instead of recursing into them.
 fn eq_shallow<S: ValueStore>(
     store: &S,
     left: Value,
     right: Value,
-    pending: &mut Vec<(Value, Value)>,
+    descend: &mut Descend<Value>,
 ) -> RuntimeResult<bool> {
     let left_int = int_value(store, left);
     let right_int = int_value(store, right);
@@ -536,25 +515,28 @@ fn eq_shallow<S: ValueStore>(
             if l.len() != r.len() {
                 return Ok(false);
             }
-            pending.extend(l.iter().copied().zip(r.iter().copied()));
+            if descend.first_visit(left, right) {
+                descend.extend(l.iter().copied().zip(r.iter().copied()));
+            }
             Ok(true)
         }
         (HeapObject::Hash(l), HeapObject::Hash(r)) => {
             if l.len() != r.len() {
                 return Ok(false);
             }
-            for (key, l_value) in l.iter() {
-                match r.get(key) {
-                    Some(r_value) => pending.push((*l_value, *r_value)),
-                    None => return Ok(false),
+            if descend.first_visit(left, right) {
+                for (key, l_value) in l.iter() {
+                    match r.get(key) {
+                        Some(r_value) => descend.push(*l_value, *r_value),
+                        None => return Ok(false),
+                    }
                 }
             }
             Ok(true)
         }
-        (HeapObject::Closure(_), HeapObject::Closure(_))
-        | (HeapObject::Class(_), HeapObject::Class(_))
-        | (HeapObject::Instance(_), HeapObject::Instance(_))
-        | (HeapObject::BoundMethod(_), HeapObject::BoundMethod(_)) => Ok(left == right),
+        // Closures, classes, instances and bound methods compare by identity,
+        // which the traversal settles before asking: distinct handles are
+        // distinct objects.
         _ => Ok(false),
     }
 }
@@ -642,13 +624,11 @@ pub fn bang(value: Value) -> Value {
     bool_value(!truthy(value))
 }
 
-/// Hash entries in canonical order: `(key type rank, canonical key bytes)`.
+/// Hash entries in canonical order (`HashKeyOrder`, design §10.2).
 fn sorted_hash_entries(entries: &HashMap<HashKey, Value>) -> Vec<(&HashKey, Value)> {
     let mut sorted: Vec<(&HashKey, Value)> =
         entries.iter().map(|(key, value)| (key, *value)).collect();
-    sorted.sort_by(|(a, _), (b, _)| {
-        (a.rank(), a.canonical_bytes()).cmp(&(b.rank(), b.canonical_bytes()))
-    });
+    sorted.sort_unstable_by_key(|&(key, _)| key.order());
     sorted
 }
 

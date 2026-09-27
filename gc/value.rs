@@ -4,6 +4,7 @@ use std::fmt::Write as _;
 use std::rc::Rc;
 
 use object::builtins::{BuiltIns, BuiltinId};
+use object::semantics::{structurally_equal, HashKeyOrder};
 use object::{Closure, CompiledFunction, Object};
 use serde::Serialize;
 
@@ -155,20 +156,12 @@ pub enum HashKey {
 }
 
 impl HashKey {
-    /// Rank + canonical bytes ordering used by displays (design §10.2).
-    fn rank(&self) -> u8 {
+    /// The key's place in the canonical display order (design §10.2).
+    fn order(&self) -> HashKeyOrder<'_> {
         match self {
-            HashKey::Integer(_) => 0,
-            HashKey::Boolean(_) => 1,
-            HashKey::String(_) => 2,
-        }
-    }
-
-    fn canonical_bytes(&self) -> Vec<u8> {
-        match self {
-            HashKey::Integer(raw) => raw.to_string().into_bytes(),
-            HashKey::Boolean(raw) => raw.to_string().into_bytes(),
-            HashKey::String(raw) => raw.clone().into_bytes(),
+            HashKey::Integer(raw) => return HashKeyOrder::Integer(*raw),
+            HashKey::Boolean(raw) => return HashKeyOrder::Boolean(*raw),
+            HashKey::String(raw) => return HashKeyOrder::String(raw),
         }
     }
 
@@ -516,18 +509,17 @@ fn instance_class_name(heap: &GcHeap, instance: GcRef) -> String {
     }
 }
 
-/// Hash entries in the canonical order every backend renders them in:
-/// `(key type rank, canonical key bytes)` with integer=0, boolean=1, string=2
-/// (arm64 backend design §10.2). Without this, the same hash prints in a
-/// different order on different runs, because `HashMap` iteration order is
-/// unspecified.
+/// Hash entries in the canonical order every backend renders them in
+/// ([`HashKeyOrder`], arm64 backend design §10.2). Without this, the same hash
+/// prints in a different order on different runs, because `HashMap` iteration
+/// order is unspecified.
 pub fn sorted_hash_entries(map: &HashMap<HashKey, GcRef>) -> Vec<(&HashKey, GcRef)> {
     let mut entries = map
         .iter()
         .map(|(key, value)| (key, *value))
         .collect::<Vec<_>>();
-    entries.sort_by_key(|(key, _)| (key.rank(), key.canonical_bytes()));
-    entries
+    entries.sort_unstable_by_key(|&(key, _)| key.order());
+    return entries;
 }
 
 fn format_hash_key(key: &HashKey) -> String {
@@ -540,68 +532,54 @@ fn format_hash_key(key: &HashKey) -> String {
 
 /// Frozen equality (arm64 backend design §10.1), the `GcRef` mirror of
 /// `impl PartialEq for object::Object`: scalars compare by value, arrays and
-/// hashes compare recursively and independently of iteration order, closures,
+/// hashes compare structurally and independently of iteration order, closures,
 /// classes, instances and bound methods compare by identity, and two values of
 /// different types are simply unequal — never a type error.
 ///
-/// The comparison runs on an explicit worklist rather than the call stack.
-/// Nesting depth is a property of the *data*, and one `OpEqual` can be handed
-/// an array thousands of levels deep, which the instruction budget cannot see
-/// and a recursive walk would answer by overflowing the native stack.
-///
-/// `assumed` doubles as the cycle guard and as a memo: reaching a pair a
-/// second time means the first visit did not disprove it (any inequality
-/// returns immediately), so it is equal, or still in progress and assumed
-/// equal — the co-inductive reading that lets two structurally identical
-/// cyclic graphs compare equal. Memoising also keeps a shared subtree from
-/// being compared once per path into it.
+/// The traversal is [`structurally_equal`]'s, over heap handles, so one
+/// `OpEqual` handed an array thousands of levels deep — which the instruction
+/// budget cannot see — neither recurses nor revisits a shared subtree.
 pub fn values_equal(heap: &GcHeap, left: GcRef, right: GcRef) -> bool {
-    let mut pending = vec![(left, right)];
-    let mut assumed: HashSet<(usize, usize)> = HashSet::new();
-
-    while let Some((left, right)) = pending.pop() {
-        if left == right || !assumed.insert((left.0, right.0)) {
-            continue;
-        }
-        let equal = match (get_value(heap, left), get_value(heap, right)) {
-            (Value::Integer(l), Value::Integer(r)) => l == r,
-            (Value::Boolean(l), Value::Boolean(r)) => l == r,
-            (Value::String(l), Value::String(r)) => l == r,
-            (Value::Null, Value::Null) => true,
-            (Value::Error(l), Value::Error(r)) => l == r,
-            (Value::Builtin(l), Value::Builtin(r)) => l == r,
-            (Value::CompiledFunction(l), Value::CompiledFunction(r)) => l == r,
+    return structurally_equal(left, right, |left, right, descend| {
+        match (get_value(heap, left), get_value(heap, right)) {
+            (Value::Integer(l), Value::Integer(r)) => return l == r,
+            (Value::Boolean(l), Value::Boolean(r)) => return l == r,
+            (Value::String(l), Value::String(r)) => return l == r,
+            (Value::Null, Value::Null) => return true,
+            (Value::Error(l), Value::Error(r)) => return l == r,
+            (Value::Builtin(l), Value::Builtin(r)) => return l == r,
+            (Value::CompiledFunction(l), Value::CompiledFunction(r)) => return l == r,
             (Value::Array(l), Value::Array(r)) => {
-                l.len() == r.len() && {
-                    pending.extend(l.iter().copied().zip(r.iter().copied()));
-                    true
+                if l.len() != r.len() {
+                    return false;
                 }
+                if descend.first_visit(left, right) {
+                    descend.extend(l.iter().copied().zip(r.iter().copied()));
+                }
+                return true;
             }
             (Value::Hash(l), Value::Hash(r)) => {
-                // Keys are scalars, so the lookup never nests; values can.
-                l.len() == r.len()
-                    && l.iter().all(|(key, value)| match r.get(key) {
-                        Some(other) => {
-                            pending.push((*value, *other));
-                            true
+                if l.len() != r.len() {
+                    return false;
+                }
+                if descend.first_visit(left, right) {
+                    // Keys are scalars, so the lookup never nests; values can.
+                    for (key, value) in l {
+                        match r.get(key) {
+                            Some(other) => descend.push(*value, *other),
+                            None => return false,
                         }
-                        None => false,
-                    })
+                    }
+                }
+                return true;
             }
-            // Identity only: `left == right` above already covered it, and two
+            // Closures, classes, instances and bound methods compare by
+            // identity, which the traversal settles before asking: two
             // distinct objects are never equal even with identical fields —
             // two closures sharing code and captures included.
-            (Value::Closure(_), Value::Closure(_))
-            | (Value::Class(_), Value::Class(_))
-            | (Value::Instance(_), Value::Instance(_))
-            | (Value::BoundMethod(_), Value::BoundMethod(_)) => false,
-            _ => false,
-        };
-        if !equal {
-            return false;
+            _ => return false,
         }
-    }
-    return true;
+    });
 }
 
 pub fn import_object(heap: &mut GcHeap, object: &Object) -> GcRef {
