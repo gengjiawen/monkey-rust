@@ -22,6 +22,7 @@ import {
   valueKinds,
 } from './gcReport'
 import { HeapGraphView } from './HeapGraphView'
+import { PhaseReplayView } from './PhaseReplayView'
 
 export type GcPanelState =
   | { status: 'idle' }
@@ -1135,6 +1136,7 @@ export function GcReportView({ state, onErrorSpanSelect }: GcReportViewProps) {
       </section>
 
       <HeapGraphView report={report} />
+      <PhaseReplayView report={report} />
       <ObjectDecisionWalkthrough report={report} />
       <VisitedHeapEdges report={report} />
 
